@@ -27,6 +27,14 @@ import (
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 )
 
+func TestVerifyShadowsocksPacketListenerInterface(t *testing.T) {
+	var _ transport.PacketListener = (*packetListener)(nil)
+}
+
+func TestVerifyShadowsocksPacketConnInterface(t *testing.T) {
+	var _ net.PacketConn = (*packetConn)(nil)
+}
+
 func TestShadowsocksPacketListener_ListenPacket(t *testing.T) {
 	cipher := makeTestCipher(t)
 	proxy, running := startShadowsocksUDPEchoServer(cipher, testTargetAddr, t)

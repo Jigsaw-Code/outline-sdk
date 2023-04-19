@@ -27,6 +27,10 @@ import (
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 )
 
+func TestVerifyShadowsocksStreamDialerInterface(t *testing.T) {
+	var _ transport.StreamDialer = (*ShadowsocksStreamDialer)(nil)
+}
+
 func TestShadowsocksStreamDialer_Dial(t *testing.T) {
 	cipher := makeTestCipher(t)
 	proxy, running := startShadowsocksTCPEchoProxy(cipher, testTargetAddr, t)
@@ -147,7 +151,7 @@ func TestShadowsocksStreamDialer_TCPPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
-	d.SetTCPSaltGenerator(NewPrefixSaltGenerator(prefix))
+	d.Salter = NewPrefixSaltGenerator(prefix)
 	conn, err := d.Dial(context.Background(), testTargetAddr)
 	if err != nil {
 		t.Fatalf("StreamDialer.Dial failed: %v", err)
