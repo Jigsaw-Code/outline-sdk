@@ -40,9 +40,9 @@ func NewShadowsocksStreamDialer(endpoint transport.StreamEndpoint, cipher *shado
 type ShadowsocksStreamDialer struct {
 	endpoint transport.StreamEndpoint
 	cipher   *shadowsocks.Cipher
-	// Salter is the SaltGenerator used by Shadowsocks to generate the connection salts.
-	// `Salter` may be `nil`, which defaults to a random generator.
-	Salter shadowsocks.SaltGenerator
+	// SaltGenerator is used by Shadowsocks to generate the connection salts.
+	// `SaltGenerator` may be `nil`, which defaults to a random generator.
+	SaltGenerator shadowsocks.SaltGenerator
 	// ClientDataWait specifies the amount of time to wait for client data before sending
 	// the Shadowsocks connection request to the proxy server. It's 10 milliseconds by default.
 	//
@@ -84,8 +84,8 @@ func (c *ShadowsocksStreamDialer) Dial(ctx context.Context, remoteAddr string) (
 		return nil, err
 	}
 	ssw := shadowsocks.NewShadowsocksWriter(proxyConn, c.cipher)
-	if c.Salter != nil {
-		ssw.SetSaltGenerator(c.Salter)
+	if c.SaltGenerator != nil {
+		ssw.SetSaltGenerator(c.SaltGenerator)
 	}
 	_, err = ssw.LazyWrite(socksTargetAddr)
 	if err != nil {

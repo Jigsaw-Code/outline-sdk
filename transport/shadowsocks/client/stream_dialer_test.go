@@ -151,7 +151,7 @@ func TestShadowsocksStreamDialer_TCPPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
-	d.Salter = NewPrefixSaltGenerator(prefix)
+	d.SaltGenerator = NewPrefixSaltGenerator(prefix)
 	conn, err := d.Dial(context.Background(), testTargetAddr)
 	if err != nil {
 		t.Fatalf("StreamDialer.Dial failed: %v", err)
