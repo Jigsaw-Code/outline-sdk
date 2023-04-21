@@ -10,48 +10,42 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/chacha20poly1305"
 )
-
-func newTestCipher(t testing.TB) *EncryptionKey {
-	cipher, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return cipher
-}
 
 // Overhead for cipher chacha20poly1305
 const testCipherOverhead = 16
 
 func TestCipherReaderAuthenticationFailure(t *testing.T) {
-	cipher := newTestCipher(t)
+	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
+	require.Nil(t, err)
 
 	clientReader := strings.NewReader("Fails Authentication")
-	reader := NewShadowsocksReader(clientReader, cipher)
-	_, err := reader.Read(make([]byte, 1))
+	reader := NewShadowsocksReader(clientReader, key)
+	_, err = reader.Read(make([]byte, 1))
 	if err == nil {
 		t.Fatalf("Expected authentication failure, got %v", err)
 	}
 }
 
 func TestCipherReaderUnexpectedEOF(t *testing.T) {
-	cipher := newTestCipher(t)
+	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
+	require.Nil(t, err)
 
 	clientReader := strings.NewReader("short")
-	server := NewShadowsocksReader(clientReader, cipher)
-	_, err := server.Read(make([]byte, 10))
-	if err != io.ErrUnexpectedEOF {
-		t.Fatalf("Expected ErrUnexpectedEOF, got %v", err)
-	}
+	server := NewShadowsocksReader(clientReader, key)
+	_, err = server.Read(make([]byte, 10))
+	require.Equal(t, io.ErrUnexpectedEOF, err)
 }
 
 func TestCipherReaderEOF(t *testing.T) {
-	cipher := newTestCipher(t)
+	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
+	require.Nil(t, err)
 
 	clientReader := strings.NewReader("")
-	server := NewShadowsocksReader(clientReader, cipher)
-	_, err := server.Read(make([]byte, 10))
+	server := NewShadowsocksReader(clientReader, key)
+	_, err = server.Read(make([]byte, 10))
 	if err != io.EOF {
 		t.Fatalf("Expected EOF, got %v", err)
 	}
@@ -87,13 +81,14 @@ func encryptBlocks(key *EncryptionKey, salt []byte, blocks [][]byte) (io.Reader,
 }
 
 func TestCipherReaderGoodReads(t *testing.T) {
-	cipher := newTestCipher(t)
+	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
+	require.Nil(t, err)
 
 	salt := []byte("12345678901234567890123456789012")
-	if len(salt) != cipher.SaltSize() {
-		t.Fatalf("Salt has size %v. Expected %v", len(salt), cipher.SaltSize())
+	if len(salt) != key.SaltSize() {
+		t.Fatalf("Salt has size %v. Expected %v", len(salt), key.SaltSize())
 	}
-	ssText, err := encryptBlocks(cipher, salt, [][]byte{
+	ssText, err := encryptBlocks(key, salt, [][]byte{
 		[]byte("[First Block]"),
 		[]byte(""), // Corner case: empty block
 		[]byte("[Third Block]")})
@@ -101,7 +96,7 @@ func TestCipherReaderGoodReads(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reader := NewShadowsocksReader(ssText, cipher)
+	reader := NewShadowsocksReader(ssText, key)
 	plainText := make([]byte, len("[First Block]")+len("[Third Block]"))
 	n, err := io.ReadFull(reader, plainText)
 	if err != nil {
@@ -118,45 +113,48 @@ func TestCipherReaderGoodReads(t *testing.T) {
 }
 
 func TestCipherReaderClose(t *testing.T) {
-	cipher := newTestCipher(t)
+	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
+	require.Nil(t, err)
 
 	pipeReader, pipeWriter := io.Pipe()
-	server := NewShadowsocksReader(pipeReader, cipher)
+	server := NewShadowsocksReader(pipeReader, key)
 	result := make(chan error)
 	go func() {
 		_, err := server.Read(make([]byte, 10))
 		result <- err
 	}()
 	pipeWriter.Close()
-	err := <-result
+	err = <-result
 	if err != io.EOF {
 		t.Fatalf("Expected ErrUnexpectedEOF, got %v", err)
 	}
 }
 
 func TestCipherReaderCloseError(t *testing.T) {
-	cipher := newTestCipher(t)
+	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
+	require.Nil(t, err)
 
 	pipeReader, pipeWriter := io.Pipe()
-	server := NewShadowsocksReader(pipeReader, cipher)
+	server := NewShadowsocksReader(pipeReader, key)
 	result := make(chan error)
 	go func() {
 		_, err := server.Read(make([]byte, 10))
 		result <- err
 	}()
 	pipeWriter.CloseWithError(fmt.Errorf("xx!!ERROR!!xx"))
-	err := <-result
+	err = <-result
 	if err == nil || !strings.Contains(err.Error(), "xx!!ERROR!!xx") {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 }
 
 func TestEndToEnd(t *testing.T) {
-	cipher := newTestCipher(t)
+	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
+	require.Nil(t, err)
 
 	connReader, connWriter := io.Pipe()
-	writer := NewShadowsocksWriter(connWriter, cipher)
-	reader := NewShadowsocksReader(connReader, cipher)
+	writer := NewShadowsocksWriter(connWriter, key)
+	reader := NewShadowsocksReader(connReader, key)
 	expected := "Test"
 	wg := sync.WaitGroup{}
 	var writeErr error
@@ -181,9 +179,10 @@ func TestEndToEnd(t *testing.T) {
 }
 
 func TestLazyWriteFlush(t *testing.T) {
-	cipher := newTestCipher(t)
+	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
+	require.Nil(t, err)
 	buf := new(bytes.Buffer)
-	writer := NewShadowsocksWriter(buf, cipher)
+	writer := NewShadowsocksWriter(buf, key)
 	header := []byte{1, 2, 3, 4}
 	n, err := writer.LazyWrite(header)
 	if n != len(header) {
@@ -217,7 +216,7 @@ func TestLazyWriteFlush(t *testing.T) {
 	}
 
 	// Verify content arrives in two blocks
-	reader := NewShadowsocksReader(buf, cipher)
+	reader := NewShadowsocksReader(buf, key)
 	decrypted := make([]byte, len(header)+len(body))
 	n, err = reader.Read(decrypted)
 	if n != len(header) {
@@ -242,9 +241,10 @@ func TestLazyWriteFlush(t *testing.T) {
 }
 
 func TestLazyWriteConcat(t *testing.T) {
-	cipher := newTestCipher(t)
+	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
+	require.Nil(t, err)
 	buf := new(bytes.Buffer)
-	writer := NewShadowsocksWriter(buf, cipher)
+	writer := NewShadowsocksWriter(buf, key)
 	header := []byte{1, 2, 3, 4}
 	n, err := writer.LazyWrite(header)
 	if n != len(header) {
@@ -280,7 +280,7 @@ func TestLazyWriteConcat(t *testing.T) {
 	}
 
 	// Verify content arrives in one block
-	reader := NewShadowsocksReader(buf, cipher)
+	reader := NewShadowsocksReader(buf, key)
 	decrypted := make([]byte, len(body)+len(header))
 	n, err = reader.Read(decrypted)
 	if n != len(decrypted) {
@@ -296,9 +296,10 @@ func TestLazyWriteConcat(t *testing.T) {
 }
 
 func TestLazyWriteOversize(t *testing.T) {
-	cipher := newTestCipher(t)
+	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
+	require.Nil(t, err)
 	buf := new(bytes.Buffer)
-	writer := NewShadowsocksWriter(buf, cipher)
+	writer := NewShadowsocksWriter(buf, key)
 	N := 25000 // More than one block, less than two.
 	data := make([]byte, N)
 	for i := range data {
@@ -322,7 +323,7 @@ func TestLazyWriteOversize(t *testing.T) {
 	}
 
 	// Verify content
-	reader := NewShadowsocksReader(buf, cipher)
+	reader := NewShadowsocksReader(buf, key)
 	decrypted, err := ioutil.ReadAll(reader)
 	if len(decrypted) != N {
 		t.Errorf("Wrong number of bytes out: %d", len(decrypted))
@@ -336,9 +337,10 @@ func TestLazyWriteOversize(t *testing.T) {
 }
 
 func TestLazyWriteConcurrentFlush(t *testing.T) {
-	cipher := newTestCipher(t)
+	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
+	require.Nil(t, err)
 	buf := new(bytes.Buffer)
-	writer := NewShadowsocksWriter(buf, cipher)
+	writer := NewShadowsocksWriter(buf, key)
 	header := []byte{1, 2, 3, 4}
 	n, err := writer.LazyWrite(header)
 	if n != len(header) {
@@ -393,7 +395,7 @@ func TestLazyWriteConcurrentFlush(t *testing.T) {
 	}
 
 	// Verify content arrives in two blocks
-	reader := NewShadowsocksReader(buf, cipher)
+	reader := NewShadowsocksReader(buf, key)
 	decrypted := make([]byte, len(header)+len(body))
 	n, err = reader.Read(decrypted)
 	if n != len(header) {
@@ -432,8 +434,9 @@ func BenchmarkWriter(b *testing.B) {
 	b.StopTimer()
 	b.ResetTimer()
 
-	cipher := newTestCipher(b)
-	writer := NewShadowsocksWriter(new(nullIO), cipher)
+	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
+	require.Nil(b, err)
+	writer := NewShadowsocksWriter(new(nullIO), key)
 
 	start := time.Now()
 	b.StartTimer()

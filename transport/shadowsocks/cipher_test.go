@@ -66,11 +66,11 @@ func TestUnsupportedCipher(t *testing.T) {
 
 func TestMaxNonceSize(t *testing.T) {
 	for _, aeadName := range supportedCiphers {
-		cipher, err := NewEncryptionKey(aeadName, "")
+		key, err := NewEncryptionKey(aeadName, "")
 		if err != nil {
 			t.Errorf("Failed to create Cipher %v: %v", aeadName, err)
 		}
-		aead, err := cipher.NewAEAD(make([]byte, cipher.SaltSize()))
+		aead, err := key.NewAEAD(make([]byte, key.SaltSize()))
 		if err != nil {
 			t.Errorf("Failed to create AEAD %v: %v", aeadName, err)
 		}

@@ -45,7 +45,7 @@ func expectEchoPayload(conn io.ReadWriter, payload, buf []byte, t testing.TB) {
 func makeTestKey(tb testing.TB) *shadowsocks.EncryptionKey {
 	key, err := shadowsocks.NewEncryptionKey(shadowsocks.CHACHA20IETFPOLY1305, "testPassword")
 	if err != nil {
-		tb.Fatalf("Failed to create cipher: %v", err)
+		tb.Fatalf("Failed to create key: %v", err)
 	}
 	return key
 }

@@ -17,6 +17,8 @@ package shadowsocks
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 // Microbenchmark for the performance of Shadowsocks UDP encryption.
@@ -24,15 +26,16 @@ func BenchmarkPack(b *testing.B) {
 	b.StopTimer()
 	b.ResetTimer()
 
-	cipher := newTestCipher(b)
+	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
+	require.Nil(b, err)
 	MTU := 1500
 	pkt := make([]byte, MTU)
-	plaintextBuf := pkt[cipher.SaltSize() : len(pkt)-cipher.TagSize()]
+	plaintextBuf := pkt[key.SaltSize() : len(pkt)-key.TagSize()]
 
 	start := time.Now()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		Pack(pkt, plaintextBuf, cipher)
+		Pack(pkt, plaintextBuf, key)
 	}
 	b.StopTimer()
 	elapsed := time.Now().Sub(start)
