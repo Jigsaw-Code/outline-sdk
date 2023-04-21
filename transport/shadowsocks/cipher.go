@@ -19,7 +19,6 @@ import (
 	"crypto/cipher"
 	"crypto/md5"
 	"crypto/sha1"
-	"fmt"
 	"io"
 	"strings"
 
@@ -45,6 +44,14 @@ var (
 
 var supportedCiphers = [](*Cipher){CHACHA20IETFPOLY1305, AES256GCM, AES192GCM, AES128GCM}
 
+type ErrUnsupportedCipher struct {
+	Name string
+}
+
+func (err ErrUnsupportedCipher) Error() string {
+	return "unsupported cipher " + err.Name
+}
+
 // CipherByName returns a [*Cipher] with the given name, or an error if the cipher is not supported.
 // The name must be the IETF name (as per https://www.iana.org/assignments/aead-parameters/aead-parameters.xhtml) or the
 // Shadowsocks alias from https://shadowsocks.org/guide/aead.html.
@@ -59,7 +66,7 @@ func CipherByName(name string) (*Cipher, error) {
 	case "AEAD_AES_128_GCM", "AES-128-GCM":
 		return AES128GCM, nil
 	default:
-		return nil, fmt.Errorf("unsupported cipher %v", name)
+		return nil, ErrUnsupportedCipher{name}
 	}
 }
 
