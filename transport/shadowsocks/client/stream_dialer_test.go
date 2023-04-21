@@ -27,10 +27,6 @@ import (
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 )
 
-func TestVerifyShadowsocksStreamDialerInterface(t *testing.T) {
-	var _ transport.StreamDialer = (*ShadowsocksStreamDialer)(nil)
-}
-
 func TestShadowsocksStreamDialer_Dial(t *testing.T) {
 	cipher := makeTestCipher(t)
 	proxy, running := startShadowsocksTCPEchoProxy(cipher, testTargetAddr, t)

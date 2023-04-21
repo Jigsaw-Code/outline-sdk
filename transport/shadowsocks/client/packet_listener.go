@@ -38,6 +38,8 @@ type packetListener struct {
 	cipher   *shadowsocks.Cipher
 }
 
+var _ transport.PacketListener = (*packetListener)(nil)
+
 func NewShadowsocksPacketListener(endpoint transport.PacketEndpoint, cipher *shadowsocks.Cipher) (transport.PacketListener, error) {
 	if endpoint == nil {
 		return nil, errors.New("argument endpoint must not be nil")
@@ -61,6 +63,8 @@ type packetConn struct {
 	net.Conn
 	cipher *shadowsocks.Cipher
 }
+
+var _ net.PacketConn = (*packetConn)(nil)
 
 // WriteTo encrypts `b` and writes to `addr` through the proxy.
 func (c *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
