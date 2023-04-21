@@ -33,14 +33,16 @@ func TestCompatibility(t *testing.T) {
 	left, right := net.Pipe()
 
 	var wait sync.WaitGroup
+	cipher, err := CipherByName(cipherName)
+	require.Nil(t, err)
+	key, err := NewEncryptionKey(cipher, secret)
+	require.Nil(t, err, "NewCipher failed: %v", err)
 	wait.Add(1)
 	go func() {
-		cipher, err := NewCipher(cipherName, secret)
-		require.Nil(t, err, "NewCipher failed: %v", err)
-		ssWriter := NewShadowsocksWriter(left, cipher)
+		ssWriter := NewShadowsocksWriter(left, key)
 		ssWriter.Write([]byte(toRight))
 
-		ssReader := NewShadowsocksReader(left, cipher)
+		ssReader := NewShadowsocksReader(left, key)
 		output := make([]byte, len(fromRight))
 		_, err = ssReader.Read(output)
 		require.Nil(t, err, "Read failed: %v", err)

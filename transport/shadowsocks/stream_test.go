@@ -13,8 +13,8 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 )
 
-func newTestCipher(t testing.TB) *Cipher {
-	cipher, err := NewCipher("chacha20-ietf-poly1305", "test secret")
+func newTestCipher(t testing.TB) *EncryptionKey {
+	cipher, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,9 +61,9 @@ func TestCipherReaderEOF(t *testing.T) {
 	}
 }
 
-func encryptBlocks(cipher *Cipher, salt []byte, blocks [][]byte) (io.Reader, error) {
+func encryptBlocks(key *EncryptionKey, salt []byte, blocks [][]byte) (io.Reader, error) {
 	var ssText bytes.Buffer
-	aead, err := cipher.NewAEAD(salt)
+	aead, err := key.NewAEAD(salt)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create AEAD: %v", err)
 	}
@@ -80,8 +80,8 @@ func encryptBlocks(cipher *Cipher, salt []byte, blocks [][]byte) (io.Reader, err
 		nonce[0]++
 		expectedCipherSize += len(block) + testCipherOverhead
 	}
-	if ssText.Len() != cipher.SaltSize()+expectedCipherSize {
-		return nil, fmt.Errorf("cipherText has size %v. Expected %v", ssText.Len(), cipher.SaltSize()+expectedCipherSize)
+	if ssText.Len() != key.SaltSize()+expectedCipherSize {
+		return nil, fmt.Errorf("cipherText has size %v. Expected %v", ssText.Len(), key.SaltSize()+expectedCipherSize)
 	}
 	return &ssText, nil
 }

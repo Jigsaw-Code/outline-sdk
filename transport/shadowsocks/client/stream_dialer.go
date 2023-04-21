@@ -34,21 +34,21 @@ type StreamDialer interface {
 }
 
 // NewShadowsocksStreamDialer creates a client that routes connections to a Shadowsocks proxy listening at
-// the given StreamEndpoint, with `cipher` as the Shadowsocks crypto.
-func NewShadowsocksStreamDialer(endpoint transport.StreamEndpoint, cipher *shadowsocks.Cipher) (StreamDialer, error) {
+// the given StreamEndpoint, with `key` as the Shadowsocks encyption key.
+func NewShadowsocksStreamDialer(endpoint transport.StreamEndpoint, key *shadowsocks.EncryptionKey) (StreamDialer, error) {
 	if endpoint == nil {
 		return nil, errors.New("argument endpoint must not be nil")
 	}
-	if cipher == nil {
-		return nil, errors.New("argument cipher must not be nil")
+	if key == nil {
+		return nil, errors.New("argument key must not be nil")
 	}
-	d := streamDialer{endpoint: endpoint, cipher: cipher}
+	d := streamDialer{endpoint: endpoint, key: key}
 	return &d, nil
 }
 
 type streamDialer struct {
 	endpoint transport.StreamEndpoint
-	cipher   *shadowsocks.Cipher
+	key      *shadowsocks.EncryptionKey
 	salter   shadowsocks.SaltGenerator
 }
 
@@ -92,7 +92,7 @@ func (c *streamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 	if err != nil {
 		return nil, err
 	}
-	ssw := shadowsocks.NewShadowsocksWriter(proxyConn, c.cipher)
+	ssw := shadowsocks.NewShadowsocksWriter(proxyConn, c.key)
 	if c.salter != nil {
 		ssw.SetSaltGenerator(c.salter)
 	}
@@ -104,6 +104,6 @@ func (c *streamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 	time.AfterFunc(helloWait, func() {
 		ssw.Flush()
 	})
-	ssr := shadowsocks.NewShadowsocksReader(proxyConn, c.cipher)
+	ssr := shadowsocks.NewShadowsocksReader(proxyConn, c.key)
 	return transport.WrapConn(proxyConn, ssr, ssw), nil
 }

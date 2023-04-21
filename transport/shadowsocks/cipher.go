@@ -27,16 +27,7 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
-// SupportedCipherNames lists the names of the AEAD ciphers that are supported.
-func SupportedCipherNames() []string {
-	names := make([]string, len(supportedAEADs))
-	for i, spec := range supportedAEADs {
-		names[i] = spec.name
-	}
-	return names
-}
-
-type aeadSpec struct {
+type Cipher struct {
 	name        string
 	newInstance func(key []byte) (cipher.AEAD, error)
 	keySize     int
@@ -44,30 +35,32 @@ type aeadSpec struct {
 	tagSize     int
 }
 
-// List of supported AEAD ciphers, as specified at https://shadowsocks.org/en/spec/AEAD-Ciphers.html
-var supportedAEADs = [...]aeadSpec{
-	newAEADSpec("chacha20-ietf-poly1305", chacha20poly1305.New, chacha20poly1305.KeySize, 32),
-	newAEADSpec("aes-256-gcm", newAesGCM, 32, 32),
-	newAEADSpec("aes-192-gcm", newAesGCM, 24, 24),
-	newAEADSpec("aes-128-gcm", newAesGCM, 16, 16),
-}
+// List of supported AEAD ciphers, as specified at https://shadowsocks.org/guide/aead.html
+var (
+	CHACHA20IETFPOLY1305 = &Cipher{"AEAD_CHACHA20_POLY1305", chacha20poly1305.New, chacha20poly1305.KeySize, 32, 16}
+	AES256GCM            = &Cipher{"AEAD_AES_256_GCM", newAesGCM, 32, 32, 16}
+	AES192GCM            = &Cipher{"AEAD_AES_192_GCM", newAesGCM, 24, 24, 16}
+	AES128GCM            = &Cipher{"AEAD_AES_128_GCM", newAesGCM, 16, 16, 16}
+)
 
-func newAEADSpec(name string, newInstance func(key []byte) (cipher.AEAD, error), keySize, saltSize int) aeadSpec {
-	dummyAead, err := newInstance(make([]byte, keySize))
-	if err != nil {
-		panic(fmt.Sprintf("Failed to initialize AEAD %v", name))
-	}
-	return aeadSpec{name, newInstance, keySize, saltSize, dummyAead.Overhead()}
-}
+var supportedCiphers = [](*Cipher){CHACHA20IETFPOLY1305, AES256GCM, AES192GCM, AES128GCM}
 
-func getAEADSpec(name string) (*aeadSpec, error) {
-	name = strings.ToLower(name)
-	for _, aeadSpec := range supportedAEADs {
-		if aeadSpec.name == name {
-			return &aeadSpec, nil
-		}
+// CipherByName returns a [*Cipher] with the given name, or an error if the cipher is not supported.
+// The name must be the IETF name (as per https://www.iana.org/assignments/aead-parameters/aead-parameters.xhtml) or the
+// Shadowsocks alias from https://shadowsocks.org/guide/aead.html.
+func CipherByName(name string) (*Cipher, error) {
+	switch strings.ToUpper(name) {
+	case "AEAD_CHACHA20_POLY1305", "CHACHA20-IETF-POLY1305":
+		return CHACHA20IETFPOLY1305, nil
+	case "AEAD_AES_256_GCM", "AES-256-GCM":
+		return AES256GCM, nil
+	case "AEAD_AES_192_GCM", "AES-192-GCM":
+		return AES192GCM, nil
+	case "AEAD_AES_128_GCM", "AES-128-GCM":
+		return AES128GCM, nil
+	default:
+		return nil, fmt.Errorf("unsupported cipher %v", name)
 	}
-	return nil, fmt.Errorf("unknown cipher %v", name)
 }
 
 func newAesGCM(key []byte) (cipher.AEAD, error) {
@@ -80,7 +73,7 @@ func newAesGCM(key []byte) (cipher.AEAD, error) {
 
 func maxTagSize() int {
 	max := 0
-	for _, spec := range supportedAEADs {
+	for _, spec := range supportedCiphers {
 		if spec.tagSize > max {
 			max = spec.tagSize
 		}
@@ -88,26 +81,26 @@ func maxTagSize() int {
 	return max
 }
 
-// Cipher encapsulates a Shadowsocks AEAD spec and a secret
-type Cipher struct {
-	aead   aeadSpec
+// EncryptionKey encapsulates a Shadowsocks AEAD spec and a secret
+type EncryptionKey struct {
+	aead   *Cipher
 	secret []byte
 }
 
 // SaltSize is the size of the salt for this Cipher
-func (c *Cipher) SaltSize() int {
+func (c *EncryptionKey) SaltSize() int {
 	return c.aead.saltSize
 }
 
 // TagSize is the size of the AEAD tag for this Cipher
-func (c *Cipher) TagSize() int {
+func (c *EncryptionKey) TagSize() int {
 	return c.aead.tagSize
 }
 
 var subkeyInfo = []byte("ss-subkey")
 
 // NewAEAD creates the AEAD for this cipher
-func (c *Cipher) NewAEAD(salt []byte) (cipher.AEAD, error) {
+func (c *EncryptionKey) NewAEAD(salt []byte) (cipher.AEAD, error) {
 	sessionKey := make([]byte, c.aead.keySize)
 	r := hkdf.New(sha1.New, c.secret, salt, subkeyInfo)
 	if _, err := io.ReadFull(r, sessionKey); err != nil {
@@ -117,36 +110,41 @@ func (c *Cipher) NewAEAD(salt []byte) (cipher.AEAD, error) {
 }
 
 // Function definition at https://www.openssl.org/docs/manmaster/man3/EVP_BytesToKey.html
-func simpleEVPBytesToKey(data []byte, keyLen int) []byte {
+func simpleEVPBytesToKey(data []byte, keyLen int) ([]byte, error) {
 	var derived, di []byte
 	h := md5.New()
 	for len(derived) < keyLen {
-		h.Write(di)
-		h.Write(data)
+		_, err := h.Write(di)
+		if err != nil {
+			return nil, err
+		}
+		_, err = h.Write(data)
+		if err != nil {
+			return nil, err
+		}
 		derived = h.Sum(derived)
 		di = derived[len(derived)-h.Size():]
 		h.Reset()
 	}
-	return derived[:keyLen]
+	return derived[:keyLen], nil
 }
 
-// NewCipher creates a Cipher given a cipher name and a secret
-func NewCipher(cipherName string, secretText string) (*Cipher, error) {
-	aeadSpec, err := getAEADSpec(cipherName)
+// NewEncryptionKey creates a Cipher given a cipher name and a secret
+func NewEncryptionKey(cipher *Cipher, secretText string) (*EncryptionKey, error) {
+	// Key derivation as per https://shadowsocks.org/en/spec/AEAD-Ciphers.html
+	secret, err := simpleEVPBytesToKey([]byte(secretText), cipher.keySize)
 	if err != nil {
 		return nil, err
 	}
-	// Key derivation as per https://shadowsocks.org/en/spec/AEAD-Ciphers.html
-	secret := simpleEVPBytesToKey([]byte(secretText), aeadSpec.keySize)
-	return &Cipher{*aeadSpec, secret}, nil
+	return &EncryptionKey{cipher, secret}, nil
 }
 
 // Assumes all ciphers have NonceSize() <= 12.
 var zeroNonce [12]byte
 
 // DecryptOnce will decrypt the cipherText using the cipher and salt, appending the output to plainText.
-func DecryptOnce(cipher *Cipher, salt []byte, plainText, cipherText []byte) ([]byte, error) {
-	aead, err := cipher.NewAEAD(salt)
+func DecryptOnce(key *EncryptionKey, salt []byte, plainText, cipherText []byte) ([]byte, error) {
+	aead, err := key.NewAEAD(salt)
 	if err != nil {
 		return nil, err
 	}

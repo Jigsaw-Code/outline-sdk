@@ -16,36 +16,56 @@ package shadowsocks
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-func assertCipher(t *testing.T, name string, saltSize, tagSize int) {
-	cipher, err := NewCipher(name, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cipher.SaltSize() != saltSize || cipher.TagSize() != tagSize {
-		t.Fatalf("Bad spec for %v", name)
-	}
+func assertCipher(t *testing.T, cipher *Cipher, saltSize, tagSize int) {
+	key, err := NewEncryptionKey(cipher, "")
+	require.Nil(t, err)
+	require.Equal(t, saltSize, key.SaltSize())
+
+	dummyAead, err := key.aead.newInstance(make([]byte, key.aead.keySize))
+	require.Nil(t, err)
+	require.Equal(t, dummyAead.Overhead(), key.TagSize())
 }
 
 func TestSizes(t *testing.T) {
 	// Values from https://shadowsocks.org/en/spec/AEAD-Ciphers.html
-	assertCipher(t, "chacha20-ietf-poly1305", 32, 16)
-	assertCipher(t, "aes-256-gcm", 32, 16)
-	assertCipher(t, "aes-192-gcm", 24, 16)
-	assertCipher(t, "aes-128-gcm", 16, 16)
+	assertCipher(t, CHACHA20IETFPOLY1305, 32, 16)
+	assertCipher(t, AES256GCM, 32, 16)
+	assertCipher(t, AES192GCM, 24, 16)
+	assertCipher(t, AES128GCM, 16, 16)
+}
+
+func TestShadowsocksCipherNames(t *testing.T) {
+	cipher, err := CipherByName("chacha20-ietf-poly1305")
+	require.Nil(t, err)
+	require.Equal(t, CHACHA20IETFPOLY1305, cipher)
+
+	cipher, err = CipherByName("aes-256-gcm")
+	require.Nil(t, err)
+	require.Equal(t, AES256GCM, cipher)
+
+	cipher, err = CipherByName("aes-192-gcm")
+	require.Nil(t, err)
+	require.Equal(t, AES192GCM, cipher)
+
+	cipher, err = CipherByName("aes-128-gcm")
+	require.Nil(t, err)
+	require.Equal(t, AES128GCM, cipher)
 }
 
 func TestUnsupportedCipher(t *testing.T) {
-	_, err := NewCipher("aes-256-cfb", "")
+	_, err := CipherByName("aes-256-cfb")
 	if err == nil {
 		t.Errorf("Should get an error for unsupported cipher")
 	}
 }
 
 func TestMaxNonceSize(t *testing.T) {
-	for _, aeadName := range SupportedCipherNames() {
-		cipher, err := NewCipher(aeadName, "")
+	for _, aeadName := range supportedCiphers {
+		cipher, err := NewEncryptionKey(aeadName, "")
 		if err != nil {
 			t.Errorf("Failed to create Cipher %v: %v", aeadName, err)
 		}

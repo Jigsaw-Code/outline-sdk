@@ -26,8 +26,8 @@ var ErrShortPacket = errors.New("short packet")
 // dst must be big enough to hold the encrypted packet.
 // If plaintext and dst overlap but are not aligned for in-place encryption, this
 // function will panic.
-func Pack(dst, plaintext []byte, cipher *Cipher) ([]byte, error) {
-	saltSize := cipher.SaltSize()
+func Pack(dst, plaintext []byte, key *EncryptionKey) ([]byte, error) {
+	saltSize := key.SaltSize()
 	if len(dst) < saltSize {
 		return nil, io.ErrShortBuffer
 	}
@@ -36,7 +36,7 @@ func Pack(dst, plaintext []byte, cipher *Cipher) ([]byte, error) {
 		return nil, err
 	}
 
-	aead, err := cipher.NewAEAD(salt)
+	aead, err := key.NewAEAD(salt)
 	if err != nil {
 		return nil, err
 	}
@@ -52,8 +52,8 @@ func Pack(dst, plaintext []byte, cipher *Cipher) ([]byte, error) {
 // If dst is nil, decryption proceeds in-place.
 // This function is needed because shadowaead.Unpack() embeds its own replay detection,
 // which we do not always want, especially on memory-constrained clients.
-func Unpack(dst, pkt []byte, cipher *Cipher) ([]byte, error) {
-	saltSize := cipher.SaltSize()
+func Unpack(dst, pkt []byte, key *EncryptionKey) ([]byte, error) {
+	saltSize := key.SaltSize()
 	if len(pkt) < saltSize {
 		return nil, ErrShortPacket
 	}
@@ -62,5 +62,5 @@ func Unpack(dst, pkt []byte, cipher *Cipher) ([]byte, error) {
 	if dst == nil {
 		dst = msg
 	}
-	return DecryptOnce(cipher, salt, dst[:0], msg)
+	return DecryptOnce(key, salt, dst[:0], msg)
 }

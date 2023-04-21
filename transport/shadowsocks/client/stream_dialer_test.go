@@ -28,10 +28,10 @@ import (
 )
 
 func TestShadowsocksStreamDialer_Dial(t *testing.T) {
-	cipher := makeTestCipher(t)
-	proxy, running := startShadowsocksTCPEchoProxy(cipher, testTargetAddr, t)
+	key := makeTestKey(t)
+	proxy, running := startShadowsocksTCPEchoProxy(key, testTargetAddr, t)
 	proxyEndpoint := transport.TCPEndpoint{RemoteAddr: *proxy.Addr().(*net.TCPAddr)}
-	d, err := NewShadowsocksStreamDialer(proxyEndpoint, cipher)
+	d, err := NewShadowsocksStreamDialer(proxyEndpoint, key)
 	if err != nil {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestShadowsocksStreamDialer_Dial(t *testing.T) {
 		t.Fatalf("StreamDialer.Dial failed: %v", err)
 	}
 	conn.SetReadDeadline(time.Now().Add(time.Second * 5))
-	expectEchoPayload(conn, shadowsocks.MakeTestPayload(1024), make([]byte, 1024), t)
+	expectEchoPayload(conn, makeTestPayload(1024), make([]byte, 1024), t)
 	conn.Close()
 
 	proxy.Close()
@@ -48,10 +48,10 @@ func TestShadowsocksStreamDialer_Dial(t *testing.T) {
 }
 
 func TestShadowsocksStreamDialer_DialNoPayload(t *testing.T) {
-	cipher := makeTestCipher(t)
-	proxy, running := startShadowsocksTCPEchoProxy(cipher, testTargetAddr, t)
+	key := makeTestKey(t)
+	proxy, running := startShadowsocksTCPEchoProxy(key, testTargetAddr, t)
 	proxyEndpoint := transport.TCPEndpoint{RemoteAddr: *proxy.Addr().(*net.TCPAddr)}
-	d, err := NewShadowsocksStreamDialer(proxyEndpoint, cipher)
+	d, err := NewShadowsocksStreamDialer(proxyEndpoint, key)
 	if err != nil {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
@@ -92,9 +92,9 @@ func TestShadowsocksStreamDialer_DialFastClose(t *testing.T) {
 		close(done)
 	}()
 
-	cipher := makeTestCipher(t)
+	key := makeTestKey(t)
 	proxyEndpoint := transport.TCPEndpoint{RemoteAddr: *listener.Addr().(*net.TCPAddr)}
-	d, err := NewShadowsocksStreamDialer(proxyEndpoint, cipher)
+	d, err := NewShadowsocksStreamDialer(proxyEndpoint, key)
 	if err != nil {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestShadowsocksStreamDialer_TCPPrefix(t *testing.T) {
 		}
 	}()
 
-	cipher := makeTestCipher(t)
+	cipher := makeTestKey(t)
 	proxyEndpoint := transport.TCPEndpoint{RemoteAddr: *listener.Addr().(*net.TCPAddr)}
 	d, err := NewShadowsocksStreamDialer(proxyEndpoint, cipher)
 	if err != nil {
@@ -161,10 +161,10 @@ func BenchmarkShadowsocksStreamDialer_Dial(b *testing.B) {
 	b.StopTimer()
 	b.ResetTimer()
 
-	cipher := makeTestCipher(b)
-	proxy, running := startShadowsocksTCPEchoProxy(cipher, testTargetAddr, b)
+	key := makeTestKey(b)
+	proxy, running := startShadowsocksTCPEchoProxy(key, testTargetAddr, b)
 	proxyEndpoint := transport.TCPEndpoint{RemoteAddr: *proxy.Addr().(*net.TCPAddr)}
-	d, err := NewShadowsocksStreamDialer(proxyEndpoint, cipher)
+	d, err := NewShadowsocksStreamDialer(proxyEndpoint, key)
 	if err != nil {
 		b.Fatalf("Failed to create StreamDialer: %v", err)
 	}
@@ -175,7 +175,7 @@ func BenchmarkShadowsocksStreamDialer_Dial(b *testing.B) {
 	conn.SetReadDeadline(time.Now().Add(time.Second * 5))
 	buf := make([]byte, 1024)
 	for n := 0; n < b.N; n++ {
-		payload := shadowsocks.MakeTestPayload(1024)
+		payload := makeTestPayload(1024)
 		b.StartTimer()
 		expectEchoPayload(conn, payload, buf, b)
 		b.StopTimer()
@@ -186,7 +186,7 @@ func BenchmarkShadowsocksStreamDialer_Dial(b *testing.B) {
 	running.Wait()
 }
 
-func startShadowsocksTCPEchoProxy(cipher *shadowsocks.Cipher, expectedTgtAddr string, t testing.TB) (net.Listener, *sync.WaitGroup) {
+func startShadowsocksTCPEchoProxy(cipher *shadowsocks.EncryptionKey, expectedTgtAddr string, t testing.TB) (net.Listener, *sync.WaitGroup) {
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
 	if err != nil {
 		t.Fatalf("ListenTCP failed: %v", err)

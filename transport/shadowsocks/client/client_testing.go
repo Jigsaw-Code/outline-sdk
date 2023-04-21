@@ -42,10 +42,19 @@ func expectEchoPayload(conn io.ReadWriter, payload, buf []byte, t testing.TB) {
 	}
 }
 
-func makeTestCipher(tb testing.TB) *shadowsocks.Cipher {
-	cipher, err := shadowsocks.NewCipher(shadowsocks.TestCipher, "testPassword")
+func makeTestKey(tb testing.TB) *shadowsocks.EncryptionKey {
+	key, err := shadowsocks.NewEncryptionKey(shadowsocks.CHACHA20IETFPOLY1305, "testPassword")
 	if err != nil {
 		tb.Fatalf("Failed to create cipher: %v", err)
 	}
-	return cipher
+	return key
+}
+
+// makeTestPayload returns a slice of `size` arbitrary bytes.
+func makeTestPayload(size int) []byte {
+	payload := make([]byte, size)
+	for i := 0; i < size; i++ {
+		payload[i] = byte(i)
+	}
+	return payload
 }
