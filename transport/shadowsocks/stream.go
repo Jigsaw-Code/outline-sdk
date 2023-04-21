@@ -58,6 +58,11 @@ type Writer struct {
 	counter []byte
 }
 
+var (
+	_ io.Writer     = (*Writer)(nil)
+	_ io.ReaderFrom = (*Writer)(nil)
+)
+
 // NewShadowsocksWriter creates a Writer that encrypts the given Writer using
 // the shadowsocks protocol with the given shadowsocks cipher.
 func NewShadowsocksWriter(writer io.Writer, ssCipher *Cipher) *Writer {
