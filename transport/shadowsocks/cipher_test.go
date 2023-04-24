@@ -25,7 +25,7 @@ func assertCipher(t *testing.T, cipher *Cipher, saltSize, tagSize int) {
 	require.Nil(t, err)
 	require.Equal(t, saltSize, key.SaltSize())
 
-	dummyAead, err := key.aead.newInstance(make([]byte, key.aead.keySize))
+	dummyAead, err := key.NewAEAD(make([]byte, cipher.keySize))
 	require.Nil(t, err)
 	require.Equal(t, dummyAead.Overhead(), key.TagSize())
 	require.Equal(t, tagSize, key.TagSize())

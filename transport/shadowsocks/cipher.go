@@ -90,30 +90,30 @@ func maxTagSize() int {
 
 // EncryptionKey encapsulates a Shadowsocks AEAD spec and a secret
 type EncryptionKey struct {
-	aead   *Cipher
+	cipher *Cipher
 	secret []byte
 }
 
 // SaltSize is the size of the salt for this Cipher
 func (c *EncryptionKey) SaltSize() int {
-	return c.aead.saltSize
+	return c.cipher.saltSize
 }
 
 // TagSize is the size of the AEAD tag for this Cipher
 func (c *EncryptionKey) TagSize() int {
-	return c.aead.tagSize
+	return c.cipher.tagSize
 }
 
 var subkeyInfo = []byte("ss-subkey")
 
 // NewAEAD creates the AEAD for this cipher
 func (c *EncryptionKey) NewAEAD(salt []byte) (cipher.AEAD, error) {
-	sessionKey := make([]byte, c.aead.keySize)
+	sessionKey := make([]byte, c.cipher.keySize)
 	r := hkdf.New(sha1.New, c.secret, salt, subkeyInfo)
 	if _, err := io.ReadFull(r, sessionKey); err != nil {
 		return nil, err
 	}
-	return c.aead.newInstance(sessionKey)
+	return c.cipher.newInstance(sessionKey)
 }
 
 // Function definition at https://www.openssl.org/docs/manmaster/man3/EVP_BytesToKey.html
