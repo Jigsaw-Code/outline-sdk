@@ -16,7 +16,6 @@ package shadowsocks
 
 import (
 	"errors"
-	"fmt"
 	"io"
 )
 
@@ -71,7 +70,7 @@ func Unpack(dst, pkt []byte, key *EncryptionKey) ([]byte, error) {
 		dst = cipherTextAndTag
 	}
 	if cap(dst) < len(cipherTextAndTag)-key.TagSize() {
-		return nil, fmt.Errorf("short buffer. cap(dst) = %v, len(dst) = %v, len(cipherTextAndTag) = %v", cap(dst), len(dst), len(cipherTextAndTag)) //.ErrShortBuffer
+		return nil, io.ErrShortBuffer
 	}
 
 	aead, err := key.NewAEAD(salt)
