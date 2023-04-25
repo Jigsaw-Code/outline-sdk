@@ -63,8 +63,8 @@ var (
 	_ io.ReaderFrom = (*Writer)(nil)
 )
 
-// NewShadowsocksWriter creates a Writer that encrypts the given Writer using
-// the shadowsocks protocol with the given shadowsocks key.
+// NewShadowsocksWriter creates a [Writer] that encrypts the given [io.Writer] using
+// the shadowsocks protocol with the given encryption key.
 func NewShadowsocksWriter(writer io.Writer, key *EncryptionKey) *Writer {
 	return &Writer{writer: writer, key: key, saltGenerator: RandomSaltGenerator}
 }
@@ -286,8 +286,8 @@ type Reader interface {
 	io.WriterTo
 }
 
-// NewShadowsocksReader creates a Reader that decrypts the given Reader using
-// the shadowsocks protocol with the given shadowsocks key.
+// NewShadowsocksReader creates a [Reader] that decrypts the given [io.Reader] using
+// the shadowsocks protocol with the given encryption key.
 func NewShadowsocksReader(reader io.Reader, key *EncryptionKey) Reader {
 	return &readConverter{
 		cr: &chunkReader{
