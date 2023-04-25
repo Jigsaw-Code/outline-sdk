@@ -14,38 +14,43 @@
 
 package ip
 
-import (
-	"context"
-)
-
-// IPDevice is a generic network device that reads and writes IP packets.
+// IPDevice is a generic network device that reads and writes IP packets. It
+// extends the io.ReadWriteCloser interface.
+//
+// Some examples of IPDevices are a virtual network adapter or a local IP
+// proxy.
 type IPDevice interface {
 	// Close closes this device. Any future ReadPacket or WritePacket operations
-	// will return errors.
+	// will return net.ErrClosed error.
 	Close() error
 
-	// ReadPacket reads an IP packet from this device using the provided context
-	// `ctx`. The implementation decides where to get the IP packet from, such as
-	// a virtual network adapter or a local proxy.
+	// Read reads an IP packet from this device into `p`, returning the number of
+	// bytes read. The slice `p` must be large enough to hold the entire IP
+	// packet (see `MTU()`). Read blocks until a full IP packet has been
+	// received.
 	//
-	// The provided `ctx` must be non-nil. If the `ctx` expires before the
-	// operation is complete, an error is returned.
+	// If the returned error is nil, it means that Read has completed
+	// successfully and that an entire IP packet has been read into `p`.
 	//
-	// If the returned error is nil, it means that ReadPacket has completed
-	// successfully and that an entire IP packet has been read and returned. It
-	// won't return if only a portion of the packet is read.
-	ReadPacket(ctx context.Context) ([]byte, error)
+	// Read will return io.ErrShortBuffer if `p` is too small to hold the IP
+	// packet being read.
+	Read(p []byte) (int, error)
 
-	// WritePacket writes an IP packet `b` to this device using the provided
-	// context `ctx`. The implementation decides what to do with the packet, such
-	// as sending it to the Internet or interpreting it as TCP/UDP packets.
+	// Write writes an IP packet `p` to this device and returns the number of
+	// bytes written. len(p) must not exceed the maximum buffer size returned by
+	// MTU().
 	//
-	// The provided `ctx` must be non-nil. If the `ctx` expires before the
-	// operation is complete, an error is returned.
-	//
-	// If the returned error is nil, it means that WritePacket has completed
+	// If the returned error is nil, it means that Write has completed
 	// successfully and that the entire packet has been written to the
-	// destination. It won't return if only a portion of the packet has been
-	// processed.
-	WritePacket(ctx context.Context, b []byte) error
+	// destination.
+	//
+	// Write will return io.ErrShortWrite if len(p) > MTU().
+	//
+	// If only a portion of the packet has been written, Write will
+	// return a non-nil error as well as the number of bytes written (< len(p)).
+	Write(b []byte) (int, error)
+
+	// MTU returns the size of the Maximum Transmission Unit for this device,
+	// which is the maximum size of a single IP packet that can be received/sent.
+	MTU() int
 }

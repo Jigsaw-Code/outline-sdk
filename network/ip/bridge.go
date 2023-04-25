@@ -16,28 +16,15 @@ package ip
 
 import "fmt"
 
-// An IPBridge forwards IP traffic bidirectionally between two IPDevices.
-type IPBridge struct {
-}
-
-// NewIPBridge returns a new IPBridge instance that can be used to bridge the
-// traffic between the devices `dev1` and `dev2`. Forwarding will not start
-// automatically, you must call the Open() function on the returned instance to
-// start forwarding traffic bidirectionally.
-func NewIPBridge(dev1, dev2 IPDevice) (*IPBridge, error) {
-	return nil, fmt.Errorf("not implemented yet")
-}
-
-// Open starts forwarding IP traffic between the two devices that were passed
-// to the NewIPBridge function as the `dev1` and `dev2` parameters. To stop the
-// traffic forwarding, call the Destroy method.
-func (br *IPBridge) Open() error {
-	return fmt.Errorf("not implemented yet")
-}
-
-// Destroy stops forwarding IP traffic, it won't Close the related IPDevices.
-// This means that you can call the Open method again to start forwarding
-// traffic.
-func (br *IPBridge) Destroy() error {
+// Bridge forwards IP traffic bidirectionally between two IPDevices, `dev1` and
+// `dev2`, until an error or EOF occur.
+//
+// A successful Bridge function returns err == nil, not err == EOF. It does not
+// consider EOF from either device to be an error.
+//
+// Once Bridge has started, it cannot be interrupted or "un-bridged". The only
+// way to stop forwarding traffic is to make one of the devices return either
+// error or EOF.
+func Bridge(dev1, dev2 IPDevice) error {
 	return fmt.Errorf("not implemented yet")
 }
