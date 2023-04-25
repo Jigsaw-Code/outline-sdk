@@ -32,20 +32,20 @@ type StreamConn interface {
 	CloseWrite() error
 }
 
-// StreamEndpoint represents an endpoint that can be used to established stream connections (like TCP)
+// StreamEndpoint represents an endpoint that can be used to established stream connections (like TCP) to a fixed destination.
 type StreamEndpoint interface {
 	// Connect establishes a connection with the endpoint, returning the connection.
 	Connect(ctx context.Context) (StreamConn, error)
 }
 
-// StreamDialer provides a way to establish stream connections to a destination.
+// StreamDialer provides a way to dial a destination and establish stream connections.
 type StreamDialer interface {
 	// Dial connects to `raddr`.
 	// `raddr` has the form `host:port`, where `host` can be a domain name or IP address.
 	Dial(ctx context.Context, raddr string) (StreamConn, error)
 }
 
-// TCPEndpoint is a StreamEndpoint that connects to the given address via TCP
+// TCPEndpoint is a [StreamEndpoint] that connects to the given address via TCP.
 type TCPEndpoint struct {
 	// The Dialer used to create the connection on Connect().
 	Dialer net.Dialer
@@ -53,6 +53,9 @@ type TCPEndpoint struct {
 	RemoteAddr net.TCPAddr
 }
 
+var _ StreamEndpoint = (*TCPEndpoint)(nil)
+
+// Connect implements [StreamEndpoint.Connect].
 func (e TCPEndpoint) Connect(ctx context.Context) (StreamConn, error) {
 	conn, err := e.Dialer.DialContext(ctx, "tcp", e.RemoteAddr.String())
 	if err != nil {
@@ -86,8 +89,8 @@ func (dc *duplexConnAdaptor) CloseWrite() error {
 	return dc.StreamConn.CloseWrite()
 }
 
-// WrapDuplexConn wraps an existing DuplexConn with new Reader and Writer, but
-// preserving the original CloseRead() and CloseWrite().
+// WrapDuplexConn wraps an existing [StreamConn] with new Reader and Writer, but
+// preserving the original [StreamConn.CloseRead] and [StreamConn.CloseWrite].
 func WrapConn(c StreamConn, r io.Reader, w io.Writer) StreamConn {
 	conn := c
 	// We special-case duplexConnAdaptor to avoid multiple levels of nesting.

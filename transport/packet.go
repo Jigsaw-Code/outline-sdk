@@ -19,7 +19,7 @@ import (
 	"net"
 )
 
-// PacketEndpoint represents an endpoint that can be used to established packet connections (like UDP)
+// PacketEndpoint represents an endpoint that can be used to established packet connections (like UDP) to a fixed destination.
 type PacketEndpoint interface {
 	// Connect creates a connection bound to an endpoint, returning the connection.
 	Connect(ctx context.Context) (net.Conn, error)
@@ -31,7 +31,7 @@ type PacketListener interface {
 	ListenPacket(ctx context.Context) (net.PacketConn, error)
 }
 
-// UDPEndpoint is a PacketEndpoint that connects to the given address via UDP
+// UDPEndpoint is a [PacketEndpoint] that connects to the given address via UDP
 type UDPEndpoint struct {
 	// The Dialer used to create the net.Conn on Connect().
 	Dialer net.Dialer
@@ -39,6 +39,9 @@ type UDPEndpoint struct {
 	RemoteAddr net.UDPAddr
 }
 
+var _ PacketEndpoint = (*UDPEndpoint)(nil)
+
+// Connect implements [PacketEndpoint.Connect].
 func (e UDPEndpoint) Connect(ctx context.Context) (net.Conn, error) {
 	conn, err := e.Dialer.DialContext(ctx, "udp", e.RemoteAddr.String())
 	if err != nil {

@@ -44,7 +44,9 @@ var (
 
 var supportedCiphers = [](*Cipher){CHACHA20IETFPOLY1305, AES256GCM, AES192GCM, AES128GCM}
 
+// ErrUnsupportedCipher is returned by [CypherByName] when the named cipher is not supported.
 type ErrUnsupportedCipher struct {
+	// The name of the requested [Cipher]
 	Name string
 }
 
@@ -144,22 +146,4 @@ func NewEncryptionKey(cipher *Cipher, secretText string) (*EncryptionKey, error)
 		return nil, err
 	}
 	return &EncryptionKey{cipher, secret}, nil
-}
-
-// Assumes all ciphers have NonceSize() <= 12.
-var zeroNonce [12]byte
-
-// DecryptOnce will decrypt the cipherText using the cipher and salt, appending the output to plainText.
-func DecryptOnce(key *EncryptionKey, salt []byte, plainText, cipherText []byte) ([]byte, error) {
-	aead, err := key.NewAEAD(salt)
-	if err != nil {
-		return nil, err
-	}
-	if len(cipherText) < aead.Overhead() {
-		return nil, io.ErrUnexpectedEOF
-	}
-	if cap(plainText)-len(plainText) < len(cipherText)-aead.Overhead() {
-		return nil, io.ErrShortBuffer
-	}
-	return aead.Open(plainText, zeroNonce[:aead.NonceSize()], cipherText, nil)
 }
