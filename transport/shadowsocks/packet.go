@@ -19,8 +19,11 @@ import (
 	"io"
 )
 
-// ErrShortPacket is identical to shadowaead.ErrShortPacket
+// ErrShortPacket indicates the destination packet given to Unpack is too short.
 var ErrShortPacket = errors.New("short packet")
+
+// Assumes all ciphers have NonceSize() <= 12.
+var zeroNonce [12]byte
 
 // Pack encrypts a Shadowsocks-UDP packet and returns a slice containing the encrypted packet.
 // dst must be big enough to hold the encrypted packet.
@@ -47,20 +50,33 @@ func Pack(dst, plaintext []byte, key *EncryptionKey) ([]byte, error) {
 	return aead.Seal(salt, zeroNonce[:aead.NonceSize()], plaintext, nil), nil
 }
 
-// Unpack decrypts a Shadowsocks-UDP packet and returns a slice containing the decrypted payload or an error.
+// Unpack decrypts a Shadowsocks-UDP packet in the format [salt][cipherText][AEAD tag] and returns a slice containing
+// the decrypted payload or an error.
 // If dst is present, it is used to store the plaintext, and must have enough capacity.
 // If dst is nil, decryption proceeds in-place.
-// This function is needed because shadowaead.Unpack() embeds its own replay detection,
-// which we do not always want, especially on memory-constrained clients.
 func Unpack(dst, pkt []byte, key *EncryptionKey) ([]byte, error) {
 	saltSize := key.SaltSize()
 	if len(pkt) < saltSize {
 		return nil, ErrShortPacket
 	}
+
 	salt := pkt[:saltSize]
-	msg := pkt[saltSize:]
-	if dst == nil {
-		dst = msg
+	cipherTextAndTag := pkt[saltSize:]
+	if len(cipherTextAndTag) < key.TagSize() {
+		return nil, io.ErrUnexpectedEOF
 	}
-	return DecryptOnce(key, salt, dst[:0], msg)
+
+	if dst == nil {
+		dst = cipherTextAndTag
+	}
+	if cap(dst) < len(cipherTextAndTag)-key.TagSize() {
+		return nil, io.ErrShortBuffer
+	}
+
+	aead, err := key.NewAEAD(salt)
+	if err != nil {
+		return nil, err
+	}
+
+	return aead.Open(dst[:0], zeroNonce[:aead.NonceSize()], cipherTextAndTag, nil)
 }
