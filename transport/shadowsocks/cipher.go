@@ -26,8 +26,7 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
-type Cipher struct {
-	name        string
+type cipherSpec struct {
 	newInstance func(key []byte) (cipher.AEAD, error)
 	keySize     int
 	saltSize    int
@@ -36,13 +35,20 @@ type Cipher struct {
 
 // List of supported AEAD ciphers, as specified at https://shadowsocks.org/guide/aead.html
 var (
-	CHACHA20IETFPOLY1305 = &Cipher{"AEAD_CHACHA20_POLY1305", chacha20poly1305.New, chacha20poly1305.KeySize, 32, 16}
-	AES256GCM            = &Cipher{"AEAD_AES_256_GCM", newAesGCM, 32, 32, 16}
-	AES192GCM            = &Cipher{"AEAD_AES_192_GCM", newAesGCM, 24, 24, 16}
-	AES128GCM            = &Cipher{"AEAD_AES_128_GCM", newAesGCM, 16, 16, 16}
+	CHACHA20IETFPOLY1305 = "AEAD_CHACHA20_POLY1305"
+	AES256GCM            = "AEAD_AES_256_GCM"
+	AES192GCM            = "AEAD_AES_192_GCM"
+	AES128GCM            = "AEAD_AES_128_GCM"
 )
 
-var supportedCiphers = [](*Cipher){CHACHA20IETFPOLY1305, AES256GCM, AES192GCM, AES128GCM}
+var (
+	chacha20IETFPOLY1305Cipher = &cipherSpec{chacha20poly1305.New, chacha20poly1305.KeySize, 32, 16}
+	aes256GCMCipher            = &cipherSpec{newAesGCM, 32, 32, 16}
+	aes192GCMCipher            = &cipherSpec{newAesGCM, 24, 24, 16}
+	aes128GCMCipher            = &cipherSpec{newAesGCM, 16, 16, 16}
+)
+
+var supportedCiphers = [](string){CHACHA20IETFPOLY1305, AES256GCM, AES192GCM, AES128GCM}
 
 // ErrUnsupportedCipher is returned by [CypherByName] when the named cipher is not supported.
 type ErrUnsupportedCipher struct {
@@ -54,19 +60,22 @@ func (err ErrUnsupportedCipher) Error() string {
 	return "unsupported cipher " + err.Name
 }
 
+// Largest tag size among the supported ciphers. Used by the TCP buffer pool
+const maxTagSize = 16
+
 // CipherByName returns a [*Cipher] with the given name, or an error if the cipher is not supported.
 // The name must be the IETF name (as per https://www.iana.org/assignments/aead-parameters/aead-parameters.xhtml) or the
 // Shadowsocks alias from https://shadowsocks.org/guide/aead.html.
-func CipherByName(name string) (*Cipher, error) {
+func cipherByName(name string) (*cipherSpec, error) {
 	switch strings.ToUpper(name) {
 	case "AEAD_CHACHA20_POLY1305", "CHACHA20-IETF-POLY1305":
-		return CHACHA20IETFPOLY1305, nil
+		return chacha20IETFPOLY1305Cipher, nil
 	case "AEAD_AES_256_GCM", "AES-256-GCM":
-		return AES256GCM, nil
+		return aes256GCMCipher, nil
 	case "AEAD_AES_192_GCM", "AES-192-GCM":
-		return AES192GCM, nil
+		return aes192GCMCipher, nil
 	case "AEAD_AES_128_GCM", "AES-128-GCM":
-		return AES128GCM, nil
+		return aes128GCMCipher, nil
 	default:
 		return nil, ErrUnsupportedCipher{name}
 	}
@@ -80,19 +89,9 @@ func newAesGCM(key []byte) (cipher.AEAD, error) {
 	return cipher.NewGCM(blk)
 }
 
-func maxTagSize() int {
-	max := 0
-	for _, spec := range supportedCiphers {
-		if spec.tagSize > max {
-			max = spec.tagSize
-		}
-	}
-	return max
-}
-
 // EncryptionKey encapsulates a Shadowsocks AEAD spec and a secret
 type EncryptionKey struct {
-	cipher *Cipher
+	cipher *cipherSpec
 	secret []byte
 }
 
@@ -138,12 +137,21 @@ func simpleEVPBytesToKey(data []byte, keyLen int) ([]byte, error) {
 	return derived[:keyLen], nil
 }
 
-// NewEncryptionKey creates a Cipher given a cipher name and a secret
-func NewEncryptionKey(cipher *Cipher, secretText string) (*EncryptionKey, error) {
-	// Key derivation as per https://shadowsocks.org/en/spec/AEAD-Ciphers.html
-	secret, err := simpleEVPBytesToKey([]byte(secretText), cipher.keySize)
+// NewEncryptionKey creates a Cipher given a cipher name and a secret.
+// The cipher name must be the IETF name (as per https://www.iana.org/assignments/aead-parameters/aead-parameters.xhtml)
+// or the Shadowsocks alias from https://shadowsocks.org/guide/aead.html.
+func NewEncryptionKey(cipherName string, secretText string) (*EncryptionKey, error) {
+	var key EncryptionKey
+	var err error
+	key.cipher, err = cipherByName(cipherName)
 	if err != nil {
 		return nil, err
 	}
-	return &EncryptionKey{cipher, secret}, nil
+
+	// Key derivation as per https://shadowsocks.org/en/spec/AEAD-Ciphers.html
+	key.secret, err = simpleEVPBytesToKey([]byte(secretText), key.cipher.keySize)
+	if err != nil {
+		return nil, err
+	}
+	return &key, nil
 }

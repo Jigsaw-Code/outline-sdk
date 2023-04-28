@@ -34,9 +34,7 @@ func TestCompatibility(t *testing.T) {
 
 	var wait sync.WaitGroup
 	wait.Add(1)
-	cipher, err := CipherByName(cipherName)
-	require.Nil(t, err)
-	key, err := NewEncryptionKey(cipher, secret)
+	key, err := NewEncryptionKey(cipherName, secret)
 	require.Nil(t, err, "NewCipher failed: %v", err)
 	ssWriter := NewShadowsocksWriter(left, key)
 	go func() {

@@ -25,12 +25,12 @@ import (
 	"github.com/Jigsaw-Code/outline-internal-sdk/internal/slicepool"
 )
 
-// payloadSizeMask is the maximum size of payload in bytes.
+// payloadSizeMask is the maximum size of payload in bytes, as per https://shadowsocks.org/guide/aead.html#tcp.
 const payloadSizeMask = 0x3FFF // 16*1024 - 1
 
 // Buffer pool used for decrypting Shadowsocks streams.
 // The largest buffer we could need is for decrypting a max-length payload.
-var readBufPool = slicepool.MakePool(payloadSizeMask + maxTagSize())
+var readBufPool = slicepool.MakePool(payloadSizeMask + maxTagSize)
 
 // Writer is an [io.Writer] that also implements [io.ReaderFrom] to
 // allow for piping the data without extra allocations and copies.
