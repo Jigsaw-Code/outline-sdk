@@ -20,6 +20,9 @@ import (
 	"sync"
 	"testing"
 	"testing/iotest"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewTCPEndpointIPv4(t *testing.T) {
@@ -27,49 +30,55 @@ func TestNewTCPEndpointIPv4(t *testing.T) {
 	responseText := []byte("Response")
 
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
-	if err != nil {
-		t.Fatalf("Failed to create TCP listener: %v", err)
-	}
+	require.Nilf(t, err, "Failed to create TCP listener: %v", err)
+	defer listener.Close()
+
 	var running sync.WaitGroup
-	running.Add(1)
+	running.Add(2)
+
+	// Server
 	go func() {
 		defer running.Done()
-		defer listener.Close()
 		clientConn, err := listener.AcceptTCP()
-		if err != nil {
-			t.Errorf("AcceptTCP failed: %v", err)
-			return
-		}
+		require.Nilf(t, err, "AcceptTCP failed: %v", err)
+
 		defer clientConn.Close()
-		if err = iotest.TestReader(clientConn, requestText); err != nil {
-			t.Errorf("Request read failed: %v", err)
-			return
-		}
-		if err = clientConn.CloseRead(); err != nil {
-			t.Errorf("CloseRead failed: %v", err)
-			return
-		}
-		if _, err = clientConn.Write(responseText); err != nil {
-			t.Errorf("Write failed: %v", err)
-			return
-		}
-		if err = clientConn.CloseWrite(); err != nil {
-			t.Errorf("CloseWrite failed: %v", err)
-			return
-		}
+		err = iotest.TestReader(clientConn, requestText)
+		assert.Nilf(t, err, "Request read failed: %v", err)
+
+		// This works on Linux, but on macOS it errors with "shutdown: socket is not connected" (syscall.ENOTCONN).
+		// It seems that on macOS you cannot call CloseRead() if you've already received a FIN and read all the data.
+		// TODO(fortuna): Consider wrapping StreamConns on macOS to make CloseRead a no-op if Read has returned io.EOF
+		// or WriteTo has been called.
+		// err = clientConn.CloseRead()
+		// assert.Nilf(t, err, "clientConn.CloseRead failed: %v", err)
+
+		_, err = clientConn.Write(responseText)
+		assert.Nilf(t, err, "Write failed: %v", err)
+
+		err = clientConn.CloseWrite()
+		assert.Nilf(t, err, "CloseWrite failed: %v", err)
 	}()
 
-	e := TCPEndpoint{RemoteAddr: *listener.Addr().(*net.TCPAddr)}
-	serverConn, err := e.Connect(context.Background())
-	if err != nil {
-		t.Fatalf("Connect failed: %v", err)
-	}
-	defer serverConn.Close()
-	serverConn.Write(requestText)
-	serverConn.CloseWrite()
-	if err = iotest.TestReader(serverConn, responseText); err != nil {
-		t.Fatalf("Response read failed: %v", err)
-	}
-	serverConn.CloseRead()
+	// Client
+	go func() {
+		defer running.Done()
+		e := TCPEndpoint{RemoteAddr: *listener.Addr().(*net.TCPAddr)}
+		serverConn, err := e.Connect(context.Background())
+		require.Nilf(t, err, "Connect failed: %v", err)
+		defer serverConn.Close()
+
+		n, err := serverConn.Write(requestText)
+		require.Nil(t, err)
+		require.Equal(t, 7, n)
+		assert.Nil(t, serverConn.CloseWrite())
+
+		err = iotest.TestReader(serverConn, responseText)
+		require.Nilf(t, err, "Response read failed: %v", err)
+		// See CloseRead comment on the server go-routine.
+		// err = serverConn.CloseRead()
+		// assert.Nilf(t, err, "serverConn.CloseRead failed: %v", err)
+	}()
+
 	running.Wait()
 }

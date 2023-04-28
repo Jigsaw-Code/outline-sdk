@@ -25,6 +25,7 @@ import (
 	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
 	"github.com/Jigsaw-Code/outline-internal-sdk/transport/shadowsocks"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
+	"github.com/stretchr/testify/require"
 )
 
 func TestShadowsocksStreamDialer_Dial(t *testing.T) {
@@ -73,43 +74,46 @@ func TestShadowsocksStreamDialer_DialNoPayload(t *testing.T) {
 func TestShadowsocksStreamDialer_DialFastClose(t *testing.T) {
 	// Set up a listener that verifies no data is sent.
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
-	if err != nil {
-		t.Fatalf("ListenTCP failed: %v", err)
-	}
+	require.Nilf(t, err, "ListenTCP failed: %v", err)
+	defer listener.Close()
 
-	done := make(chan struct{})
+	var running sync.WaitGroup
+	running.Add(2)
+	// Server
 	go func() {
+		defer running.Done()
 		conn, err := listener.Accept()
-		if err != nil {
-			t.Error(err)
-		}
+		require.Nil(t, err)
+		defer conn.Close()
 		buf := make([]byte, 64)
 		n, err := conn.Read(buf)
 		if n > 0 || err != io.EOF {
 			t.Errorf("Expected EOF, got %v, %v", buf[:n], err)
 		}
-		listener.Close()
-		close(done)
 	}()
 
-	key := makeTestKey(t)
-	proxyEndpoint := transport.TCPEndpoint{RemoteAddr: *listener.Addr().(*net.TCPAddr)}
-	d, err := NewShadowsocksStreamDialer(proxyEndpoint, key)
-	if err != nil {
-		t.Fatalf("Failed to create StreamDialer: %v", err)
-	}
-	conn, err := d.Dial(context.Background(), testTargetAddr)
-	if err != nil {
-		t.Fatalf("StreamDialer.Dial failed: %v", err)
-	}
+	// Client
+	go func() {
+		defer running.Done()
+		key := makeTestKey(t)
+		proxyEndpoint := transport.TCPEndpoint{RemoteAddr: *listener.Addr().(*net.TCPAddr)}
+		d, err := NewShadowsocksStreamDialer(proxyEndpoint, key)
+		require.Nilf(t, err, "Failed to create StreamDialer: %v", err)
+		// Extend the wait to be safer.
+		d.ClientDataWait = 100 * time.Millisecond
 
-	// Wait for less than 10 milliseconds to ensure that the target
-	// address is not sent.
-	time.Sleep(1 * time.Millisecond)
-	// Close the connection before the target address is sent.
-	conn.Close()
+		conn, err := d.Dial(context.Background(), testTargetAddr)
+		require.Nilf(t, err, "StreamDialer.Dial failed: %v", err)
+
+		// Wait for less than 100 milliseconds to ensure that the target
+		// address is not sent.
+		time.Sleep(1 * time.Millisecond)
+		// Close the connection before the target address is sent.
+		conn.Close()
+	}()
+
 	// Wait for the listener to verify the close.
-	<-done
+	running.Wait()
 }
 
 func TestShadowsocksStreamDialer_TCPPrefix(t *testing.T) {
