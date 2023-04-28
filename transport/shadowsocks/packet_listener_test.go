@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package client
+package shadowsocks
 
 import (
 	"context"
@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
-	"github.com/Jigsaw-Code/outline-internal-sdk/transport/shadowsocks"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 )
 
@@ -31,7 +30,7 @@ func TestShadowsocksPacketListener_ListenPacket(t *testing.T) {
 	key := makeTestKey(t)
 	proxy, running := startShadowsocksUDPEchoServer(key, testTargetAddr, t)
 	proxyEndpoint := transport.UDPEndpoint{Address: proxy.LocalAddr().String()}
-	d, err := NewShadowsocksPacketListener(proxyEndpoint, key)
+	d, err := NewPacketListener(proxyEndpoint, key)
 	if err != nil {
 		t.Fatalf("Failed to create PacketListener: %v", err)
 	}
@@ -55,7 +54,7 @@ func BenchmarkShadowsocksPacketListener_ListenPacket(b *testing.B) {
 	key := makeTestKey(b)
 	proxy, running := startShadowsocksUDPEchoServer(key, testTargetAddr, b)
 	proxyEndpoint := transport.UDPEndpoint{Address: proxy.LocalAddr().String()}
-	d, err := NewShadowsocksPacketListener(proxyEndpoint, key)
+	d, err := NewPacketListener(proxyEndpoint, key)
 	if err != nil {
 		b.Fatalf("Failed to create PacketListener: %v", err)
 	}
@@ -78,7 +77,7 @@ func BenchmarkShadowsocksPacketListener_ListenPacket(b *testing.B) {
 	running.Wait()
 }
 
-func startShadowsocksUDPEchoServer(key *shadowsocks.EncryptionKey, expectedTgtAddr string, t testing.TB) (net.Conn, *sync.WaitGroup) {
+func startShadowsocksUDPEchoServer(key *EncryptionKey, expectedTgtAddr string, t testing.TB) (net.Conn, *sync.WaitGroup) {
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
 	if err != nil {
 		t.Fatalf("Proxy ListenUDP failed: %v", err)
@@ -97,7 +96,7 @@ func startShadowsocksUDPEchoServer(key *shadowsocks.EncryptionKey, expectedTgtAd
 				t.Logf("Failed to read from UDP conn: %v", err)
 				return
 			}
-			buf, err := shadowsocks.Unpack(clientBuf, cipherBuf[:n], key)
+			buf, err := Unpack(clientBuf, cipherBuf[:n], key)
 			if err != nil {
 				t.Fatalf("Failed to decrypt: %v", err)
 			}
@@ -109,7 +108,7 @@ func startShadowsocksUDPEchoServer(key *shadowsocks.EncryptionKey, expectedTgtAd
 				t.Fatalf("Expected target address '%v'. Got '%v'", expectedTgtAddr, tgtAddr)
 			}
 			// Echo both the payload and SOCKS address.
-			buf, err = shadowsocks.Pack(cipherBuf, buf, key)
+			buf, err = Pack(cipherBuf, buf, key)
 			if err != nil {
 				t.Fatalf("Failed to encrypt: %v", err)
 			}
