@@ -25,27 +25,24 @@ type PacketEndpoint interface {
 	Connect(ctx context.Context) (net.Conn, error)
 }
 
-// PacketListener provides a way to create a local unbound packet connection to send packets to different destinations.
-type PacketListener interface {
-	// ListenPacket creates a PacketConn that can be used to relay packets (such as UDP) through some proxy.
-	ListenPacket(ctx context.Context) (net.PacketConn, error)
-}
-
 // UDPEndpoint is a [PacketEndpoint] that connects to the given address via UDP
 type UDPEndpoint struct {
 	// The Dialer used to create the net.Conn on Connect().
 	Dialer net.Dialer
-	// The remote address to pass to Dial.
-	RemoteAddr net.UDPAddr
+	// The remote address (host:port) to pass to Dial.
+	// If the host is a domain name, consider pre-resolving it to avoid resolution calls.
+	RemoteAddr string
 }
 
 var _ PacketEndpoint = (*UDPEndpoint)(nil)
 
 // Connect implements [PacketEndpoint.Connect].
 func (e UDPEndpoint) Connect(ctx context.Context) (net.Conn, error) {
-	conn, err := e.Dialer.DialContext(ctx, "udp", e.RemoteAddr.String())
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
+	return e.Dialer.DialContext(ctx, "udp", e.RemoteAddr)
+}
+
+// PacketListener provides a way to create a local unbound packet connection to send packets to different destinations.
+type PacketListener interface {
+	// ListenPacket creates a PacketConn that can be used to relay packets (such as UDP) through some proxy.
+	ListenPacket(ctx context.Context) (net.PacketConn, error)
 }

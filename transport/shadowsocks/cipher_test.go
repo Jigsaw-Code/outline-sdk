@@ -17,6 +17,7 @@ package shadowsocks
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,8 +60,10 @@ func TestShadowsocksCipherNames(t *testing.T) {
 
 func TestUnsupportedCipher(t *testing.T) {
 	_, err := CipherByName("aes-256-cfb")
-	if err == nil {
-		t.Errorf("Should get an error for unsupported cipher")
+	var unsupportedErr ErrUnsupportedCipher
+	if assert.ErrorAs(t, err, &unsupportedErr) {
+		assert.Equal(t, "aes-256-cfb", unsupportedErr.Name)
+		assert.Equal(t, "unsupported cipher aes-256-cfb", unsupportedErr.Error())
 	}
 }
 
