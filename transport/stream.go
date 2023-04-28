@@ -18,6 +18,9 @@ import (
 	"context"
 	"io"
 	"net"
+	"os"
+	"sync"
+	"time"
 )
 
 // StreamConn is a net.Conn that allows for closing only the reader or writer end of
@@ -117,4 +120,84 @@ func (d *TCPStreamDialer) Dial(ctx context.Context, addr string) (StreamConn, er
 		return nil, err
 	}
 	return conn.(*net.TCPConn), nil
+}
+
+type pipeStreamConn struct {
+	Reader     *io.PipeReader
+	Writer     *io.PipeWriter
+	localAddr  net.Addr
+	remoteAddr net.Addr
+	timerMu    sync.Mutex
+	readTimer  *time.Timer
+	writeTimer *time.Timer
+}
+
+var _ StreamConn = (*pipeStreamConn)(nil)
+
+func (c *pipeStreamConn) LocalAddr() net.Addr {
+	return c.localAddr
+}
+
+func (c *pipeStreamConn) RemoteAddr() net.Addr {
+	return c.remoteAddr
+}
+
+func (c *pipeStreamConn) Read(b []byte) (int, error) {
+	n, err := c.Reader.Read(b)
+	if err == io.ErrClosedPipe {
+		err = net.ErrClosed
+	}
+	return n, err
+}
+
+func (c *pipeStreamConn) CloseRead() error {
+	return c.Reader.Close()
+}
+
+func (c *pipeStreamConn) Write(b []byte) (int, error) {
+	n, err := c.Writer.Write(b)
+	if err == io.ErrClosedPipe {
+		err = net.ErrClosed
+	}
+	return n, err
+}
+
+func (c *pipeStreamConn) CloseWrite() error {
+	return c.Writer.Close()
+}
+
+func (c *pipeStreamConn) Close() error {
+	c.Reader.Close()
+	c.Writer.Close()
+	return nil
+}
+
+func (c *pipeStreamConn) SetReadDeadline(t time.Time) error {
+	c.timerMu.Lock()
+	defer c.timerMu.Unlock()
+	if c.readTimer != nil {
+		if !c.readTimer.Stop() {
+			<-c.readTimer.C
+		}
+	}
+	c.readTimer = time.AfterFunc(time.Until(t), func() { c.Reader.CloseWithError(os.ErrDeadlineExceeded) })
+	return nil
+}
+
+func (c *pipeStreamConn) SetWriteDeadline(t time.Time) error {
+	c.timerMu.Lock()
+	defer c.timerMu.Unlock()
+	if c.writeTimer != nil {
+		if !c.writeTimer.Stop() {
+			<-c.writeTimer.C
+		}
+	}
+	c.writeTimer = time.AfterFunc(time.Until(t), func() { c.Writer.CloseWithError(os.ErrDeadlineExceeded) })
+	return nil
+}
+
+func (c *pipeStreamConn) SetDeadline(t time.Time) error {
+	c.SetReadDeadline(t)
+	c.SetWriteDeadline(t)
+	return nil
 }
