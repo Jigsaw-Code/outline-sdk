@@ -24,7 +24,7 @@ import (
 
 func TestUDPEndpointIPv4(t *testing.T) {
 	const serverAddr = "127.0.0.10:8888"
-	ep := &UDPEndpoint{RemoteAddr: serverAddr}
+	ep := &UDPEndpoint{Address: serverAddr}
 	ep.Dialer.Control = func(network, address string, c syscall.RawConn) error {
 		require.Equal(t, "udp4", network)
 		require.Equal(t, serverAddr, address)
@@ -37,7 +37,7 @@ func TestUDPEndpointIPv4(t *testing.T) {
 
 func TestUDPEndpointIPv6(t *testing.T) {
 	const serverAddr = "[::1]:8888"
-	ep := &UDPEndpoint{RemoteAddr: serverAddr}
+	ep := &UDPEndpoint{Address: serverAddr}
 	ep.Dialer.Control = func(network, address string, c syscall.RawConn) error {
 		require.Equal(t, "udp6", network)
 		require.Equal(t, serverAddr, address)

@@ -76,23 +76,24 @@ type StreamEndpoint interface {
 	Connect(ctx context.Context) (StreamConn, error)
 }
 
-// DialStreamEndpoint is a [StreamEndpoint] that connects to the given address using the given [StreamDialer].
-type DialStreamEndpoint struct {
-	// The Dialer used to create the connection on Connect(). If nil, it uses a TCP net.Dialer.
-	Dialer StreamDialer
-	// The remote address (host:port) to pass to Dial.
+// TCPEndpoint is a [StreamEndpoint] that connects to the given address using the given [StreamDialer].
+type TCPEndpoint struct {
+	// The Dialer used to create the net.Conn on Connect().
+	Dialer net.Dialer
+	// The endpoint address (host:port) to pass to Dial.
 	// If the host is a domain name, consider pre-resolving it to avoid resolution calls.
-	RemoteAddr string
+	Address string
 }
 
-var _ StreamEndpoint = (*DialStreamEndpoint)(nil)
+var _ StreamEndpoint = (*TCPEndpoint)(nil)
 
 // Connect implements [StreamEndpoint.Connect].
-func (e DialStreamEndpoint) Connect(ctx context.Context) (StreamConn, error) {
-	if e.Dialer == nil {
-		return (&TCPStreamDialer{}).Dial(ctx, e.RemoteAddr)
+func (e *TCPEndpoint) Connect(ctx context.Context) (StreamConn, error) {
+	conn, err := e.Dialer.DialContext(ctx, "tcp", e.Address)
+	if err != nil {
+		return nil, err
 	}
-	return e.Dialer.Dial(ctx, e.RemoteAddr)
+	return conn.(*net.TCPConn), nil
 }
 
 // StreamDialer provides a way to dial a destination and establish stream connections.

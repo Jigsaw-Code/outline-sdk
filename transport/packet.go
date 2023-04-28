@@ -29,16 +29,16 @@ type PacketEndpoint interface {
 type UDPEndpoint struct {
 	// The Dialer used to create the net.Conn on Connect().
 	Dialer net.Dialer
-	// The remote address (host:port) to pass to Dial.
+	// The endpoint address (host:port) to pass to Dial.
 	// If the host is a domain name, consider pre-resolving it to avoid resolution calls.
-	RemoteAddr string
+	Address string
 }
 
 var _ PacketEndpoint = (*UDPEndpoint)(nil)
 
 // Connect implements [PacketEndpoint.Connect].
 func (e UDPEndpoint) Connect(ctx context.Context) (net.Conn, error) {
-	return e.Dialer.DialContext(ctx, "udp", e.RemoteAddr)
+	return e.Dialer.DialContext(ctx, "udp", e.Address)
 }
 
 // PacketListener provides a way to create a local unbound packet connection to send packets to different destinations.

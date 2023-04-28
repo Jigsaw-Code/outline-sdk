@@ -30,8 +30,7 @@ import (
 func TestShadowsocksStreamDialer_Dial(t *testing.T) {
 	key := makeTestKey(t)
 	proxy, running := startShadowsocksTCPEchoProxy(key, testTargetAddr, t)
-	proxyEndpoint := transport.DialStreamEndpoint{RemoteAddr: proxy.Addr().String()}
-	d, err := NewShadowsocksStreamDialer(proxyEndpoint, key)
+	d, err := NewShadowsocksStreamDialer(&transport.TCPEndpoint{Address: proxy.Addr().String()}, key)
 	if err != nil {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
@@ -50,8 +49,7 @@ func TestShadowsocksStreamDialer_Dial(t *testing.T) {
 func TestShadowsocksStreamDialer_DialNoPayload(t *testing.T) {
 	key := makeTestKey(t)
 	proxy, running := startShadowsocksTCPEchoProxy(key, testTargetAddr, t)
-	proxyEndpoint := transport.DialStreamEndpoint{RemoteAddr: proxy.Addr().String()}
-	d, err := NewShadowsocksStreamDialer(proxyEndpoint, key)
+	d, err := NewShadowsocksStreamDialer(&transport.TCPEndpoint{Address: proxy.Addr().String()}, key)
 	if err != nil {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
@@ -93,8 +91,7 @@ func TestShadowsocksStreamDialer_DialFastClose(t *testing.T) {
 	}()
 
 	key := makeTestKey(t)
-	proxyEndpoint := transport.DialStreamEndpoint{RemoteAddr: listener.Addr().String()}
-	d, err := NewShadowsocksStreamDialer(proxyEndpoint, key)
+	d, err := NewShadowsocksStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String()}, key)
 	if err != nil {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
@@ -142,8 +139,7 @@ func TestShadowsocksStreamDialer_TCPPrefix(t *testing.T) {
 	}()
 
 	key := makeTestKey(t)
-	proxyEndpoint := transport.DialStreamEndpoint{RemoteAddr: listener.Addr().String()}
-	d, err := NewShadowsocksStreamDialer(proxyEndpoint, key)
+	d, err := NewShadowsocksStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String()}, key)
 	if err != nil {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
@@ -163,8 +159,7 @@ func BenchmarkShadowsocksStreamDialer_Dial(b *testing.B) {
 
 	key := makeTestKey(b)
 	proxy, running := startShadowsocksTCPEchoProxy(key, testTargetAddr, b)
-	proxyEndpoint := transport.DialStreamEndpoint{RemoteAddr: proxy.Addr().String()}
-	d, err := NewShadowsocksStreamDialer(proxyEndpoint, key)
+	d, err := NewShadowsocksStreamDialer(&transport.TCPEndpoint{Address: proxy.Addr().String()}, key)
 	if err != nil {
 		b.Fatalf("Failed to create StreamDialer: %v", err)
 	}

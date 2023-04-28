@@ -30,7 +30,7 @@ import (
 func TestShadowsocksPacketListener_ListenPacket(t *testing.T) {
 	key := makeTestKey(t)
 	proxy, running := startShadowsocksUDPEchoServer(key, testTargetAddr, t)
-	proxyEndpoint := transport.UDPEndpoint{RemoteAddr: proxy.LocalAddr().String()}
+	proxyEndpoint := transport.UDPEndpoint{Address: proxy.LocalAddr().String()}
 	d, err := NewShadowsocksPacketListener(proxyEndpoint, key)
 	if err != nil {
 		t.Fatalf("Failed to create PacketListener: %v", err)
@@ -54,7 +54,7 @@ func BenchmarkShadowsocksPacketListener_ListenPacket(b *testing.B) {
 
 	key := makeTestKey(b)
 	proxy, running := startShadowsocksUDPEchoServer(key, testTargetAddr, b)
-	proxyEndpoint := transport.UDPEndpoint{RemoteAddr: proxy.LocalAddr().String()}
+	proxyEndpoint := transport.UDPEndpoint{Address: proxy.LocalAddr().String()}
 	d, err := NewShadowsocksPacketListener(proxyEndpoint, key)
 	if err != nil {
 		b.Fatalf("Failed to create PacketListener: %v", err)
