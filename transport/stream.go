@@ -76,8 +76,8 @@ type StreamEndpoint interface {
 	Connect(ctx context.Context) (StreamConn, error)
 }
 
-// DialEndpoint is a [StreamEndpoint] that connects to the given address using the given [StreamDialer].
-type DialEndpoint struct {
+// DialStreamEndpoint is a [StreamEndpoint] that connects to the given address using the given [StreamDialer].
+type DialStreamEndpoint struct {
 	// The Dialer used to create the connection on Connect().
 	Dialer StreamDialer
 	// The remote address (host:port) to pass to Dial.
@@ -85,10 +85,10 @@ type DialEndpoint struct {
 	RemoteAddr string
 }
 
-var _ StreamEndpoint = (*DialEndpoint)(nil)
+var _ StreamEndpoint = (*DialStreamEndpoint)(nil)
 
 // Connect implements [StreamEndpoint.Connect].
-func (e DialEndpoint) Connect(ctx context.Context) (StreamConn, error) {
+func (e DialStreamEndpoint) Connect(ctx context.Context) (StreamConn, error) {
 	return e.Dialer.Dial(ctx, e.RemoteAddr)
 }
 
