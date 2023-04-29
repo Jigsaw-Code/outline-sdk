@@ -53,6 +53,8 @@ jobs:
 
   test_windows:
     name: Windows
+    # Use windows-2019, which is a lot faster than windows-2022:
+    # https://github.com/actions/runner-images/issues/5166
     runs-on: windows-2019
     steps:
 
