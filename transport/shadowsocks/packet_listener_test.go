@@ -24,6 +24,7 @@ import (
 
 	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
+	"github.com/stretchr/testify/require"
 )
 
 func TestShadowsocksPacketListener_ListenPacket(t *testing.T) {
@@ -40,7 +41,9 @@ func TestShadowsocksPacketListener_ListenPacket(t *testing.T) {
 	}
 	defer conn.Close()
 	conn.SetReadDeadline(time.Now().Add(time.Second * 5))
-	pcrw := &packetConnReadWriter{PacketConn: conn, targetAddr: newAddr(testTargetAddr, "udp")}
+	pcrw := &packetConnReadWriter{PacketConn: conn}
+	pcrw.targetAddr, err = transport.MakeNetAddr("udp", testTargetAddr)
+	require.Nil(t, err)
 	expectEchoPayload(pcrw, makeTestPayload(1024), make([]byte, 1024), t)
 
 	proxy.Close()
@@ -53,6 +56,8 @@ func BenchmarkShadowsocksPacketListener_ListenPacket(b *testing.B) {
 
 	key := makeTestKey(b)
 	proxy, running := startShadowsocksUDPEchoServer(key, testTargetAddr, b)
+	targetAddr, err := transport.MakeNetAddr("udp", testTargetAddr)
+	require.Nil(b, err)
 	proxyEndpoint := transport.UDPEndpoint{Address: proxy.LocalAddr().String()}
 	d, err := NewPacketListener(proxyEndpoint, key)
 	if err != nil {
@@ -67,7 +72,7 @@ func BenchmarkShadowsocksPacketListener_ListenPacket(b *testing.B) {
 	buf := make([]byte, clientUDPBufferSize)
 	for n := 0; n < b.N; n++ {
 		payload := makeTestPayload(1024)
-		pcrw := &packetConnReadWriter{PacketConn: conn, targetAddr: newAddr(testTargetAddr, "udp")}
+		pcrw := &packetConnReadWriter{PacketConn: conn, targetAddr: targetAddr}
 		b.StartTimer()
 		expectEchoPayload(pcrw, payload, buf, b)
 		b.StopTimer()
