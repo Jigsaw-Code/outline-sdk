@@ -31,7 +31,7 @@ func TestNewTCPStreamDialerIPv4(t *testing.T) {
 	requestText := []byte("Request")
 	responseText := []byte("Response")
 
-	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 10)})
+	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.Nilf(t, err, "Failed to create TCP listener: %v", err)
 	defer listener.Close()
 
@@ -113,7 +113,7 @@ func TestNewTCPStreamDialerAddress(t *testing.T) {
 }
 
 func TestDialStreamEndpointAddr(t *testing.T) {
-	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 2)})
+	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.Nil(t, err, "Failed to create TCP listener")
 	defer listener.Close()
 
