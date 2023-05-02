@@ -185,59 +185,35 @@ func TestLazyWriteFlush(t *testing.T) {
 	writer := NewWriter(buf, key)
 	header := []byte{1, 2, 3, 4}
 	n, err := writer.LazyWrite(header)
-	if n != len(header) {
-		t.Errorf("Wrong write size: %d", n)
-	}
-	if err != nil {
-		t.Errorf("LazyWrite failed: %v", err)
-	}
-	if buf.Len() != 0 {
-		t.Errorf("LazyWrite isn't lazy: %v", buf.Bytes())
-	}
-	if err = writer.Flush(); err != nil {
-		t.Errorf("Flush failed: %v", err)
-	}
+	require.Nilf(t, err, "LazyWrite failed: %v", err)
+	require.Equal(t, len(header), n, "Wrong write size")
+	require.Equal(t, 0, buf.Len(), "LazyWrite isn't lazy")
+
+	err = writer.Flush()
+	require.Nilf(t, err, "Flush failed: %v", err)
+
 	len1 := buf.Len()
-	if len1 <= len(header) {
-		t.Errorf("Not enough bytes flushed: %d", len1)
-	}
+	require.Greater(t, len1, len(header), "Not enough bytes flushed")
 
 	// Check that normal writes now work
 	body := []byte{5, 6, 7}
 	n, err = writer.Write(body)
-	if n != len(body) {
-		t.Errorf("Wrong write size: %d", n)
-	}
-	if err != nil {
-		t.Errorf("Write failed: %v", err)
-	}
-	if buf.Len() == len1 {
-		t.Errorf("No write observed")
-	}
+	require.Nilf(t, err, "Write failed: %v", err)
+	require.Equal(t, len(body), n, "Wrong write size")
+	require.Greater(t, buf.Len(), len1, "No write observed")
 
 	// Verify content arrives in two blocks
 	reader := NewReader(buf, key)
 	decrypted := make([]byte, len(header)+len(body))
 	n, err = reader.Read(decrypted)
-	if n != len(header) {
-		t.Errorf("Wrong number of bytes out: %d", n)
-	}
-	if err != nil {
-		t.Errorf("Read failed: %v", err)
-	}
-	if !bytes.Equal(decrypted[:n], header) {
-		t.Errorf("Wrong final content: %v", decrypted)
-	}
+	require.Nilf(t, err, "Read failed: %v", err)
+	require.Equal(t, len(header), n, "Wrong number of bytes out")
+	require.Equal(t, header, decrypted[:n], "Wrong final content")
+
 	n, err = reader.Read(decrypted[n:])
-	if n != len(body) {
-		t.Errorf("Wrong number of bytes out: %d", n)
-	}
-	if err != nil {
-		t.Errorf("Read failed: %v", err)
-	}
-	if !bytes.Equal(decrypted[len(header):], body) {
-		t.Errorf("Wrong final content: %v", decrypted)
-	}
+	require.Nilf(t, err, "Read failed: %v", err)
+	require.Equal(t, len(body), n, "Wrong number of bytes out")
+	require.Equal(t, body, decrypted[len(header):], "Wrong final content")
 }
 
 func TestLazyWriteConcat(t *testing.T) {
@@ -343,15 +319,9 @@ func TestLazyWriteConcurrentFlush(t *testing.T) {
 	writer := NewWriter(buf, key)
 	header := []byte{1, 2, 3, 4}
 	n, err := writer.LazyWrite(header)
-	if n != len(header) {
-		t.Errorf("Wrong write size: %d", n)
-	}
-	if err != nil {
-		t.Errorf("LazyWrite failed: %v", err)
-	}
-	if buf.Len() != 0 {
-		t.Errorf("LazyWrite isn't lazy: %v", buf.Bytes())
-	}
+	require.Nilf(t, err, "LazyWrite failed: %v", err)
+	require.Equalf(t, len(header), n, "Wrong write size: %d", n)
+	require.Equal(t, 0, buf.Len(), "LazyWrite isn't lazy: %v", buf.Bytes())
 
 	body := []byte{5, 6, 7}
 	r, w := io.Pipe()
@@ -359,12 +329,8 @@ func TestLazyWriteConcurrentFlush(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		n, err := writer.ReadFrom(r)
-		if n != int64(len(body)) {
-			t.Errorf("ReadFrom: Wrong read size %d", n)
-		}
-		if err != nil {
-			t.Errorf("ReadFrom: %v", err)
-		}
+		require.Nilf(t, err, "ReadFrom: %v", err)
+		require.Equalf(t, int64(len(body)), n, "ReadFrom: Wrong read size %d", n)
 		wg.Done()
 	}()
 
@@ -372,51 +338,33 @@ func TestLazyWriteConcurrentFlush(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 
 	// Flush while ReadFrom is blocked.
-	if err := writer.Flush(); err != nil {
-		t.Errorf("Flush error: %v", err)
-	}
+	require.Nilf(t, writer.Flush(), "Flush error: %v", err)
+
 	len1 := buf.Len()
-	if len1 == 0 {
-		t.Errorf("No bytes flushed")
-	}
+	require.Greater(t, len1, 0, "No bytes flushed")
 
 	// Check that normal writes now work
 	n, err = w.Write(body)
-	if n != len(body) {
-		t.Errorf("Wrong write size: %d", n)
-	}
-	if err != nil {
-		t.Errorf("Write failed: %v", err)
-	}
+	require.Nilf(t, err, "Write failed: %v", err)
+	require.Equalf(t, len(body), n, "Wrong write size: %d", n)
+
 	w.Close()
 	wg.Wait()
-	if buf.Len() == len1 {
-		t.Errorf("No write observed")
-	}
+	require.Greater(t, buf.Len(), len1, "No write observed")
 
 	// Verify content arrives in two blocks
 	reader := NewReader(buf, key)
 	decrypted := make([]byte, len(header)+len(body))
 	n, err = reader.Read(decrypted)
-	if n != len(header) {
-		t.Errorf("Wrong number of bytes out: %d", n)
-	}
-	if err != nil {
-		t.Errorf("Read failed: %v", err)
-	}
-	if !bytes.Equal(decrypted[:len(header)], header) {
-		t.Errorf("Wrong final content: %v", decrypted)
-	}
+	require.Equal(t, len(header), n, "Wrong number of bytes out")
+	require.Nilf(t, err, "Read failed: %v", err)
+
+	require.Equal(t, header, decrypted[:len(header)], "Wrong final content")
+
 	n, err = reader.Read(decrypted[len(header):])
-	if n != len(body) {
-		t.Errorf("Wrong number of bytes out: %d", n)
-	}
-	if err != nil {
-		t.Errorf("Read failed: %v", err)
-	}
-	if !bytes.Equal(decrypted[len(header):], body) {
-		t.Errorf("Wrong final content: %v", decrypted)
-	}
+	require.Nilf(t, err, "Read failed: %v", err)
+	require.Equal(t, len(body), n, "Wrong number of bytes out")
+	require.Equal(t, body, decrypted[len(header):], "Wrong final content")
 }
 
 type nullIO struct{}
