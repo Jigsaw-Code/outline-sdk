@@ -11,21 +11,64 @@ permissions:  # added using https://github.com/step-security/secure-workflows
 
 jobs:
 
-  build:
-    name: Build
+  test_linux:
+    name: Linux
     runs-on: ubuntu-latest
     steps:
 
-    - name: Set up Go 1.20
-      uses: actions/setup-go@v3
-      with:
-        go-version: ^1.20
-
     - name: Check out code into the Go module directory
       uses: actions/checkout@v3
+
+    - name: Set up Go 1.20
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: '${{ github.workspace }}/go.mod'
 
     - name: Build
       run: go build -v ./...
 
     - name: Test
-      run: go test -v -race -bench=. ./... -benchtime=100ms
+      run: go test -v -race -bench '.' ./... -benchtime=100ms
+  
+
+  test_macos:
+    name: macOS
+    runs-on: macos-latest
+    steps:
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v3
+
+    - name: Set up Go 1.20
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: '${{ github.workspace }}/go.mod'
+
+    - name: Build
+      run: go build -v ./...
+
+    - name: Test
+      run: go test -v -race -bench '.' ./... -benchtime=100ms
+
+
+  test_windows:
+    name: Windows
+    # Use windows-2019, which is a lot faster than windows-2022:
+    # https://github.com/actions/runner-images/issues/5166
+    runs-on: windows-2019
+    steps:
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v3
+
+    - name: Set up Go 1.20
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: '${{ github.workspace }}/go.mod'
+
+    - name: Build
+      run: go build -v ./...
+
+    - name: Test
+      run: go test -v -race -bench '.' -benchtime=100ms ./...
+

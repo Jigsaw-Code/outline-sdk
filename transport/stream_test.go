@@ -23,6 +23,7 @@ import (
 	"testing"
 	"testing/iotest"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,54 +31,62 @@ func TestNewTCPStreamDialerIPv4(t *testing.T) {
 	requestText := []byte("Request")
 	responseText := []byte("Response")
 
-	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 10)})
-	require.Nil(t, err, "Failed to create TCP listener")
+	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	require.Nilf(t, err, "Failed to create TCP listener: %v", err)
+	defer listener.Close()
 
 	var running sync.WaitGroup
-	running.Add(1)
+	running.Add(2)
+
+	// Server
 	go func() {
 		defer running.Done()
-		defer listener.Close()
 		clientConn, err := listener.AcceptTCP()
-		if err != nil {
-			t.Errorf("AcceptTCP failed: %v", err)
-			return
-		}
+		require.Nilf(t, err, "AcceptTCP failed: %v", err)
+
 		defer clientConn.Close()
-		if err = iotest.TestReader(clientConn, requestText); err != nil {
-			t.Errorf("Request read failed: %v", err)
-			return
-		}
-		if err = clientConn.CloseRead(); err != nil {
-			t.Errorf("CloseRead failed: %v", err)
-			return
-		}
-		if _, err = clientConn.Write(responseText); err != nil {
-			t.Errorf("Write failed: %v", err)
-			return
-		}
-		if err = clientConn.CloseWrite(); err != nil {
-			t.Errorf("CloseWrite failed: %v", err)
-			return
-		}
+		err = iotest.TestReader(clientConn, requestText)
+		assert.Nilf(t, err, "Request read failed: %v", err)
+
+		// This works on Linux, but on macOS it errors with "shutdown: socket is not connected" (syscall.ENOTCONN).
+		// It seems that on macOS you cannot call CloseRead() if you've already received a FIN and read all the data.
+		// TODO(fortuna): Consider wrapping StreamConns on macOS to make CloseRead a no-op if Read has returned io.EOF
+		// or WriteTo has been called.
+		// err = clientConn.CloseRead()
+		// assert.Nilf(t, err, "clientConn.CloseRead failed: %v", err)
+
+		_, err = clientConn.Write(responseText)
+		assert.Nilf(t, err, "Write failed: %v", err)
+
+		err = clientConn.CloseWrite()
+		assert.Nilf(t, err, "CloseWrite failed: %v", err)
 	}()
 
-	dialer := &TCPStreamDialer{}
-	dialer.Dialer.Control = func(network, address string, c syscall.RawConn) error {
-		require.Equal(t, "tcp4", network)
-		require.Equal(t, listener.Addr().String(), address)
-		return nil
-	}
-	serverConn, err := dialer.Dial(context.Background(), listener.Addr().String())
-	require.Nil(t, err, "Dial failed")
-	require.Equal(t, listener.Addr().String(), serverConn.RemoteAddr().String())
-	defer serverConn.Close()
+	// Client
+	go func() {
+		defer running.Done()
+		dialer := &TCPStreamDialer{}
+		dialer.Dialer.Control = func(network, address string, c syscall.RawConn) error {
+			require.Equal(t, "tcp4", network)
+			require.Equal(t, listener.Addr().String(), address)
+			return nil
+		}
+		serverConn, err := dialer.Dial(context.Background(), listener.Addr().String())
+		require.Nil(t, err, "Dial failed")
+		require.Equal(t, listener.Addr().String(), serverConn.RemoteAddr().String())
+		defer serverConn.Close()
 
-	serverConn.Write(requestText)
-	serverConn.CloseWrite()
+		n, err := serverConn.Write(requestText)
+		require.Nil(t, err)
+		require.Equal(t, 7, n)
+		assert.Nil(t, serverConn.CloseWrite())
 
-	require.Nil(t, iotest.TestReader(serverConn, responseText), "Response read failed")
-	serverConn.CloseRead()
+		err = iotest.TestReader(serverConn, responseText)
+		require.Nilf(t, err, "Response read failed: %v", err)
+		// See CloseRead comment on the server go-routine.
+		// err = serverConn.CloseRead()
+		// assert.Nilf(t, err, "serverConn.CloseRead failed: %v", err)
+	}()
 
 	running.Wait()
 }
@@ -104,7 +113,7 @@ func TestNewTCPStreamDialerAddress(t *testing.T) {
 }
 
 func TestDialStreamEndpointAddr(t *testing.T) {
-	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 2)})
+	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.Nil(t, err, "Failed to create TCP listener")
 	defer listener.Close()
 
