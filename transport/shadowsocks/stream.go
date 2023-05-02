@@ -25,12 +25,12 @@ import (
 	"github.com/Jigsaw-Code/outline-internal-sdk/internal/slicepool"
 )
 
-// payloadSizeMask is the maximum size of payload in bytes.
+// payloadSizeMask is the maximum size of payload in bytes, as per https://shadowsocks.org/guide/aead.html#tcp.
 const payloadSizeMask = 0x3FFF // 16*1024 - 1
 
 // Buffer pool used for decrypting Shadowsocks streams.
 // The largest buffer we could need is for decrypting a max-length payload.
-var readBufPool = slicepool.MakePool(payloadSizeMask + maxTagSize())
+var readBufPool = slicepool.MakePool(payloadSizeMask + maxTagSize)
 
 // Writer is an [io.Writer] that also implements [io.ReaderFrom] to
 // allow for piping the data without extra allocations and copies.
@@ -63,9 +63,9 @@ var (
 	_ io.ReaderFrom = (*Writer)(nil)
 )
 
-// NewShadowsocksWriter creates a [Writer] that encrypts the given [io.Writer] using
+// NewWriter creates a [Writer] that encrypts the given [io.Writer] using
 // the shadowsocks protocol with the given encryption key.
-func NewShadowsocksWriter(writer io.Writer, key *EncryptionKey) *Writer {
+func NewWriter(writer io.Writer, key *EncryptionKey) *Writer {
 	return &Writer{writer: writer, key: key, saltGenerator: RandomSaltGenerator}
 }
 
@@ -286,9 +286,9 @@ type Reader interface {
 	io.WriterTo
 }
 
-// NewShadowsocksReader creates a [Reader] that decrypts the given [io.Reader] using
+// NewReader creates a [Reader] that decrypts the given [io.Reader] using
 // the shadowsocks protocol with the given encryption key.
-func NewShadowsocksReader(reader io.Reader, key *EncryptionKey) Reader {
+func NewReader(reader io.Reader, key *EncryptionKey) Reader {
 	return &readConverter{
 		cr: &chunkReader{
 			reader:  reader,

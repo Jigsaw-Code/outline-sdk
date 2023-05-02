@@ -16,6 +16,7 @@ package shadowsocks
 
 import (
 	"crypto/rand"
+	"errors"
 )
 
 // SaltGenerator generates unique salts to use in Shadowsocks connections.
@@ -35,3 +36,31 @@ func (randomSaltGenerator) GetSalt(salt []byte) error {
 
 // RandomSaltGenerator is a basic SaltGenerator.
 var RandomSaltGenerator SaltGenerator = randomSaltGenerator{}
+
+type prefixSaltGenerator struct {
+	prefix []byte
+}
+
+func (g prefixSaltGenerator) GetSalt(salt []byte) error {
+	n := copy(salt, g.prefix)
+	if n != len(g.prefix) {
+		return errors.New("prefix is too long")
+	}
+	_, err := rand.Read(salt[n:])
+	return err
+}
+
+// NewPrefixSaltGenerator returns a SaltGenerator whose output consists of
+// the provided prefix, followed by random bytes. This is useful to change
+// how shadowsocks traffic is classified by middleboxes.
+//
+// Note: Prefixes steal entropy from the initialization vector. This weakens
+// security by increasing the likelihood that the same IV is used in two
+// different connections (which becomes likely once 2^(N/2) connections are
+// made, due to the birthday attack).  If an IV is reused, the attacker can
+// not only decrypt the ciphertext of those two connections; they can also
+// easily recover the shadowsocks key and decrypt all other connections to
+// this server.  Use with care!
+func NewPrefixSaltGenerator(prefix []byte) SaltGenerator {
+	return prefixSaltGenerator{prefix}
+}

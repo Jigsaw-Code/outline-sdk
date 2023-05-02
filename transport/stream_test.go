@@ -16,20 +16,23 @@ package transport
 
 import (
 	"context"
+	"errors"
 	"net"
 	"sync"
+	"syscall"
 	"testing"
 	"testing/iotest"
+
+	"github.com/stretchr/testify/require"
 )
 
-func TestNewTCPEndpointIPv4(t *testing.T) {
+func TestNewTCPStreamDialerIPv4(t *testing.T) {
 	requestText := []byte("Request")
 	responseText := []byte("Response")
 
-	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
-	if err != nil {
-		t.Fatalf("Failed to create TCP listener: %v", err)
-	}
+	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 10)})
+	require.Nil(t, err, "Failed to create TCP listener")
+
 	var running sync.WaitGroup
 	running.Add(1)
 	go func() {
@@ -59,17 +62,60 @@ func TestNewTCPEndpointIPv4(t *testing.T) {
 		}
 	}()
 
-	e := TCPEndpoint{RemoteAddr: *listener.Addr().(*net.TCPAddr)}
-	serverConn, err := e.Connect(context.Background())
-	if err != nil {
-		t.Fatalf("Connect failed: %v", err)
+	dialer := &TCPStreamDialer{}
+	dialer.Dialer.Control = func(network, address string, c syscall.RawConn) error {
+		require.Equal(t, "tcp4", network)
+		require.Equal(t, listener.Addr().String(), address)
+		return nil
 	}
+	serverConn, err := dialer.Dial(context.Background(), listener.Addr().String())
+	require.Nil(t, err, "Dial failed")
+	require.Equal(t, listener.Addr().String(), serverConn.RemoteAddr().String())
 	defer serverConn.Close()
+
 	serverConn.Write(requestText)
 	serverConn.CloseWrite()
-	if err = iotest.TestReader(serverConn, responseText); err != nil {
-		t.Fatalf("Response read failed: %v", err)
-	}
+
+	require.Nil(t, iotest.TestReader(serverConn, responseText), "Response read failed")
 	serverConn.CloseRead()
+
 	running.Wait()
+}
+
+func TestNewTCPStreamDialerAddress(t *testing.T) {
+	errCancel := errors.New("cancelled")
+	dialer := &TCPStreamDialer{}
+
+	dialer.Dialer.Control = func(network, address string, c syscall.RawConn) error {
+		require.Equal(t, "tcp4", network)
+		require.Equal(t, "8.8.8.8:53", address)
+		return errCancel
+	}
+	_, err := dialer.Dial(context.Background(), "8.8.8.8:53")
+	require.ErrorIs(t, err, errCancel)
+
+	dialer.Dialer.Control = func(network, address string, c syscall.RawConn) error {
+		require.Equal(t, "tcp6", network)
+		require.Equal(t, "[2001:4860:4860::8888]:53", address)
+		return errCancel
+	}
+	_, err = dialer.Dial(context.Background(), "[2001:4860:4860::8888]:53")
+	require.ErrorIs(t, err, errCancel)
+}
+
+func TestDialStreamEndpointAddr(t *testing.T) {
+	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 2)})
+	require.Nil(t, err, "Failed to create TCP listener")
+	defer listener.Close()
+
+	endpoint := TCPEndpoint{Address: listener.Addr().String()}
+	endpoint.Dialer.Control = func(network, address string, c syscall.RawConn) error {
+		require.Equal(t, "tcp4", network)
+		require.Equal(t, listener.Addr().String(), address)
+		return nil
+	}
+	conn, err := endpoint.Connect(context.Background())
+	require.Nil(t, err)
+	require.Equal(t, listener.Addr().String(), conn.RemoteAddr().String())
+	require.Nil(t, conn.Close())
 }
