@@ -212,7 +212,8 @@ func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
 	accessKeyFlag := flag.String("key", "", "Outline access key")
 	domainFlag := flag.String("domain", "example.com.", "Domain name to resolve")
-	resolversFlag := flag.String("resolvers", "8.8.8.8,2001:4860:4860::8888", "Comma-separated list of the DNS resolver to use for the test")
+	resolverFlag := flag.String("resolver", "8.8.8.8,2001:4860:4860::8888", "Comma-separated list of the DNS resolver to use for the test")
+	protoFlag := flag.String("proto", "tcp,udp", "Comma-separated list of the protocols to test. Muse be \"tcp\", \"udp\", or a combination of them")
 
 	flag.Parse()
 	if *verboseFlag {
@@ -246,42 +247,37 @@ func main() {
 	// TODO: limit number of IPs. Or force an input IP?
 	for _, hostIP := range proxyIPs {
 		proxyAddress := net.JoinHostPort(hostIP.String(), fmt.Sprint(config.Port))
-		for _, resolverHost := range strings.Split(*resolversFlag, ",") {
+		for _, resolverHost := range strings.Split(*resolverFlag, ",") {
+			resolverHost := strings.TrimSpace(resolverHost)
 			resolverAddress := net.JoinHostPort(resolverHost, "53")
-			for _, proto := range []string{"tcp", "udp"} {
-				// TODO: skip prefixes if we can't establish a TCP connection to the server.
-				prefixes := make([]Prefix, 1)
-				if proto == "tcp" && len(config.Prefix) > 0 {
-					prefixes = append(prefixes, config.Prefix)
+			for _, proto := range strings.Split(*protoFlag, ",") {
+				proto = strings.TrimSpace(proto)
+				// var dnsClient := dns.Client{Net: proto}
+				var dnsDial DNSDial
+				if proto == "tcp" {
+					dnsDial, err = makeTCPDialer(proxyAddress, config.CryptoKey, config.Prefix)
+				} else {
+					dnsDial, err = makeUDPDialer(proxyAddress, config.CryptoKey)
 				}
-				for _, prefix := range prefixes {
-					// var dnsClient := dns.Client{Net: proto}
-					var dnsDial DNSDial
-					if proto == "tcp" {
-						dnsDial, err = makeTCPDialer(proxyAddress, config.CryptoKey, prefix)
-					} else {
-						dnsDial, err = makeUDPDialer(proxyAddress, config.CryptoKey)
-					}
-					if err != nil {
-						log.Fatalf("Failed to create DNS resolver: %#v", err)
-					}
-					testTime := time.Now()
-					testErr := testResolver(dnsDial, resolverAddress, *domainFlag)
-					debugLog.Printf("Test error: %v", testErr)
-					duration := time.Since(testTime)
-					record := jsonRecord{
-						Time:       testTime.UTC().Truncate(time.Second),
-						DurationMs: duration.Milliseconds(),
-						Proxy:      proxyAddress,
-						Resolver:   resolverAddress,
-						Proto:      proto,
-						Prefix:     prefix.String(),
-						Error:      makeErrorRecord(testErr),
-					}
-					err = jsonEncoder.Encode(record)
-					if err != nil {
-						log.Fatalf("Failed to output JSON: %v", err)
-					}
+				if err != nil {
+					log.Fatalf("Failed to create DNS resolver: %#v", err)
+				}
+				testTime := time.Now()
+				testErr := testResolver(dnsDial, resolverAddress, *domainFlag)
+				debugLog.Printf("Test error: %v", testErr)
+				duration := time.Since(testTime)
+				record := jsonRecord{
+					Time:       testTime.UTC().Truncate(time.Second),
+					DurationMs: duration.Milliseconds(),
+					Proxy:      proxyAddress,
+					Resolver:   resolverAddress,
+					Proto:      proto,
+					Prefix:     config.Prefix.String(),
+					Error:      makeErrorRecord(testErr),
+				}
+				err = jsonEncoder.Encode(record)
+				if err != nil {
+					log.Fatalf("Failed to output JSON: %v", err)
 				}
 			}
 		}
