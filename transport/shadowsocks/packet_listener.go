@@ -105,29 +105,13 @@ func (c *packetConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	if socksSrcAddr == nil {
 		return 0, nil, errors.New("failed to read source address")
 	}
-	srcAddr := newAddr(socksSrcAddr.String(), "udp")
+	srcAddr, err := transport.MakeNetAddr("udp", socksSrcAddr.String())
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to convert incoming address: %w", err)
+	}
 	n = copy(b, buf[len(socksSrcAddr):]) // Strip the SOCKS source address
 	if len(b) < len(buf)-len(socksSrcAddr) {
 		return n, srcAddr, io.ErrShortBuffer
 	}
 	return n, srcAddr, nil
-}
-
-type addr struct {
-	address string
-	network string
-}
-
-func (a *addr) String() string {
-	return a.address
-}
-
-func (a *addr) Network() string {
-	return a.network
-}
-
-// newAddr returns a net.Addr that holds an address of the form `host:port` with a domain name or IP as host.
-// Used for SOCKS addressing.
-func newAddr(address, network string) net.Addr {
-	return &addr{address: address, network: network}
 }
