@@ -1,4 +1,4 @@
-module github.com/Jigsaw-Code/outline-internal-sdk/examples/outline-connectivity
+module github.com/Jigsaw-Code/outline-internal-sdk/x/outline-connectivity
 
 go 1.20
 
