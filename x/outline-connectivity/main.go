@@ -167,10 +167,12 @@ func (err *testError) Unwrap() error {
 }
 
 type jsonRecord struct {
-	Proxy      string     `json:"proxy"`
-	Resolver   string     `json:"resolver"`
-	Proto      string     `json:"proto"`
-	Prefix     string     `json:"prefix"`
+	// Inputs
+	Proxy    string `json:"proxy"`
+	Resolver string `json:"resolver"`
+	Proto    string `json:"proto"`
+	Prefix   string `json:"prefix"`
+	// Observations
 	Time       time.Time  `json:"time"`
 	DurationMs int64      `json:"duration_ms"`
 	Error      *errorJSON `json:"error"`
