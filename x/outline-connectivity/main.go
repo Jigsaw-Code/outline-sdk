@@ -242,6 +242,7 @@ func main() {
 		log.Fatalf("Failed to resolve host name: %v", err)
 	}
 
+	success := false
 	jsonEncoder := json.NewEncoder(os.Stdout)
 	jsonEncoder.SetEscapeHTML(false)
 	// TODO: limit number of IPs. Or force an input IP?
@@ -266,6 +267,9 @@ func main() {
 				testErr := testResolver(dnsDial, resolverAddress, *domainFlag)
 				debugLog.Printf("Test error: %v", testErr)
 				duration := time.Since(testTime)
+				if testErr == nil {
+					success = true
+				}
 				record := jsonRecord{
 					Time:       testTime.UTC().Truncate(time.Second),
 					DurationMs: duration.Milliseconds(),
@@ -281,5 +285,8 @@ func main() {
 				}
 			}
 		}
+	}
+	if !success {
+		os.Exit(1)
 	}
 }
