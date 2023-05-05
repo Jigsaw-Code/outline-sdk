@@ -1,3 +1,5 @@
+github.com/Jigsaw-Code/outline-internal-sdk v0.0.0-20230505210647-dbe3f575a4d7 h1:v95uHaiAP6NLPhhLjSWsqxM4FGuEoL2DZN5bA0iNLX4=
+github.com/Jigsaw-Code/outline-internal-sdk v0.0.0-20230505210647-dbe3f575a4d7/go.mod h1:vxtE3esaFy5UG6TnipLyWx0esUQBy9LBXHLQx+SoER8=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/riobard/go-bloom v0.0.0-20200614022211-cdc8013cb5b3 h1:f/FNXud6gA3MNr8meMVVGxhp+QBTqY91tM8HjEuMjGg=

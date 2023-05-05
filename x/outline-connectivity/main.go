@@ -211,8 +211,8 @@ func unwrapAll(err error) error {
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
 	accessKeyFlag := flag.String("key", "", "Outline access key")
-	domainFlag := flag.String("domain", "example.com.", "Domain name to resolve")
-	resolverFlag := flag.String("resolver", "8.8.8.8,2001:4860:4860::8888", "Comma-separated list of the DNS resolver to use for the test")
+	domainFlag := flag.String("domain", "example.com.", "Domain name to resolve in the test")
+	resolverFlag := flag.String("resolver", "8.8.8.8,2001:4860:4860::8888", "Comma-separated list of addresses of DNS resolver to use for the test")
 	protoFlag := flag.String("proto", "tcp,udp", "Comma-separated list of the protocols to test. Muse be \"tcp\", \"udp\", or a combination of them")
 
 	flag.Parse()
