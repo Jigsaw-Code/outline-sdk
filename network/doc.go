@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package network/ip defines a generic interface for IP devices that can be
-// used to read and write IP packets. It also provides utilitites to manipulate
-// IP devices, such as bridging.
-package ip
+/*
+The network package defines interfaces and provides utilities for network layer (OSI layer 3) functionalities. For
+example, the IPDevice interface can be used to read and write IP packets from a physical or virtual network device, and
+the Bridge function can be used to forwards IP traffic bidirectionally between two IPDevices.
+*/
+package network
