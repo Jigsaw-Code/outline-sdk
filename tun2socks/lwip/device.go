@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
@@ -114,4 +115,31 @@ func (t2s *LwIPTun2SocksDevice) Write(b []byte) (int, error) {
 		return n, net.ErrClosed
 	}
 	return n, err
+}
+
+// ReadFrom implements io.ReaderFrom. It reads all IP packets from `r` until EOF or error. EOF can occur if either this
+// device is closed or `r` is closed, and it will not be treated as an error. This function will only allocate a single
+// buffer of MTU() bytes.
+//
+// ReadFrom returns the total number of bytes read and any error encountered during the read.
+func (t2s *LwIPTun2SocksDevice) ReadFrom(r io.Reader) (int64, error) {
+	p := make([]byte, t2s.MTU())
+	total := int64(0)
+	for {
+		n, err := r.Read(p)
+		total += int64(n)
+		if err != nil {
+			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) {
+				break
+			}
+			return total, err
+		}
+		if _, err := t2s.Write(p); err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				break
+			}
+			return total, err
+		}
+	}
+	return total, nil
 }

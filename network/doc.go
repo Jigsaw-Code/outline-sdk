@@ -14,7 +14,6 @@
 
 /*
 The network package defines interfaces and provides utilities for network layer (OSI layer 3) functionalities. For
-example, the IPDevice interface can be used to read and write IP packets from a physical or virtual network device, and
-the Bridge function can be used to forwards IP traffic bidirectionally between two IPDevices.
+example, the IPDevice interface can be used to read and write IP packets from a physical or virtual network device.
 */
 package network

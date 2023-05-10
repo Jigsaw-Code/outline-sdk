@@ -53,6 +53,9 @@ func (b *packetPipe) close() {
 		defer b.mu.Unlock()
 		b.eof = true
 		close(b.rd)
+		if b.wr != nil {
+			close(b.wrDone)
+		}
 	})
 }
 
