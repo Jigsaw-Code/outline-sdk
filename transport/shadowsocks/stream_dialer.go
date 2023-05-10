@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package client
+package shadowsocks
 
 import (
 	"context"
@@ -20,53 +20,47 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
-	"github.com/Jigsaw-Code/outline-internal-sdk/transport/shadowsocks"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 )
 
-type StreamDialer interface {
-	transport.StreamDialer
-
-	// SetTCPSaltGenerator controls the SaltGenerator used for TCP upstream.
-	// `salter` may be `nil`.
-	// This method is not thread-safe.
-	SetTCPSaltGenerator(shadowsocks.SaltGenerator)
-}
-
-// NewShadowsocksStreamDialer creates a client that routes connections to a Shadowsocks proxy listening at
-// the given StreamEndpoint, with `cipher` as the Shadowsocks crypto.
-func NewShadowsocksStreamDialer(endpoint transport.StreamEndpoint, cipher *shadowsocks.Cipher) (StreamDialer, error) {
+// NewStreamDialer creates a client that routes connections to a Shadowsocks proxy listening at
+// the given StreamEndpoint, with `key` as the Shadowsocks encyption key.
+func NewStreamDialer(endpoint transport.StreamEndpoint, key *EncryptionKey) (*StreamDialer, error) {
 	if endpoint == nil {
 		return nil, errors.New("argument endpoint must not be nil")
 	}
-	if cipher == nil {
-		return nil, errors.New("argument cipher must not be nil")
+	if key == nil {
+		return nil, errors.New("argument key must not be nil")
 	}
-	d := streamDialer{endpoint: endpoint, cipher: cipher}
+	d := StreamDialer{endpoint: endpoint, key: key, ClientDataWait: 10 * time.Millisecond}
 	return &d, nil
 }
 
-type streamDialer struct {
+type StreamDialer struct {
 	endpoint transport.StreamEndpoint
-	cipher   *shadowsocks.Cipher
-	salter   shadowsocks.SaltGenerator
+	key      *EncryptionKey
+
+	// SaltGenerator is used by Shadowsocks to generate the connection salts.
+	// `SaltGenerator` may be `nil`, which defaults to [shadowsocks.RandomSaltGenerator].
+	SaltGenerator SaltGenerator
+
+	// ClientDataWait specifies the amount of time to wait for client data before sending
+	// the Shadowsocks connection request to the proxy server. It's 10 milliseconds by default.
+	//
+	// StreamDialer has an optimization to send the initial client payload along with
+	// the Shadowsocks connection request.  This saves one packet during connection, and also
+	// reduces the distinctiveness of the connection pattern.
+	//
+	// Normally, the initial payload will be sent as soon as the socket is connected,
+	// except for delays due to inter-process communication.  However, some protocols
+	// expect the server to send data first, in which case there is no client payload.
+	// We therefore use a short delay by default (10ms), longer than any reasonable IPC but shorter than
+	// typical network latency.  (In an Android emulator, the 90th percentile delay
+	// was ~1 ms.)  If no client payload is received by this time, we connect without it.
+	ClientDataWait time.Duration
 }
 
-func (c *streamDialer) SetTCPSaltGenerator(salter shadowsocks.SaltGenerator) {
-	c.salter = salter
-}
-
-// This code contains an optimization to send the initial client payload along with
-// the Shadowsocks handshake.  This saves one packet during connection, and also
-// reduces the distinctiveness of the connection pattern.
-//
-// Normally, the initial payload will be sent as soon as the socket is connected,
-// except for delays due to inter-process communication.  However, some protocols
-// expect the server to send data first, in which case there is no client payload.
-// We therefore use a short delay, longer than any reasonable IPC but shorter than
-// typical network latency.  (In an Android emulator, the 90th percentile delay
-// was ~1 ms.)  If no client payload is received by this time, we connect without it.
-const helloWait = 10 * time.Millisecond
+var _ transport.StreamDialer = (*StreamDialer)(nil)
 
 // Dial implements StreamDialer.Dial via a Shadowsocks server.
 //
@@ -83,7 +77,7 @@ const helloWait = 10 * time.Millisecond
 // initial data from the application in order to send the Shadowsocks salt, SOCKS address and initial data
 // all in one packet. This makes the size of the initial packet hard to predict, avoiding packet size
 // fingerprinting. We can only get the application initial data if we return a connection first.
-func (c *streamDialer) Dial(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
+func (c *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
 	socksTargetAddr := socks.ParseAddr(remoteAddr)
 	if socksTargetAddr == nil {
 		return nil, errors.New("failed to parse target address")
@@ -92,18 +86,18 @@ func (c *streamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 	if err != nil {
 		return nil, err
 	}
-	ssw := shadowsocks.NewShadowsocksWriter(proxyConn, c.cipher)
-	if c.salter != nil {
-		ssw.SetSaltGenerator(c.salter)
+	ssw := NewWriter(proxyConn, c.key)
+	if c.SaltGenerator != nil {
+		ssw.SetSaltGenerator(c.SaltGenerator)
 	}
 	_, err = ssw.LazyWrite(socksTargetAddr)
 	if err != nil {
 		proxyConn.Close()
 		return nil, errors.New("failed to write target address")
 	}
-	time.AfterFunc(helloWait, func() {
+	time.AfterFunc(c.ClientDataWait, func() {
 		ssw.Flush()
 	})
-	ssr := shadowsocks.NewShadowsocksReader(proxyConn, c.cipher)
+	ssr := NewReader(proxyConn, c.key)
 	return transport.WrapConn(proxyConn, ssr, ssw), nil
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package client
+package shadowsocks
 
 import (
 	"context"
@@ -23,7 +23,6 @@ import (
 
 	"github.com/Jigsaw-Code/outline-internal-sdk/internal/slicepool"
 	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
-	"github.com/Jigsaw-Code/outline-internal-sdk/transport/shadowsocks"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 )
 
@@ -35,17 +34,19 @@ var udpPool = slicepool.MakePool(clientUDPBufferSize)
 
 type packetListener struct {
 	endpoint transport.PacketEndpoint
-	cipher   *shadowsocks.Cipher
+	key      *EncryptionKey
 }
 
-func NewShadowsocksPacketListener(endpoint transport.PacketEndpoint, cipher *shadowsocks.Cipher) (transport.PacketListener, error) {
+var _ transport.PacketListener = (*packetListener)(nil)
+
+func NewPacketListener(endpoint transport.PacketEndpoint, key *EncryptionKey) (transport.PacketListener, error) {
 	if endpoint == nil {
 		return nil, errors.New("argument endpoint must not be nil")
 	}
-	if cipher == nil {
-		return nil, errors.New("argument cipher must not be nil")
+	if key == nil {
+		return nil, errors.New("argument key must not be nil")
 	}
-	return &packetListener{endpoint: endpoint, cipher: cipher}, nil
+	return &packetListener{endpoint: endpoint, key: key}, nil
 }
 
 func (c *packetListener) ListenPacket(ctx context.Context) (net.PacketConn, error) {
@@ -53,14 +54,16 @@ func (c *packetListener) ListenPacket(ctx context.Context) (net.PacketConn, erro
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to endpoint: %x", err)
 	}
-	conn := packetConn{Conn: proxyConn, cipher: c.cipher}
+	conn := packetConn{Conn: proxyConn, key: c.key}
 	return &conn, nil
 }
 
 type packetConn struct {
 	net.Conn
-	cipher *shadowsocks.Cipher
+	key *EncryptionKey
 }
+
+var _ net.PacketConn = (*packetConn)(nil)
 
 // WriteTo encrypts `b` and writes to `addr` through the proxy.
 func (c *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
@@ -71,12 +74,12 @@ func (c *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
 	lazySlice := udpPool.LazySlice()
 	cipherBuf := lazySlice.Acquire()
 	defer lazySlice.Release()
-	saltSize := c.cipher.SaltSize()
+	saltSize := c.key.SaltSize()
 	// Copy the SOCKS target address and payload, reserving space for the generated salt to avoid
 	// partially overlapping the plaintext and cipher slices since `Pack` skips the salt when calling
 	// `AEAD.Seal` (see https://golang.org/pkg/crypto/cipher/#AEAD).
 	plaintextBuf := append(append(cipherBuf[saltSize:saltSize], socksTargetAddr...), b...)
-	buf, err := shadowsocks.Pack(cipherBuf, plaintextBuf, c.cipher)
+	buf, err := Pack(cipherBuf, plaintextBuf, c.key)
 	if err != nil {
 		return 0, err
 	}
@@ -94,7 +97,7 @@ func (c *packetConn) ReadFrom(b []byte) (int, net.Addr, error) {
 		return 0, nil, err
 	}
 	// Decrypt in-place.
-	buf, err := shadowsocks.Unpack(nil, cipherBuf[:n], c.cipher)
+	buf, err := Unpack(nil, cipherBuf[:n], c.key)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -102,29 +105,13 @@ func (c *packetConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	if socksSrcAddr == nil {
 		return 0, nil, errors.New("failed to read source address")
 	}
-	srcAddr := newAddr(socksSrcAddr.String(), "udp")
+	srcAddr, err := transport.MakeNetAddr("udp", socksSrcAddr.String())
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to convert incoming address: %w", err)
+	}
 	n = copy(b, buf[len(socksSrcAddr):]) // Strip the SOCKS source address
 	if len(b) < len(buf)-len(socksSrcAddr) {
 		return n, srcAddr, io.ErrShortBuffer
 	}
 	return n, srcAddr, nil
-}
-
-type addr struct {
-	address string
-	network string
-}
-
-func (a *addr) String() string {
-	return a.address
-}
-
-func (a *addr) Network() string {
-	return a.network
-}
-
-// newAddr returns a net.Addr that holds an address of the form `host:port` with a domain name or IP as host.
-// Used for SOCKS addressing.
-func newAddr(address, network string) net.Addr {
-	return &addr{address: address, network: network}
 }

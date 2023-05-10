@@ -28,38 +28,39 @@ import (
 func TestCompatibility(t *testing.T) {
 	cipherName := "chacha20-ietf-poly1305"
 	secret := "secret"
-	toRight := "payload1"
+	fromLeft := "payload1"
 	fromRight := "payload2"
 	left, right := net.Pipe()
 
 	var wait sync.WaitGroup
 	wait.Add(1)
+	key, err := NewEncryptionKey(cipherName, secret)
+	require.Nil(t, err, "NewCipher failed: %v", err)
+	ssWriter := NewWriter(left, key)
 	go func() {
-		cipher, err := NewCipher(cipherName, secret)
-		require.Nil(t, err, "NewCipher failed: %v", err)
-		ssWriter := NewShadowsocksWriter(left, cipher)
-		ssWriter.Write([]byte(toRight))
+		defer wait.Done()
+		var err error
+		ssWriter.Write([]byte(fromLeft))
 
-		ssReader := NewShadowsocksReader(left, cipher)
-		output := make([]byte, len(fromRight))
-		_, err = ssReader.Read(output)
+		ssReader := NewReader(left, key)
+		receivedByLeft := make([]byte, len(fromRight))
+		_, err = ssReader.Read(receivedByLeft)
 		require.Nil(t, err, "Read failed: %v", err)
-		require.Equal(t, fromRight, string(output))
+		require.Equal(t, fromRight, string(receivedByLeft))
 		left.Close()
-		wait.Done()
 	}()
 
 	otherCipher, err := core.PickCipher(cipherName, []byte{}, secret)
 	require.Nil(t, err)
-	conn := shadowaead.NewConn(right, otherCipher.(shadowaead.Cipher))
-	output := make([]byte, len(toRight))
-	_, err = io.ReadFull(conn, output)
+	rightSSConn := shadowaead.NewConn(right, otherCipher.(shadowaead.Cipher))
+	receivedByRight := make([]byte, len(fromLeft))
+	_, err = io.ReadFull(rightSSConn, receivedByRight)
 	require.Nil(t, err)
-	require.Equal(t, toRight, string(output))
+	require.Equal(t, fromLeft, string(receivedByRight))
 
-	_, err = conn.Write([]byte(fromRight))
+	_, err = rightSSConn.Write([]byte(fromRight))
 	require.Nil(t, err, "Write failed: %v", err)
 
-	conn.Close()
+	rightSSConn.Close()
 	wait.Wait()
 }

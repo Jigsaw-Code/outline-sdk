@@ -16,40 +16,64 @@ package shadowsocks
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func assertCipher(t *testing.T, name string, saltSize, tagSize int) {
-	cipher, err := NewCipher(name, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cipher.SaltSize() != saltSize || cipher.TagSize() != tagSize {
-		t.Fatalf("Bad spec for %v", name)
-	}
+func assertCipher(t *testing.T, cipher string, saltSize, tagSize int) {
+	key, err := NewEncryptionKey(cipher, "")
+	require.Nil(t, err)
+	require.Equal(t, saltSize, key.SaltSize())
+
+	dummyAead, err := key.NewAEAD(make([]byte, key.SaltSize()))
+	require.Nil(t, err)
+	require.Equal(t, tagSize, key.TagSize())
+	require.Equal(t, key.TagSize(), dummyAead.Overhead())
 }
 
 func TestSizes(t *testing.T) {
 	// Values from https://shadowsocks.org/en/spec/AEAD-Ciphers.html
-	assertCipher(t, "chacha20-ietf-poly1305", 32, 16)
-	assertCipher(t, "aes-256-gcm", 32, 16)
-	assertCipher(t, "aes-192-gcm", 24, 16)
-	assertCipher(t, "aes-128-gcm", 16, 16)
+	assertCipher(t, CHACHA20IETFPOLY1305, 32, 16)
+	assertCipher(t, AES256GCM, 32, 16)
+	assertCipher(t, AES192GCM, 24, 16)
+	assertCipher(t, AES128GCM, 16, 16)
+}
+
+func TestShadowsocksCipherNames(t *testing.T) {
+	key, err := NewEncryptionKey("chacha20-ietf-poly1305", "")
+	require.Nil(t, err)
+	require.Equal(t, chacha20IETFPOLY1305Cipher, key.cipher)
+
+	key, err = NewEncryptionKey("aes-256-gcm", "")
+	require.Nil(t, err)
+	require.Equal(t, aes256GCMCipher, key.cipher)
+
+	key, err = NewEncryptionKey("aes-192-gcm", "")
+	require.Nil(t, err)
+	require.Equal(t, aes192GCMCipher, key.cipher)
+
+	key, err = NewEncryptionKey("aes-128-gcm", "")
+	require.Nil(t, err)
+	require.Equal(t, aes128GCMCipher, key.cipher)
 }
 
 func TestUnsupportedCipher(t *testing.T) {
-	_, err := NewCipher("aes-256-cfb", "")
-	if err == nil {
-		t.Errorf("Should get an error for unsupported cipher")
+	_, err := NewEncryptionKey("aes-256-cfb", "")
+	var unsupportedErr ErrUnsupportedCipher
+	if assert.ErrorAs(t, err, &unsupportedErr) {
+		assert.Equal(t, "aes-256-cfb", unsupportedErr.Name)
+		assert.Equal(t, "unsupported cipher aes-256-cfb", unsupportedErr.Error())
 	}
 }
 
 func TestMaxNonceSize(t *testing.T) {
-	for _, aeadName := range SupportedCipherNames() {
-		cipher, err := NewCipher(aeadName, "")
+	for _, aeadName := range supportedCiphers {
+		key, err := NewEncryptionKey(aeadName, "")
 		if err != nil {
 			t.Errorf("Failed to create Cipher %v: %v", aeadName, err)
 		}
-		aead, err := cipher.NewAEAD(make([]byte, cipher.SaltSize()))
+		aead, err := key.NewAEAD(make([]byte, key.SaltSize()))
 		if err != nil {
 			t.Errorf("Failed to create AEAD %v: %v", aeadName, err)
 		}
@@ -57,4 +81,19 @@ func TestMaxNonceSize(t *testing.T) {
 			t.Errorf("Cipher %v has nonce size %v > zeroNonce (%v)", aeadName, aead.NonceSize(), len(zeroNonce))
 		}
 	}
+}
+
+func TestMaxTagSize(t *testing.T) {
+	var calculatedMax int
+	for _, cipher := range supportedCiphers {
+		key, err := NewEncryptionKey(cipher, "")
+		if !assert.Nilf(t, err, "Failed to create cipher %v", cipher) {
+			continue
+		}
+		assert.LessOrEqualf(t, key.TagSize(), maxTagSize, "Tag size for cipher %v (%v) is greater than the max (%v)", cipher, key.TagSize(), maxTagSize)
+		if key.TagSize() > calculatedMax {
+			calculatedMax = key.TagSize()
+		}
+	}
+	require.Equal(t, maxTagSize, calculatedMax)
 }

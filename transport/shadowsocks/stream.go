@@ -25,14 +25,14 @@ import (
 	"github.com/Jigsaw-Code/outline-internal-sdk/internal/slicepool"
 )
 
-// payloadSizeMask is the maximum size of payload in bytes.
+// payloadSizeMask is the maximum size of payload in bytes, as per https://shadowsocks.org/guide/aead.html#tcp.
 const payloadSizeMask = 0x3FFF // 16*1024 - 1
 
 // Buffer pool used for decrypting Shadowsocks streams.
 // The largest buffer we could need is for decrypting a max-length payload.
-var readBufPool = slicepool.MakePool(payloadSizeMask + maxTagSize())
+var readBufPool = slicepool.MakePool(payloadSizeMask + maxTagSize)
 
-// Writer is an io.Writer that also implements io.ReaderFrom to
+// Writer is an [io.Writer] that also implements [io.ReaderFrom] to
 // allow for piping the data without extra allocations and copies.
 // The LazyWrite and Flush methods allow a header to be
 // added but delayed until the first write, for concatenation.
@@ -45,7 +45,7 @@ type Writer struct {
 	// Indicates that a concurrent flush is currently allowed.
 	needFlush     bool
 	writer        io.Writer
-	ssCipher      *Cipher
+	key           *EncryptionKey
 	saltGenerator SaltGenerator
 	// Wrapper for input that arrives as a slice.
 	byteWrapper bytes.Reader
@@ -58,10 +58,15 @@ type Writer struct {
 	counter []byte
 }
 
-// NewShadowsocksWriter creates a Writer that encrypts the given Writer using
-// the shadowsocks protocol with the given shadowsocks cipher.
-func NewShadowsocksWriter(writer io.Writer, ssCipher *Cipher) *Writer {
-	return &Writer{writer: writer, ssCipher: ssCipher, saltGenerator: RandomSaltGenerator}
+var (
+	_ io.Writer     = (*Writer)(nil)
+	_ io.ReaderFrom = (*Writer)(nil)
+)
+
+// NewWriter creates a [Writer] that encrypts the given [io.Writer] using
+// the shadowsocks protocol with the given encryption key.
+func NewWriter(writer io.Writer, key *EncryptionKey) *Writer {
+	return &Writer{writer: writer, key: key, saltGenerator: RandomSaltGenerator}
 }
 
 // SetSaltGenerator sets the salt generator to be used. Must be called before the first write.
@@ -73,11 +78,11 @@ func (sw *Writer) SetSaltGenerator(saltGenerator SaltGenerator) {
 // the salt to the inner Writer.
 func (sw *Writer) init() (err error) {
 	if sw.aead == nil {
-		salt := make([]byte, sw.ssCipher.SaltSize())
+		salt := make([]byte, sw.key.SaltSize())
 		if err := sw.saltGenerator.GetSalt(salt); err != nil {
 			return fmt.Errorf("failed to generate salt: %v", err)
 		}
-		sw.aead, err = sw.ssCipher.NewAEAD(salt)
+		sw.aead, err = sw.key.NewAEAD(salt)
 		if err != nil {
 			return fmt.Errorf("failed to create AEAD: %v", err)
 		}
@@ -159,7 +164,7 @@ func isZero(b []byte) bool {
 // Returns the slices of sw.buf in which to place plaintext for encryption.
 func (sw *Writer) buffers() (sizeBuf, payloadBuf []byte) {
 	// sw.buf starts with the salt.
-	saltSize := sw.ssCipher.SaltSize()
+	saltSize := sw.key.SaltSize()
 
 	// Each Shadowsocks-TCP message consists of a fixed-length size block,
 	// followed by a variable-length payload block.
@@ -184,7 +189,7 @@ func (sw *Writer) ReadFrom(r io.Reader) (int64, error) {
 		pending := sw.pending
 
 		sw.mu.Unlock()
-		saltsize := sw.ssCipher.SaltSize()
+		saltsize := sw.key.SaltSize()
 		overhead := sw.aead.Overhead()
 		// The first pending+overhead bytes of payloadBuf are potentially
 		// in use, and may be modified on the flush thread.  Data after
@@ -233,7 +238,7 @@ func (sw *Writer) flush() error {
 		return nil
 	}
 	// sw.buf starts with the salt.
-	saltSize := sw.ssCipher.SaltSize()
+	saltSize := sw.key.SaltSize()
 	// Normally we ignore the salt at the beginning of sw.buf.
 	start := saltSize
 	if isZero(sw.counter) {
@@ -262,8 +267,8 @@ type genericChunkReader interface {
 }
 
 type chunkReader struct {
-	reader   io.Reader
-	ssCipher *Cipher
+	reader io.Reader
+	key    *EncryptionKey
 	// These are lazily initialized:
 	aead cipher.AEAD
 	// Index of the next encrypted chunk to read.
@@ -274,21 +279,21 @@ type chunkReader struct {
 	payload slicepool.LazySlice
 }
 
-// Reader is an io.Reader that also implements io.WriterTo to
+// Reader is an [io.Reader] that also implements [io.WriterTo] to
 // allow for piping the data without extra allocations and copies.
 type Reader interface {
 	io.Reader
 	io.WriterTo
 }
 
-// NewShadowsocksReader creates a Reader that decrypts the given Reader using
-// the shadowsocks protocol with the given shadowsocks cipher.
-func NewShadowsocksReader(reader io.Reader, ssCipher *Cipher) Reader {
+// NewReader creates a [Reader] that decrypts the given [io.Reader] using
+// the shadowsocks protocol with the given encryption key.
+func NewReader(reader io.Reader, key *EncryptionKey) Reader {
 	return &readConverter{
 		cr: &chunkReader{
-			reader:   reader,
-			ssCipher: ssCipher,
-			payload:  readBufPool.LazySlice(),
+			reader:  reader,
+			key:     key,
+			payload: readBufPool.LazySlice(),
 		},
 	}
 }
@@ -297,14 +302,14 @@ func NewShadowsocksReader(reader io.Reader, ssCipher *Cipher) Reader {
 func (cr *chunkReader) init() (err error) {
 	if cr.aead == nil {
 		// For chacha20-poly1305, SaltSize is 32, NonceSize is 12 and Overhead is 16.
-		salt := make([]byte, cr.ssCipher.SaltSize())
+		salt := make([]byte, cr.key.SaltSize())
 		if _, err := io.ReadFull(cr.reader, salt); err != nil {
 			if err != io.EOF && err != io.ErrUnexpectedEOF {
 				err = fmt.Errorf("failed to read salt: %w", err)
 			}
 			return err
 		}
-		cr.aead, err = cr.ssCipher.NewAEAD(salt)
+		cr.aead, err = cr.key.NewAEAD(salt)
 		if err != nil {
 			return fmt.Errorf("failed to create AEAD: %v", err)
 		}

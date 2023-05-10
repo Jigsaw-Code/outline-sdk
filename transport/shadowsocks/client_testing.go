@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package client
+package shadowsocks
 
 import (
 	"bytes"
 	"io"
 	"testing"
-
-	"github.com/Jigsaw-Code/outline-internal-sdk/transport/shadowsocks"
 )
 
 const (
@@ -42,10 +40,19 @@ func expectEchoPayload(conn io.ReadWriter, payload, buf []byte, t testing.TB) {
 	}
 }
 
-func makeTestCipher(tb testing.TB) *shadowsocks.Cipher {
-	cipher, err := shadowsocks.NewCipher(shadowsocks.TestCipher, "testPassword")
+func makeTestKey(tb testing.TB) *EncryptionKey {
+	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "testPassword")
 	if err != nil {
-		tb.Fatalf("Failed to create cipher: %v", err)
+		tb.Fatalf("Failed to create key: %v", err)
 	}
-	return cipher
+	return key
+}
+
+// makeTestPayload returns a slice of `size` arbitrary bytes.
+func makeTestPayload(size int) []byte {
+	payload := make([]byte, size)
+	for i := 0; i < size; i++ {
+		payload[i] = byte(i)
+	}
+	return payload
 }
