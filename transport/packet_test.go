@@ -21,8 +21,11 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// UDPEndpoint
 
 func TestUDPEndpointIPv4(t *testing.T) {
 	const serverAddr = "127.0.0.10:8888"
@@ -34,7 +37,8 @@ func TestUDPEndpointIPv4(t *testing.T) {
 	}
 	conn, err := ep.Connect(context.Background())
 	require.Nil(t, err)
-	require.Equal(t, serverAddr, conn.RemoteAddr().String())
+	assert.Equal(t, "udp", conn.RemoteAddr().Network())
+	assert.Equal(t, serverAddr, conn.RemoteAddr().String())
 }
 
 func TestUDPEndpointIPv6(t *testing.T) {
@@ -47,8 +51,25 @@ func TestUDPEndpointIPv6(t *testing.T) {
 	}
 	conn, err := ep.Connect(context.Background())
 	require.Nil(t, err)
-	require.Equal(t, serverAddr, conn.RemoteAddr().String())
+	assert.Equal(t, "udp", conn.RemoteAddr().Network())
+	assert.Equal(t, serverAddr, conn.RemoteAddr().String())
 }
+
+func TestUDPEndpointDomain(t *testing.T) {
+	const serverAddr = "localhost:53"
+	ep := &UDPEndpoint{Address: serverAddr}
+	var resolvedAddr string
+	ep.Dialer.Control = func(network, address string, c syscall.RawConn) error {
+		resolvedAddr = address
+		return nil
+	}
+	conn, err := ep.Connect(context.Background())
+	require.ErrorIs(t, err, nil)
+	assert.Equal(t, "udp", conn.RemoteAddr().Network())
+	assert.Equal(t, resolvedAddr, conn.RemoteAddr().String())
+}
+
+// UDPPacketListener
 
 func TestUDPPacketListenerLocalIPv4Addr(t *testing.T) {
 	listener := &UDPPacketListener{Address: "127.0.0.1:0"}
@@ -90,7 +111,37 @@ func TestUDPPacketListenerDefaulAddr(t *testing.T) {
 	require.Equal(t, "::", listenIP)
 }
 
-func TestPacketListenerEndpoint(t *testing.T) {
+// UDPPacketDialer
+
+func TestUUDPPacketDialer(t *testing.T) {
+	server, err := net.ListenUDP("udp", &net.UDPAddr{})
+	require.Nil(t, err)
+	require.Equal(t, "udp", server.LocalAddr().Network())
+
+	dialer := &UDPPacketDialer{}
+	conn, err := dialer.Dial(context.Background(), server.LocalAddr().String())
+	require.Nil(t, err)
+
+	request := []byte("PING")
+	conn.Write(request)
+	receivedRequest := make([]byte, 5)
+	n, clientAddr, err := server.ReadFrom(receivedRequest)
+	require.Nil(t, err)
+	require.Equal(t, request, receivedRequest[:n])
+
+	response := []byte("PONG")
+	n, err = server.WriteTo(response, clientAddr)
+	require.ErrorIs(t, err, nil)
+	require.Equal(t, 4, n)
+	receivedResponse := make([]byte, 5)
+	n, err = conn.Read(receivedResponse)
+	require.Nil(t, err)
+	require.Equal(t, response, receivedResponse[:n])
+}
+
+// PacketListenerDialer
+
+func TestPacketListenerDialer(t *testing.T) {
 	request := []byte("Request")
 	response := []byte("Response")
 
@@ -126,11 +177,10 @@ func TestPacketListenerEndpoint(t *testing.T) {
 			running.Done()
 		}()
 
-		serverEndpoint := &PacketListenerEndpoint{
+		serverEndpoint := &PacketListenerDialer{
 			Listener: UDPPacketListener{Address: "127.0.0.1:0"},
-			Address:  serverPacketConn.LocalAddr().String(),
 		}
-		conn, err := serverEndpoint.Connect(context.Background())
+		conn, err := serverEndpoint.Dial(context.Background(), serverPacketConn.LocalAddr().String())
 		require.Nil(t, err)
 		t.Logf("Connected to %v from %v", conn.RemoteAddr(), conn.LocalAddr())
 		defer func() {
@@ -151,4 +201,19 @@ func TestPacketListenerEndpoint(t *testing.T) {
 	}()
 
 	running.Wait()
+}
+
+// PacketConn assertions
+
+func TestPacketConnInvalidArgument(t *testing.T) {
+	serverListener, err := net.ListenUDP("udp", nil)
+	require.ErrorIs(t, err, nil)
+	t.Logf("Listening on %v", serverListener.LocalAddr())
+
+	netAddr, err := MakeNetAddr("udp", "localhost:8888")
+	require.ErrorIs(t, err, nil)
+
+	_, err = serverListener.WriteTo([]byte("PING"), netAddr)
+	// This returns Invalid Argument because netAddr is not a *UDPAddr
+	require.ErrorIs(t, err, syscall.EINVAL)
 }
