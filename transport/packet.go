@@ -85,7 +85,7 @@ var _ net.Conn = (*boundPacketConn)(nil)
 func (e PacketListenerDialer) Dial(ctx context.Context, address string) (net.Conn, error) {
 	packetConn, err := e.Listener.ListenPacket(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("could not create PacketConn: %#v", err)
+		return nil, fmt.Errorf("could not create PacketConn: %w", err)
 	}
 	netAddr, err := MakeNetAddr("udp", address)
 	if err != nil {
