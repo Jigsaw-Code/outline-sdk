@@ -167,12 +167,14 @@ func (err *testError) Unwrap() error {
 }
 
 type jsonRecord struct {
+	// Inputs
+	Proxy    string `json:"proxy"`
+	Resolver string `json:"resolver"`
+	Proto    string `json:"proto"`
+	Prefix   string `json:"prefix"`
+	// Observations
 	Time       time.Time  `json:"time"`
 	DurationMs int64      `json:"duration_ms"`
-	Proxy      string     `json:"proxy"`
-	Resolver   string     `json:"resolver"`
-	Proto      string     `json:"proto"`
-	Prefix     string     `json:"prefix"`
 	Error      *errorJSON `json:"error"`
 }
 
@@ -211,8 +213,8 @@ func unwrapAll(err error) error {
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
 	accessKeyFlag := flag.String("key", "", "Outline access key")
-	domainFlag := flag.String("domain", "example.com.", "Domain name to resolve")
-	resolverFlag := flag.String("resolver", "8.8.8.8,2001:4860:4860::8888", "Comma-separated list of the DNS resolver to use for the test")
+	domainFlag := flag.String("domain", "example.com.", "Domain name to resolve in the test")
+	resolverFlag := flag.String("resolver", "8.8.8.8,2001:4860:4860::8888", "Comma-separated list of addresses of DNS resolver to use for the test")
 	protoFlag := flag.String("proto", "tcp,udp", "Comma-separated list of the protocols to test. Muse be \"tcp\", \"udp\", or a combination of them")
 
 	flag.Parse()
@@ -242,6 +244,7 @@ func main() {
 		log.Fatalf("Failed to resolve host name: %v", err)
 	}
 
+	success := false
 	jsonEncoder := json.NewEncoder(os.Stdout)
 	jsonEncoder.SetEscapeHTML(false)
 	// TODO: limit number of IPs. Or force an input IP?
@@ -266,6 +269,9 @@ func main() {
 				testErr := testResolver(dnsDial, resolverAddress, *domainFlag)
 				debugLog.Printf("Test error: %v", testErr)
 				duration := time.Since(testTime)
+				if testErr == nil {
+					success = true
+				}
 				record := jsonRecord{
 					Time:       testTime.UTC().Truncate(time.Second),
 					DurationMs: duration.Milliseconds(),
@@ -281,5 +287,8 @@ func main() {
 				}
 			}
 		}
+	}
+	if !success {
+		os.Exit(1)
 	}
 }
