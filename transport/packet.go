@@ -77,7 +77,7 @@ type boundPacketConn struct {
 
 var _ net.Conn = (*boundPacketConn)(nil)
 
-// Connect implements [PacketDialer].Dial.
+// Dial implements [PacketDialer].Dial.
 // The address is a host:port and the host must be a full IP address (not [::]) or a domain
 // The address must be supported by the WriteTo call of the PacketConn
 // returned by the PacketListener. For instance, a [net.UDPConn] only supports IP addresses, not domain names.
@@ -111,7 +111,7 @@ func (c *boundPacketConn) Read(packet []byte) (int, error) {
 	}
 }
 
-// Read implements [net.Conn].Write.
+// Write implements [net.Conn].Write.
 func (c *boundPacketConn) Write(packet []byte) (int, error) {
 	// This may return syscall.EINVAL if remoteAddr is a name like localhost or [::].
 	n, err := c.PacketConn.WriteTo(packet, c.remoteAddr)
