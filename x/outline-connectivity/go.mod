@@ -2,6 +2,8 @@ module github.com/Jigsaw-Code/outline-internal-sdk/x/outline-connectivity
 
 go 1.20
 
+retract v0.0.0
+
 require github.com/Jigsaw-Code/outline-internal-sdk v0.0.0
 
 replace github.com/Jigsaw-Code/outline-internal-sdk => ../..
