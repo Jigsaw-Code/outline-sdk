@@ -113,7 +113,7 @@ func TestUDPPacketListenerDefaulAddr(t *testing.T) {
 
 // UDPPacketDialer
 
-func TestUUDPPacketDialer(t *testing.T) {
+func TestUDPPacketDialer(t *testing.T) {
 	server, err := net.ListenUDP("udp", &net.UDPAddr{})
 	require.Nil(t, err)
 	require.Equal(t, "udp", server.LocalAddr().Network())
