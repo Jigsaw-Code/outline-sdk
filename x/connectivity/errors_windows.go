@@ -126,6 +126,6 @@ func errnoName(errno syscall.Errno) string {
 	case windows.WSAEREFUSED:
 		return "EREFUSED"
 	default:
-		return ""
+		return fmt.Sprintf("Error %d (0x%x)", int(errno), int(errno))
 	}
 }
