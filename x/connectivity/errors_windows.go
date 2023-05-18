@@ -17,6 +17,7 @@
 package connectivity
 
 import (
+	"fmt"
 	"golang.org/x/sys/windows"
 	"syscall"
 )
