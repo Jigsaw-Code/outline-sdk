@@ -16,6 +16,8 @@ package connectivity
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net"
 	"os"
 	"runtime"
@@ -121,6 +123,30 @@ func TestTestStreamDialerConnectivityReset(t *testing.T) {
 	var errno syscall.Errno
 	require.ErrorAs(t, err, &errno)
 	require.Equal(t, "ECONNRESET", errnoName(errno))
+}
+
+func TestTestStreamDialerEarlyClose(t *testing.T) {
+	var running sync.WaitGroup
+	listener := runTestTCPServer(t, func(conn *net.TCPConn) {
+		conn.CloseWrite()
+		// Consume all the incoming data to avoid a reset.
+		_, err := io.Copy(io.Discard, conn)
+		require.ErrorIs(t, err, nil)
+		require.Nil(t, conn.Close())
+	}, &running)
+	defer listener.Close()
+
+	dialer := &transport.TCPStreamDialer{}
+	_, err := TestStreamDialerConnectivity(context.Background(), dialer, listener.Addr().String(), "anything")
+
+	var testErr *TestError
+	require.ErrorAs(t, err, &testErr)
+	require.Equalf(t, "read", testErr.Op, "Wrong test operation. Error: %v", testErr.Err)
+	require.Equal(t, "", testErr.PosixError)
+	require.Error(t, err, "unexpected EOF")
+
+	var sysErr *os.SyscallError
+	require.False(t, errors.As(err, &sysErr))
 }
 
 func TestTestStreamDialerConnectivityTimeout(t *testing.T) {

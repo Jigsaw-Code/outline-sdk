@@ -105,6 +105,9 @@ func testDialer(ctx context.Context, dial func(context.Context, string) (net.Con
 
 		_, readErr := dnsConn.ReadMsg()
 		if readErr != nil {
+			// An early close on the connection may cause a "unexpected EOF" error. That's an application-layer error,
+			// not triggered by a syscall error so we don't capture an error code.
+			// TODO: figure out how to standardize on those errors.
 			return makeTestError("read", readErr)
 		}
 		return nil
