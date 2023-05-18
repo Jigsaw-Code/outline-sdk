@@ -10,65 +10,32 @@ permissions:  # added using https://github.com/step-security/secure-workflows
   contents: read
 
 jobs:
+  test:
+    strategy:
+      matrix:
+        # Use windows-2019, which is a lot faster than windows-2022:
+        # https://github.com/actions/runner-images/issues/5166
+        os: [ubuntu-latest, macos-latest, windows-2019]
 
-  test_linux:
-    name: Linux
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+
     steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v3
 
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v3
+      - name: Set up Go 1.20
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: '${{ github.workspace }}/go.mod'
 
-    - name: Set up Go 1.20
-      uses: actions/setup-go@v4
-      with:
-        go-version-file: '${{ github.workspace }}/go.mod'
+      - name: Build SDK
+        run: go build -v ./...
 
-    - name: Build
-      run: go build -v ./...
+      - name: Build X
+        run: go build -C x -o bin/ -v ./...
 
-    - name: Test
-      run: go test -v -race -bench '.' ./... -benchtime=100ms
-  
+      - name: Test SDK
+        run: go test -v -race -bench '.' ./... -benchtime=100ms
 
-  test_macos:
-    name: macOS
-    runs-on: macos-latest
-    steps:
-
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v3
-
-    - name: Set up Go 1.20
-      uses: actions/setup-go@v4
-      with:
-        go-version-file: '${{ github.workspace }}/go.mod'
-
-    - name: Build
-      run: go build -v ./...
-
-    - name: Test
-      run: go test -v -race -bench '.' ./... -benchtime=100ms
-
-
-  test_windows:
-    name: Windows
-    # Use windows-2019, which is a lot faster than windows-2022:
-    # https://github.com/actions/runner-images/issues/5166
-    runs-on: windows-2019
-    steps:
-
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v3
-
-    - name: Set up Go 1.20
-      uses: actions/setup-go@v4
-      with:
-        go-version-file: '${{ github.workspace }}/go.mod'
-
-    - name: Build
-      run: go build -v ./...
-
-    - name: Test
-      run: go test -v -race -bench '.' -benchtime=100ms ./...
-
+      - name: Test X
+        run: go test -C x -v -race -bench '.' ./... -benchtime=100ms
