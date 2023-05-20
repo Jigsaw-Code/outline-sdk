@@ -284,9 +284,11 @@ func TestPacketConnDestAddr(t *testing.T) {
 		require.Equal(t, net.IP{127, 0, 0, 1}, clientAddr.IP.To4())
 		require.Equal(t, client4.LocalAddr().(*net.UDPAddr).Port, clientAddr.Port)
 
+		// Need to use IPv6 format because the "any" address is IPv6.
 		var cm6 ipv6.ControlMessage
 		require.ErrorIs(t, cm6.Parse(oob[:oobn]), nil)
 		t.Logf("Control Message: %#v", cm6)
+		// IPv4 is encoded as IPv4. Need to convert.
 		require.Equal(t, net.IP{127, 0, 0, 1}, cm6.Dst.To4())
 		require.Equal(t, 1, cm6.IfIndex)
 		require.Equal(t, 0, flags)
