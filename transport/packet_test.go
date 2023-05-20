@@ -23,8 +23,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
-	"golang.org/x/sys/unix"
 )
 
 // UDPEndpoint
@@ -249,12 +249,17 @@ func TestPacketConnDestAddr(t *testing.T) {
 		t.Logf("IPv4 socket. Address: %v", server.LocalAddr())
 		// darwin: ok, linux & windows: not defined
 		// May be able to use syscall.IP_RECVDSTADDR or syscall.IP_PKTINFO
-		require.ErrorIs(t, setsockoptInt(server, syscall.IPPROTO_IP, syscall.IP_RECVPKTINFO, 1), nil)
+		// Linux: undefined: syscall.IP_RECVPKTINFO
+		// require.ErrorIs(t, setsockoptInt(server, syscall.IPPROTO_IP, syscall.IP_RECVPKTINFO, 1), nil)
+		sc := ipv4.NewPacketConn(server)
+		require.ErrorIs(t, sc.SetControlMessage(ipv4.FlagDst, true), nil)
 	} else if server.LocalAddr().(*net.UDPAddr).IP.To16() != nil {
 		t.Logf("IPv6 socket. Address: %v", server.LocalAddr())
 		// TODO(fortuna): need to make it work on Windows. (unix not defined)
 		// From https://www.rfc-editor.org/rfc/rfc3542.
-		require.ErrorIs(t, setsockoptInt(server, syscall.IPPROTO_IPV6, unix.IPV6_RECVPKTINFO, 1), nil)
+		// require.ErrorIs(t, setsockoptInt(server, syscall.IPPROTO_IPV6, unix.IPV6_RECVPKTINFO, 1), nil)
+		sc := ipv6.NewPacketConn(server)
+		require.ErrorIs(t, sc.SetControlMessage(ipv6.FlagDst, true), nil)
 	} else {
 		t.Error("Invalid address")
 	}
