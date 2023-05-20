@@ -64,7 +64,7 @@ Windows example:
 
 To run Linux binaries we use a Linux container via [Podman](https://podman.io/).
 
-## Set up podman
+### Set up podman
 <details>
   <summary>Instructions</summary>
 
@@ -97,7 +97,7 @@ podman machine stop
 ```
 </details>
 
-## Run
+### Run
 
 The easiest way is to run using `go run` directly with the `--exec` flag and our convenience tool `run_on_podman.sh`:
 ```sh
