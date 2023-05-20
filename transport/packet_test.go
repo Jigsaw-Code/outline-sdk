@@ -220,18 +220,20 @@ func TestPacketConnInvalidArgument(t *testing.T) {
 	require.ErrorIs(t, err, syscall.EINVAL)
 }
 
-func setsockoptInt(conn interface {
-	SyscallConn() (syscall.RawConn, error)
-}, level, opt, value int) error {
-	rawConn, err := conn.SyscallConn()
-	if err != nil {
-		return err
-	}
-	rawConn.Control(func(fd uintptr) {
-		err = syscall.SetsockoptInt(int(fd), level, opt, value)
-	})
-	return err
-}
+// func setsockoptInt(conn interface {
+// 	SyscallConn() (syscall.RawConn, error)
+// }, level, opt, value int) error {
+// 	rawConn, err := conn.SyscallConn()
+// 	if err != nil {
+// 		return err
+// 	}
+// 	rawConn.Control(func(fd uintptr) {
+// 		// On Windows:
+// 		// cannot use int(fd) (value of type int) as syscall.Handle value in argument to syscall.SetsockoptInt
+// 		err = syscall.SetsockoptInt(int(fd), level, opt, value)
+// 	})
+// 	return err
+// }
 
 func TestPacketConnDestAddr(t *testing.T) {
 	server, err := net.ListenUDP("udp", nil)
