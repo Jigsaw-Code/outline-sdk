@@ -62,7 +62,7 @@ Windows example:
 
 ## Running Linux binaries
 
-To run Linux binaries we use a Linux container via [Podman](https://podman.io/).
+To run Linux binaries you can use a Linux container via [Podman](https://podman.io/).
 
 ### Set up podman
 <details>
@@ -138,3 +138,43 @@ Flags explanation:
 - `-t` (tty): Allocate a pseudo-TTY for container
 - `-v` (volume): Bind mount a volume into the container. Volume source will be on the server machine, not the client
 </details>
+
+## Running Windows binaries
+
+To run Windows binaries you can use [Wine](https://en.wikipedia.org/wiki/Wine_(software)) to emulate a Windows environment.
+This is not the same as a real Windows environment, so make sure you test on actual Windows machines.
+
+### Install Wine
+
+<details>
+  <summary>Instructions</summary>
+
+Follow the instructions at https://wiki.winehq.org/Download.
+
+On macOS: 
+```
+brew tap homebrew/cask-versions
+brew install --cask --no-quarantine wine-stable
+```
+
+After installation, `wine64` should be on your `PATH`. Check with:
+```
+wine64 --version
+```
+
+</details>
+
+### Run
+
+You can pass `wine64` as the `-exec` parameter in the `go` calls.
+
+To build:
+
+```sh
+GOOS=windows go run -C x -exec "wine64" ./outline-connectivity
+```
+
+For tests:
+```sh
+GOOS=windows go test -exec "wine64"  ./...
+```
