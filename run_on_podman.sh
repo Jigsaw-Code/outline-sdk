@@ -18,7 +18,8 @@ function main() {
   declare -r bin="$1"
   # Remove the binary name from the args
   shift 1
-  podman run --arch $(uname -m) --rm -it -v "${bin}":/outline/bin alpine /outline/bin "$@"
+  # We are using Google's ~2MB minimal image. See https://github.com/GoogleContainerTools/distroless.
+  podman run --arch $(uname -m) --rm -it -v "${bin}":/outline/bin gcr.io/distroless/static-debian11 /outline/bin "$@"
 }
 
 main "$@"
