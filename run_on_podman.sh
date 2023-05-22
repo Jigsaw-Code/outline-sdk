@@ -16,6 +16,7 @@
 
 function main() {
   declare -r bin="$1"
+  # Remove the binary name from the args
   shift 1
   podman run --arch $(uname -m) --rm -it -v "${bin}":/outline/bin alpine /outline/bin "$@"
 }
