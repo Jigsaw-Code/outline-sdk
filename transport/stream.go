@@ -96,6 +96,19 @@ func (e *TCPEndpoint) Connect(ctx context.Context) (StreamConn, error) {
 	return conn.(*net.TCPConn), nil
 }
 
+// StreamDialerEndpoint is a [StreamEndpoint] that connects to the given address using the given [StreamDialer].
+type StreamDialerEndpoint struct {
+	Dialer  StreamDialer
+	Address string
+}
+
+var _ StreamEndpoint = (*StreamDialerEndpoint)(nil)
+
+// Connect implements [StreamEndpoint].Connect.
+func (e *StreamDialerEndpoint) Connect(ctx context.Context) (StreamConn, error) {
+	return e.Dialer.Dial(ctx, e.Address)
+}
+
 // StreamDialer provides a way to dial a destination and establish stream connections.
 type StreamDialer interface {
 	// Dial connects to `raddr`.

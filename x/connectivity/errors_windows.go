@@ -12,19 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// go:build windows
-
 package connectivity
 
 import (
 	"fmt"
-	"golang.org/x/sys/windows"
 	"syscall"
+
+	"golang.org/x/sys/windows"
 )
 
 func errnoName(errno syscall.Errno) string {
-	// List from https://cs.opensource.google/go/x/sys/+/master:windows/zerrors_windows.go,
-	// restricted to WSAE errors.
+	// Windows socket API errors
+	// Official list at https://learn.microsoft.com/en-us/windows/win32/winsock/windows-sockets-error-codes-2.
+	// Easy to parse list at https://cs.opensource.google/go/x/sys/+/master:windows/zerrors_windows.go,
+	// then restricted to those starting in "WSAE"
 	switch errno {
 	case windows.WSAEINTR:
 		return "EINTR"

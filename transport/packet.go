@@ -37,9 +37,22 @@ type UDPEndpoint struct {
 
 var _ PacketEndpoint = (*UDPEndpoint)(nil)
 
-// Connect implements [PacketEndpoint.Connect].
+// Connect implements [PacketEndpoint].Connect.
 func (e UDPEndpoint) Connect(ctx context.Context) (net.Conn, error) {
 	return e.Dialer.DialContext(ctx, "udp", e.Address)
+}
+
+// PacketDialerEndpoint is a [PacketEndpoint] that connects to the given address using the given [PacketDialer].
+type PacketDialerEndpoint struct {
+	Dialer  PacketDialer
+	Address string
+}
+
+var _ PacketEndpoint = (*PacketDialerEndpoint)(nil)
+
+// Connect implements [PacketEndpoint].Connect.
+func (e *PacketDialerEndpoint) Connect(ctx context.Context) (net.Conn, error) {
+	return e.Dialer.Dial(ctx, e.Address)
 }
 
 // PacketDialer provides a way to dial a destination and establish datagram connections.

@@ -46,18 +46,16 @@ func (err *TestError) Unwrap() error {
 	return err.Err
 }
 
-// TestStreamDialerConnectivity uses the given [transport.StreamDialer] to resolve the test domain using the given DNS resolver.
+// TestResolverStreamConnectivity uses the given [transport.StreamEndpoint] to connect to a DNS resolver and resolve the test domain.
 // The context can be used to set a timeout or deadline, or to pass values to the dialer.
-func TestStreamDialerConnectivity(ctx context.Context, dialer transport.StreamDialer, resolverAddress string, testDomain string) (time.Duration, error) {
-	dial := func(ctx context.Context, address string) (net.Conn, error) { return dialer.Dial(ctx, resolverAddress) }
-	return testDialer(ctx, dial, resolverAddress, testDomain)
+func TestResolverStreamConnectivity(ctx context.Context, resolver transport.StreamEndpoint, testDomain string) (time.Duration, error) {
+	return testResolver(ctx, resolver.Connect, testDomain)
 }
 
-// TestPacketDialerConnectivity uses the given [transport.PacketDialer] to resolve the test domain using the given DNS resolver.
+// TestResolverPacketConnectivity uses the given [transport.PacketEndpoint] to connect to a DNS resolver and resolve the test domain.
 // The context can be used to set a timeout or deadline, or to pass values to the listener.
-func TestPacketDialerConnectivity(ctx context.Context, dialer transport.PacketDialer, resolverAddress string, testDomain string) (time.Duration, error) {
-	dial := func(ctx context.Context, address string) (net.Conn, error) { return dialer.Dial(ctx, resolverAddress) }
-	return testDialer(ctx, dial, resolverAddress, testDomain)
+func TestResolverPacketConnectivity(ctx context.Context, resolver transport.PacketEndpoint, testDomain string) (time.Duration, error) {
+	return testResolver(ctx, resolver.Connect, testDomain)
 }
 
 func isTimeout(err error) bool {
@@ -76,7 +74,7 @@ func makeTestError(op string, err error) error {
 	return &TestError{Op: op, PosixError: code, Err: err}
 }
 
-func testDialer(ctx context.Context, dial func(context.Context, string) (net.Conn, error), resolverAddress string, testDomain string) (time.Duration, error) {
+func testResolver[C net.Conn](ctx context.Context, connect func(context.Context) (C, error), testDomain string) (time.Duration, error) {
 	deadline, ok := ctx.Deadline()
 	if !ok {
 		// Default deadline is 5 seconds.
@@ -88,7 +86,7 @@ func testDialer(ctx context.Context, dial func(context.Context, string) (net.Con
 	}
 	testTime := time.Now()
 	testErr := func() error {
-		conn, dialErr := dial(ctx, resolverAddress)
+		conn, dialErr := connect(ctx)
 		if dialErr != nil {
 			return makeTestError("dial", dialErr)
 		}

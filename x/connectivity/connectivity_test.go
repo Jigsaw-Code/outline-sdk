@@ -33,10 +33,10 @@ import (
 )
 
 // StreamDialer Tests
-func TestTestStreamDialerConnectivityOk(t *testing.T) {
+func TestTestResolverStreamConnectivityOk(t *testing.T) {
 	// TODO(fortuna): Run a local resolver and make test not depend on an external server.
-	dialer := &transport.TCPStreamDialer{}
-	_, err := TestStreamDialerConnectivity(context.Background(), dialer, "8.8.8.8:53", "example.com")
+	resolver := &transport.TCPEndpoint{Address: "8.8.8.8:53"}
+	_, err := TestResolverStreamConnectivity(context.Background(), resolver, "example.com")
 	require.Nil(t, err)
 }
 
@@ -63,14 +63,14 @@ func runTestTCPServer(tb testing.TB, handle func(conn *net.TCPConn), running *sy
 	return listener
 }
 
-func TestTestStreamDialerConnectivityRefused(t *testing.T) {
+func TestTestResolverStreamConnectivityRefused(t *testing.T) {
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IP{127, 0, 0, 1}})
 	require.Nil(t, err)
 	// Close right away to ensure the port is closed. The OS will likely not reuse it soon enough.
 	require.Nil(t, listener.Close())
 
-	dialer := &transport.TCPStreamDialer{}
-	_, err = TestStreamDialerConnectivity(context.Background(), dialer, listener.Addr().String(), "anything")
+	resolver := &transport.TCPEndpoint{Address: listener.Addr().String()}
+	_, err = TestResolverStreamConnectivity(context.Background(), resolver, "anything")
 	var testErr *TestError
 	require.ErrorAs(t, err, &testErr)
 	require.Equal(t, "dial", testErr.Op)
@@ -89,7 +89,7 @@ func TestTestStreamDialerConnectivityRefused(t *testing.T) {
 	require.Equal(t, "ECONNREFUSED", errnoName(errno))
 }
 
-func TestTestStreamDialerConnectivityReset(t *testing.T) {
+func TestTestResolverStreamConnectivityReset(t *testing.T) {
 	var running sync.WaitGroup
 	listener := runTestTCPServer(t, func(conn *net.TCPConn) {
 		// Wait for some data from client. We read one byte to unblock the client write.
@@ -104,8 +104,8 @@ func TestTestStreamDialerConnectivityReset(t *testing.T) {
 	}, &running)
 	defer listener.Close()
 
-	dialer := &transport.TCPStreamDialer{}
-	_, err := TestStreamDialerConnectivity(context.Background(), dialer, listener.Addr().String(), "anything")
+	resolver := &transport.TCPEndpoint{Address: listener.Addr().String()}
+	_, err := TestResolverStreamConnectivity(context.Background(), resolver, "anything")
 
 	var testErr *TestError
 	require.ErrorAs(t, err, &testErr)
@@ -136,8 +136,8 @@ func TestTestStreamDialerEarlyClose(t *testing.T) {
 	}, &running)
 	defer listener.Close()
 
-	dialer := &transport.TCPStreamDialer{}
-	_, err := TestStreamDialerConnectivity(context.Background(), dialer, listener.Addr().String(), "anything")
+	resolver := &transport.TCPEndpoint{Address: listener.Addr().String()}
+	_, err := TestResolverStreamConnectivity(context.Background(), resolver, "anything")
 
 	var testErr *TestError
 	require.ErrorAs(t, err, &testErr)
@@ -149,7 +149,7 @@ func TestTestStreamDialerEarlyClose(t *testing.T) {
 	require.False(t, errors.As(err, &sysErr))
 }
 
-func TestTestStreamDialerConnectivityTimeout(t *testing.T) {
+func TestTestResolverStreamConnectivityTimeout(t *testing.T) {
 	var running sync.WaitGroup
 	var timeout sync.WaitGroup
 	timeout.Add(1)
@@ -161,8 +161,8 @@ func TestTestStreamDialerConnectivityTimeout(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	dialer := &transport.TCPStreamDialer{}
-	_, err := TestStreamDialerConnectivity(ctx, dialer, listener.Addr().String(), "anything")
+	resolver := &transport.TCPEndpoint{Address: listener.Addr().String()}
+	_, err := TestResolverStreamConnectivity(ctx, resolver, "anything")
 
 	var testErr *TestError
 	require.ErrorAs(t, err, &testErr)
@@ -200,8 +200,8 @@ func TestTestPacketPacketConnectivityOk(t *testing.T) {
 		require.ErrorIs(t, err, nil)
 	}()
 
-	dialer := &transport.UDPPacketDialer{}
-	_, err = TestPacketDialerConnectivity(context.Background(), dialer, server.LocalAddr().String(), "example.com")
+	resolver := &transport.UDPEndpoint{Address: server.LocalAddr().String()}
+	_, err = TestResolverPacketConnectivity(context.Background(), resolver, "example.com")
 	require.ErrorIs(t, err, nil)
 }
 
