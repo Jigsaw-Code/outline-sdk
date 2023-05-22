@@ -87,7 +87,7 @@ type TCPEndpoint struct {
 
 var _ StreamEndpoint = (*TCPEndpoint)(nil)
 
-// Connect implements [StreamEndpoint.Connect].
+// Connect implements [StreamEndpoint].Connect.
 func (e *TCPEndpoint) Connect(ctx context.Context) (StreamConn, error) {
 	conn, err := e.Dialer.DialContext(ctx, "tcp", e.Address)
 	if err != nil {
