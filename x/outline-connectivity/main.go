@@ -153,7 +153,7 @@ func main() {
 					if err != nil {
 						log.Fatalf("Failed to create StreamDialer: %v", err)
 					}
-					resolver := transport.StreamDialerEndpoint{Dialer: dialer, Address: resolverAddress}
+					resolver := &transport.StreamDialerEndpoint{Dialer: dialer, Address: resolverAddress}
 					testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, *domainFlag)
 				case "udp":
 					listener, err := makePacketListener(proxyAddress, config.CryptoKey)
@@ -161,7 +161,7 @@ func main() {
 						log.Fatalf("Failed to create PacketListener: %v", err)
 					}
 					dialer := transport.PacketListenerDialer{Listener: listener}
-					resolver := transport.PacketDialerEndpoint{Dialer: dialer, Address: resolverAddress}
+					resolver := &transport.PacketDialerEndpoint{Dialer: dialer, Address: resolverAddress}
 					testDuration, testErr = connectivity.TestResolverPacketConnectivity(context.Background(), resolver, *domainFlag)
 				default:
 					log.Fatalf(`Invalid proto %v. Must be "tcp" or "udp"`, proto)
