@@ -114,7 +114,7 @@ func TestUDPPacketListenerDefaulAddr(t *testing.T) {
 // UDPPacketDialer
 
 func TestUDPPacketDialer(t *testing.T) {
-	server, err := net.ListenUDP("udp", &net.UDPAddr{})
+	server, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.Nil(t, err)
 	require.Equal(t, "udp", server.LocalAddr().Network())
 
@@ -206,7 +206,7 @@ func TestPacketListenerDialer(t *testing.T) {
 // PacketConn assertions
 
 func TestPacketConnInvalidArgument(t *testing.T) {
-	serverListener, err := net.ListenUDP("udp", nil)
+	serverListener, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	require.ErrorIs(t, err, nil)
 	t.Logf("Listening on %v", serverListener.LocalAddr())
 

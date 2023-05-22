@@ -80,11 +80,11 @@ func (sw *Writer) init() (err error) {
 	if sw.aead == nil {
 		salt := make([]byte, sw.key.SaltSize())
 		if err := sw.saltGenerator.GetSalt(salt); err != nil {
-			return fmt.Errorf("failed to generate salt: %v", err)
+			return fmt.Errorf("failed to generate salt: %w", err)
 		}
 		sw.aead, err = sw.key.NewAEAD(salt)
 		if err != nil {
-			return fmt.Errorf("failed to create AEAD: %v", err)
+			return fmt.Errorf("failed to create AEAD: %w", err)
 		}
 		sw.saltGenerator = nil // No longer needed, so release reference.
 		sw.counter = make([]byte, sw.aead.NonceSize())
@@ -174,7 +174,7 @@ func (sw *Writer) buffers() (sizeBuf, payloadBuf []byte) {
 	return
 }
 
-// ReadFrom implements the io.ReaderFrom interface.
+// ReadFrom implements the [io.ReaderFrom] interface.
 func (sw *Writer) ReadFrom(r io.Reader) (int64, error) {
 	if err := sw.init(); err != nil {
 		return 0, err
@@ -311,7 +311,7 @@ func (cr *chunkReader) init() (err error) {
 		}
 		cr.aead, err = cr.key.NewAEAD(salt)
 		if err != nil {
-			return fmt.Errorf("failed to create AEAD: %v", err)
+			return fmt.Errorf("failed to create AEAD: %w", err)
 		}
 		cr.counter = make([]byte, cr.aead.NonceSize())
 		cr.payloadSizeBuf = make([]byte, 2+cr.aead.Overhead())
@@ -331,7 +331,7 @@ func (cr *chunkReader) readMessage(buf []byte) error {
 	_, err = cr.aead.Open(buf[:0], cr.counter, buf, nil)
 	increment(cr.counter)
 	if err != nil {
-		return fmt.Errorf("failed to decrypt: %v", err)
+		return fmt.Errorf("failed to decrypt: %w", err)
 	}
 	return nil
 }

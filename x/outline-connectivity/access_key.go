@@ -47,17 +47,17 @@ func parseAccessKey(accessKey string) (*sessionConfig, error) {
 	var config sessionConfig
 	accessKeyURL, err := url.Parse(accessKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse access key: %v", err)
+		return nil, fmt.Errorf("failed to parse access key: %w", err)
 	}
 	var portString string
 	// Host is a <host>:<port> string
 	config.Hostname, portString, err = net.SplitHostPort(accessKeyURL.Host)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse endpoint address: %v", err)
+		return nil, fmt.Errorf("failed to parse endpoint address: %w", err)
 	}
 	config.Port, err = strconv.Atoi(portString)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse port number: %v", err)
+		return nil, fmt.Errorf("failed to parse port number: %w", err)
 	}
 	cipherInfoBytes, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(accessKeyURL.User.String())
 	if err != nil {
@@ -69,13 +69,13 @@ func parseAccessKey(accessKey string) (*sessionConfig, error) {
 	}
 	config.CryptoKey, err = shadowsocks.NewEncryptionKey(cipherName, secret)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cipher: %v", err)
+		return nil, fmt.Errorf("failed to create cipher: %w", err)
 	}
 	prefixStr := accessKeyURL.Query().Get("prefix")
 	if len(prefixStr) > 0 {
 		config.Prefix, err = ParseStringPrefix(prefixStr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse prefix: %v", err)
+			return nil, fmt.Errorf("failed to parse prefix: %w", err)
 		}
 	}
 	return &config, nil

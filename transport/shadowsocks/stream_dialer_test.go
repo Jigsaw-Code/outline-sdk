@@ -53,14 +53,17 @@ func TestStreamDialer_DialNoPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
+	// Extend the wait to be safer.
+	d.ClientDataWait = 0 * time.Millisecond
+
 	conn, err := d.Dial(context.Background(), testTargetAddr)
 	if err != nil {
 		t.Fatalf("StreamDialer.Dial failed: %v", err)
 	}
 
-	// Wait for more than 10 milliseconds to ensure that the target
+	// Wait for more than 100 milliseconds to ensure that the target
 	// address is sent.
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	// Force the echo server to verify the target address.
 	conn.Close()
 
@@ -199,7 +202,9 @@ func startShadowsocksTCPEchoProxy(key *EncryptionKey, expectedTgtAddr string, t 
 		for {
 			clientConn, err := listener.AcceptTCP()
 			if err != nil {
-				t.Logf("AcceptTCP failed: %v", err)
+				if err != net.ErrClosed {
+					t.Logf("AcceptTCP failed: %v", err)
+				}
 				return
 			}
 			running.Add(1)
