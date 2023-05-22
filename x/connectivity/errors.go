@@ -21,7 +21,7 @@ import (
 
 func errnoName(errno syscall.Errno) string {
 	name := systemErrnoName(errno)
-	if name != "" {
+	if len(name) > 0 {
 		return name
 	}
 	return fmt.Sprintf("Error %d (0x%x)", int(errno), int(errno))
