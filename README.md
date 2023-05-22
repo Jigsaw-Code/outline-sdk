@@ -33,7 +33,7 @@ Tentative roadmap:
 
 ## Building
 
-In Go, you can compile for other target operating system and architecture by specifying the `GOOS` and `GOARCH` environment variables.
+In Go you can compile for other target operating system and architecture by specifying the `GOOS` and `GOARCH` environment variables. That only works if you are not using [Cgo](https://pkg.go.dev/cmd/cgo) to call C code.
 
 <details>
   <summary>Examples</summary>
