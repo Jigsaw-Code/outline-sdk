@@ -17,13 +17,12 @@
 package connectivity
 
 import (
-	"fmt"
 	"syscall"
 
 	"golang.org/x/sys/windows"
 )
 
-func errnoName(errno syscall.Errno) string {
+func systemErrnoName(errno syscall.Errno) string {
 	// Windows socket API errors
 	// Official list at https://learn.microsoft.com/en-us/windows/win32/winsock/windows-sockets-error-codes-2.
 	// Easy to parse list at https://cs.opensource.google/go/x/sys/+/master:windows/zerrors_windows.go,
@@ -130,6 +129,6 @@ func errnoName(errno syscall.Errno) string {
 	case windows.WSAEREFUSED:
 		return "EREFUSED"
 	default:
-		return fmt.Sprintf("Error %d (0x%x)", int(errno), int(errno))
+		return ""
 	}
 }

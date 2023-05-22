@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build unix
-
 package connectivity
 
 import (
+	"fmt"
 	"syscall"
-
-	"golang.org/x/sys/unix"
 )
 
-func systemErrnoName(errno syscall.Errno) string {
-	return unix.ErrnoName(errno)
+func errnoName(errno syscall.Errno) string {
+	name := systemErrnoName(errno)
+	if name != "" {
+		return name
+	}
+	return fmt.Sprintf("Error %d (0x%x)", int(errno), int(errno))
 }
