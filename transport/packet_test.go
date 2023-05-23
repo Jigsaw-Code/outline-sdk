@@ -118,7 +118,7 @@ func TestUDPPacketDialer(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "udp", server.LocalAddr().Network())
 
-	dialer := &UDPPacketDialer{}
+	dialer := &UDPDialer{}
 	conn, err := dialer.Dial(context.Background(), server.LocalAddr().String())
 	require.Nil(t, err)
 

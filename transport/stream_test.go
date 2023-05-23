@@ -65,7 +65,7 @@ func TestNewTCPStreamDialerIPv4(t *testing.T) {
 	// Client
 	go func() {
 		defer running.Done()
-		dialer := &TCPStreamDialer{}
+		dialer := &TCPDialer{}
 		dialer.Dialer.Control = func(network, address string, c syscall.RawConn) error {
 			require.Equal(t, "tcp4", network)
 			require.Equal(t, listener.Addr().String(), address)
@@ -93,7 +93,7 @@ func TestNewTCPStreamDialerIPv4(t *testing.T) {
 
 func TestNewTCPStreamDialerAddress(t *testing.T) {
 	errCancel := errors.New("cancelled")
-	dialer := &TCPStreamDialer{}
+	dialer := &TCPDialer{}
 
 	dialer.Dialer.Control = func(network, address string, c syscall.RawConn) error {
 		require.Equal(t, "tcp4", network)
