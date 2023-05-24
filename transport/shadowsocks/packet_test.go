@@ -27,7 +27,7 @@ func BenchmarkPack(b *testing.B) {
 	b.ResetTimer()
 
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
-	require.Nil(b, err)
+	require.NoError(b, err)
 	MTU := 1500
 	pkt := make([]byte, MTU)
 	plaintextBuf := pkt[key.SaltSize() : len(pkt)-key.TagSize()]

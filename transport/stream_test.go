@@ -32,7 +32,7 @@ func TestNewTCPStreamDialerIPv4(t *testing.T) {
 	responseText := []byte("Response")
 
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
-	require.Nilf(t, err, "Failed to create TCP listener: %v", err)
+	require.NoError(t, err, "Failed to create TCP listener: %v", err)
 	defer listener.Close()
 
 	var running sync.WaitGroup
@@ -42,24 +42,24 @@ func TestNewTCPStreamDialerIPv4(t *testing.T) {
 	go func() {
 		defer running.Done()
 		clientConn, err := listener.AcceptTCP()
-		require.Nilf(t, err, "AcceptTCP failed: %v", err)
+		require.NoError(t, err, "AcceptTCP failed: %v", err)
 
 		defer clientConn.Close()
 		err = iotest.TestReader(clientConn, requestText)
-		assert.Nilf(t, err, "Request read failed: %v", err)
+		assert.NoError(t, err, "Request read failed: %v", err)
 
 		// This works on Linux, but on macOS it errors with "shutdown: socket is not connected" (syscall.ENOTCONN).
 		// It seems that on macOS you cannot call CloseRead() if you've already received a FIN and read all the data.
 		// TODO(fortuna): Consider wrapping StreamConns on macOS to make CloseRead a no-op if Read has returned io.EOF
 		// or WriteTo has been called.
 		// err = clientConn.CloseRead()
-		// assert.Nilf(t, err, "clientConn.CloseRead failed: %v", err)
+		// assert.NoError(t, err, "clientConn.CloseRead failed: %v", err)
 
 		_, err = clientConn.Write(responseText)
-		assert.Nilf(t, err, "Write failed: %v", err)
+		assert.NoError(t, err, "Write failed: %v", err)
 
 		err = clientConn.CloseWrite()
-		assert.Nilf(t, err, "CloseWrite failed: %v", err)
+		assert.NoError(t, err, "CloseWrite failed: %v", err)
 	}()
 
 	// Client
@@ -72,20 +72,20 @@ func TestNewTCPStreamDialerIPv4(t *testing.T) {
 			return nil
 		}
 		serverConn, err := dialer.Dial(context.Background(), listener.Addr().String())
-		require.Nil(t, err, "Dial failed")
+		require.NoError(t, err, "Dial failed")
 		require.Equal(t, listener.Addr().String(), serverConn.RemoteAddr().String())
 		defer serverConn.Close()
 
 		n, err := serverConn.Write(requestText)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.Equal(t, 7, n)
 		assert.Nil(t, serverConn.CloseWrite())
 
 		err = iotest.TestReader(serverConn, responseText)
-		require.Nilf(t, err, "Response read failed: %v", err)
+		require.NoError(t, err, "Response read failed: %v", err)
 		// See CloseRead comment on the server go-routine.
 		// err = serverConn.CloseRead()
-		// assert.Nilf(t, err, "serverConn.CloseRead failed: %v", err)
+		// assert.NoError(t, err, "serverConn.CloseRead failed: %v", err)
 	}()
 
 	running.Wait()
@@ -114,7 +114,7 @@ func TestNewTCPStreamDialerAddress(t *testing.T) {
 
 func TestDialStreamEndpointAddr(t *testing.T) {
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
-	require.Nil(t, err, "Failed to create TCP listener")
+	require.NoError(t, err, "Failed to create TCP listener")
 	defer listener.Close()
 
 	endpoint := TCPEndpoint{Address: listener.Addr().String()}
@@ -124,7 +124,7 @@ func TestDialStreamEndpointAddr(t *testing.T) {
 		return nil
 	}
 	conn, err := endpoint.Connect(context.Background())
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, listener.Addr().String(), conn.RemoteAddr().String())
 	require.Nil(t, conn.Close())
 }

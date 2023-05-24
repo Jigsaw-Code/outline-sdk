@@ -37,7 +37,7 @@ func TestTestResolverStreamConnectivityOk(t *testing.T) {
 	// TODO(fortuna): Run a local resolver and make test not depend on an external server.
 	resolver := &transport.TCPEndpoint{Address: "8.8.8.8:53"}
 	_, err := TestResolverStreamConnectivity(context.Background(), resolver, "example.com")
-	require.Nil(t, err)
+	require.NoError(t, err)
 }
 
 // TODO: Move this to the SDK.
@@ -65,7 +65,7 @@ func runTestTCPServer(tb testing.TB, handle func(conn *net.TCPConn), running *sy
 
 func TestTestResolverStreamConnectivityRefused(t *testing.T) {
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IP{127, 0, 0, 1}})
-	require.Nil(t, err)
+	require.NoError(t, err)
 	// Close right away to ensure the port is closed. The OS will likely not reuse it soon enough.
 	require.Nil(t, listener.Close())
 
@@ -97,7 +97,7 @@ func TestTestResolverStreamConnectivityReset(t *testing.T) {
 		// not reading any data may keep the client blocked on the write, causing inconsistent
 		// TestErr.Op results across OSes.
 		_, err := conn.Read(make([]byte, 1))
-		require.ErrorIs(t, err, nil)
+		require.NoError(t, err)
 		// This forces a reset when the connection is closed and there's data not acknowledged.
 		conn.SetLinger(0)
 		require.Nil(t, conn.Close())
@@ -131,7 +131,7 @@ func TestTestStreamDialerEarlyClose(t *testing.T) {
 		conn.CloseWrite()
 		// Consume all the incoming data to avoid a reset.
 		_, err := io.Copy(io.Discard, conn)
-		require.ErrorIs(t, err, nil)
+		require.NoError(t, err)
 		require.Nil(t, conn.Close())
 	}, &running)
 	defer listener.Close()
@@ -181,28 +181,28 @@ func TestTestResolverStreamConnectivityTimeout(t *testing.T) {
 
 func TestTestPacketPacketConnectivityOk(t *testing.T) {
 	server, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
-	require.ErrorIs(t, err, nil)
+	require.NoError(t, err)
 	defer server.Close()
 
 	go func() {
 		buf := make([]byte, 512)
 		n, clientAddr, err := server.ReadFrom(buf)
-		require.ErrorIs(t, err, nil)
+		require.NoError(t, err)
 		var request dns.Msg
 		err = request.Unpack(buf[:n])
-		require.ErrorIs(t, err, nil)
+		require.NoError(t, err)
 
 		var response dns.Msg
 		response.SetReply(&request)
 		responseBytes, err := response.Pack()
-		require.ErrorIs(t, err, nil)
+		require.NoError(t, err)
 		_, err = server.WriteTo(responseBytes, clientAddr)
-		require.ErrorIs(t, err, nil)
+		require.NoError(t, err)
 	}()
 
 	resolver := &transport.UDPEndpoint{Address: server.LocalAddr().String()}
 	_, err = TestResolverPacketConnectivity(context.Background(), resolver, "example.com")
-	require.ErrorIs(t, err, nil)
+	require.NoError(t, err)
 }
 
 // TODO: Add more tests
