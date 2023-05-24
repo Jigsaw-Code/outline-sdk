@@ -13,17 +13,17 @@
 // limitations under the License.
 
 /*
-The tun2socks/lwip package uses the lwIP (A Lightweight TCP/IP stack) library to translate between IP packets and
-TCP/UDP protocols. The library is singleton, so only one instance can be created per process.
+The network/lwip2transport package uses the lwIP (A Lightweight TCP/IP stack) library to translate between IP packets
+and TCP/UDP protocols. The device is singleton, so only one instance can be created per process.
 
 To create the instance with TCP/UDP handlers:
 
 	// tcpHandler will be used to handle TCP streams, and udpHandler to handle UDP packets
-	t2s, err := lwip.NewTun2SocksDevice(tcpHandler, udpHandler)
+	t2s, err := lwip2transport.NewDevice(tcpHandler, udpHandler)
 	if err != nil {
 		// handle error
 	}
 
-InitInstance can only be called once. You will get an error if you call it more than once.
+NewDevice can only be called once. The behavior is undefined if you call it more than once.
 */
-package lwip
+package lwip2transport
