@@ -23,11 +23,11 @@ import (
 
 func assertCipher(t *testing.T, cipher string, saltSize, tagSize int) {
 	key, err := NewEncryptionKey(cipher, "")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, saltSize, key.SaltSize())
 
 	dummyAead, err := key.NewAEAD(make([]byte, key.SaltSize()))
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, tagSize, key.TagSize())
 	require.Equal(t, key.TagSize(), dummyAead.Overhead())
 }
@@ -42,19 +42,19 @@ func TestSizes(t *testing.T) {
 
 func TestShadowsocksCipherNames(t *testing.T) {
 	key, err := NewEncryptionKey("chacha20-ietf-poly1305", "")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, chacha20IETFPOLY1305Cipher, key.cipher)
 
 	key, err = NewEncryptionKey("aes-256-gcm", "")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, aes256GCMCipher, key.cipher)
 
 	key, err = NewEncryptionKey("aes-192-gcm", "")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, aes192GCMCipher, key.cipher)
 
 	key, err = NewEncryptionKey("aes-128-gcm", "")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, aes128GCMCipher, key.cipher)
 }
 
@@ -87,7 +87,7 @@ func TestMaxTagSize(t *testing.T) {
 	var calculatedMax int
 	for _, cipher := range supportedCiphers {
 		key, err := NewEncryptionKey(cipher, "")
-		if !assert.Nilf(t, err, "Failed to create cipher %v", cipher) {
+		if !assert.NoError(t, err, "Failed to create cipher %v", cipher) {
 			continue
 		}
 		assert.LessOrEqualf(t, key.TagSize(), maxTagSize, "Tag size for cipher %v (%v) is greater than the max (%v)", cipher, key.TagSize(), maxTagSize)

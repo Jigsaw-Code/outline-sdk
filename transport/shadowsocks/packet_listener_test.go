@@ -43,7 +43,7 @@ func TestShadowsocksPacketListener_ListenPacket(t *testing.T) {
 	conn.SetReadDeadline(time.Now().Add(time.Second * 5))
 	pcrw := &packetConnReadWriter{PacketConn: conn}
 	pcrw.targetAddr, err = transport.MakeNetAddr("udp", testTargetAddr)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	expectEchoPayload(pcrw, makeTestPayload(1024), make([]byte, 1024), t)
 
 	proxy.Close()
@@ -57,7 +57,7 @@ func BenchmarkShadowsocksPacketListener_ListenPacket(b *testing.B) {
 	key := makeTestKey(b)
 	proxy, running := startShadowsocksUDPEchoServer(key, testTargetAddr, b)
 	targetAddr, err := transport.MakeNetAddr("udp", testTargetAddr)
-	require.Nil(b, err)
+	require.NoError(b, err)
 	proxyEndpoint := transport.UDPEndpoint{Address: proxy.LocalAddr().String()}
 	d, err := NewPacketListener(proxyEndpoint, key)
 	if err != nil {
