@@ -23,6 +23,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 )
 
 // UDPEndpoint
@@ -217,3 +219,171 @@ func TestPacketConnInvalidArgument(t *testing.T) {
 	// This returns Invalid Argument because netAddr is not a *UDPAddr
 	require.ErrorIs(t, err, syscall.EINVAL)
 }
+
+// func setsockoptInt(conn interface {
+// 	SyscallConn() (syscall.RawConn, error)
+// }, level, opt, value int) error {
+// 	rawConn, err := conn.SyscallConn()
+// 	if err != nil {
+// 		return err
+// 	}
+// 	rawConn.Control(func(fd uintptr) {
+// 		// On Windows:
+// 		// cannot use int(fd) (value of type int) as syscall.Handle value in argument to syscall.SetsockoptInt
+// 		err = syscall.SetsockoptInt(int(fd), level, opt, value)
+// 	})
+// 	return err
+// }
+
+func TestPacketConnDestAddr(t *testing.T) {
+	server, err := net.ListenUDP("udp", nil)
+	require.ErrorIs(t, err, nil)
+
+	// Set RECVPKTINFO. See https://blog.cloudflare.com/everything-you-ever-wanted-to-know-about-udp-sockets-but-were-afraid-to-ask-part-1/#sourcing-packets-from-a-wildcard-socket
+	// To check for supported options, use getsockopt and check for ENOPROTOOPT
+	//
+	// Windows Compatibility:
+	// - IPPROTO_IP: https://learn.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options
+	//   - IP_PKTINFO, IP_TTL
+	// - IPPROTO_IPV6: https://learn.microsoft.com/en-us/windows/win32/winsock/ipproto-ipv6-socket-options
+	//   - IP_ORIGINAL_ARRIVAL_IF, IPV6_PKTINFO, IPV6_RECVIF
+	if server.LocalAddr().(*net.UDPAddr).IP.To4() != nil {
+		t.Logf("IPv4 socket. Address: %v", server.LocalAddr())
+		// darwin: ok, linux & windows: not defined
+		// May be able to use syscall.IP_RECVDSTADDR or syscall.IP_PKTINFO
+		// Linux: undefined: syscall.IP_RECVPKTINFO
+		// require.ErrorIs(t, setsockoptInt(server, syscall.IPPROTO_IP, syscall.IP_RECVPKTINFO, 1), nil)
+		sc := ipv4.NewPacketConn(server)
+		require.ErrorIs(t, sc.SetControlMessage(ipv4.FlagDst, true), nil)
+	} else if server.LocalAddr().(*net.UDPAddr).IP.To16() != nil {
+		t.Logf("IPv6 socket. Address: %v", server.LocalAddr())
+		// TODO(fortuna): need to make it work on Windows. (unix not defined)
+		// From https://www.rfc-editor.org/rfc/rfc3542.
+		// require.ErrorIs(t, setsockoptInt(server, syscall.IPPROTO_IPV6, unix.IPV6_RECVPKTINFO, 1), nil)
+		sc := ipv6.NewPacketConn(server)
+		require.ErrorIs(t, sc.SetControlMessage(ipv6.FlagDst, true), nil)
+	} else {
+		t.Error("Invalid address")
+	}
+
+	serverPort := server.LocalAddr().(*net.UDPAddr).Port
+
+	serverBuf := make([]byte, 6)
+
+	{
+		client4, err := net.ListenUDP("udp4", nil)
+		require.ErrorIs(t, err, nil)
+
+		n, err := client4.WriteToUDP([]byte("PING4"), &net.UDPAddr{IP: net.IP{127, 0, 0, 1}, Port: serverPort})
+		require.ErrorIs(t, err, nil)
+		require.Equal(t, 5, n)
+
+		// oob := ipv4.NewControlMessage(ipv4.FlagDst)
+		oob := make([]byte, 100)
+		n, oobn, flags, clientAddr, err := server.ReadMsgUDP(serverBuf, oob)
+		require.ErrorIs(t, err, nil)
+		require.Equal(t, string(serverBuf[:n]), "PING4")
+		require.Equal(t, net.IP{127, 0, 0, 1}, clientAddr.IP.To4())
+		require.Equal(t, client4.LocalAddr().(*net.UDPAddr).Port, clientAddr.Port)
+
+		// Need to use IPv6 format because the "any" address is IPv6.
+		var cm6 ipv6.ControlMessage
+		require.ErrorIs(t, cm6.Parse(oob[:oobn]), nil)
+		t.Logf("Control Message: %#v", cm6)
+		// IPv4 is encoded as IPv4. Need to convert.
+		require.Equal(t, net.IP{127, 0, 0, 1}, cm6.Dst.To4())
+		require.Equal(t, 1, cm6.IfIndex)
+		require.Equal(t, 0, flags)
+
+		// var cm4 ipv4.ControlMessage
+		// require.ErrorIs(t, cm4.Parse(oob[:oobn]), nil)
+		// t.Logf("Control Message: %#v", cm4)
+		// require.Equal(t, net.IP{127, 0, 0, 1}, cm4.Dst)
+		// require.Equal(t, 1, cm4.IfIndex)
+		// require.Equal(t, 0, flags)
+	}
+
+	{
+		client6, err := net.ListenUDP("udp6", nil)
+		require.ErrorIs(t, err, nil)
+
+		n, err := client6.WriteToUDP([]byte("PING6"), &net.UDPAddr{IP: net.IPv6loopback, Port: serverPort})
+		require.ErrorIs(t, err, nil)
+		require.Equal(t, 5, n)
+
+		oob := ipv6.NewControlMessage(ipv6.FlagDst)
+		n, oobn, flags, clientAddr, err := server.ReadMsgUDP(serverBuf, oob)
+		require.ErrorIs(t, err, nil)
+		require.Equal(t, string(serverBuf[:n]), "PING6")
+		require.Equal(t, net.IPv6loopback, clientAddr.IP)
+		require.Equal(t, client6.LocalAddr().(*net.UDPAddr).Port, clientAddr.Port)
+
+		var cm6 ipv6.ControlMessage
+		require.ErrorIs(t, cm6.Parse(oob[:oobn]), nil)
+		t.Logf("Control Message: %#v", cm6)
+		require.Equal(t, net.IPv6loopback, cm6.Dst)
+		require.Equal(t, 1, cm6.IfIndex)
+		require.Equal(t, 0, flags)
+	}
+}
+
+// func TestPacketConnDestAddr2(t *testing.T) {
+// 	server, err := net.ListenUDP("udp", nil)
+// 	require.ErrorIs(t, err, nil)
+
+// 	// Set RECVPKTINFO. See https://blog.cloudflare.com/everything-you-ever-wanted-to-know-about-udp-sockets-but-were-afraid-to-ask-part-1/#sourcing-packets-from-a-wildcard-socket
+// 	// To check for supported options, use getsockopt and check for ENOPROTOOPT
+// 	//
+// 	// Windows Compatibility:
+// 	// - IPPROTO_IP: https://learn.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options
+// 	//   - IP_PKTINFO, IP_TTL
+// 	// - IPPROTO_IPV6: https://learn.microsoft.com/en-us/windows/win32/winsock/ipproto-ipv6-socket-options
+// 	//   - IP_ORIGINAL_ARRIVAL_IF, IPV6_PKTINFO, IPV6_RECVIF
+// 	if server.LocalAddr().(*net.UDPAddr).IP.To4() != nil {
+// 		t.Logf("IPv4 socket. Address: %v", server.LocalAddr())
+// 		sc := ipv4.NewPacketConn(server)
+// 		require.ErrorIs(t, sc.SetControlMessage(ipv4.FlagDst, true), nil)
+// 	} else if server.LocalAddr().(*net.UDPAddr).IP.To16() != nil {
+// 		t.Logf("IPv6 socket. Address: %v", server.LocalAddr())
+// 		sc := ipv6.NewPacketConn(server)
+// 		require.ErrorIs(t, sc.SetControlMessage(ipv6.FlagDst, true), nil)
+// 	} else {
+// 		t.Error("Invalid address")
+// 	}
+
+// 	serverPort := server.LocalAddr().(*net.UDPAddr).Port
+
+// 	serverBuf := make([]byte, 6)
+// 	// // TODO: How big should this be?
+// 	oob := make([]byte, 100)
+
+// 	client4, err := net.ListenUDP("udp4", nil)
+// 	require.ErrorIs(t, err, nil)
+
+// 	n, err := client4.WriteToUDP([]byte("PING4"), &net.UDPAddr{IP: net.IP{127, 0, 0, 1}, Port: serverPort})
+// 	require.ErrorIs(t, err, nil)
+// 	require.Equal(t, 5, n)
+
+// 	n, oobn, flags, clientAddr, err := server.ReadMsgUDP(serverBuf, oob)
+// 	require.ErrorIs(t, err, nil)
+// 	require.Equal(t, string(serverBuf[:n]), "PING4")
+// 	require.Equal(t, net.IP{127, 0, 0, 1}, clientAddr.IP.To4())
+// 	require.Equal(t, client4.LocalAddr().(*net.UDPAddr).Port, clientAddr.Port)
+// 	require.Equal(t, []byte{}, oob[:oobn])
+// 	require.Equal(t, 0, flags)
+
+// 	client6, err := net.ListenUDP("udp6", nil)
+// 	require.ErrorIs(t, err, nil)
+
+// 	n, err = client6.WriteToUDP([]byte("PING6"), &net.UDPAddr{IP: net.IPv6loopback, Port: serverPort})
+// 	require.ErrorIs(t, err, nil)
+// 	require.Equal(t, 5, n)
+
+// 	n, oobn, flags, clientAddr, err = server.ReadMsgUDP(serverBuf, oob)
+// 	require.ErrorIs(t, err, nil)
+// 	require.Equal(t, string(serverBuf[:n]), "PING6")
+// 	require.Equal(t, net.IPv6loopback, clientAddr.IP)
+// 	require.Equal(t, client6.LocalAddr().(*net.UDPAddr).Port, clientAddr.Port)
+// 	require.Equal(t, []byte{}, oob[:oobn])
+// 	require.Equal(t, 0, flags)
+// }
