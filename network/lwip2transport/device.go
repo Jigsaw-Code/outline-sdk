@@ -203,7 +203,7 @@ func (d *lwIPDevice) Write(b []byte) (int, error) {
 		return 0, network.ErrMsgSize
 	}
 	n, err := d.stack.Write(b)
-	// workaround: lwip netstack did not use a standard error code
+	// Workaround: lwip netstack did not use a typed error.
 	if err != nil && err.Error() == "stack closed" {
 		return n, network.ErrClosed
 	}
