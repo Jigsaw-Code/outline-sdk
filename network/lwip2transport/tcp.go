@@ -20,7 +20,7 @@ import (
 	"net"
 
 	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
-	lwipLib "github.com/eycorsican/go-tun2socks/core"
+	lwip "github.com/eycorsican/go-tun2socks/core"
 )
 
 type tcpHandler struct {
@@ -38,7 +38,7 @@ func (h *tcpHandler) Handle(conn net.Conn, target *net.TCPAddr) error {
 		return err
 	}
 	// TODO: Request upstream to make `conn` a `core.TCPConn` so we can avoid this type assertion.
-	go relay(conn.(lwipLib.TCPConn), proxyConn)
+	go relay(conn.(lwip.TCPConn), proxyConn)
 	return nil
 }
 

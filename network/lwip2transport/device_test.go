@@ -26,7 +26,7 @@ import (
 )
 
 func TestStackClosedWriteError(t *testing.T) {
-	_, d := newlwIPDeviceForTest(t)
+	_, d := reConfigurelwIPDeviceForTest(t)
 	d.stack.Close() // close the underlying stack without calling Close
 	n, err := d.Write([]byte{0x01})
 	require.Exactly(t, 0, n)
@@ -34,10 +34,10 @@ func TestStackClosedWriteError(t *testing.T) {
 	require.ErrorIs(t, err, os.ErrClosed) // network.ErrClosed should wrap os.ErrClosed
 }
 
-func newlwIPDeviceForTest(t *testing.T) (*mockTcpUdpHandler, *lwIPDevice) {
+func reConfigurelwIPDeviceForTest(t *testing.T) (*mockTcpUdpHandler, *lwIPDevice) {
 	h := &mockTcpUdpHandler{}
-	td, err := NewDevice(h, h)
-	require.Nil(t, err)
+	td, err := ConfigureDevice(h, h)
+	require.NoError(t, err)
 	d, ok := td.(*lwIPDevice)
 	require.True(t, ok)
 	return h, d

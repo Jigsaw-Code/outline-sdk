@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
-	lwipLib "github.com/eycorsican/go-tun2socks/core"
+	lwip "github.com/eycorsican/go-tun2socks/core"
 )
 
 type udpHandler struct {
@@ -37,7 +37,7 @@ type udpHandler struct {
 	timeout time.Duration
 
 	// Maps connections from TUN to connections to the proxy.
-	conns map[lwipLib.UDPConn]net.PacketConn
+	conns map[lwip.UDPConn]net.PacketConn
 }
 
 // newUDPHandler returns a lwIP UDP connection handler.
@@ -48,11 +48,11 @@ func newUDPHandler(pl transport.PacketListener, timeout time.Duration) *udpHandl
 	return &udpHandler{
 		listener: pl,
 		timeout:  timeout,
-		conns:    make(map[lwipLib.UDPConn]net.PacketConn, 8),
+		conns:    make(map[lwip.UDPConn]net.PacketConn, 8),
 	}
 }
 
-func (h *udpHandler) Connect(tunConn lwipLib.UDPConn, target *net.UDPAddr) error {
+func (h *udpHandler) Connect(tunConn lwip.UDPConn, target *net.UDPAddr) error {
 	proxyConn, err := h.listener.ListenPacket(context.Background())
 	if err != nil {
 		return err
@@ -65,11 +65,11 @@ func (h *udpHandler) Connect(tunConn lwipLib.UDPConn, target *net.UDPAddr) error
 }
 
 // relayPacketsFromProxy relays packets from the proxy to the TUN device.
-func (h *udpHandler) relayPacketsFromProxy(tunConn lwipLib.UDPConn, proxyConn net.PacketConn) {
-	buf := lwipLib.NewBytes(lwipLib.BufSize)
+func (h *udpHandler) relayPacketsFromProxy(tunConn lwip.UDPConn, proxyConn net.PacketConn) {
+	buf := lwip.NewBytes(lwip.BufSize)
 	defer func() {
 		h.close(tunConn)
-		lwipLib.FreeBytes(buf)
+		lwip.FreeBytes(buf)
 	}()
 	for {
 		proxyConn.SetDeadline(time.Now().Add(h.timeout))
@@ -90,7 +90,7 @@ func (h *udpHandler) relayPacketsFromProxy(tunConn lwipLib.UDPConn, proxyConn ne
 }
 
 // ReceiveTo relays packets from the TUN device to the proxy. It's called by tun2socks.
-func (h *udpHandler) ReceiveTo(tunConn lwipLib.UDPConn, data []byte, destAddr *net.UDPAddr) error {
+func (h *udpHandler) ReceiveTo(tunConn lwip.UDPConn, data []byte, destAddr *net.UDPAddr) error {
 	h.Lock()
 	proxyConn, ok := h.conns[tunConn]
 	h.Unlock()
@@ -102,7 +102,7 @@ func (h *udpHandler) ReceiveTo(tunConn lwipLib.UDPConn, data []byte, destAddr *n
 	return err
 }
 
-func (h *udpHandler) close(tunConn lwipLib.UDPConn) {
+func (h *udpHandler) close(tunConn lwip.UDPConn) {
 	tunConn.Close()
 	h.Lock()
 	defer h.Unlock()

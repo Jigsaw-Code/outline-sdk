@@ -17,11 +17,12 @@ package lwip2transport
 import (
 	"errors"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-internal-sdk/network"
 	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
-	lwipLib "github.com/eycorsican/go-tun2socks/core"
+	lwip "github.com/eycorsican/go-tun2socks/core"
 )
 
 const packetMTU = 1500
@@ -32,28 +33,28 @@ const packetMTU = 1500
 // LwIPTransportDevice must be a singleton object due to limitations in [lwIP library].
 //
 // To use a LwIPTransportDevice:
-//  1. Call [NewDevice] with two handlers for TCP and UDP traffic.
-//  2. [Write] IP packets to the device. The device will translate the IP packets to TCP/UDP traffic and send them to
-//     the appropriate handlers.
-//  3. [Read] IP packets from the device to get the TCP/UDP responses.
+//  1. Call [ConfigureDevice] with two handlers for TCP and UDP traffic.
+//  2. Write IP packets to the device. The device will translate the IP packets to TCP/UDP traffic and send them to the
+//     appropriate handlers.
+//  3. Read IP packets from the device to get the TCP/UDP responses.
 //
-// A LwIPTransportDevice is NOT thread-safe. However it is safe to use [Write], [Read]/[WriteTo] and [Close] in
-// different goroutines. But keep in mind that only one goroutine can use [Write] at a time; and only one goroutine can
-// use the [Read] or [WriteTo] methods at a time.
+// A LwIPTransportDevice is NOT thread-safe. However it is safe to use Write, Read/WriteTo and Close in different
+// goroutines. But keep in mind that only one goroutine can call Write at a time; and only one goroutine can use either
+// Read or WriteTo at a time.
 //
 // [lwIP library]: https://savannah.nongnu.org/projects/lwip/
 type LwIPTransportDevice interface {
 	network.IPDevice
 }
 
-// Compilation Guard Against Interface Implementation
+// Compilation guard against interface implementation
 var _ network.IPDevice = (*lwIPDevice)(nil)
 var _ LwIPTransportDevice = (*lwIPDevice)(nil)
 
 type lwIPDevice struct {
 	tcp   *tcpHandler
 	udp   *udpHandler
-	stack lwipLib.LWIPStack
+	stack lwip.LWIPStack
 
 	// whether the device has been closed
 	done chan struct{}
@@ -63,29 +64,39 @@ type lwIPDevice struct {
 	rdN   chan int
 }
 
-// NewDevice creates a new LwIPTransportDevice. This device uses a [transport.StreamDialer] `sd` to handle TCP streams
-// and a [transport.PacketListener] `pl` to handle UDP packets.
+// Singleton instance
+var instMu sync.Mutex
+var inst *lwIPDevice = nil
+
+// ConfigureDevice configures the singleton LwIPTransportDevice using the [transport.StreamDialer] sd to handle TCP
+// streams and the [transport.PacketListener] pl to handle UDP packets.
 //
-// You can only have one active LwIPTransportDevice per process. If you try to create more than one, the behavior is
-// undefined. However, it's OK to [Close] an existing LwIPTransportDevice and then create a new one.
-func NewDevice(sd transport.StreamDialer, pl transport.PacketListener) (LwIPTransportDevice, error) {
+// You can only have one active LwIPTransportDevice per process. If you try to call ConfigureDevice more than once, we
+// will Close the previous device and reconfigures the it.
+func ConfigureDevice(sd transport.StreamDialer, pl transport.PacketListener) (LwIPTransportDevice, error) {
 	if sd == nil || pl == nil {
 		return nil, errors.New("both sd and pl are required")
 	}
 
-	d := &lwIPDevice{
+	instMu.Lock()
+	defer instMu.Unlock()
+
+	if inst != nil {
+		inst.Close()
+	}
+	inst = &lwIPDevice{
 		tcp:   newTCPHandler(sd),
 		udp:   newUDPHandler(pl, 30*time.Second),
-		stack: lwipLib.NewLWIPStack(),
+		stack: lwip.NewLWIPStack(),
 		done:  make(chan struct{}),
 		rdBuf: make(chan []byte),
 		rdN:   make(chan int),
 	}
-	lwipLib.RegisterTCPConnHandler(d.tcp)
-	lwipLib.RegisterUDPConnHandler(d.udp)
-	lwipLib.RegisterOutputFn(d.writeResponse)
+	lwip.RegisterTCPConnHandler(inst.tcp)
+	lwip.RegisterUDPConnHandler(inst.udp)
+	lwip.RegisterOutputFn(inst.writeResponse)
 
-	return d, nil
+	return inst, nil
 }
 
 // Close implements [io.Closer] and [network.IPDevice]. It closes the device, rendering it unusable for I/O.
@@ -93,8 +104,14 @@ func NewDevice(sd transport.StreamDialer, pl transport.PacketListener) (LwIPTran
 // Close does not close other objects that are passed to this device, such as the [transport.StreamDialer],
 // [transport.PacketListener] or [io.Writer]. You are responsible for closing these objects yourself.
 func (d *lwIPDevice) Close() error {
-	close(d.done)
-	return d.stack.Close()
+	// make sure we don't close the channel twice
+	select {
+	case <-d.done:
+		return nil
+	default:
+		close(d.done)
+		return d.stack.Close()
+	}
 }
 
 // MTU implements [network.IPDevice]. It returns the maximum buffer size of a single IP packet that can be processed by
@@ -113,6 +130,9 @@ func (d *lwIPDevice) MTU() int {
 // time). We sequentialize the calls by using channels, if performance issues arise in the future, we can use other
 // more performant but more error-prone methods (e.g. the [sync] package) to resolve them.
 func (d *lwIPDevice) writeResponse(b []byte) (int, error) {
+	if len(b) == 0 {
+		return 0, nil
+	}
 	select {
 	case d.rdBuf <- b:
 		select {
