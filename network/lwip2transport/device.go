@@ -27,29 +27,8 @@ import (
 
 const packetMTU = 1500
 
-// LwIPTransportDevice is a [network.IPDevice] that can translate IP packets to TCP/UDP traffic and vice versa. It uses
-// the [lwIP library] to perform the translation.
-//
-// LwIPTransportDevice must be a singleton object due to limitations in [lwIP library].
-//
-// To use a LwIPTransportDevice:
-//  1. Call [ConfigureDevice] with two handlers for TCP and UDP traffic.
-//  2. Write IP packets to the device. The device will translate the IP packets to TCP/UDP traffic and send them to the
-//     appropriate handlers.
-//  3. Read IP packets from the device to get the TCP/UDP responses.
-//
-// A LwIPTransportDevice is NOT thread-safe. However it is safe to use Write, Read/WriteTo and Close in different
-// goroutines. But keep in mind that only one goroutine can call Write at a time; and only one goroutine can use either
-// Read or WriteTo at a time.
-//
-// [lwIP library]: https://savannah.nongnu.org/projects/lwip/
-type LwIPTransportDevice interface {
-	network.IPDevice
-}
-
 // Compilation guard against interface implementation
 var _ network.IPDevice = (*lwIPDevice)(nil)
-var _ LwIPTransportDevice = (*lwIPDevice)(nil)
 
 type lwIPDevice struct {
 	tcp   *tcpHandler
@@ -71,9 +50,24 @@ var inst *lwIPDevice = nil
 // ConfigureDevice configures the singleton LwIPTransportDevice using the [transport.StreamDialer] sd to handle TCP
 // streams and the [transport.PacketListener] pl to handle UDP packets.
 //
-// You can only have one active LwIPTransportDevice per process. If you try to call ConfigureDevice more than once, we
-// will Close the previous device and reconfigures it.
-func ConfigureDevice(sd transport.StreamDialer, pl transport.PacketListener) (LwIPTransportDevice, error) {
+// LwIPTransportDevice is a [network.IPDevice] that can translate IP packets to TCP/UDP traffic and vice versa. It uses
+// the [lwIP library] to perform the translation.
+//
+// LwIPTransportDevice must be a singleton object due to limitations in [lwIP library]. If you try to call
+// ConfigureDevice more than once, we will Close the previous device and reconfigures it.
+//
+// To use a LwIPTransportDevice:
+//  1. Call [ConfigureDevice] with two handlers for TCP and UDP traffic.
+//  2. Write IP packets to the device. The device will translate the IP packets to TCP/UDP traffic and send them to the
+//     appropriate handlers.
+//  3. Read IP packets from the device to get the TCP/UDP responses.
+//
+// A LwIPTransportDevice is NOT thread-safe. However it is safe to use Write, Read/WriteTo and Close in different
+// goroutines. But keep in mind that only one goroutine can call Write at a time; and only one goroutine can use either
+// Read or WriteTo at a time.
+//
+// [lwIP library]: https://savannah.nongnu.org/projects/lwip/
+func ConfigureDevice(sd transport.StreamDialer, pl transport.PacketListener) (network.IPDevice, error) {
 	if sd == nil || pl == nil {
 		return nil, errors.New("both sd and pl are required")
 	}
@@ -192,15 +186,11 @@ func (d *lwIPDevice) WriteTo(w io.Writer) (int64, error) {
 // then translate the IP packet into a TCP or UDP traffic.
 //
 // Write returns [network.ErrClosed] if this device is already closed.
-// Write returns [network.ErrMsgSize] if len(b) > [MTU].
 func (d *lwIPDevice) Write(b []byte) (int, error) {
 	select {
 	case <-d.done:
 		return 0, network.ErrClosed
 	default:
-	}
-	if len(b) > d.MTU() {
-		return 0, network.ErrMsgSize
 	}
 	n, err := d.stack.Write(b)
 	// Workaround: lwip netstack did not use a typed error.
