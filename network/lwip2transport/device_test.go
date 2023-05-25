@@ -27,7 +27,7 @@ import (
 )
 
 func TestStackClosedWriteError(t *testing.T) {
-	h := &errTcpUdpHandler{err: errors.ErrUnsupported}
+	h := &errTcpUdpHandler{err: errors.New("not supported")}
 	t2s := reConfigurelwIPDeviceForTest(t, h, h)
 
 	t2s.stack.Close() // close the underlying stack without calling Close

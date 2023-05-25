@@ -45,6 +45,12 @@ func (h *tcpHandler) Handle(conn net.Conn, target *net.TCPAddr) error {
 	return nil
 }
 
+// copyOneWay copies from rightConn to leftConn until either EOF is reached on rightConn or an error occurs.
+//
+// If rightConn implements io.WriterTo, or if leftConn implements io.ReaderFrom, copyOneWay will leverage these
+// interfaces to do the copy as a performance improvement method.
+//
+// rightConn's read end and leftConn's write end will be closed after copyOneWay returns.
 func copyOneWay(leftConn, rightConn transport.StreamConn) (int64, error) {
 	n, err := io.Copy(leftConn, rightConn)
 	// Send FIN to indicate EOF
