@@ -15,9 +15,9 @@
 package network
 
 import (
-	"errors"
 	"fmt"
 	"os"
+	"syscall"
 )
 
 // Portable analogs of some common errors.
@@ -31,7 +31,7 @@ var (
 
 	// ErrMsgSize is the error returned by a Write on a network device that the size of the message to be sent is bigger
 	// than the maximum message size the device can process.
-	ErrMsgSize = errors.New("packet size is too big")
+	ErrMsgSize = fmt.Errorf("packet size is too big: %w", syscall.EMSGSIZE)
 )
 
 // IPDevice is a generic network device that reads and writes IP packets. It extends the [io.ReadWriteCloser]

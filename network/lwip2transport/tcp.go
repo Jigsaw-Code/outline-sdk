@@ -23,6 +23,9 @@ import (
 	lwip "github.com/eycorsican/go-tun2socks/core"
 )
 
+// Compilation guard against interface implementation
+var _ lwip.TCPConnHandler = (*tcpHandler)(nil)
+
 type tcpHandler struct {
 	dialer transport.StreamDialer
 }

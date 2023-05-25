@@ -25,6 +25,9 @@ import (
 	lwip "github.com/eycorsican/go-tun2socks/core"
 )
 
+// Compilation guard against interface implementation
+var _ lwip.UDPConnHandler = (*udpHandler)(nil)
+
 type udpHandler struct {
 	// Protects the connections map
 	sync.Mutex
@@ -36,8 +39,8 @@ type udpHandler struct {
 	// is closed.
 	timeout time.Duration
 
-	// Maps connections from TUN to connections to the proxy.
-	conns map[lwip.UDPConn]net.PacketConn
+	// Maps local UDP addresses (IPv4:port/[IPv6]:port) to connections to the proxy.
+	conns map[string]net.PacketConn
 }
 
 // newUDPHandler returns a lwIP UDP connection handler.
@@ -48,7 +51,7 @@ func newUDPHandler(pl transport.PacketListener, timeout time.Duration) *udpHandl
 	return &udpHandler{
 		listener: pl,
 		timeout:  timeout,
-		conns:    make(map[lwip.UDPConn]net.PacketConn, 8),
+		conns:    make(map[string]net.PacketConn, 8),
 	}
 }
 
@@ -58,7 +61,7 @@ func (h *udpHandler) Connect(tunConn lwip.UDPConn, target *net.UDPAddr) error {
 		return err
 	}
 	h.Lock()
-	h.conns[tunConn] = proxyConn
+	h.conns[tunConn.LocalAddr().String()] = proxyConn
 	h.Unlock()
 	go h.relayPacketsFromProxy(tunConn, proxyConn)
 	return nil
@@ -92,7 +95,7 @@ func (h *udpHandler) relayPacketsFromProxy(tunConn lwip.UDPConn, proxyConn net.P
 // ReceiveTo relays packets from the TUN device to the proxy. It's called by tun2socks.
 func (h *udpHandler) ReceiveTo(tunConn lwip.UDPConn, data []byte, destAddr *net.UDPAddr) error {
 	h.Lock()
-	proxyConn, ok := h.conns[tunConn]
+	proxyConn, ok := h.conns[tunConn.LocalAddr().String()]
 	h.Unlock()
 	if !ok {
 		return fmt.Errorf("connection %v->%v does not exist", tunConn.LocalAddr(), destAddr)
@@ -103,10 +106,12 @@ func (h *udpHandler) ReceiveTo(tunConn lwip.UDPConn, data []byte, destAddr *net.
 }
 
 func (h *udpHandler) close(tunConn lwip.UDPConn) {
+	laddr := tunConn.LocalAddr().String()
 	tunConn.Close()
 	h.Lock()
 	defer h.Unlock()
-	if proxyConn, ok := h.conns[tunConn]; ok {
+	if proxyConn, ok := h.conns[laddr]; ok {
 		proxyConn.Close()
+		delete(h.conns, laddr)
 	}
 }

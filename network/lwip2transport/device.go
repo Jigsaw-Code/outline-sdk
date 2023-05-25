@@ -72,7 +72,7 @@ var inst *lwIPDevice = nil
 // streams and the [transport.PacketListener] pl to handle UDP packets.
 //
 // You can only have one active LwIPTransportDevice per process. If you try to call ConfigureDevice more than once, we
-// will Close the previous device and reconfigures the it.
+// will Close the previous device and reconfigures it.
 func ConfigureDevice(sd transport.StreamDialer, pl transport.PacketListener) (LwIPTransportDevice, error) {
 	if sd == nil || pl == nil {
 		return nil, errors.New("both sd and pl are required")
@@ -94,7 +94,7 @@ func ConfigureDevice(sd transport.StreamDialer, pl transport.PacketListener) (Lw
 	}
 	lwip.RegisterTCPConnHandler(inst.tcp)
 	lwip.RegisterUDPConnHandler(inst.udp)
-	lwip.RegisterOutputFn(inst.writeResponse)
+	lwip.RegisterOutputFn(inst.forwardOutgoingIPPacket)
 
 	return inst, nil
 }
@@ -120,16 +120,16 @@ func (d *lwIPDevice) MTU() int {
 	return packetMTU
 }
 
-// writeResponse writes an incoming IP packet response `b` to this device. The packet can be read by calling the [Read]
-// function, or it can be redirected to an [io.Writer] if the [WriteTo] function has been called. writeResponse blocks
-// until the packet is successfully consumed by a [Read] or [WriteTo].
+// forwardOutgoingIPPacket writes an IP packet response `b` to this device. The packet can be read by calling the Read
+// function, or it can be redirected to an [io.Writer] if the WriteTo function has been called. forwardOutgoingIPPacket
+// blocks until the packet is successfully consumed by a Read or WriteTo.
 //
-// writeResponse can be used as an output function for lwIP.
+// forwardOutgoingIPPacket can be used as an output function for lwIP.
 //
-// writeResponse might be called by multiple goroutines (for example, when multiple UDP packets arrive at the same
-// time). We sequentialize the calls by using channels, if performance issues arise in the future, we can use other
-// more performant but more error-prone methods (e.g. the [sync] package) to resolve them.
-func (d *lwIPDevice) writeResponse(b []byte) (int, error) {
+// forwardOutgoingIPPacket might be called by multiple goroutines (for example, when multiple UDP packets arrive at the
+// same time). We sequentialize the calls by using channels, if performance issues arise in the future, we can use
+// other more performant but more error-prone methods (e.g. the [sync] package) to resolve them.
+func (d *lwIPDevice) forwardOutgoingIPPacket(b []byte) (int, error) {
 	if len(b) == 0 {
 		return 0, nil
 	}

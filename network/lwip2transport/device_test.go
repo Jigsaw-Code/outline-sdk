@@ -16,6 +16,7 @@ package lwip2transport
 
 import (
 	"context"
+	"errors"
 	"net"
 	"os"
 	"testing"
@@ -26,30 +27,32 @@ import (
 )
 
 func TestStackClosedWriteError(t *testing.T) {
-	_, d := reConfigurelwIPDeviceForTest(t)
-	d.stack.Close() // close the underlying stack without calling Close
-	n, err := d.Write([]byte{0x01})
+	h := &errTcpUdpHandler{err: errors.ErrUnsupported}
+	t2s := reConfigurelwIPDeviceForTest(t, h, h)
+
+	t2s.stack.Close() // close the underlying stack without calling Close
+	n, err := t2s.Write([]byte{0x01})
 	require.Exactly(t, 0, n)
 	require.ErrorIs(t, err, network.ErrClosed)
 	require.ErrorIs(t, err, os.ErrClosed) // network.ErrClosed should wrap os.ErrClosed
 }
 
-func reConfigurelwIPDeviceForTest(t *testing.T) (*mockTcpUdpHandler, *lwIPDevice) {
-	h := &mockTcpUdpHandler{}
-	td, err := ConfigureDevice(h, h)
+func reConfigurelwIPDeviceForTest(t *testing.T, sd transport.StreamDialer, pl transport.PacketListener) *lwIPDevice {
+	t2s, err := ConfigureDevice(sd, pl)
 	require.NoError(t, err)
-	d, ok := td.(*lwIPDevice)
+	t2sInternal, ok := t2s.(*lwIPDevice)
 	require.True(t, ok)
-	return h, d
+	return t2sInternal
 }
 
-type mockTcpUdpHandler struct {
+type errTcpUdpHandler struct {
+	err error
 }
 
-func (h *mockTcpUdpHandler) Dial(ctx context.Context, raddr string) (transport.StreamConn, error) {
-	return nil, nil
+func (h *errTcpUdpHandler) Dial(ctx context.Context, raddr string) (transport.StreamConn, error) {
+	return nil, h.err
 }
 
-func (h *mockTcpUdpHandler) ListenPacket(ctx context.Context) (net.PacketConn, error) {
-	return nil, nil
+func (h *errTcpUdpHandler) ListenPacket(ctx context.Context) (net.PacketConn, error) {
+	return nil, h.err
 }

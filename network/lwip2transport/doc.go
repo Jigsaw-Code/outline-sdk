@@ -13,11 +13,11 @@
 // limitations under the License.
 
 /*
-The network/lwip2transport package translate between IP packets and TCP/UDP protocols. It uses a [modified lwIP go
+The network/lwip2transport package translates between IP packets and TCP/UDP protocols. It uses a [modified lwIP go
 library], which is based on the original [lwIP library] (A Lightweight TCP/IP stack). The device is singleton, so only
 one instance can be created per process.
 
-To create the instance with TCP/UDP handlers:
+To configure the instance with TCP/UDP handlers:
 
 	// tcpHandler will be used to handle TCP streams, and udpHandler to handle UDP packets
 	t2s, err := lwip2transport.ConfigureDevice(tcpHandler, udpHandler)
@@ -25,7 +25,7 @@ To create the instance with TCP/UDP handlers:
 		// handle error
 	}
 
+[modified lwIP go library]: https://github.com/eycorsican/go-tun2socks
 [lwIP library]: https://savannah.nongnu.org/projects/lwip/
-[modified lwIP go library]: github.com/eycorsican/go-tun2socks
 */
 package lwip2transport
