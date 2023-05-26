@@ -3,6 +3,7 @@ module github.com/Jigsaw-Code/outline-internal-sdk
 go 1.20
 
 require (
+	github.com/eycorsican/go-tun2socks v1.16.11
 	github.com/shadowsocks/go-shadowsocks2 v0.1.5
 	github.com/stretchr/testify v1.8.2
 	golang.org/x/crypto v0.7.0
