@@ -23,8 +23,8 @@ Tentative roadmap:
   - [ ] Utility implementations (`ReplaceablePacketListener`, `TruncateDNSPacketListener`)
 
 - Network libraries
-  - [ ] Generic network primitives (TBD, something like a generic TUN device)
-  - [ ] Implementation based on go-tun2socks
+  - [x] Generic network primitives (TBD, something like a generic TUN device)
+  - [x] Implementation based on go-tun2socks
 
 - VPN API
   - [ ] VPN API for desktop (Linux, Windows, macOS)
