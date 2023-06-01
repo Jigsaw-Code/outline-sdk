@@ -33,7 +33,7 @@ Tentative roadmap:
 
 ## Building
 
-In Go you can compile for other target operating system and architecture by specifying the `GOOS` and `GOARCH` environment variables. That only works if you are not using [Cgo](https://pkg.go.dev/cmd/cgo) to call C code.
+In Go you can compile for other target operating system and architecture by specifying the `GOOS` and `GOARCH` environment variables and using the [`go build` command](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies). That only works if you are not using [Cgo](https://pkg.go.dev/cmd/cgo) to call C code.
 
 <details>
   <summary>Examples</summary>
@@ -68,30 +68,29 @@ To run Linux binaries you can use a Linux container via [Podman](https://podman.
 <details>
   <summary>Instructions</summary>
 
-[Install Podman](https://podman.io/docs/installation)
-On macOS (once):
+[Install Podman](https://podman.io/docs/installation) (once). On macOS:
 ```sh
 brew install podman
 ```
 
-Create the podman service VM (once):
+Create the podman service VM (once) with the [`podman machine init` command](https://docs.podman.io/en/latest/markdown/podman-machine-init.1.html):
 ```sh
 podman machine init
 ```
 
-Start the VM (after every time it is stopped):
+Start the VM with the [`podman machine start` command](https://docs.podman.io/en/latest/markdown/podman-machine-start.1.html), after every time it is stopped:
 ```sh
 podman machine start
 ``` 
 
-You can see it running with `podman machine list`:
+You can see the VM running with the [`podman machine list` command](https://docs.podman.io/en/latest/markdown/podman-machine-list.1.html):
 ```
 % podman machine list
 NAME                     VM TYPE     CREATED        LAST UP            CPUS        MEMORY      DISK SIZE
 podman-machine-default*  qemu        3 minutes ago  Currently running  1           2.147GB     107.4GB
 ```
 
-When you are done with development, you can stop the machine:
+When you are done with development, you can stop the machine with the [`podman machine stop` command](https://docs.podman.io/en/latest/markdown/podman-machine-stop.1.html):
 ```sh
 podman machine stop
 ```
@@ -99,12 +98,12 @@ podman machine stop
 
 ### Run
 
-The easiest way is to run using `go run` directly with the `--exec` flag and our convenience tool `run_on_podman.sh`:
+The easiest way is to run a binary is to use the [`go run` command](https://pkg.go.dev/cmd/go#hdr-Compile_and_run_Go_program) directly with the `-exec` flag and our convenience tool `run_on_podman.sh`:
 ```sh
 GOOS=linux go run -C x -exec "$(pwd)/run_on_podman.sh" ./outline-connectivity
 ```
 
-It also works for tests:
+It also works with the [`go test` command](https://pkg.go.dev/cmd/go#hdr-Test_packages):
 ```sh
 GOOS=linux go test -exec "$(pwd)/run_on_podman.sh"  ./...
 ```
@@ -112,14 +111,14 @@ GOOS=linux go test -exec "$(pwd)/run_on_podman.sh"  ./...
 <details>
   <summary>Details and direct invocation</summary>
 
-The `run_on_podman.sh` script uses `podman run` and the minimal [Alpine Linux](https://en.wikipedia.org/wiki/Alpine_Linux) to run the binary you want:
+The `run_on_podman.sh` script uses the [`podman run` command](https://docs.podman.io/en/latest/markdown/podman-run.1.html) and a minimal ["distroless" container image](https://github.com/GoogleContainerTools/distroless) to run the binary you want:
 ```sh
-podman run --rm -it -v "${bin}":/outline/bin alpine /outline/bin "$@"
+podman run --arch $(uname -m) --rm -it -v "${bin}":/outline/bin gcr.io/distroless/static-debian11 /outline/bin "$@"
 ```
 
-You can also use `podman` directly to run a pre-built binary:
+You can also use `podman run` directly to run a pre-built binary:
 ```
-% podman run --rm -it -v ./x/bin:/outline alpine /outline/outline-connectivity
+% podman run --rm -it -v ./x/bin:/outline gcr.io/distroless/static-debian11 /outline/outline-connectivity
 Usage of /outline/outline-connectivity:
   -domain string
         Domain name to resolve in the test (default "example.com.")
@@ -157,7 +156,7 @@ brew tap homebrew/cask-versions
 brew install --cask --no-quarantine wine-stable
 ```
 
-After installation, `wine64` should be on your `PATH`. Check with:
+After installation, `wine64` should be on your `PATH`. Check with `wine64 --version`:
 ```
 wine64 --version
 ```
