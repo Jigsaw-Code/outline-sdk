@@ -30,7 +30,7 @@ import (
 func TestStreamDialer_Dial(t *testing.T) {
 	key := makeTestKey(t)
 	proxy, running := startShadowsocksTCPEchoProxy(key, testTargetAddr, t)
-	d, err := NewStreamDialer(&transport.TCPEndpoint{Address: proxy.Addr().String()}, key)
+	d, err := NewStreamDialer(&transport.TCPEndpoint2{Address: proxy.Addr().String()}, key)
 	if err != nil {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestStreamDialer_Dial(t *testing.T) {
 func TestStreamDialer_DialNoPayload(t *testing.T) {
 	key := makeTestKey(t)
 	proxy, running := startShadowsocksTCPEchoProxy(key, testTargetAddr, t)
-	d, err := NewStreamDialer(&transport.TCPEndpoint{Address: proxy.Addr().String()}, key)
+	d, err := NewStreamDialer(&transport.TCPEndpoint2{Address: proxy.Addr().String()}, key)
 	if err != nil {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestStreamDialer_DialFastClose(t *testing.T) {
 	go func() {
 		defer running.Done()
 		key := makeTestKey(t)
-		proxyEndpoint := &transport.TCPEndpoint{Address: listener.Addr().String()}
+		proxyEndpoint := &transport.TCPEndpoint2{Address: listener.Addr().String()}
 		d, err := NewStreamDialer(proxyEndpoint, key)
 		require.NoError(t, err, "Failed to create StreamDialer: %v", err)
 		// Extend the wait to be safer.
@@ -146,7 +146,7 @@ func TestStreamDialer_TCPPrefix(t *testing.T) {
 	}()
 
 	key := makeTestKey(t)
-	d, err := NewStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String()}, key)
+	d, err := NewStreamDialer(&transport.TCPEndpoint2{Address: listener.Addr().String()}, key)
 	if err != nil {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
@@ -166,7 +166,7 @@ func BenchmarkStreamDialer_Dial(b *testing.B) {
 
 	key := makeTestKey(b)
 	proxy, running := startShadowsocksTCPEchoProxy(key, testTargetAddr, b)
-	d, err := NewStreamDialer(&transport.TCPEndpoint{Address: proxy.Addr().String()}, key)
+	d, err := NewStreamDialer(&transport.TCPEndpoint2{Address: proxy.Addr().String()}, key)
 	if err != nil {
 		b.Fatalf("Failed to create StreamDialer: %v", err)
 	}

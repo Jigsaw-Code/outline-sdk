@@ -117,7 +117,7 @@ func TestDialStreamEndpointAddr(t *testing.T) {
 	require.NoError(t, err, "Failed to create TCP listener")
 	defer listener.Close()
 
-	endpoint := TCPEndpoint{Address: listener.Addr().String()}
+	endpoint := TCPEndpoint2{Address: listener.Addr().String()}
 	endpoint.Dialer.Control = func(network, address string, c syscall.RawConn) error {
 		require.Equal(t, "tcp4", network)
 		require.Equal(t, listener.Addr().String(), address)

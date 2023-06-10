@@ -35,7 +35,7 @@ import (
 // StreamDialer Tests
 func TestTestResolverStreamConnectivityOk(t *testing.T) {
 	// TODO(fortuna): Run a local resolver and make test not depend on an external server.
-	resolver := &transport.TCPEndpoint{Address: "8.8.8.8:53"}
+	resolver := &transport.TCPEndpoint2{Address: "8.8.8.8:53"}
 	_, err := TestResolverStreamConnectivity(context.Background(), resolver, "example.com")
 	require.NoError(t, err)
 }
@@ -69,7 +69,7 @@ func TestTestResolverStreamConnectivityRefused(t *testing.T) {
 	// Close right away to ensure the port is closed. The OS will likely not reuse it soon enough.
 	require.Nil(t, listener.Close())
 
-	resolver := &transport.TCPEndpoint{Address: listener.Addr().String()}
+	resolver := &transport.TCPEndpoint2{Address: listener.Addr().String()}
 	_, err = TestResolverStreamConnectivity(context.Background(), resolver, "anything")
 	var testErr *TestError
 	require.ErrorAs(t, err, &testErr)
@@ -104,7 +104,7 @@ func TestTestResolverStreamConnectivityReset(t *testing.T) {
 	}, &running)
 	defer listener.Close()
 
-	resolver := &transport.TCPEndpoint{Address: listener.Addr().String()}
+	resolver := &transport.TCPEndpoint2{Address: listener.Addr().String()}
 	_, err := TestResolverStreamConnectivity(context.Background(), resolver, "anything")
 
 	var testErr *TestError
@@ -136,7 +136,7 @@ func TestTestStreamDialerEarlyClose(t *testing.T) {
 	}, &running)
 	defer listener.Close()
 
-	resolver := &transport.TCPEndpoint{Address: listener.Addr().String()}
+	resolver := &transport.TCPEndpoint2{Address: listener.Addr().String()}
 	_, err := TestResolverStreamConnectivity(context.Background(), resolver, "anything")
 
 	var testErr *TestError
@@ -161,7 +161,7 @@ func TestTestResolverStreamConnectivityTimeout(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	resolver := &transport.TCPEndpoint{Address: listener.Addr().String()}
+	resolver := &transport.TCPEndpoint2{Address: listener.Addr().String()}
 	_, err := TestResolverStreamConnectivity(ctx, resolver, "anything")
 
 	var testErr *TestError

@@ -76,8 +76,8 @@ type StreamEndpoint interface {
 	Connect(ctx context.Context) (StreamConn, error)
 }
 
-// TCPEndpoint is a [StreamEndpoint] that connects to the given address using the given [StreamDialer].
-type TCPEndpoint struct {
+// TCPEndpoint2 is a [StreamEndpoint] that connects to the given address using the given [StreamDialer].
+type TCPEndpoint2 struct {
 	// The Dialer used to create the net.Conn on Connect().
 	Dialer net.Dialer
 	// The endpoint address (host:port) to pass to Dial.
@@ -85,10 +85,10 @@ type TCPEndpoint struct {
 	Address string
 }
 
-var _ StreamEndpoint = (*TCPEndpoint)(nil)
+var _ StreamEndpoint = (*TCPEndpoint2)(nil)
 
 // Connect implements [StreamEndpoint].Connect.
-func (e *TCPEndpoint) Connect(ctx context.Context) (StreamConn, error) {
+func (e *TCPEndpoint2) Connect(ctx context.Context) (StreamConn, error) {
 	conn, err := e.Dialer.DialContext(ctx, "tcp", e.Address)
 	if err != nil {
 		return nil, err

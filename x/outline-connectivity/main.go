@@ -37,7 +37,7 @@ var debugLog log.Logger = *log.New(io.Discard, "", 0)
 // var errorLog log.Logger = *log.New(os.Stderr, "[ERROR] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
 func makeStreamDialer(proxyAddress string, cryptoKey *shadowsocks.EncryptionKey, prefix []byte) (transport.StreamDialer, error) {
-	proxyDialer, err := shadowsocks.NewStreamDialer(&transport.TCPEndpoint{Address: proxyAddress}, cryptoKey)
+	proxyDialer, err := shadowsocks.NewStreamDialer(&transport.TCPEndpoint2{Address: proxyAddress}, cryptoKey)
 	if err != nil {
 		return nil, err
 	}
