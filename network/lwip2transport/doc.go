@@ -13,9 +13,9 @@
 // limitations under the License.
 
 /*
-The network/lwip2transport package translates between IP packets and TCP/UDP protocols. It uses a [modified lwIP go
-library], which is based on the original [lwIP library] (A Lightweight TCP/IP stack). The device is singleton, so only
-one instance can be created per process.
+Package lwip2transport translates between IP packets and TCP/UDP protocols. It uses a [modified lwIP go library], which
+is based on the original [lwIP library] (A Lightweight TCP/IP stack). The device is singleton, so only one instance can
+be configured and used per process.
 
 To configure the instance with TCP/UDP handlers:
 
