@@ -38,7 +38,7 @@ func BenchmarkPack(b *testing.B) {
 		Pack(pkt, plaintextBuf, key)
 	}
 	b.StopTimer()
-	elapsed := time.Now().Sub(start)
+	elapsed := time.Since(start)
 
 	megabits := float64(8*len(plaintextBuf)*b.N) * 1e-6
 	b.ReportMetric(megabits/(elapsed.Seconds()), "mbps")
