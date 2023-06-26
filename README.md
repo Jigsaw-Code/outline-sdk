@@ -18,7 +18,7 @@ The Outline SDK helps developers:
 - Create multi-platform tools to protect against network-level interference
 - Add network-level interference protection to existing apps, such as content or communication apps
 
-| Multi-Platform | Battle-Tested | Composable |
+| Multi-Platform | Proven Technology | Composable |
 |-|-|-|
 | The Outline SDK can be used on Android, iOS, Windows, macOS or Linux. | The Outline Client and Server have been using the SDK for years, helping millions of users in the harshest conditions. | The SDK interfaces were carefully designed to allow for composition and reuse, so you can craft your own transport. |
 
