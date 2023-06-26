@@ -45,23 +45,27 @@ The goal of the Alpha release is to make it available to potential developers ea
 
 The code in this repository will move to https://github.com/Jigsaw-Code/outline-sdk and versions will be tagged.
 
-- Transport libraries
+Alpha tasks:
+
+- Add Transport libraries
   - [x] Generic transport client primitives (`StreamDialer`, `PacketListener` and Endpoints)
   - [x] TCP and UDP client implementations
   - [x] Shadowsocks client implementations
 
-- Network libraries
+- Add Network libraries
   - [x] IP Device abstraction
   - [x] Implementation based on go-tun2socks (LWIP)
   - [ ] UDP handler to fallback to DNS-over-TCP
 
 ### Beta
 
-The goal of the Beta release is to communicate that the SDK is ready for broader consumption, after we believe the APIs are stable enough and we have all the supporting resource in place (website, documentation, examples, ...).
+The goal of the Beta release is to communicate that the SDK is ready for broader consumption, after we believe the APIs are stable enough and we have all the supporting resources in place (website, documentation, examples, etc
 
-- Resources
+Beta tasks:
+
+- Add Resources
   - [ ] Website
   - [ ] Bindings
+  - [ ] Integration documentation
   - [ ] Example command-line apps
   - [ ] Example graphical apps
-
