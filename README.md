@@ -7,16 +7,18 @@
 [![Mattermost](https://badgen.net/badge/Mattermost/Outline%20Community/blue)](https://community.internetfreedomfestival.org/community/channels/outline-community)
 [![Reddit](https://badgen.net/badge/Reddit/r%2Foutlinevpn/orange)](https://www.reddit.com/r/outlinevpn/)
 
+<center>
+<img src="https://github.com/Jigsaw-Code/outline-brand/blob/main/assets/powered_by_outline/color/logo.png?raw=true" width=400pt style="display: block; margin-left: auto; margin-right: auto" />
+</center>
+
 > **Warning**
 > This code is not ready to be used by the public. There's no guarantee of stability.
 
-<p>
-<img src="https://github.com/Jigsaw-Code/outline-brand/blob/main/assets/powered_by_outline/color/logo.png?raw=true" width=400pt style="display: block; margin-left: auto; margin-right: auto" />
-</p>
-
 The Outline SDK helps developers:
-- Create multi-platform tools to protect against network-level interference
+- Create tools to protect against network-level interference
 - Add network-level interference protection to existing apps, such as content or communication apps
+
+## Advantages
 
 | Multi-Platform | Proven Technology | Composable |
 |-|-|-|
@@ -43,8 +45,6 @@ The goal of the Alpha release is to make it available to potential developers ea
 
 The code in this repository will move to https://github.com/Jigsaw-Code/outline-sdk and versions will be tagged.
 
-Progress:
-
 - Transport libraries
   - [x] Generic transport client primitives (`StreamDialer`, `PacketListener` and Endpoints)
   - [x] TCP and UDP client implementations
@@ -58,8 +58,6 @@ Progress:
 ### Beta
 
 The goal of the Beta release is to communicate that the SDK is ready for broader consumption, after we believe the APIs are stable enough and we have all the supporting resource in place (website, documentation, examples, ...).
-
-Progress:
 
 - Resources
   - [ ] Website
