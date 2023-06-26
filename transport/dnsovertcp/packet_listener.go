@@ -299,7 +299,7 @@ func (c *dnsOverTcpConn) sendDNSRequestOverTCP(req []byte, resolver net.Addr) (e
 		return
 	}
 
-	// DoT: message length prefix
+	// DNS-over-TCP: message length prefix
 	var lenpfx [2]byte // make sure buffer is stack allocated
 	binary.BigEndian.PutUint16(lenpfx[:], (uint16)(len(req)))
 	if _, err = conn.Write(lenpfx[:]); err != nil {
