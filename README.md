@@ -21,7 +21,7 @@ The Outline SDK helps developers:
 ## Advantages
 
 | Multi-Platform | Proven Technology | Composable |
-|-|-|-|
+|:-:|:-:|:-:|
 | The Outline SDK can be used on Android, iOS, Windows, macOS or Linux. | The Outline Client and Server have been using the code in the SDK for years, helping millions of users in the harshest conditions. | The SDK interfaces were carefully designed to allow for composition and reuse, so you can craft your own transport. |
 
 ## Integration
