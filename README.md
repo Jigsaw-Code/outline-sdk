@@ -28,10 +28,10 @@ The Outline SDK helps developers:
 
 The Outline SDK is written in Go. There are multiple ways to integrate the Outline SDK into your app:
 
-- As a **Go library**, in a Go application (CLI or graphical app with frameworks like [Fyne.io](https://fyne.io/), [Wails](https://wails.io/), [Qt for Go](https://therecipe.github.io/qt/), or [Go Mobile app](https://pkg.go.dev/golang.org/x/mobile/app)
+- As a **Go library**, in a Go application (CLI or graphical app with frameworks like [Fyne.io](https://fyne.io/), [Wails](https://wails.io/), [Qt for Go](https://therecipe.github.io/qt/), or [Go Mobile app](https://pkg.go.dev/golang.org/x/mobile/app))
 - As a native **mobile library**, using Go Mobile `bind` to generate Java and Objective-C bindings for Android, iOS and macOS.
-- As a **C library**, generated using the appropriate [build mode](https://pkg.go.dev/cmd/go#hdr-Build_modes).
-- As a **side service**. You can build a standalone Go binary that your main application talks to. Note that this is not possible on iOS, due to the limitation on starting sub-processes.
+- As a **C library**, generated using the appropriate [Go build mode](https://pkg.go.dev/cmd/go#hdr-Build_modes).
+- As a **side service**, built as a standalone Go binary that your main application talks to. Note that this is not possible on iOS, due to the limitation on starting sub-processes.
 
 The Outline Client uses the mobile library approach on Android, iOS and macOS (based on Cordova) and the side service on Windows and Linux (based on Electron).
 
