@@ -15,7 +15,6 @@
 package lwip2transport
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"sync"
@@ -27,91 +26,78 @@ import (
 
 // Compilation guard against interface implementation
 var _ lwip.UDPConnHandler = (*udpHandler)(nil)
+var _ transport.PacketResponseWriter = (*udpResponseWriter)(nil)
 
 type udpHandler struct {
-	// Protects the connections map
-	sync.Mutex
-
-	// Used to establish connections to the proxy
-	listener transport.PacketListener
+	mu      sync.Mutex // protect the session field
+	server  transport.PacketServer
+	session transport.PacketHandler
+	respw   *udpResponseWriter
 
 	// How long to wait for a packet from the proxy. Longer than this and the connection
 	// is closed.
 	timeout time.Duration
+}
 
-	// Maps local UDP addresses (IPv4:port/[IPv6]:port) to connections to the proxy.
-	conns map[string]net.PacketConn
+type udpResponseWriter struct {
+	lwip.UDPConn
 }
 
 // newUDPHandler returns a lwIP UDP connection handler.
 //
-// `pl` is an UDP packet listener.
+// `pkt` is a server that handles UDP packets.
 // `timeout` is the UDP read and write timeout.
-func newUDPHandler(pl transport.PacketListener, timeout time.Duration) *udpHandler {
+func newUDPHandler(pkt transport.PacketServer, timeout time.Duration) *udpHandler {
 	return &udpHandler{
-		listener: pl,
-		timeout:  timeout,
-		conns:    make(map[string]net.PacketConn, 8),
+		server:  pkt,
+		timeout: timeout,
 	}
 }
 
-func (h *udpHandler) Connect(tunConn lwip.UDPConn, target *net.UDPAddr) error {
-	proxyConn, err := h.listener.ListenPacket(context.Background())
+// Connect creats a new UDP session from the [transport.PacketServer]. It also schedule a timer with the timeout of the
+// session; the session will be closed once the timer triggers.
+func (h *udpHandler) Connect(tunConn lwip.UDPConn, _ *net.UDPAddr) (err error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.respw = &udpResponseWriter{tunConn}
+	h.session, err = h.server.NewSession(tunConn.LocalAddr())
 	if err != nil {
-		return err
+		h.respw.Close()
+		return
 	}
-	h.Lock()
-	h.conns[tunConn.LocalAddr().String()] = proxyConn
-	h.Unlock()
-	go h.relayPacketsFromProxy(tunConn, proxyConn)
-	return nil
+	time.AfterFunc(h.timeout, func() {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+
+		h.session.Close()
+		h.respw.Close()
+		h.session = nil
+	})
+	return
 }
 
-// relayPacketsFromProxy relays packets from the proxy to the TUN device.
-func (h *udpHandler) relayPacketsFromProxy(tunConn lwip.UDPConn, proxyConn net.PacketConn) {
-	buf := lwip.NewBytes(lwip.BufSize)
-	defer func() {
-		h.close(tunConn)
-		lwip.FreeBytes(buf)
-	}()
-	for {
-		proxyConn.SetDeadline(time.Now().Add(h.timeout))
-		n, sourceAddr, err := proxyConn.ReadFrom(buf)
-		if err != nil {
-			return
-		}
-		// No resolution will take place, the address sent by the proxy is a resolved IP.
-		sourceUDPAddr, err := net.ResolveUDPAddr("udp", sourceAddr.String())
-		if err != nil {
-			return
-		}
-		_, err = tunConn.WriteFrom(buf[:n], sourceUDPAddr)
-		if err != nil {
-			return
-		}
-	}
-}
-
-// ReceiveTo relays packets from the TUN device to the proxy. It's called by tun2socks.
+// ReceiveTo relays packets from the lwIP TUN device to the proxy. It's called by lwIP.
 func (h *udpHandler) ReceiveTo(tunConn lwip.UDPConn, data []byte, destAddr *net.UDPAddr) error {
-	h.Lock()
-	proxyConn, ok := h.conns[tunConn.LocalAddr().String()]
-	h.Unlock()
-	if !ok {
+	h.mu.Lock()
+	session := h.session
+	respw := h.respw
+	h.mu.Unlock()
+
+	if session == nil {
 		return fmt.Errorf("connection %v->%v does not exist", tunConn.LocalAddr(), destAddr)
 	}
-	proxyConn.SetDeadline(time.Now().Add(h.timeout))
-	_, err := proxyConn.WriteTo(data, destAddr)
-	return err
+	return session.ServePacket(respw, &transport.PacketRequest{
+		Body: data,
+		Dest: destAddr,
+	})
 }
 
-func (h *udpHandler) close(tunConn lwip.UDPConn) {
-	laddr := tunConn.LocalAddr().String()
-	tunConn.Close()
-	h.Lock()
-	defer h.Unlock()
-	if proxyConn, ok := h.conns[laddr]; ok {
-		proxyConn.Close()
-		delete(h.conns, laddr)
+// Write relays packets from the proxy to the lwIP TUN device. It's called by [transport.PacketHandler].
+func (r *udpResponseWriter) Write(p []byte, from net.Addr) (int, error) {
+	srcAddr, err := net.ResolveUDPAddr("udp", from.String())
+	if err != nil {
+		return 0, err
 	}
+	return r.WriteFrom(p, srcAddr)
 }

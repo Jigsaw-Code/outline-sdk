@@ -47,29 +47,29 @@ type lwIPDevice struct {
 var instMu sync.Mutex
 var inst *lwIPDevice = nil
 
-// ConfigureDevice configures the singleton LwIPTransportDevice using the [transport.StreamDialer] sd to handle TCP
-// streams and the [transport.PacketListener] pl to handle UDP packets.
+// ConfigureDevice configures the singleton LwIP device using the [transport.StreamDialer] to handle TCP streams and
+// the [transport.PacketServer] to handle UDP packets.
 //
-// LwIPTransportDevice is a [network.IPDevice] that can translate IP packets to TCP/UDP traffic and vice versa. It uses
-// the [lwIP library] to perform the translation.
+// LwIP device is a [network.IPDevice] that can translate IP packets to TCP/UDP traffic and vice versa. It uses the
+// [lwIP library] to perform the translation.
 //
-// LwIPTransportDevice must be a singleton object due to limitations in [lwIP library]. If you try to call
-// ConfigureDevice more than once, we will Close the previous device and reconfigures it.
+// LwIP device must be a singleton object due to limitations in [lwIP library]. If you try to call ConfigureDevice more
+// than once, we will Close the previous device and reconfigures it.
 //
-// To use a LwIPTransportDevice:
+// To use a LwIP device:
 //  1. Call [ConfigureDevice] with two handlers for TCP and UDP traffic.
 //  2. Write IP packets to the device. The device will translate the IP packets to TCP/UDP traffic and send them to the
 //     appropriate handlers.
 //  3. Read IP packets from the device to get the TCP/UDP responses.
 //
-// A LwIPTransportDevice is NOT thread-safe. However it is safe to use Write, Read/WriteTo and Close in different
-// goroutines. But keep in mind that only one goroutine can call Write at a time; and only one goroutine can use either
-// Read or WriteTo at a time.
+// A LwIP device is NOT thread-safe. However it is safe to use Write, Read/WriteTo and Close in different goroutines.
+// But keep in mind that only one goroutine can call Write at a time; and only one goroutine can use either Read or
+// WriteTo at a time.
 //
 // [lwIP library]: https://savannah.nongnu.org/projects/lwip/
-func ConfigureDevice(sd transport.StreamDialer, pl transport.PacketListener) (network.IPDevice, error) {
-	if sd == nil || pl == nil {
-		return nil, errors.New("both sd and pl are required")
+func ConfigureDevice(sd transport.StreamDialer, pkt transport.PacketServer) (network.IPDevice, error) {
+	if sd == nil || pkt == nil {
+		return nil, errors.New("both sd and pkt are required")
 	}
 
 	instMu.Lock()
@@ -80,7 +80,7 @@ func ConfigureDevice(sd transport.StreamDialer, pl transport.PacketListener) (ne
 	}
 	inst = &lwIPDevice{
 		tcp:   newTCPHandler(sd),
-		udp:   newUDPHandler(pl, 30*time.Second),
+		udp:   newUDPHandler(pkt, 30*time.Second),
 		stack: lwip.NewLWIPStack(),
 		done:  make(chan struct{}),
 		rdBuf: make(chan []byte),
