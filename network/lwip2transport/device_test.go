@@ -37,8 +37,8 @@ func TestStackClosedWriteError(t *testing.T) {
 	require.ErrorIs(t, err, os.ErrClosed) // network.ErrClosed should wrap os.ErrClosed
 }
 
-func reConfigurelwIPDeviceForTest(t *testing.T, sd transport.StreamDialer, pl transport.PacketListener) *lwIPDevice {
-	t2s, err := ConfigureDevice(sd, pl)
+func reConfigurelwIPDeviceForTest(t *testing.T, sd transport.StreamDialer, pkt network.PacketHandler) *lwIPDevice {
+	t2s, err := ConfigureDevice(sd, pkt)
 	require.NoError(t, err)
 	t2sInternal, ok := t2s.(*lwIPDevice)
 	require.True(t, ok)
@@ -49,10 +49,10 @@ type errTcpUdpHandler struct {
 	err error
 }
 
-func (h *errTcpUdpHandler) Dial(ctx context.Context, raddr string) (transport.StreamConn, error) {
+func (h *errTcpUdpHandler) Dial(context.Context, string) (transport.StreamConn, error) {
 	return nil, h.err
 }
 
-func (h *errTcpUdpHandler) ListenPacket(ctx context.Context) (net.PacketConn, error) {
+func (h *errTcpUdpHandler) NewSession(net.Addr, network.PacketResponseWriter) (network.PacketSession, error) {
 	return nil, h.err
 }

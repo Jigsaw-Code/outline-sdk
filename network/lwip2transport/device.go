@@ -67,7 +67,7 @@ var inst *lwIPDevice = nil
 // WriteTo at a time.
 //
 // [lwIP library]: https://savannah.nongnu.org/projects/lwip/
-func ConfigureDevice(sd transport.StreamDialer, pkt transport.PacketServer) (network.IPDevice, error) {
+func ConfigureDevice(sd transport.StreamDialer, pkt network.PacketHandler) (network.IPDevice, error) {
 	if sd == nil || pkt == nil {
 		return nil, errors.New("both sd and pkt are required")
 	}
