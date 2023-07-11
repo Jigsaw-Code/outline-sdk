@@ -59,20 +59,22 @@ func TestResolverPacketConnectivity(ctx context.Context, resolver transport.Pack
 }
 
 // TestTCPResolver connects to a DNS resolver over TCP.
-func TestTCPResolver(ctx, testDomain) (error) {
-client := dns.Client{}
+func TestTCPResolver(ctx context.Context, testDomain string) error {
+	client := dns.Client{}
 	msg := dns.Msg{}
 	msg.SetQuestion("example.com.", dns.TypeA)
 
 	response, _, err := client.Exchange(&msg, "8.8.8.8:53")
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
-		return
+		return makeTestError("Exchange", err)
 	}
 
 	for _, answer := range response.Answer {
 		fmt.Printf("%v\n", answer)
-	}	
+	}
+
+	return nil
 }
 
 func isTimeout(err error) bool {
