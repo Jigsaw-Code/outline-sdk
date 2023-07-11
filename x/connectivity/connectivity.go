@@ -61,6 +61,7 @@ func TestResolverPacketConnectivity(ctx context.Context, resolver transport.Pack
 // TestTCPResolver connects to a DNS resolver over TCP.
 func TestTCPResolver(ctx context.Context, testDomain string) error {
 	client := dns.Client{}
+	client.Net = "tcp"
 	msg := dns.Msg{}
 	msg.SetQuestion(dns.Fqdn(testDomain), dns.TypeA)
 
