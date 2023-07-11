@@ -18,7 +18,6 @@ import (
 	"errors"
 	"io"
 	"sync"
-	"time"
 
 	"github.com/Jigsaw-Code/outline-internal-sdk/network"
 	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
@@ -67,7 +66,7 @@ var inst *lwIPDevice = nil
 // WriteTo at a time.
 //
 // [lwIP library]: https://savannah.nongnu.org/projects/lwip/
-func ConfigureDevice(sd transport.StreamDialer, pkt network.PacketHandler) (network.IPDevice, error) {
+func ConfigureDevice(sd transport.StreamDialer, pkt network.PacketProxy) (network.IPDevice, error) {
 	if sd == nil || pkt == nil {
 		return nil, errors.New("both sd and pkt are required")
 	}
@@ -80,7 +79,7 @@ func ConfigureDevice(sd transport.StreamDialer, pkt network.PacketHandler) (netw
 	}
 	inst = &lwIPDevice{
 		tcp:   newTCPHandler(sd),
-		udp:   newUDPHandler(pkt, 30*time.Second),
+		udp:   newUDPHandler(pkt),
 		stack: lwip.NewLWIPStack(),
 		done:  make(chan struct{}),
 		rdBuf: make(chan []byte),

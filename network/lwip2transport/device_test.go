@@ -17,7 +17,6 @@ package lwip2transport
 import (
 	"context"
 	"errors"
-	"net"
 	"os"
 	"testing"
 
@@ -37,7 +36,7 @@ func TestStackClosedWriteError(t *testing.T) {
 	require.ErrorIs(t, err, os.ErrClosed) // network.ErrClosed should wrap os.ErrClosed
 }
 
-func reConfigurelwIPDeviceForTest(t *testing.T, sd transport.StreamDialer, pkt network.PacketHandler) *lwIPDevice {
+func reConfigurelwIPDeviceForTest(t *testing.T, sd transport.StreamDialer, pkt network.PacketProxy) *lwIPDevice {
 	t2s, err := ConfigureDevice(sd, pkt)
 	require.NoError(t, err)
 	t2sInternal, ok := t2s.(*lwIPDevice)
@@ -53,6 +52,6 @@ func (h *errTcpUdpHandler) Dial(context.Context, string) (transport.StreamConn, 
 	return nil, h.err
 }
 
-func (h *errTcpUdpHandler) NewSession(net.Addr, network.PacketResponseWriter) (network.PacketSession, error) {
+func (h *errTcpUdpHandler) NewSession(network.PacketResponseReceiver) (network.PacketRequestSender, error) {
 	return nil, h.err
 }
