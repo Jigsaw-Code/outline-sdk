@@ -62,7 +62,7 @@ func TestResolverPacketConnectivity(ctx context.Context, resolver transport.Pack
 func TestTCPResolver(ctx context.Context, testDomain string) error {
 	client := dns.Client{}
 	msg := dns.Msg{}
-	msg.SetQuestion("example.com.", dns.TypeA)
+	msg.SetQuestion(dns.Fqdn(testDomain), dns.TypeA)
 
 	response, _, err := client.Exchange(&msg, "8.8.8.8:53")
 	if err != nil {
