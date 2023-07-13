@@ -105,8 +105,7 @@ func (proxy *packetListenerProxyAdapter) NewSession(respWriter PacketResponseRec
 // [net.PacketConn].WriteTo function.
 func (s *packetListenerRequestSender) WriteTo(p []byte, destination net.Addr) (int, error) {
 	s.timer.SetDeadline(time.Now().Add(s.adapter.timeout))
-	n, err := s.proxyConn.WriteTo(p, destination)
-	return n, err
+	return s.proxyConn.WriteTo(p, destination)
 }
 
 // Close implements [PacketRequestSender].Close function. It closes the underlying [net.PacketConn]. This will also
