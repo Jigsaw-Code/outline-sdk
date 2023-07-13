@@ -36,8 +36,8 @@ func TestStackClosedWriteError(t *testing.T) {
 	require.ErrorIs(t, err, os.ErrClosed) // network.ErrClosed should wrap os.ErrClosed
 }
 
-func reConfigurelwIPDeviceForTest(t *testing.T, sd transport.StreamDialer, pkt network.PacketProxy) *lwIPDevice {
-	t2s, err := ConfigureDevice(sd, pkt)
+func reConfigurelwIPDeviceForTest(t *testing.T, sd transport.StreamDialer, pktProxy network.PacketProxy) *lwIPDevice {
+	t2s, err := ConfigureDevice(sd, pktProxy)
 	require.NoError(t, err)
 	t2sInternal, ok := t2s.(*lwIPDevice)
 	require.True(t, ok)

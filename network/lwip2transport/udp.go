@@ -15,7 +15,6 @@
 package lwip2transport
 
 import (
-	"fmt"
 	"net"
 	"sync"
 
@@ -28,78 +27,68 @@ var _ lwip.UDPConnHandler = (*udpHandler)(nil)
 var _ network.PacketResponseReceiver = (*udpConnResponseWriter)(nil)
 
 type udpHandler struct {
-	mu      sync.Mutex                             // Protects the sessions field
-	handler network.PacketProxy                    // A network stack neutral implementation of UDP handler
-	senders map[string]network.PacketRequestSender // Maps local lwIP UDP socket (IPv4:port/[IPv6]:port) to PacketSession
+	mu      sync.Mutex                             // Protects the senders field
+	proxy   network.PacketProxy                    // A network stack neutral implementation of UDP PacketProxy
+	senders map[string]network.PacketRequestSender // Maps local lwIP UDP socket to PacketRequestSender
 }
 
 // newUDPHandler returns a lwIP UDP connection handler.
 //
-// `h` is a handler that handles UDP packets.
-// `timeout` is the UDP read and write timeout.
-func newUDPHandler(h network.PacketProxy) *udpHandler {
+// `pktProxy` is a PacketProxy that handles UDP packets.
+func newUDPHandler(pktProxy network.PacketProxy) *udpHandler {
 	return &udpHandler{
-		handler: h,
+		proxy:   pktProxy,
 		senders: make(map[string]network.PacketRequestSender, 8),
 	}
 }
 
-// Connect creats a new UDP session from the [transport.PacketServer]. It also schedule a timer with the timeout of the
-// session; the session will be closed once the timer triggers.
+// Connect does nothing. New UDP sessions will be created in ReceiveTo.
 func (h *udpHandler) Connect(tunConn lwip.UDPConn, _ *net.UDPAddr) error {
-	return h.newSession(tunConn)
+	return nil
 }
 
-// ReceiveTo relays packets from the lwIP TUN device to the proxy. It's called by lwIP.
-func (h *udpHandler) ReceiveTo(tunConn lwip.UDPConn, data []byte, destAddr *net.UDPAddr) error {
+// ReceiveTo relays packets from the lwIP TUN device to the proxy. It's called by lwIP. ReceiveTo will also create a
+// new UDP session if `data` is the first packet from the `tunConn`.
+func (h *udpHandler) ReceiveTo(tunConn lwip.UDPConn, data []byte, destAddr *net.UDPAddr) (err error) {
 	laddr := tunConn.LocalAddr().String()
 
 	h.mu.Lock()
 	reqSender, ok := h.senders[laddr]
+	if !ok {
+		if reqSender, err = h.newSession(tunConn); err != nil {
+			return
+		}
+		h.senders[laddr] = reqSender
+	}
 	h.mu.Unlock()
 
-	if !ok {
-		return fmt.Errorf("no session found for local address %v", laddr)
-	}
-	_, err := reqSender.WriteTo(data, destAddr)
-	return err
+	_, err = reqSender.WriteTo(data, destAddr)
+	return
 }
 
-// newSession creates a new UDP session related to conn.
-func (h *udpHandler) newSession(conn lwip.UDPConn) error {
-	laddr := conn.LocalAddr().String()
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	if _, ok := h.senders[laddr]; ok {
-		return fmt.Errorf("session already exists for local address %v", laddr)
-	}
-
+// newSession creates a new PacketRequestSender related to conn. The caller needs to put the new PacketRequestSender
+// to the h.senders map.
+func (h *udpHandler) newSession(conn lwip.UDPConn) (network.PacketRequestSender, error) {
 	respWriter := &udpConnResponseWriter{conn, h}
-
-	// TODO: we can move this out of h.mu.Lock() to increase performance
-	//       but that requires additional handling of early arrived packets
-	reqSender, err := h.handler.NewSession(respWriter)
+	reqSender, err := h.proxy.NewSession(respWriter)
 	if err != nil {
 		respWriter.Close()
-		return err
 	}
-
-	h.senders[laddr] = reqSender
-	return nil
+	return reqSender, err
 }
 
 // closeSession cleans up resources related to conn.
-func (h *udpHandler) closeSession(conn lwip.UDPConn) {
+func (h *udpHandler) closeSession(conn lwip.UDPConn) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	laddr := conn.LocalAddr().String()
+	err := conn.Close()
 	if reqSender, ok := h.senders[laddr]; ok {
 		reqSender.Close()
 		delete(h.senders, laddr)
 	}
+	return err
 }
 
 // The PacketResponseWriter that will write responses to the lwip network stack.
@@ -108,17 +97,18 @@ type udpConnResponseWriter struct {
 	h    *udpHandler
 }
 
-// Write relays packets from the proxy to the lwIP TUN device. It's called by transport.PacketSession.
+// Write relays packets from the proxy to the lwIP TUN device.
 func (r *udpConnResponseWriter) WriteFrom(p []byte, source net.Addr) (int, error) {
+	// net.Addr -> *net.UDPAddr, because r.conn.WriteFrom requires *net.UDPAddr
+	// and this is more reliable than type assertion
 	srcAddr, err := net.ResolveUDPAddr("udp", source.String())
 	if err != nil {
 		return 0, err
 	}
-	return r.WriteFrom(p, srcAddr)
+	return r.conn.WriteFrom(p, srcAddr)
 }
 
+// Close informs the udpHandler to close the UDPConn and clean up the UDP session.
 func (r *udpConnResponseWriter) Close() error {
-	err := r.conn.Close()
-	r.h.closeSession(r.conn)
-	return err
+	return r.h.closeSession(r.conn)
 }

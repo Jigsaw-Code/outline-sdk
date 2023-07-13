@@ -17,7 +17,7 @@ The network package defines interfaces and provides utilities for network layer 
 example, the [IPDevice] interface can be used to read and write IP packets from a physical or virtual network device.
 
 In addition, user-space network stack implementations are also included in the sub-packages (such as
-network/lwip2transport) that can translate raw IP packets into TCP/UDP connections. You can implement a [PacketProxy]
-to handle UDP traffic, and a transport.StreamDialer to handle TCP traffic.
+network/lwip2transport) that can translate raw IP packets into TCP/UDP flows. You can implement a [PacketProxy]
+to handle UDP traffic, and a [transport.StreamDialer] to handle TCP traffic.
 */
 package network

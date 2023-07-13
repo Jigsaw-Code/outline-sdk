@@ -47,7 +47,7 @@ var instMu sync.Mutex
 var inst *lwIPDevice = nil
 
 // ConfigureDevice configures the singleton LwIP device using the [transport.StreamDialer] to handle TCP streams and
-// the [transport.PacketServer] to handle UDP packets.
+// the [transport.PacketProxy] to handle UDP packets.
 //
 // LwIP device is a [network.IPDevice] that can translate IP packets to TCP/UDP traffic and vice versa. It uses the
 // [lwIP library] to perform the translation.
@@ -66,9 +66,9 @@ var inst *lwIPDevice = nil
 // WriteTo at a time.
 //
 // [lwIP library]: https://savannah.nongnu.org/projects/lwip/
-func ConfigureDevice(sd transport.StreamDialer, pkt network.PacketProxy) (network.IPDevice, error) {
-	if sd == nil || pkt == nil {
-		return nil, errors.New("both sd and pkt are required")
+func ConfigureDevice(sd transport.StreamDialer, pktProxy network.PacketProxy) (network.IPDevice, error) {
+	if sd == nil || pktProxy == nil {
+		return nil, errors.New("both sd and pktProxy are required")
 	}
 
 	instMu.Lock()
@@ -79,7 +79,7 @@ func ConfigureDevice(sd transport.StreamDialer, pkt network.PacketProxy) (networ
 	}
 	inst = &lwIPDevice{
 		tcp:   newTCPHandler(sd),
-		udp:   newUDPHandler(pkt),
+		udp:   newUDPHandler(pktProxy),
 		stack: lwip.NewLWIPStack(),
 		done:  make(chan struct{}),
 		rdBuf: make(chan []byte),
