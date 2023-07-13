@@ -112,6 +112,5 @@ func (s *packetListenerRequestSender) WriteTo(p []byte, destination net.Addr) (i
 // Close implements [PacketRequestSender].Close function. It closes the underlying [net.PacketConn]. This will also
 // terminate the goroutine created in NewSession because s.conn.ReadFrom will return [io.EOF].
 func (s *packetListenerRequestSender) Close() error {
-	s.timer.Stop()
 	return s.proxyConn.Close()
 }
