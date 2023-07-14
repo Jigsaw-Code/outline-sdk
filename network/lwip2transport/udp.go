@@ -100,7 +100,8 @@ type udpConnResponseWriter struct {
 // Write relays packets from the proxy to the lwIP TUN device.
 func (r *udpConnResponseWriter) WriteFrom(p []byte, source net.Addr) (int, error) {
 	// net.Addr -> *net.UDPAddr, because r.conn.WriteFrom requires *net.UDPAddr
-	// and this is more reliable than type assertion. Because the source address host will be an IP address, no actual resolution will be done.
+	// and this is more reliable than type assertion
+	// also the source address host will be an IP address, no actual resolution will be done
 	srcAddr, err := net.ResolveUDPAddr("udp", source.String())
 	if err != nil {
 		return 0, err

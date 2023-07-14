@@ -21,25 +21,29 @@ import (
 	"net"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-internal-sdk/internal/ddltimer"
+	"github.com/Jigsaw-Code/outline-internal-sdk/internal/slicepool"
 	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
 )
 
+// this was the buffer size used before, we may consider update it in the future
 const packetMaxSize = 2048
+
+// packetBufferPool is used to create buffers to read UDP response packets
+var packetBufferPool = slicepool.MakePool(packetMaxSize)
 
 // Compilation guard against interface implementation
 var _ PacketProxy = (*packetListenerProxyAdapter)(nil)
 var _ PacketRequestSender = (*packetListenerRequestSender)(nil)
 
 type packetListenerProxyAdapter struct {
-	listener transport.PacketListener
-	timeout  time.Duration
+	listener         transport.PacketListener
+	writeIdleTimeout time.Duration
 }
 
 type packetListenerRequestSender struct {
-	adapter   *packetListenerProxyAdapter
-	proxyConn net.PacketConn
-	timer     *ddltimer.DeadlineTimer
+	proxyConn        net.PacketConn
+	writeIdleTimeout time.Duration
+	writeIdleTimer   *time.Timer
 }
 
 // NewPacketProxyFromPacketListener creates a new [PacketProxy] that uses the existing [transport.PacketListener]
@@ -51,8 +55,8 @@ func NewPacketProxyFromPacketListener(pl transport.PacketListener) (PacketProxy,
 		return nil, errors.New("pl must not be nil")
 	}
 	return &packetListenerProxyAdapter{
-		listener: pl,
-		timeout:  30 * time.Second,
+		listener:         pl,
+		writeIdleTimeout: 30 * time.Second,
 	}, nil
 }
 
@@ -67,22 +71,22 @@ func (proxy *packetListenerProxyAdapter) NewSession(respWriter PacketResponseRec
 		return nil, err
 	}
 	reqSender := &packetListenerRequestSender{
-		adapter:   proxy,
-		proxyConn: proxyConn,
-		timer:     ddltimer.New(),
+		proxyConn:        proxyConn,
+		writeIdleTimeout: proxy.writeIdleTimeout,
 	}
 
 	// Terminate the session after timeout with no outgoing writes (deadline is refreshed by WriteTo)
-	go func() {
-		reqSender.timer.SetDeadline(time.Now().Add(proxy.timeout))
-		<-reqSender.timer.Timeout()
-		reqSender.Close()
-	}()
+	reqSender.writeIdleTimer = time.AfterFunc(reqSender.writeIdleTimeout, func() { reqSender.Close() })
 
 	// Relay incoming UDP responses from the proxy asynchronously until EOF, session expiration or error
 	go func() {
 		defer respWriter.Close()
-		buf := make([]byte, packetMaxSize)
+
+		// Allocate buffer from slicepool, because `go build -gcflags="-m"` shows a local array will escape to heap
+		slice := packetBufferPool.LazySlice()
+		buf := slice.Acquire()
+		defer slice.Release()
+
 		for {
 			n, srcAddr, err := proxyConn.ReadFrom(buf)
 			if err != nil {
@@ -104,12 +108,13 @@ func (proxy *packetListenerProxyAdapter) NewSession(respWriter PacketResponseRec
 // WriteTo implements [PacketRequestSender].WriteTo function. It simply forwards the packet to the underlying
 // [net.PacketConn].WriteTo function.
 func (s *packetListenerRequestSender) WriteTo(p []byte, destination net.Addr) (int, error) {
-	s.timer.SetDeadline(time.Now().Add(s.adapter.timeout))
+	s.writeIdleTimer.Reset(s.writeIdleTimeout)
 	return s.proxyConn.WriteTo(p, destination)
 }
 
 // Close implements [PacketRequestSender].Close function. It closes the underlying [net.PacketConn]. This will also
 // terminate the goroutine created in NewSession because s.conn.ReadFrom will return [io.EOF].
 func (s *packetListenerRequestSender) Close() error {
+	s.writeIdleTimer.Stop()
 	return s.proxyConn.Close()
 }
