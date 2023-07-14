@@ -79,7 +79,7 @@ func (proxy *packetListenerProxyAdapter) NewSession(respWriter PacketResponseRec
 		reqSender.Close()
 	}()
 
-	// Relay incoming UDP responses from the proxy asynchronously until EOF or error
+	// Relay incoming UDP responses from the proxy asynchronously until EOF, session expiration or error
 	go func() {
 		defer respWriter.Close()
 		buf := make([]byte, packetMaxSize)
