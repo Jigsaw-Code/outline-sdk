@@ -72,7 +72,7 @@ func (proxy *packetListenerProxyAdapter) NewSession(respWriter PacketResponseRec
 		timer:     ddltimer.New(),
 	}
 
-	// Terminate the session after timeout (deadline can be updated by WriteTo)
+	// Terminate the session after timeout with no outgoing writes (deadline is refreshed by WriteTo)
 	go func() {
 		reqSender.timer.SetDeadline(time.Now().Add(proxy.timeout))
 		<-reqSender.timer.Timeout()
