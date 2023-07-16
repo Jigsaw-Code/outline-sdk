@@ -36,19 +36,23 @@ var debugLog log.Logger = *log.New(io.Discard, "", 0)
 
 // var errorLog log.Logger = *log.New(os.Stderr, "[ERROR] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
-func makeStreamDialer(proxyAddress string, cryptoKey *shadowsocks.EncryptionKey, prefix []byte) (transport.StreamDialer, error) {
-	proxyDialer, err := shadowsocks.NewStreamDialer(&transport.TCPEndpoint{Address: proxyAddress}, cryptoKey)
+func newStreamDialer(proxyAddress string, cryptoKey *shadowsocks.EncryptionKey, prefix []byte) (transport.StreamDialer, error) {
+	dialer, err := shadowsocks.NewStreamDialer(&transport.TCPEndpoint{Address: proxyAddress}, cryptoKey)
 	if err != nil {
 		return nil, err
 	}
 	if len(prefix) > 0 {
-		proxyDialer.SaltGenerator = shadowsocks.NewPrefixSaltGenerator(prefix)
+		dialer.SaltGenerator = shadowsocks.NewPrefixSaltGenerator(prefix)
 	}
-	return proxyDialer, nil
+	return dialer, nil
 }
 
-func makePacketListener(proxyAddress string, cryptoKey *shadowsocks.EncryptionKey) (transport.PacketListener, error) {
-	return shadowsocks.NewPacketListener(&transport.UDPEndpoint{Address: proxyAddress}, cryptoKey)
+func newPacketDialer(proxyAddress string, cryptoKey *shadowsocks.EncryptionKey) (transport.PacketDialer, error) {
+	listener, err := shadowsocks.NewPacketListener(&transport.UDPEndpoint{Address: proxyAddress}, cryptoKey)
+	if err != nil {
+		return nil, err
+	}
+	return &transport.PacketListenerDialer{Listener: listener}, nil
 }
 
 type jsonRecord struct {
@@ -149,19 +153,18 @@ func main() {
 				var testDuration time.Duration
 				switch proto {
 				case "tcp":
-					dialer, err := makeStreamDialer(proxyAddress, config.CryptoKey, config.Prefix)
+					dialer, err := newStreamDialer(proxyAddress, config.CryptoKey, config.Prefix)
 					if err != nil {
 						log.Fatalf("Failed to create StreamDialer: %v", err)
 					}
-					resolver := &transport.StreamDialerEndpoint{Dialer: dialer, Address: resolverAddress}
+					var resolver = transport.NewDialerEndpoint(dialer, resolverAddress)
 					testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, *domainFlag)
 				case "udp":
-					listener, err := makePacketListener(proxyAddress, config.CryptoKey)
+					dialer, err := newPacketDialer(proxyAddress, config.CryptoKey)
 					if err != nil {
 						log.Fatalf("Failed to create PacketListener: %v", err)
 					}
-					dialer := transport.PacketListenerDialer{Listener: listener}
-					resolver := &transport.PacketDialerEndpoint{Dialer: dialer, Address: resolverAddress}
+					resolver := transport.NewDialerEndpoint(dialer, resolverAddress)
 					testDuration, testErr = connectivity.TestResolverPacketConnectivity(context.Background(), resolver, *domainFlag)
 				default:
 					log.Fatalf(`Invalid proto %v. Must be "tcp" or "udp"`, proto)

@@ -21,10 +21,7 @@ import (
 )
 
 // PacketEndpoint represents an endpoint that can be used to established packet connections (like UDP) to a fixed destination.
-type PacketEndpoint interface {
-	// Connect creates a connection bound to an endpoint, returning the connection.
-	Connect(ctx context.Context) (net.Conn, error)
-}
+type PacketEndpoint = Endpoint[net.Conn]
 
 // UDPEndpoint is a [PacketEndpoint] that connects to the given address via UDP
 type UDPEndpoint struct {
@@ -42,38 +39,21 @@ func (e UDPEndpoint) Connect(ctx context.Context) (net.Conn, error) {
 	return e.Dialer.DialContext(ctx, "udp", e.Address)
 }
 
-// PacketDialerEndpoint is a [PacketEndpoint] that connects to the given address using the given [PacketDialer].
-type PacketDialerEndpoint struct {
-	Dialer  PacketDialer
-	Address string
-}
-
-var _ PacketEndpoint = (*PacketDialerEndpoint)(nil)
-
-// Connect implements [PacketEndpoint].Connect.
-func (e *PacketDialerEndpoint) Connect(ctx context.Context) (net.Conn, error) {
-	return e.Dialer.Dial(ctx, e.Address)
-}
-
-// PacketDialer provides a way to dial a destination and establish datagram connections.
-type PacketDialer interface {
-	// Dial connects to `raddr`.
-	// `raddr` has the form `host:port`, where `host` can be a domain name or IP address.
-	Dial(ctx context.Context, addr string) (net.Conn, error)
-}
-
-// UDPPacketDialer is a [PacketDialer] that uses the standard [net.Dialer] to dial.
+// UDPDialer is a [PacketDialer] that uses the standard [net.Dialer] to dial.
 // It provides a convenient way to use a [net.Dialer] when you need a [PacketDialer].
-type UDPPacketDialer struct {
+type UDPDialer struct {
 	Dialer net.Dialer
 }
 
-var _ PacketDialer = (*UDPPacketDialer)(nil)
+var _ PacketDialer = (*UDPDialer)(nil)
 
-// Dial implements [PacketDialer].Dial.
-func (d *UDPPacketDialer) Dial(ctx context.Context, addr string) (net.Conn, error) {
+// Dial implements [Dialer].Dial.
+func (d *UDPDialer) Dial(ctx context.Context, addr string) (net.Conn, error) {
 	return d.Dialer.DialContext(ctx, "udp", addr)
 }
+
+// PacketDialer provides a way to dial a destination and establish datagram connections.
+type PacketDialer = Dialer[net.Conn]
 
 // PacketListenerDialer is a [PacketDialer] that connects to the destination using the given [PacketListener].
 type PacketListenerDialer struct {

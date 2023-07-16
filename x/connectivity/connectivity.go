@@ -49,13 +49,13 @@ func (err *TestError) Unwrap() error {
 // TestResolverStreamConnectivity uses the given [transport.StreamEndpoint] to connect to a DNS resolver and resolve the test domain.
 // The context can be used to set a timeout or deadline, or to pass values to the dialer.
 func TestResolverStreamConnectivity(ctx context.Context, resolver transport.StreamEndpoint, testDomain string) (time.Duration, error) {
-	return testResolver(ctx, resolver.Connect, testDomain)
+	return testResolverConnectivity(ctx, resolver, testDomain)
 }
 
 // TestResolverPacketConnectivity uses the given [transport.PacketEndpoint] to connect to a DNS resolver and resolve the test domain.
 // The context can be used to set a timeout or deadline, or to pass values to the listener.
 func TestResolverPacketConnectivity(ctx context.Context, resolver transport.PacketEndpoint, testDomain string) (time.Duration, error) {
-	return testResolver(ctx, resolver.Connect, testDomain)
+	return testResolverConnectivity(ctx, resolver, testDomain)
 }
 
 func isTimeout(err error) bool {
@@ -74,7 +74,11 @@ func makeTestError(op string, err error) error {
 	return &TestError{Op: op, PosixError: code, Err: err}
 }
 
-func testResolver[C net.Conn](ctx context.Context, connect func(context.Context) (C, error), testDomain string) (time.Duration, error) {
+// testResolverConnectivity uses the given [transport.Endpoint] to connect to a DNS resolver and resolve the test domain.
+// If the connection returned by the endpoint is a [net.PacketConn], it sends the request as a DNS-over-UDP datagram,
+// otherwise it sends the request as a DNS-over-TCP record.
+// The [context.Context] can be used to set a timeout or deadline, or to pass values to the listener.
+func testResolverConnectivity[Conn net.Conn](ctx context.Context, endpoint transport.Endpoint[Conn], testDomain string) (time.Duration, error) {
 	deadline, ok := ctx.Deadline()
 	if !ok {
 		// Default deadline is 5 seconds.
@@ -86,7 +90,7 @@ func testResolver[C net.Conn](ctx context.Context, connect func(context.Context)
 	}
 	testTime := time.Now()
 	testErr := func() error {
-		conn, dialErr := connect(ctx)
+		conn, dialErr := endpoint.Connect(ctx)
 		if dialErr != nil {
 			return makeTestError("dial", dialErr)
 		}

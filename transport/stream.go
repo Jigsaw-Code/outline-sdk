@@ -20,7 +20,7 @@ import (
 	"net"
 )
 
-// StreamConn is a net.Conn that allows for closing only the reader or writer end of
+// StreamConn is a [net.Conn] that allows for closing only the reader or writer end of
 // it, supporting half-open state.
 type StreamConn interface {
 	net.Conn
@@ -71,10 +71,7 @@ func WrapConn(c StreamConn, r io.Reader, w io.Writer) StreamConn {
 }
 
 // StreamEndpoint represents an endpoint that can be used to established stream connections (like TCP) to a fixed destination.
-type StreamEndpoint interface {
-	// Connect establishes a connection with the endpoint, returning the connection.
-	Connect(ctx context.Context) (StreamConn, error)
-}
+type StreamEndpoint = Endpoint[StreamConn]
 
 // TCPEndpoint is a [StreamEndpoint] that connects to the given address using the given [StreamDialer].
 type TCPEndpoint struct {
@@ -96,35 +93,19 @@ func (e *TCPEndpoint) Connect(ctx context.Context) (StreamConn, error) {
 	return conn.(*net.TCPConn), nil
 }
 
-// StreamDialerEndpoint is a [StreamEndpoint] that connects to the given address using the given [StreamDialer].
-type StreamDialerEndpoint struct {
-	Dialer  StreamDialer
-	Address string
-}
-
-var _ StreamEndpoint = (*StreamDialerEndpoint)(nil)
-
-// Connect implements [StreamEndpoint].Connect.
-func (e *StreamDialerEndpoint) Connect(ctx context.Context) (StreamConn, error) {
-	return e.Dialer.Dial(ctx, e.Address)
-}
-
 // StreamDialer provides a way to dial a destination and establish stream connections.
-type StreamDialer interface {
-	// Dial connects to `raddr`.
-	// `raddr` has the form `host:port`, where `host` can be a domain name or IP address.
-	Dial(ctx context.Context, raddr string) (StreamConn, error)
-}
+type StreamDialer = Dialer[StreamConn]
 
-// TCPStreamDialer is a [StreamDialer] that uses the standard [net.Dialer] to dial.
+// TCPDialer is a [StreamDialer] that uses the standard [net.Dialer] to dial.
 // It provides a convenient way to use a [net.Dialer] when you need a [StreamDialer].
-type TCPStreamDialer struct {
+type TCPDialer struct {
 	Dialer net.Dialer
 }
 
-var _ StreamDialer = (*TCPStreamDialer)(nil)
+var _ StreamDialer = (*TCPDialer)(nil)
 
-func (d *TCPStreamDialer) Dial(ctx context.Context, addr string) (StreamConn, error) {
+// Dial implements [Dialer].Dial.
+func (d *TCPDialer) Dial(ctx context.Context, addr string) (StreamConn, error) {
 	conn, err := d.Dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return nil, err
