@@ -19,6 +19,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-internal-sdk/internal/slicepool"
@@ -41,6 +42,9 @@ type packetListenerProxyAdapter struct {
 }
 
 type packetListenerRequestSender struct {
+	mu     sync.Mutex // Protects closed and timer function calls
+	closed bool
+
 	proxyConn        net.PacketConn
 	writeIdleTimeout time.Duration
 	writeIdleTimer   *time.Timer
@@ -76,7 +80,9 @@ func (proxy *packetListenerProxyAdapter) NewSession(respWriter PacketResponseRec
 	}
 
 	// Terminate the session after timeout with no outgoing writes (deadline is refreshed by WriteTo)
-	reqSender.writeIdleTimer = time.AfterFunc(reqSender.writeIdleTimeout, func() { reqSender.Close() })
+	reqSender.writeIdleTimer = time.AfterFunc(reqSender.writeIdleTimeout, func() {
+		reqSender.Close()
+	})
 
 	// Relay incoming UDP responses from the proxy asynchronously until EOF, session expiration or error
 	go func() {
@@ -108,6 +114,12 @@ func (proxy *packetListenerProxyAdapter) NewSession(respWriter PacketResponseRec
 // WriteTo implements [PacketRequestSender].WriteTo function. It simply forwards the packet to the underlying
 // [net.PacketConn].WriteTo function.
 func (s *packetListenerRequestSender) WriteTo(p []byte, destination net.Addr) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.closed {
+		return 0, ErrClosed
+	}
 	s.writeIdleTimer.Reset(s.writeIdleTimeout)
 	return s.proxyConn.WriteTo(p, destination)
 }
@@ -115,6 +127,13 @@ func (s *packetListenerRequestSender) WriteTo(p []byte, destination net.Addr) (i
 // Close implements [PacketRequestSender].Close function. It closes the underlying [net.PacketConn]. This will also
 // terminate the goroutine created in NewSession because s.conn.ReadFrom will return [io.EOF].
 func (s *packetListenerRequestSender) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.closed {
+		return ErrClosed
+	}
+	s.closed = true
 	s.writeIdleTimer.Stop()
 	return s.proxyConn.Close()
 }
