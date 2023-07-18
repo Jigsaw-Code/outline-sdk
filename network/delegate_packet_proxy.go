@@ -14,32 +14,61 @@
 
 package network
 
-import "errors"
+import (
+	"errors"
+	"sync/atomic"
+)
 
+// DelegatePacketProxy is a PacketProxy that forwards calls (like NewSession) to another PacketProxy. To create a
+// DelegatePacketProxy with the default PacketProxy, use NewDelegatePacketProxy. To change the underlying PacketProxy,
+// use SetProxy.
+//
+// Note: After changing the underlying PacketProxy, only new NewSession calls will be routed to the new PacketProxy.
+// Existing sessions will not be affected.
+//
+// Multiple goroutines may invoke methods on a DelegatePacketProxy simultaneously.
 type DelegatePacketProxy interface {
 	PacketProxy
-	SetProxy(proxy PacketProxy)
+
+	// SetProxy updates the underlying PacketProxy to `proxy`. And `proxy` must not be nil. After this function
+	// returns, all new PacketProxy calls will be forwarded to the `proxy`. Existing sessions will not be affected.
+	SetProxy(proxy PacketProxy) error
 }
+
+var errInvalidProxy = errors.New("the underlying proxy must not be nil")
 
 // Compilation guard against interface implementation
 var _ DelegatePacketProxy = (*delegatePacketProxy)(nil)
 
 type delegatePacketProxy struct {
-	proxy PacketProxy
+	proxy atomic.Value
 }
 
-func NewDelegatePacketProxy(proxy PacketProxy) DelegatePacketProxy {
-	return &delegatePacketProxy{proxy}
+// NewDelegatePacketProxy creates a new [DelegatePacketProxy] that forwards calls to the `proxy` [PacketProxy].
+// The `proxy` must not be nil.
+func NewDelegatePacketProxy(proxy PacketProxy) (DelegatePacketProxy, error) {
+	if proxy == nil {
+		return nil, errInvalidProxy
+	}
+	dp := delegatePacketProxy{}
+	dp.proxy.Store(proxy)
+	return &dp, nil
 }
 
+// NewSession implements PacketProxy.NewSession, and it will forward the call to the underlying PacketProxy.
 func (p *delegatePacketProxy) NewSession(respWriter PacketResponseReceiver) (PacketRequestSender, error) {
-	realProxy := p.proxy
+	realProxy := p.proxy.Load().(PacketProxy)
 	if realProxy == nil {
-		return nil, errors.New("not supported")
+		return nil, errInvalidProxy
 	}
 	return realProxy.NewSession(respWriter)
 }
 
-func (p *delegatePacketProxy) SetProxy(proxy PacketProxy) {
-	p.proxy = proxy
+// SetProxy implements DelegatePacketProxy.SetProxy.
+func (p *delegatePacketProxy) SetProxy(proxy PacketProxy) error {
+	if proxy == nil {
+		return errInvalidProxy
+	}
+	p.proxy.Store(proxy)
+	return nil
 }
