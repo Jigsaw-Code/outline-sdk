@@ -68,7 +68,7 @@ var inst *lwIPDevice = nil
 // [lwIP library]: https://savannah.nongnu.org/projects/lwip/
 func ConfigureDevice(sd transport.StreamDialer, pp network.PacketProxy) (network.IPDevice, error) {
 	if sd == nil || pp == nil {
-		return nil, errors.New("both sd and pktProxy are required")
+		return nil, errors.New("both sd and pp are required")
 	}
 
 	instMu.Lock()
