@@ -57,11 +57,7 @@ func NewDelegatePacketProxy(proxy PacketProxy) (DelegatePacketProxy, error) {
 
 // NewSession implements PacketProxy.NewSession, and it will forward the call to the underlying PacketProxy.
 func (p *delegatePacketProxy) NewSession(respWriter PacketResponseReceiver) (PacketRequestSender, error) {
-	realProxy := p.proxy.Load().(PacketProxy)
-	if realProxy == nil {
-		return nil, errInvalidProxy
-	}
-	return realProxy.NewSession(respWriter)
+	return p.proxy.Load().(PacketProxy).NewSession(respWriter)
 }
 
 // SetProxy implements DelegatePacketProxy.SetProxy.
