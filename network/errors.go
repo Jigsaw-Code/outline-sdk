@@ -16,16 +16,13 @@ package network
 
 import (
 	"errors"
-	"net"
-	"os"
-	"syscall"
 )
 
 // Portable analogs of some common errors.
 //
 // Errors returned from this package and all sub-packages may be tested against these errors with [errors.Is].
 
-// ErrClosed is the error returned by an I/O call on a network device that has already been closed, or that is closed
-// by another goroutine before the I/O is completed. This may be wrapped in another error, and should normally be
-// tested using errors.Is(err, network.ErrClosed).
-var ErrClosed = errors.Join(os.ErrClosed, net.ErrClosed, syscall.ESHUTDOWN)
+// ErrClosed is the error returned by an I/O call on a network device or proxy that has already been closed, or that is
+// closed by another goroutine before the I/O is completed. This may be wrapped in another error, and should normally
+// be tested using errors.Is(err, network.ErrClosed).
+var ErrClosed = errors.New("network device already closed")

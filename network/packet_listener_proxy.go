@@ -114,13 +114,9 @@ func (proxy *packetListenerProxyAdapter) NewSession(respWriter PacketResponseRec
 // WriteTo implements [PacketRequestSender].WriteTo function. It simply forwards the packet to the underlying
 // [net.PacketConn].WriteTo function.
 func (s *packetListenerRequestSender) WriteTo(p []byte, destination net.Addr) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.closed {
-		return 0, ErrClosed
+	if err := s.resetWriteIdleTimer(); err != nil {
+		return 0, err
 	}
-	s.writeIdleTimer.Reset(s.writeIdleTimeout)
 	return s.proxyConn.WriteTo(p, destination)
 }
 
@@ -136,4 +132,17 @@ func (s *packetListenerRequestSender) Close() error {
 	s.closed = true
 	s.writeIdleTimer.Stop()
 	return s.proxyConn.Close()
+}
+
+// resetWriteIdleTimer extends the writeIdleTimer's timeout to now() + writeIdleTimeout. If `s` is closed, it will
+// return ErrClosed.
+func (s *packetListenerRequestSender) resetWriteIdleTimer() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.closed {
+		return ErrClosed
+	}
+	s.writeIdleTimer.Reset(s.writeIdleTimeout)
+	return nil
 }
