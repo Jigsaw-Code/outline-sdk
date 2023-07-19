@@ -19,6 +19,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"syscall"
 	"testing"
 
 	"github.com/Jigsaw-Code/outline-internal-sdk/network"
@@ -34,11 +35,15 @@ func TestStackClosedWriteError(t *testing.T) {
 	n, err := t2s.Write([]byte{0x01})
 	require.Exactly(t, 0, n)
 	require.ErrorIs(t, err, network.ErrClosed)
-	require.ErrorIs(t, err, os.ErrClosed) // network.ErrClosed should wrap os.ErrClosed
+
+	// network.ErrClosed should not wrap golang's ErrClosed errors
+	require.NotErrorIs(t, err, os.ErrClosed)
+	require.NotErrorIs(t, err, net.ErrClosed)
+	require.NotErrorIs(t, err, syscall.ESHUTDOWN)
 }
 
-func reConfigurelwIPDeviceForTest(t *testing.T, sd transport.StreamDialer, pl transport.PacketListener) *lwIPDevice {
-	t2s, err := ConfigureDevice(sd, pl)
+func reConfigurelwIPDeviceForTest(t *testing.T, sd transport.StreamDialer, pp network.PacketProxy) *lwIPDevice {
+	t2s, err := ConfigureDevice(sd, pp)
 	require.NoError(t, err)
 	t2sInternal, ok := t2s.(*lwIPDevice)
 	require.True(t, ok)
@@ -49,10 +54,10 @@ type errTcpUdpHandler struct {
 	err error
 }
 
-func (h *errTcpUdpHandler) Dial(ctx context.Context, raddr string) (transport.StreamConn, error) {
+func (h *errTcpUdpHandler) Dial(context.Context, string) (transport.StreamConn, error) {
 	return nil, h.err
 }
 
-func (h *errTcpUdpHandler) ListenPacket(ctx context.Context) (net.PacketConn, error) {
+func (h *errTcpUdpHandler) NewSession(network.PacketResponseReceiver) (network.PacketRequestSender, error) {
 	return nil, h.err
 }

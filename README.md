@@ -7,173 +7,81 @@
 [![Mattermost](https://badgen.net/badge/Mattermost/Outline%20Community/blue)](https://community.internetfreedomfestival.org/community/channels/outline-community)
 [![Reddit](https://badgen.net/badge/Reddit/r%2Foutlinevpn/orange)](https://www.reddit.com/r/outlinevpn/)
 
-This is the repository to hold the future Outline SDK as we develop it. The goal is to clean up and move reusable code from [outline-ss-server](https://github.com/Jigsaw-Code/outline-ss-server) and [outline-go-tun2socks](https://github.com/Jigsaw-Code/outline-go-tun2socks).
+<p align="center">
+<img src="https://github.com/Jigsaw-Code/outline-brand/blob/main/assets/powered_by_outline/color/logo.png?raw=true" width=400pt />
+</p>
 
-**WARNING: This code is not ready to be used by the public. There's no guarantee of stability.**
+> **Warning**
+> This code is not ready to be used by the public. There's no guarantee of stability.
 
-Tentative roadmap:
+The Outline SDK helps developers:
+- Create tools to protect against network-level interference
+- Add network-level interference protection to existing apps, such as content or communication apps
 
-- Transport libraries
-  - [x] Generic transport client primitives (`StreamDialer`, `PacketListener` and Endpoints)
-  - [x] TCP and UDP client implementations
-  - [x] Shadowsocks client implementations
-  - [ ] Generic transport server primitives (TBD)
-  - [ ] TCP and UDP server implementations
-  - [ ] Shadowsocks server implementations
-  - [ ] Utility implementations (`ReplaceablePacketListener`, `TruncateDNSPacketListener`)
+## Advantages
+
+| Multi-Platform | Proven Technology | Composable |
+|:-:|:-:|:-:|
+| The Outline SDK can be used on Android, iOS, Windows, macOS or Linux. | The Outline Client and Server have been using the code in the SDK for years, helping millions of users in the harshest conditions. | The SDK interfaces were carefully designed to allow for composition and reuse, so you can craft your own transport. |
+
+## Integration
+
+The Outline SDK is written in Go. There are multiple ways to integrate the Outline SDK into your app:
+
+- As a **Go library** ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-internal-sdk)), in a Go application (CLI or graphical app with frameworks like [Fyne.io](https://fyne.io/), [Wails](https://wails.io/), [Qt for Go](https://therecipe.github.io/qt/), or [Go Mobile app](https://pkg.go.dev/golang.org/x/mobile/app))
+- As a **C library**, generated using the appropriate [Go build mode](https://pkg.go.dev/cmd/go#hdr-Build_modes).
+- As a native **mobile library**, using [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile) to generate Java and Objective-C bindings for Android, iOS and macOS.
+- As a **side service**, built as a standalone Go binary that your main application talks to. Note that this is not possible on iOS, due to the limitation on starting sub-processes.
+
+The Outline Client uses the mobile library approach on Android, iOS and macOS (based on Cordova) and the side service on Windows and Linux (based on Electron).
+
+
+## Tentative Roadmap
+
+The launch will have two milestones: Alpha and Beta. We are currently in pre-Alpha. Note that most of the code is not new. It's the code being used by the production Outline Client and Server. The SDK work is repackaging code from [outline-ss-server](https://github.com/Jigsaw-Code/outline-ss-server) and [outline-go-tun2socks](https://github.com/Jigsaw-Code/outline-go-tun2socks) in a way that is easier to reuse and extend.
+
+### Alpha
+The goal of the Alpha release is to make it available to potential developers early so they can provide feedback on the SDK and help shape the interfaces, processes and tools.
+
+The code in this repository will move to https://github.com/Jigsaw-Code/outline-sdk and versions will be tagged.
+
+Alpha tasks:
+
+- Transport-level libraries
+  - [x] Add generic transport client primitives (`StreamDialer`, `PacketListener` and Endpoints)
+  - [x] Add TCP and UDP client implementations
+  - [x] Add Shadowsocks client implementations
+  - [x] Use transport libraries in the Outline Client
+  - [x] Use transport libraries in the Outline Server 
+
+- Network-level libraries
+  - [x] Add IP Device abstraction
+  - [x] Add IP Device implementation based on go-tun2socks (LWIP)
+  - [ ] Add UDP handler to fallback to DNS-over-TCP
+  - [ ] Add DelegatePacketProxy
+
+
+### Beta
+
+The goal of the Beta release is to communicate that the SDK is ready for broader consumption, after we believe the APIs are stable enough and we have all the supporting resources in place (website, documentation, examples, etc
+
+Beta tasks:
 
 - Network libraries
-  - [x] Generic network primitives (TBD, something like a generic TUN device)
-  - [x] Implementation based on go-tun2socks
+  - [ ] Use network libraries in the Outline Client
+  - [ ] Add extensive testing
 
-- VPN API
-  - [ ] VPN API for desktop (Linux, Windows, macOS)
+- Serverless transport libraries
+  - [ ] Encrypted DNS
+  - [ ] Packet splitting
 
-# Cross-platform Development
+- Proxy transport libraries
+  - [ ] HTTP Connect
+  - [ ] SOCKS5
 
-## Building
-
-In Go you can compile for other target operating system and architecture by specifying the `GOOS` and `GOARCH` environment variables and using the [`go build` command](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies). That only works if you are not using [Cgo](https://pkg.go.dev/cmd/cgo) to call C code.
-
-<details>
-  <summary>Examples</summary>
-
-MacOS example:
-```
-% GOOS=darwin go build -C x -o ./bin/ ./outline-connectivity 
-% file ./x/bin/outline-connectivity 
-./x/bin/outline-connectivity: Mach-O 64-bit executable x86_64
-```
-
-Linux example:
-```
-% GOOS=linux go build -C x -o ./bin/ ./outline-connectivity 
-% file ./x/bin/outline-connectivity                      
-./x/bin/outline-connectivity: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked, Go BuildID=n0WfUGLum4Y6OpYxZYuz/lbtEdv_kvyUCd3V_qOqb/CC_6GAQqdy_ebeYTdn99/Tk_G3WpBWi8vxqmIlIuU, with debug_info, not stripped
-```
-
-Windows example:
-```
-% GOOS=windows go build -C x -o ./bin/ ./outline-connectivity 
-% file ./x/bin/outline-connectivity.exe 
-./x/bin/outline-connectivity.exe: PE32+ executable (console) x86-64 (stripped to external PDB), for MS Windows
-```
-</details>
-
-## Running Linux binaries
-
-To run Linux binaries you can use a Linux container via [Podman](https://podman.io/).
-
-### Set up podman
-<details>
-  <summary>Instructions</summary>
-
-[Install Podman](https://podman.io/docs/installation) (once). On macOS:
-```sh
-brew install podman
-```
-
-Create the podman service VM (once) with the [`podman machine init` command](https://docs.podman.io/en/latest/markdown/podman-machine-init.1.html):
-```sh
-podman machine init
-```
-
-Start the VM with the [`podman machine start` command](https://docs.podman.io/en/latest/markdown/podman-machine-start.1.html), after every time it is stopped:
-```sh
-podman machine start
-``` 
-
-You can see the VM running with the [`podman machine list` command](https://docs.podman.io/en/latest/markdown/podman-machine-list.1.html):
-```
-% podman machine list
-NAME                     VM TYPE     CREATED        LAST UP            CPUS        MEMORY      DISK SIZE
-podman-machine-default*  qemu        3 minutes ago  Currently running  1           2.147GB     107.4GB
-```
-
-When you are done with development, you can stop the machine with the [`podman machine stop` command](https://docs.podman.io/en/latest/markdown/podman-machine-stop.1.html):
-```sh
-podman machine stop
-```
-</details>
-
-### Run
-
-The easiest way is to run a binary is to use the [`go run` command](https://pkg.go.dev/cmd/go#hdr-Compile_and_run_Go_program) directly with the `-exec` flag and our convenience tool `run_on_podman.sh`:
-```sh
-GOOS=linux go run -C x -exec "$(pwd)/run_on_podman.sh" ./outline-connectivity
-```
-
-It also works with the [`go test` command](https://pkg.go.dev/cmd/go#hdr-Test_packages):
-```sh
-GOOS=linux go test -exec "$(pwd)/run_on_podman.sh"  ./...
-```
-
-<details>
-  <summary>Details and direct invocation</summary>
-
-The `run_on_podman.sh` script uses the [`podman run` command](https://docs.podman.io/en/latest/markdown/podman-run.1.html) and a minimal ["distroless" container image](https://github.com/GoogleContainerTools/distroless) to run the binary you want:
-```sh
-podman run --arch $(uname -m) --rm -it -v "${bin}":/outline/bin gcr.io/distroless/static-debian11 /outline/bin "$@"
-```
-
-You can also use `podman run` directly to run a pre-built binary:
-```
-% podman run --rm -it -v ./x/bin:/outline gcr.io/distroless/static-debian11 /outline/outline-connectivity
-Usage of /outline/outline-connectivity:
-  -domain string
-        Domain name to resolve in the test (default "example.com.")
-  -key string
-        Outline access key
-  -proto string
-        Comma-separated list of the protocols to test. Muse be "tcp", "udp", or a combination of them (default "tcp,udp")
-  -resolver string
-        Comma-separated list of addresses of DNS resolver to use for the test (default "8.8.8.8,2001:4860:4860::8888")
-  -v    Enable debug output
-```
-
-Flags explanation:
-- `--rm`: Remove container (and pod if created) after exit
-- `-i` (interactive): Keep STDIN open even if not attached
-- `-t` (tty): Allocate a pseudo-TTY for container
-- `-v` (volume): Bind mount a volume into the container. Volume source will be on the server machine, not the client
-</details>
-
-## Running Windows binaries
-
-To run Windows binaries you can use [Wine](https://en.wikipedia.org/wiki/Wine_(software)) to emulate a Windows environment.
-This is not the same as a real Windows environment, so make sure you test on actual Windows machines.
-
-### Install Wine
-
-<details>
-  <summary>Instructions</summary>
-
-Follow the instructions at https://wiki.winehq.org/Download.
-
-On macOS: 
-```
-brew tap homebrew/cask-versions
-brew install --cask --no-quarantine wine-stable
-```
-
-After installation, `wine64` should be on your `PATH`. Check with `wine64 --version`:
-```
-wine64 --version
-```
-
-</details>
-
-### Run
-
-You can pass `wine64` as the `-exec` parameter in the `go` calls.
-
-To build:
-
-```sh
-GOOS=windows go run -C x -exec "wine64" ./outline-connectivity
-```
-
-For tests:
-```sh
-GOOS=windows go test -exec "wine64"  ./...
-```
+- Add Resources
+  - [ ] Website
+  - [ ] Bindings
+  - [ ] Integration documentation
+  - [ ] Example command-line apps
+  - [ ] Example graphical apps
