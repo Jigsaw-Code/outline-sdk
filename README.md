@@ -47,21 +47,36 @@ The code in this repository will move to https://github.com/Jigsaw-Code/outline-
 
 Alpha tasks:
 
-- Add Transport libraries
-  - [x] Generic transport client primitives (`StreamDialer`, `PacketListener` and Endpoints)
-  - [x] TCP and UDP client implementations
-  - [x] Shadowsocks client implementations
+- Transport-level libraries
+  - [x] Add Generic transport client primitives (`StreamDialer`, `PacketListener` and Endpoints)
+  - [x] Add TCP and UDP client implementations
+  - [x] Add Shadowsocks client implementations
+  - [x] Use transport libraries in the Outline Client
+  - [x] Use transport libraries in the Outline Server 
 
-- Add Network libraries
-  - [x] IP Device abstraction
-  - [x] Implementation based on go-tun2socks (LWIP)
-  - [ ] UDP handler to fallback to DNS-over-TCP
+- Network-level libraries
+  - [x] Add IP Device abstraction
+  - [x] Add IP Device implementation based on go-tun2socks (LWIP)
+  - [ ] Add UDP handler to fallback to DNS-over-TCP
+
 
 ### Beta
 
 The goal of the Beta release is to communicate that the SDK is ready for broader consumption, after we believe the APIs are stable enough and we have all the supporting resources in place (website, documentation, examples, etc
 
 Beta tasks:
+
+- Network libraries
+  - [x] Use network libraries in the Outline Client
+  - [ ] Add extensive testing
+
+- Serverless transport libraries
+  - [ ] Encrypted DNS
+  - [ ] Packet splitting
+
+- Proxy transport libraries
+  - [ ] HTTP Connect
+  - [ ] SOCKS5
 
 - Add Resources
   - [ ] Website
