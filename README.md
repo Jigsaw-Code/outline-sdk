@@ -67,7 +67,7 @@ The goal of the Beta release is to communicate that the SDK is ready for broader
 Beta tasks:
 
 - Network libraries
-  - [x] Use network libraries in the Outline Client
+  - [ ] Use network libraries in the Outline Client
   - [ ] Add extensive testing
 
 - Serverless transport libraries
