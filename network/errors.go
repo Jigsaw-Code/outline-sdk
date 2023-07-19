@@ -12,12 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/*
-The network package defines interfaces and provides utilities for network layer (OSI layer 3) functionalities. For
-example, the [IPDevice] interface can be used to read and write IP packets from a physical or virtual network device.
-
-In addition, user-space network stack implementations are also included in the sub-packages (such as
-network/lwip2transport) that can translate raw IP packets into TCP/UDP flows. You can implement a [PacketProxy]
-to handle UDP traffic, and a [transport.StreamDialer] to handle TCP traffic.
-*/
 package network
+
+import (
+	"errors"
+)
+
+// Portable analogs of some common errors.
+//
+// Errors returned from this package and all sub-packages may be tested against these errors with [errors.Is].
+
+// ErrClosed is the error returned by an I/O call on a network device or proxy that has already been closed, or that is
+// closed by another goroutine before the I/O is completed. This may be wrapped in another error, and should normally
+// be tested using errors.Is(err, network.ErrClosed).
+var ErrClosed = errors.New("network device already closed")
