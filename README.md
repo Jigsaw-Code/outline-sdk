@@ -48,7 +48,7 @@ The code in this repository will move to https://github.com/Jigsaw-Code/outline-
 Alpha tasks:
 
 - Transport-level libraries
-  - [x] Add Generic transport client primitives (`StreamDialer`, `PacketListener` and Endpoints)
+  - [x] Add generic transport client primitives (`StreamDialer`, `PacketListener` and Endpoints)
   - [x] Add TCP and UDP client implementations
   - [x] Add Shadowsocks client implementations
   - [x] Use transport libraries in the Outline Client
