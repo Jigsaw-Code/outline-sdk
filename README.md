@@ -29,8 +29,8 @@ The Outline SDK helps developers:
 The Outline SDK is written in Go. There are multiple ways to integrate the Outline SDK into your app:
 
 - As a **Go library** ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-internal-sdk)), in a Go application (CLI or graphical app with frameworks like [Fyne.io](https://fyne.io/), [Wails](https://wails.io/), [Qt for Go](https://therecipe.github.io/qt/), or [Go Mobile app](https://pkg.go.dev/golang.org/x/mobile/app))
-- As a native **mobile library**, using [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile) to generate Java and Objective-C bindings for Android, iOS and macOS.
 - As a **C library**, generated using the appropriate [Go build mode](https://pkg.go.dev/cmd/go#hdr-Build_modes).
+- As a native **mobile library**, using [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile) to generate Java and Objective-C bindings for Android, iOS and macOS.
 - As a **side service**, built as a standalone Go binary that your main application talks to. Note that this is not possible on iOS, due to the limitation on starting sub-processes.
 
 The Outline Client uses the mobile library approach on Android, iOS and macOS (based on Cordova) and the side service on Windows and Linux (based on Electron).
@@ -47,21 +47,37 @@ The code in this repository will move to https://github.com/Jigsaw-Code/outline-
 
 Alpha tasks:
 
-- Add Transport libraries
-  - [x] Generic transport client primitives (`StreamDialer`, `PacketListener` and Endpoints)
-  - [x] TCP and UDP client implementations
-  - [x] Shadowsocks client implementations
+- Transport-level libraries
+  - [x] Add generic transport client primitives (`StreamDialer`, `PacketListener` and Endpoints)
+  - [x] Add TCP and UDP client implementations
+  - [x] Add Shadowsocks client implementations
+  - [x] Use transport libraries in the Outline Client
+  - [x] Use transport libraries in the Outline Server 
 
-- Add Network libraries
-  - [x] IP Device abstraction
-  - [x] Implementation based on go-tun2socks (LWIP)
-  - [ ] UDP handler to fallback to DNS-over-TCP
+- Network-level libraries
+  - [x] Add IP Device abstraction
+  - [x] Add IP Device implementation based on go-tun2socks (LWIP)
+  - [ ] Add UDP handler to fallback to DNS-over-TCP
+  - [ ] Add DelegatePacketProxy
+
 
 ### Beta
 
 The goal of the Beta release is to communicate that the SDK is ready for broader consumption, after we believe the APIs are stable enough and we have all the supporting resources in place (website, documentation, examples, etc
 
 Beta tasks:
+
+- Network libraries
+  - [ ] Use network libraries in the Outline Client
+  - [ ] Add extensive testing
+
+- Serverless transport libraries
+  - [ ] Encrypted DNS
+  - [ ] Packet splitting
+
+- Proxy transport libraries
+  - [ ] HTTP Connect
+  - [ ] SOCKS5
 
 - Add Resources
   - [ ] Website
