@@ -58,6 +58,7 @@ Alpha tasks:
   - [x] Add IP Device abstraction
   - [x] Add IP Device implementation based on go-tun2socks (LWIP)
   - [ ] Add UDP handler to fallback to DNS-over-TCP
+  - [ ] Add DelegatePacketProxy
 
 
 ### Beta
