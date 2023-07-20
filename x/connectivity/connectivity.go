@@ -58,8 +58,8 @@ func TestResolverPacketConnectivity(ctx context.Context, resolver transport.Pack
 	return testResolver(ctx, resolver.Connect, testDomain)
 }
 
-// TestTCPResolver connects to a DNS resolver over TCP.
-func TestTCPResolver(ctx context.Context, testDomain string) error {
+// TestDNSOverTCPResolver connects to a DNS resolver over TCP.
+func TestDNSOverTCPResolver(ctx context.Context, testDomain string) error {
 	client := dns.Client{}
 	client.Net = "tcp"
 	msg := dns.Msg{}
@@ -76,6 +76,25 @@ func TestTCPResolver(ctx context.Context, testDomain string) error {
 	}
 
 	return nil
+}
+
+// multiResolver attempts resolving a given domain using both TCP and UDP concurrently.
+func multiResolver(ctx context.Context, testDomain string) (string, error) {
+	tcpClient := dns.Client{}
+	tcpClient.Net = "tcp"
+	msg := dns.Msg{}
+	msg.SetQuestion(dns.Fqdn(testDomain), dns.TypeA)
+
+	response, _, err := tcpClient.Exchange(&msg, "8.8.8.8:53")
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+		return "", makeTestError("Exchange", err)
+	}
+
+	for _, answer := range response.Answer {
+		fmt.Printf("%v\n", answer)
+	}
+	return "", nil
 }
 
 func isTimeout(err error) bool {

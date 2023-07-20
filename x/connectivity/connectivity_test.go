@@ -205,4 +205,9 @@ func TestTestPacketPacketConnectivityOk(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestTestDNSOverTCPResolver(t *testing.T) {
+	err := TestDNSOverTCPResolver(context.Background(), "example.com")
+	require.NoError(t, err)
+}
+
 // TODO: Add more tests
