@@ -93,6 +93,9 @@ func multiResolver(ctx context.Context, testDomain string) (string, error) {
 
 	for _, answer := range response.Answer {
 		fmt.Printf("%v\n", answer)
+		if a, ok := answer.(*dns.MX); ok {
+			fmt.Printf("A record: %s\n", a.String())
+		}
 	}
 	return "", nil
 }
