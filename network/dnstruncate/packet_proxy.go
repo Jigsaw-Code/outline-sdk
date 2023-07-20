@@ -20,12 +20,8 @@ import (
 	"net"
 	"sync/atomic"
 
+	"github.com/Jigsaw-Code/outline-internal-sdk/internal/slicepool"
 	"github.com/Jigsaw-Code/outline-internal-sdk/network"
-)
-
-var (
-	errInvalidResolver = errors.New("invalid DNS resolver's port number, it must be 53")
-	errInvalidDNSMsg   = errors.New("invalid DNS message")
 )
 
 // From [RFC 1035], the DNS message header contains the following fields:
@@ -54,7 +50,7 @@ const (
 	dnsUdpMaxMsgLen = 512 // https://datatracker.ietf.org/doc/html/rfc1035#section-2.3.4
 
 	dnsUdpAnswerByte   = 2           // The byte in the header containing QR and TC bit
-	dnsUdpResponseBit  = uint8(0x10) // The QR bit within dnsUdpAnswerByte
+	dnsUdpResponseBit  = uint8(0x80) // The QR bit within dnsUdpAnswerByte
 	dnsUdpTruncatedBit = uint8(0x02) // The TC bit within dnsUdpAnswerByte
 	dnsUdpRCodeByte    = 3           // The byte in the header containing RCODE
 	dnsUdpRCodeMask    = uint8(0x0f) // The RCODE bits within dnsUdpRCodeByte
@@ -63,6 +59,9 @@ const (
 	dnsARCntStartByte  = 6           // The starting byte of ANCOUNT
 	dnsARCntEndByte    = 7           // The ending byte (inclusive) of ANCOUNT
 )
+
+// packetBufferPool is used to create buffers to modify DNS requests
+var packetBufferPool = slicepool.MakePool(dnsUdpMaxMsgLen)
 
 // dnsTruncateProxy is a network.PacketProxy that create dnsTruncateRequestHandler to handle DNS requests locally.
 //
@@ -125,16 +124,23 @@ func (h *dnsTruncateRequestHandler) WriteTo(p []byte, destination net.Addr) (int
 	}
 	resolverAddr, err := net.ResolveUDPAddr("udp", destination.String())
 	if err != nil {
-		return 0, fmt.Errorf("DNS resolver is not a valid UDP address: %w", err)
+		return 0, fmt.Errorf("non-UDP %w, the DNS resolver is not a valid UDP address: %w", network.ErrUnsupported, err)
 	}
 	if resolverAddr.Port != dnsServerPort {
-		return 0, errInvalidResolver
+		return 0, fmt.Errorf("non-DNS UDP %w, target server's port is %v rather than %v",
+			network.ErrUnsupported, resolverAddr.Port, dnsServerPort)
 	}
 	if len(p) < dnsUdpMinMsgLen {
-		return 0, errInvalidDNSMsg
+		return 0, fmt.Errorf("invalid DNS %w, message length is %v bytes, it must be at least %v bytes",
+			network.ErrUnsupported, len(p), dnsUdpMinMsgLen)
 	}
 
-	buf := make([]byte, dnsUdpMaxMsgLen)
+	// Allocate buffer from slicepool, because `go build -gcflags="-m"` shows a local array will escape to heap
+	slice := packetBufferPool.LazySlice()
+	buf := slice.Acquire()
+	defer slice.Release()
+
+	// We need to copy p into buf because "WriteTo must not modify p, even temporarily".
 	n := copy(buf, p)
 
 	// Set "Response", "Truncated" and "NoError"

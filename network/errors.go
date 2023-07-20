@@ -21,8 +21,24 @@ import (
 // Portable analogs of some common errors.
 //
 // Errors returned from this package and all sub-packages may be tested against these errors with [errors.Is].
+var (
+	// ErrClosed is the error returned by an I/O call on a network device or proxy that has already been closed, or that is
+	// closed by another goroutine before the I/O is completed. This may be wrapped in another error, and should normally
+	// be tested using errors.Is(err, network.ErrClosed).
+	ErrClosed = errors.New("network device already closed")
 
-// ErrClosed is the error returned by an I/O call on a network device or proxy that has already been closed, or that is
-// closed by another goroutine before the I/O is completed. This may be wrapped in another error, and should normally
-// be tested using errors.Is(err, network.ErrClosed).
-var ErrClosed = errors.New("network device already closed")
+	// ErrUnsupported indicates that a requested stream or packet cannot be handled by the network device, because it is
+	// unsupported. For example, when you call dnstruncate.NewPacketProxy().WriteTo() with a non-DNS request packet.
+	//
+	// The message of this error is "traffic is not supported". So functions should typically wrap this error in another
+	// error before returning it (for example, using fmt.Errorf to construct a full message):
+	//
+	//	 fmt.Errorf("non-DNS UDP %w", ErrUnsupported) // final error message: "Non-DNS UDP traffic is not supported"
+	//
+	// Types in the network package may check against this error using:
+	//
+	//   errors.Is(err, ErrUnsupported)
+	//
+	// And they will switch to a fallback behavior if some functions (e.g. WriteTo) returns this error.
+	ErrUnsupported = errors.New("traffic is not supported")
+)
