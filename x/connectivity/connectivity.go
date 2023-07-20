@@ -79,7 +79,7 @@ func TestDNSOverTCPResolver(ctx context.Context, testDomain string) error {
 }
 
 // multiResolver attempts resolving a given domain using both TCP and UDP concurrently.
-func multiResolver(ctx context.Context, testDomain string) (string, error) {
+func multiResolver(ctx context.Context, testDomain string) (net.IP, error) {
 	tcpClient := dns.Client{}
 	tcpClient.Net = "tcp"
 	msg := dns.Msg{}
@@ -88,16 +88,17 @@ func multiResolver(ctx context.Context, testDomain string) (string, error) {
 	response, _, err := tcpClient.Exchange(&msg, "8.8.8.8:53")
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
-		return "", makeTestError("Exchange", err)
+		return nil, makeTestError("Exchange", err)
 	}
 
 	for _, answer := range response.Answer {
 		fmt.Printf("%v\n", answer)
-		if a, ok := answer.(*dns.MX); ok {
-			fmt.Printf("A record: %s\n", a.String())
+		if a, ok := answer.(*dns.A); ok {
+			fmt.Printf("A record IP: %s\n", a.A)
+			return a.A, nil
 		}
 	}
-	return "", nil
+	return nil, errors.New("UDP resolution did not find an A record")
 }
 
 func isTimeout(err error) bool {
