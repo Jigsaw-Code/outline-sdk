@@ -124,7 +124,7 @@ func (h *dnsTruncateRequestHandler) WriteTo(p []byte, destination netip.AddrPort
 		return 0, network.ErrClosed
 	}
 	if destination.Port() != standardDNSPort {
-		return 0, fmt.Errorf("non-DNS UDP is not supported: %v %w", destination.Port(), network.ErrPortUnreachable)
+		return 0, fmt.Errorf("UDP traffic to non-DNS port %v is not supported: %w", destination.Port(), network.ErrPortUnreachable)
 	}
 	if len(p) < dnsUdpMinMsgLen {
 		return 0, fmt.Errorf("invalid DNS message of length %v, it must be at least %v bytes", len(p), dnsUdpMinMsgLen)
