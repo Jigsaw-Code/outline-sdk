@@ -45,7 +45,7 @@ import (
 //
 // [RFC 1035]: https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.1
 const (
-	standardDNSPort   = 53  // https://datatracker.ietf.org/doc/html/rfc1035#section-4.2
+	standardDNSPort = 53  // https://datatracker.ietf.org/doc/html/rfc1035#section-4.2
 	dnsUdpMinMsgLen = 12  // A DNS message must at least contain the header
 	dnsUdpMaxMsgLen = 512 // https://datatracker.ietf.org/doc/html/rfc1035#section-2.3.4
 
@@ -110,7 +110,7 @@ func (h *dnsTruncateRequestHandler) Close() error {
 	if !h.closed.CompareAndSwap(false, true) {
 		return network.ErrClosed
 	}
-	h.respWriter.Close() // TODO(junyi): potential inf loop (rw.Close -> req.Close -> rw.Close ...)
+	h.respWriter.Close()
 	return nil
 }
 
@@ -126,9 +126,9 @@ func (h *dnsTruncateRequestHandler) WriteTo(p []byte, destination net.Addr) (int
 	if err != nil {
 		return 0, fmt.Errorf("non-UDP %w, the DNS resolver is not a valid UDP address: %w", network.ErrUnsupported, err)
 	}
-	if resolverAddr.Port != dnsServerPort {
+	if resolverAddr.Port != standardDNSPort {
 		return 0, fmt.Errorf("non-DNS UDP %w, target server's port is %v rather than %v",
-			network.ErrUnsupported, resolverAddr.Port, dnsServerPort)
+			network.ErrUnsupported, resolverAddr.Port, standardDNSPort)
 	}
 	if len(p) < dnsUdpMinMsgLen {
 		return 0, fmt.Errorf("invalid DNS %w, message length is %v bytes, it must be at least %v bytes",
