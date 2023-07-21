@@ -17,11 +17,11 @@ package dnstruncate
 import (
 	"fmt"
 	"net"
+	"net/netip"
 	"sync"
 	"testing"
 
 	"github.com/Jigsaw-Code/outline-internal-sdk/network"
-	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/stretchr/testify/require"
@@ -30,7 +30,7 @@ import (
 // Make sure TC & NOERROR & ANCOUNT are set in the DNS response
 func TestTruncatedBitIsSetInResponse(t *testing.T) {
 	session := newInstantDNSSessionForTest(t)
-	resolverAddr, _ := transport.MakeNetAddr("udp", "1.2.3.4:53")
+	resolverAddr := netip.MustParseAddrPort("1.2.3.4:53")
 	require.NotNil(t, resolverAddr)
 
 	dnsReq := constructDNSRequestOrResponse(t, false, 0x2468, []string{"www.google.com", "www.youtube.com"})
@@ -46,14 +46,14 @@ func TestTruncatedBitIsSetInResponse(t *testing.T) {
 // Make sure invalid DNS requests should result in an error
 func TestInvalidDNSRequestReturnsError(t *testing.T) {
 	session := newInstantDNSSessionForTest(t)
-	resolverAddr, _ := transport.MakeNetAddr("udp", "[::1]:53")
+	resolverAddr := netip.MustParseAddrPort("[::1]:53")
 	require.NotNil(t, resolverAddr)
 
 	// dns request size too small
 	dnsReq := constructDNSRequestOrResponse(t, false, 0x2345, []string{"www.google.com"})
 	_, err := session.Query(dnsReq[:11], resolverAddr)
 	require.ErrorIs(t, err, network.ErrUnsupported)
-	session.AssertNoResponseFrom(resolverAddr)
+	session.AssertNoResponseFrom(net.UDPAddrFromAddrPort(resolverAddr))
 
 	// minimum valid dns request size
 	dnsResp, err := session.Query(dnsReq[:12], resolverAddr)
@@ -63,25 +63,26 @@ func TestInvalidDNSRequestReturnsError(t *testing.T) {
 	require.NoError(t, session.Close())
 }
 
-// Make sure non-DNS UDP traffic should result in an error
-func TestNonDNSUDPPacketReturnsError(t *testing.T) {
+// Make sure proxy won't response on port other than 53
+func TestPacketNotSentToPort53ReturnsError(t *testing.T) {
 	session := newInstantDNSSessionForTest(t)
 
 	invalidResolvers := []string{
-		"3.4.5.6:55",     // port number is not 53
-		"127.0.0.257:53", // invalid ip address
-		"127.0.0.-1:53",  // invalid ip address
+		"3.4.5.6:54",
+		"127.0.0.1:52",
+		"6.5.4.3:853",
+		"8.8.8.8:443",
 	}
 
 	dnsReq := constructDNSRequestOrResponse(t, false, 0x3456, []string{"www.google.com"})
 	for _, resolver := range invalidResolvers {
-		resolverAddr, _ := transport.MakeNetAddr("udp", resolver)
+		resolverAddr := netip.MustParseAddrPort(resolver)
 		require.NotNil(t, resolverAddr)
 
 		resp, err := session.Query(dnsReq, resolverAddr)
 		require.ErrorIs(t, err, network.ErrUnsupported)
 		require.Nil(t, resp)
-		session.AssertNoResponseFrom(resolverAddr)
+		session.AssertNoResponseFrom(net.UDPAddrFromAddrPort(resolverAddr))
 	}
 
 	require.NoError(t, session.Close())
@@ -90,7 +91,7 @@ func TestNonDNSUDPPacketReturnsError(t *testing.T) {
 // Make sure WriteTo a closed proxy should result in an error
 func TestWriteToClosedProxyReturnsError(t *testing.T) {
 	session := newInstantDNSSessionForTest(t)
-	resolverAddr, _ := transport.MakeNetAddr("udp", "1.2.3.4:53")
+	resolverAddr := netip.MustParseAddrPort("1.2.3.4:53")
 	require.NotNil(t, resolverAddr)
 
 	require.NoError(t, session.Close())
@@ -98,7 +99,7 @@ func TestWriteToClosedProxyReturnsError(t *testing.T) {
 	resp, err := session.Query(dnsReq, resolverAddr)
 	require.ErrorIs(t, err, network.ErrClosed)
 	require.Nil(t, resp)
-	session.AssertNoResponseFrom(resolverAddr)
+	session.AssertNoResponseFrom(net.UDPAddrFromAddrPort(resolverAddr))
 }
 
 // Make sure NewSession returns an error for nil PacketResponseReceiver
@@ -120,7 +121,7 @@ func TestMultipleWriteToRaceCondition(t *testing.T) {
 	wg.Add(clientCnt)
 	for i := 0; i < clientCnt; i++ {
 		go func(idx int) {
-			resolverAddr, _ := transport.MakeNetAddr("udp", fmt.Sprintf("127.0.0.%d:53", idx+1))
+			resolverAddr := netip.MustParseAddrPort(fmt.Sprintf("127.0.0.%d:53", idx+1))
 			require.NotNil(t, resolverAddr)
 
 			for j := 0; j < iterationCntPerClient; j++ {
@@ -227,7 +228,7 @@ func newInstantDNSSessionForTest(t *testing.T) *instantPacketSession {
 	return s
 }
 
-func (s *instantPacketSession) Query(req []byte, dest net.Addr) ([]byte, error) {
+func (s *instantPacketSession) Query(req []byte, dest netip.AddrPort) ([]byte, error) {
 	n, err := s.sender.WriteTo(req, dest)
 	if err != nil {
 		require.Exactly(s.t, 0, n)

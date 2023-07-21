@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"sync/atomic"
 
 	"github.com/Jigsaw-Code/outline-internal-sdk/internal/slicepool"
@@ -45,9 +46,9 @@ import (
 //
 // [RFC 1035]: https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.1
 const (
-	standardDNSPort = 53  // https://datatracker.ietf.org/doc/html/rfc1035#section-4.2
-	dnsUdpMinMsgLen = 12  // A DNS message must at least contain the header
-	dnsUdpMaxMsgLen = 512 // https://datatracker.ietf.org/doc/html/rfc1035#section-2.3.4
+	standardDNSPort = uint16(53) // https://datatracker.ietf.org/doc/html/rfc1035#section-4.2
+	dnsUdpMinMsgLen = 12         // A DNS message must at least contain the header
+	dnsUdpMaxMsgLen = 512        // https://datatracker.ietf.org/doc/html/rfc1035#section-2.3.4
 
 	dnsUdpAnswerByte   = 2           // The byte in the header containing QR and TC bit
 	dnsUdpResponseBit  = uint8(0x80) // The QR bit within dnsUdpAnswerByte
@@ -118,17 +119,13 @@ func (h *dnsTruncateRequestHandler) Close() error {
 // a valid DNS request. If so, it will write the DNS response with TC (truncated) bit set to the corresponding
 // [network.PacketResponseReceiver] passed to NewSession. If it is not a valid DNS request, the packet will be
 // discarded and returns an error.
-func (h *dnsTruncateRequestHandler) WriteTo(p []byte, destination net.Addr) (int, error) {
+func (h *dnsTruncateRequestHandler) WriteTo(p []byte, destination netip.AddrPort) (int, error) {
 	if h.closed.Load() {
 		return 0, network.ErrClosed
 	}
-	resolverAddr, err := net.ResolveUDPAddr("udp", destination.String())
-	if err != nil {
-		return 0, fmt.Errorf("non-UDP %w, the DNS resolver is not a valid UDP address: %w", network.ErrUnsupported, err)
-	}
-	if resolverAddr.Port != standardDNSPort {
+	if destination.Port() != standardDNSPort {
 		return 0, fmt.Errorf("non-DNS UDP %w, target server's port is %v rather than %v",
-			network.ErrUnsupported, resolverAddr.Port, standardDNSPort)
+			network.ErrUnsupported, destination.Port(), standardDNSPort)
 	}
 	if len(p) < dnsUdpMinMsgLen {
 		return 0, fmt.Errorf("invalid DNS %w, message length is %v bytes, it must be at least %v bytes",
@@ -153,5 +150,5 @@ func (h *dnsTruncateRequestHandler) WriteTo(p []byte, destination net.Addr) (int
 	// For reference: https://github.com/eycorsican/go-tun2socks/blob/master/proxy/dnsfallback/udp.go#L59-L63
 	copy(buf[dnsARCntStartByte:dnsARCntEndByte+1], buf[dnsQDCntStartByte:dnsQDCntEndByte+1])
 
-	return h.respWriter.WriteFrom(buf[:n], destination)
+	return h.respWriter.WriteFrom(buf[:n], net.UDPAddrFromAddrPort(destination))
 }
