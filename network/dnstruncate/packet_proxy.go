@@ -45,7 +45,7 @@ import (
 //
 // [RFC 1035]: https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.1
 const (
-	dnsServerPort   = 53  // https://datatracker.ietf.org/doc/html/rfc1035#section-4.2
+	standardDNSPort   = 53  // https://datatracker.ietf.org/doc/html/rfc1035#section-4.2
 	dnsUdpMinMsgLen = 12  // A DNS message must at least contain the header
 	dnsUdpMaxMsgLen = 512 // https://datatracker.ietf.org/doc/html/rfc1035#section-2.3.4
 
