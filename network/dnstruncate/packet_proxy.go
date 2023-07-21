@@ -124,12 +124,10 @@ func (h *dnsTruncateRequestHandler) WriteTo(p []byte, destination netip.AddrPort
 		return 0, network.ErrClosed
 	}
 	if destination.Port() != standardDNSPort {
-		return 0, fmt.Errorf("non-DNS UDP %w, target server's port is %v rather than %v",
-			network.ErrUnsupported, destination.Port(), standardDNSPort)
+		return 0, fmt.Errorf("non-DNS UDP is not supported: %v %w", destination.Port(), network.ErrPortUnreachable)
 	}
 	if len(p) < dnsUdpMinMsgLen {
-		return 0, fmt.Errorf("invalid DNS %w, message length is %v bytes, it must be at least %v bytes",
-			network.ErrUnsupported, len(p), dnsUdpMinMsgLen)
+		return 0, fmt.Errorf("invalid DNS message of length %v, it must be at least %v bytes", len(p), dnsUdpMinMsgLen)
 	}
 
 	// Allocate buffer from slicepool, because `go build -gcflags="-m"` shows a local array will escape to heap
@@ -141,6 +139,8 @@ func (h *dnsTruncateRequestHandler) WriteTo(p []byte, destination netip.AddrPort
 	n := copy(buf, p)
 
 	// Set "Response", "Truncated" and "NoError"
+	// Note: gopacket is a good library doing this kind of things. But it will increase the binary size a lot.
+	//       If we decide to use gopacket in the future, please evaluate the binary size and runtime memory consumption.
 	buf[dnsUdpAnswerByte] |= (dnsUdpResponseBit | dnsUdpTruncatedBit)
 	buf[dnsUdpRCodeByte] &= ^dnsUdpRCodeMask
 

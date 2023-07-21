@@ -52,7 +52,7 @@ func TestInvalidDNSRequestReturnsError(t *testing.T) {
 	// dns request size too small
 	dnsReq := constructDNSRequestOrResponse(t, false, 0x2345, []string{"www.google.com"})
 	_, err := session.Query(dnsReq[:11], resolverAddr)
-	require.ErrorIs(t, err, network.ErrUnsupported)
+	require.Error(t, err)
 	session.AssertNoResponseFrom(net.UDPAddrFromAddrPort(resolverAddr))
 
 	// minimum valid dns request size
@@ -80,7 +80,7 @@ func TestPacketNotSentToPort53ReturnsError(t *testing.T) {
 		require.NotNil(t, resolverAddr)
 
 		resp, err := session.Query(dnsReq, resolverAddr)
-		require.ErrorIs(t, err, network.ErrUnsupported)
+		require.ErrorIs(t, err, network.ErrPortUnreachable)
 		require.Nil(t, resp)
 		session.AssertNoResponseFrom(net.UDPAddrFromAddrPort(resolverAddr))
 	}
