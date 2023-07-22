@@ -78,7 +78,7 @@ func TestDNSOverTCPResolver(ctx context.Context, testDomain string) error {
 	return nil
 }
 
-func resolve(ctx context.Context, testDomain string, use_tcp bool) (net.IP, error) {
+func resolve(ctx context.Context, testDomain string, use_tcp bool, c chan net.IP) (net.IP, error) {
 	tcpClient := dns.Client{}
 	if use_tcp {
 		tcpClient.Net = "tcp"
@@ -95,22 +95,26 @@ func resolve(ctx context.Context, testDomain string, use_tcp bool) (net.IP, erro
 	for _, answer := range response.Answer {
 		fmt.Printf("%v\n", answer)
 		if a, ok := answer.(*dns.A); ok {
-			fmt.Printf("A record IP: %s\n", a.A)
+			fmt.Printf("use_tcp:%v A record IP: %s\n", use_tcp, a.A)
+			c <- a.A
 			return a.A, nil
 		}
 	}
+
+	return nil, nil
 }
 
 // multiResolver attempts resolving a given domain using both TCP and UDP concurrently.
 func multiResolver(ctx context.Context, testDomain string) (net.IP, error) {
-	go resolve(ctx, testDomain, false /* udp */)
-	go resolve(ctx, testDomain, true /* tcp */)
+	var c chan net.IP = make(chan net.IP)
+	go resolve(ctx, testDomain, true /* tcp */, c)
+	go resolve(ctx, testDomain, false /* udp */, c)
 	select {
-		case ip1, err := 
-		case <- time.After(time.Second * 2):
-			fmt.Println("timeout")
+	case ip := <-c:
+		return ip, nil
+	case <-time.After(time.Second):
+		return nil, errors.New("UDP resolution did not find an A record")
 	}
-	return nil, errors.New("UDP resolution did not find an A record")
 }
 
 func isTimeout(err error) bool {
