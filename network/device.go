@@ -16,19 +16,10 @@ package network
 
 import (
 	"fmt"
-	"os"
 	"syscall"
 )
 
-// Portable analogs of some common errors.
-//
-// Errors returned from this package and all sub-packages may be tested against these errors with [errors.Is].
 var (
-	// ErrClosed is the error returned by an I/O call on a network device that has already been closed, or that is closed
-	// by another goroutine before the I/O is completed. This may be wrapped in another error, and should normally be
-	// tested using errors.Is(err, network.ErrClosed).
-	ErrClosed = fmt.Errorf("the network device is closed: %w", os.ErrClosed)
-
 	// ErrMsgSize is the error returned by a Write on a network device that the size of the message to be sent is bigger
 	// than the maximum message size the device can process.
 	ErrMsgSize = fmt.Errorf("packet size is too big: %w", syscall.EMSGSIZE)

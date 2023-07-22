@@ -15,103 +15,101 @@
 package lwip2transport
 
 import (
-	"context"
-	"fmt"
 	"net"
 	"sync"
-	"time"
 
-	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
+	"github.com/Jigsaw-Code/outline-internal-sdk/network"
 	lwip "github.com/eycorsican/go-tun2socks/core"
 )
 
 // Compilation guard against interface implementation
 var _ lwip.UDPConnHandler = (*udpHandler)(nil)
+var _ network.PacketResponseReceiver = (*udpConnResponseWriter)(nil)
 
 type udpHandler struct {
-	// Protects the connections map
-	sync.Mutex
-
-	// Used to establish connections to the proxy
-	listener transport.PacketListener
-
-	// How long to wait for a packet from the proxy. Longer than this and the connection
-	// is closed.
-	timeout time.Duration
-
-	// Maps local UDP addresses (IPv4:port/[IPv6]:port) to connections to the proxy.
-	conns map[string]net.PacketConn
+	mu      sync.Mutex                             // Protects the senders field
+	proxy   network.PacketProxy                    // A network stack neutral implementation of UDP PacketProxy
+	senders map[string]network.PacketRequestSender // Maps local lwIP UDP socket to PacketRequestSender
 }
 
 // newUDPHandler returns a lwIP UDP connection handler.
 //
-// `pl` is an UDP packet listener.
-// `timeout` is the UDP read and write timeout.
-func newUDPHandler(pl transport.PacketListener, timeout time.Duration) *udpHandler {
+// `pktProxy` is a PacketProxy that handles UDP packets.
+func newUDPHandler(pktProxy network.PacketProxy) *udpHandler {
 	return &udpHandler{
-		listener: pl,
-		timeout:  timeout,
-		conns:    make(map[string]net.PacketConn, 8),
+		proxy:   pktProxy,
+		senders: make(map[string]network.PacketRequestSender, 8),
 	}
 }
 
-func (h *udpHandler) Connect(tunConn lwip.UDPConn, target *net.UDPAddr) error {
-	proxyConn, err := h.listener.ListenPacket(context.Background())
-	if err != nil {
-		return err
-	}
-	h.Lock()
-	h.conns[tunConn.LocalAddr().String()] = proxyConn
-	h.Unlock()
-	go h.relayPacketsFromProxy(tunConn, proxyConn)
+// Connect does nothing. New UDP sessions will be created in ReceiveTo.
+func (h *udpHandler) Connect(tunConn lwip.UDPConn, _ *net.UDPAddr) error {
 	return nil
 }
 
-// relayPacketsFromProxy relays packets from the proxy to the TUN device.
-func (h *udpHandler) relayPacketsFromProxy(tunConn lwip.UDPConn, proxyConn net.PacketConn) {
-	buf := lwip.NewBytes(lwip.BufSize)
-	defer func() {
-		h.close(tunConn)
-		lwip.FreeBytes(buf)
-	}()
-	for {
-		proxyConn.SetDeadline(time.Now().Add(h.timeout))
-		n, sourceAddr, err := proxyConn.ReadFrom(buf)
-		if err != nil {
+// ReceiveTo relays packets from the lwIP TUN device to the proxy. It's called by lwIP. ReceiveTo will also create a
+// new UDP session if `data` is the first packet from the `tunConn`.
+func (h *udpHandler) ReceiveTo(tunConn lwip.UDPConn, data []byte, destAddr *net.UDPAddr) (err error) {
+	laddr := tunConn.LocalAddr().String()
+
+	h.mu.Lock()
+	reqSender, ok := h.senders[laddr]
+	if !ok {
+		if reqSender, err = h.newSession(tunConn); err != nil {
 			return
 		}
-		// No resolution will take place, the address sent by the proxy is a resolved IP.
-		sourceUDPAddr, err := net.ResolveUDPAddr("udp", sourceAddr.String())
-		if err != nil {
-			return
-		}
-		_, err = tunConn.WriteFrom(buf[:n], sourceUDPAddr)
-		if err != nil {
-			return
-		}
+		h.senders[laddr] = reqSender
 	}
+	h.mu.Unlock()
+
+	_, err = reqSender.WriteTo(data, destAddr)
+	return
 }
 
-// ReceiveTo relays packets from the TUN device to the proxy. It's called by tun2socks.
-func (h *udpHandler) ReceiveTo(tunConn lwip.UDPConn, data []byte, destAddr *net.UDPAddr) error {
-	h.Lock()
-	proxyConn, ok := h.conns[tunConn.LocalAddr().String()]
-	h.Unlock()
-	if !ok {
-		return fmt.Errorf("connection %v->%v does not exist", tunConn.LocalAddr(), destAddr)
+// newSession creates a new PacketRequestSender related to conn. The caller needs to put the new PacketRequestSender
+// to the h.senders map.
+func (h *udpHandler) newSession(conn lwip.UDPConn) (network.PacketRequestSender, error) {
+	respWriter := &udpConnResponseWriter{conn, h}
+	reqSender, err := h.proxy.NewSession(respWriter)
+	if err != nil {
+		respWriter.Close()
 	}
-	proxyConn.SetDeadline(time.Now().Add(h.timeout))
-	_, err := proxyConn.WriteTo(data, destAddr)
+	return reqSender, err
+}
+
+// closeSession cleans up resources related to conn.
+func (h *udpHandler) closeSession(conn lwip.UDPConn) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	laddr := conn.LocalAddr().String()
+	err := conn.Close()
+	if reqSender, ok := h.senders[laddr]; ok {
+		reqSender.Close()
+		delete(h.senders, laddr)
+	}
 	return err
 }
 
-func (h *udpHandler) close(tunConn lwip.UDPConn) {
-	laddr := tunConn.LocalAddr().String()
-	tunConn.Close()
-	h.Lock()
-	defer h.Unlock()
-	if proxyConn, ok := h.conns[laddr]; ok {
-		proxyConn.Close()
-		delete(h.conns, laddr)
+// The PacketResponseWriter that will write responses to the lwip network stack.
+type udpConnResponseWriter struct {
+	conn lwip.UDPConn
+	h    *udpHandler
+}
+
+// Write relays packets from the proxy to the lwIP TUN device.
+func (r *udpConnResponseWriter) WriteFrom(p []byte, source net.Addr) (int, error) {
+	// net.Addr -> *net.UDPAddr, because r.conn.WriteFrom requires *net.UDPAddr
+	// and this is more reliable than type assertion
+	// also the source address host will be an IP address, no actual resolution will be done
+	srcAddr, err := net.ResolveUDPAddr("udp", source.String())
+	if err != nil {
+		return 0, err
 	}
+	return r.conn.WriteFrom(p, srcAddr)
+}
+
+// Close informs the udpHandler to close the UDPConn and clean up the UDP session.
+func (r *udpConnResponseWriter) Close() error {
+	return r.h.closeSession(r.conn)
 }
