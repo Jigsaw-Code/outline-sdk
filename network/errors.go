@@ -21,8 +21,13 @@ import (
 // Portable analogs of some common errors.
 //
 // Errors returned from this package and all sub-packages may be tested against these errors with [errors.Is].
+var (
+	// ErrClosed is the error returned by an I/O call on a network device or proxy that has already been closed, or that is
+	// closed by another goroutine before the I/O is completed. This may be wrapped in another error, and should normally
+	// be tested using errors.Is(err, network.ErrClosed).
+	ErrClosed = errors.New("network device already closed")
 
-// ErrClosed is the error returned by an I/O call on a network device or proxy that has already been closed, or that is
-// closed by another goroutine before the I/O is completed. This may be wrapped in another error, and should normally
-// be tested using errors.Is(err, network.ErrClosed).
-var ErrClosed = errors.New("network device already closed")
+	// ErrPortUnreachable is an error that indicates a remote server's port cannot be reached. This may be wrapped in
+	// another error, and should normally be tested using errors.Is(err, network.ErrPortUnreachable).
+	ErrPortUnreachable = errors.New("port is not reachable")
+)

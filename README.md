@@ -57,7 +57,7 @@ Alpha tasks:
 - Network-level libraries
   - [x] Add IP Device abstraction
   - [x] Add IP Device implementation based on go-tun2socks (LWIP)
-  - [ ] Add UDP handler to fallback to DNS-over-TCP
+  - [x] Add UDP handler to fallback to DNS-over-TCP
   - [x] Add DelegatePacketProxy for runtime PacketProxy replacement
 
 

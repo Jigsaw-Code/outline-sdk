@@ -19,6 +19,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -113,11 +114,11 @@ func (proxy *packetListenerProxyAdapter) NewSession(respWriter PacketResponseRec
 
 // WriteTo implements [PacketRequestSender].WriteTo function. It simply forwards the packet to the underlying
 // [net.PacketConn].WriteTo function.
-func (s *packetListenerRequestSender) WriteTo(p []byte, destination net.Addr) (int, error) {
+func (s *packetListenerRequestSender) WriteTo(p []byte, destination netip.AddrPort) (int, error) {
 	if err := s.resetWriteIdleTimer(); err != nil {
 		return 0, err
 	}
-	return s.proxyConn.WriteTo(p, destination)
+	return s.proxyConn.WriteTo(p, net.UDPAddrFromAddrPort(destination))
 }
 
 // Close implements [PacketRequestSender].Close function. It closes the underlying [net.PacketConn]. This will also
