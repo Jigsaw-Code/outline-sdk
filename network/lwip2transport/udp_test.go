@@ -37,9 +37,9 @@ func TestUDPResponseWriterCloseNoDeadlock(t *testing.T) {
 
 	// Close this single session (i.e. the request sender), it will close proxy.respWriter
 	// udpHandler must make sure only one `Close()` is called, and there should be no deadlocks
-	err = proxy.Close()
+	err = proxy.respWriter.Close()
 	require.NoError(t, err)
-	require.Exactly(t, 2, proxy.closeCnt) // called by proxy.Close and proxy.respWriter.udpHandler.senders.Close()
+	require.Exactly(t, 1, proxy.closeCnt)
 }
 
 /********** Test Utilities **********/
