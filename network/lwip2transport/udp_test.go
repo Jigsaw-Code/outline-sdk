@@ -16,7 +16,6 @@ package lwip2transport
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"net/netip"
 	"testing"
@@ -40,11 +39,13 @@ func TestUDPResponseWriterClose(t *testing.T) {
 	// udpHandler must make sure only one `Close()` is called, and there should be no deadlocks
 	err = proxy.Close()
 	require.NoError(t, err)
+	require.Exactly(t, 1, proxy.closeCnt)
 }
 
 /********** Test Utilities **********/
 
 type noopSingleSessionPacketProxy struct {
+	closeCnt   int
 	respWriter network.PacketResponseReceiver
 }
 
@@ -57,7 +58,7 @@ func (p *noopSingleSessionPacketProxy) NewSession(respWriter network.PacketRespo
 }
 
 func (p *noopSingleSessionPacketProxy) Close() error {
-	fmt.Println("Closing !!!!!")
+	p.closeCnt++
 	return p.respWriter.Close()
 }
 
