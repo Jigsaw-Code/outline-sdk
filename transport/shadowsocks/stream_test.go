@@ -1,10 +1,23 @@
+// Copyright 2023 Jigsaw Operations LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package shadowsocks
 
 import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"strings"
 	"sync"
 	"testing"
@@ -19,7 +32,7 @@ const testCipherOverhead = 16
 
 func TestCipherReaderAuthenticationFailure(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	clientReader := strings.NewReader("Fails Authentication")
 	reader := NewReader(clientReader, key)
@@ -31,7 +44,7 @@ func TestCipherReaderAuthenticationFailure(t *testing.T) {
 
 func TestCipherReaderUnexpectedEOF(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	clientReader := strings.NewReader("short")
 	server := NewReader(clientReader, key)
@@ -41,7 +54,7 @@ func TestCipherReaderUnexpectedEOF(t *testing.T) {
 
 func TestCipherReaderEOF(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	clientReader := strings.NewReader("")
 	server := NewReader(clientReader, key)
@@ -82,7 +95,7 @@ func encryptBlocks(key *EncryptionKey, salt []byte, blocks [][]byte) (io.Reader,
 
 func TestCipherReaderGoodReads(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	salt := []byte("12345678901234567890123456789012")
 	if len(salt) != key.SaltSize() {
@@ -114,7 +127,7 @@ func TestCipherReaderGoodReads(t *testing.T) {
 
 func TestCipherReaderClose(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	pipeReader, pipeWriter := io.Pipe()
 	server := NewReader(pipeReader, key)
@@ -132,7 +145,7 @@ func TestCipherReaderClose(t *testing.T) {
 
 func TestCipherReaderCloseError(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	pipeReader, pipeWriter := io.Pipe()
 	server := NewReader(pipeReader, key)
@@ -150,7 +163,7 @@ func TestCipherReaderCloseError(t *testing.T) {
 
 func TestEndToEnd(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	connReader, connWriter := io.Pipe()
 	writer := NewWriter(connWriter, key)
@@ -180,17 +193,17 @@ func TestEndToEnd(t *testing.T) {
 
 func TestLazyWriteFlush(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	buf := new(bytes.Buffer)
 	writer := NewWriter(buf, key)
 	header := []byte{1, 2, 3, 4}
 	n, err := writer.LazyWrite(header)
-	require.Nilf(t, err, "LazyWrite failed: %v", err)
+	require.NoError(t, err, "LazyWrite failed: %v", err)
 	require.Equal(t, len(header), n, "Wrong write size")
 	require.Equal(t, 0, buf.Len(), "LazyWrite isn't lazy")
 
 	err = writer.Flush()
-	require.Nilf(t, err, "Flush failed: %v", err)
+	require.NoError(t, err, "Flush failed: %v", err)
 
 	len1 := buf.Len()
 	require.Greater(t, len1, len(header), "Not enough bytes flushed")
@@ -198,7 +211,7 @@ func TestLazyWriteFlush(t *testing.T) {
 	// Check that normal writes now work
 	body := []byte{5, 6, 7}
 	n, err = writer.Write(body)
-	require.Nilf(t, err, "Write failed: %v", err)
+	require.NoError(t, err, "Write failed: %v", err)
 	require.Equal(t, len(body), n, "Wrong write size")
 	require.Greater(t, buf.Len(), len1, "No write observed")
 
@@ -206,19 +219,19 @@ func TestLazyWriteFlush(t *testing.T) {
 	reader := NewReader(buf, key)
 	decrypted := make([]byte, len(header)+len(body))
 	n, err = reader.Read(decrypted)
-	require.Nilf(t, err, "Read failed: %v", err)
+	require.NoError(t, err, "Read failed: %v", err)
 	require.Equal(t, len(header), n, "Wrong number of bytes out")
 	require.Equal(t, header, decrypted[:n], "Wrong final content")
 
 	n, err = reader.Read(decrypted[n:])
-	require.Nilf(t, err, "Read failed: %v", err)
+	require.NoError(t, err, "Read failed: %v", err)
 	require.Equal(t, len(body), n, "Wrong number of bytes out")
 	require.Equal(t, body, decrypted[len(header):], "Wrong final content")
 }
 
 func TestLazyWriteConcat(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	buf := new(bytes.Buffer)
 	writer := NewWriter(buf, key)
 	header := []byte{1, 2, 3, 4}
@@ -273,7 +286,7 @@ func TestLazyWriteConcat(t *testing.T) {
 
 func TestLazyWriteOversize(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	buf := new(bytes.Buffer)
 	writer := NewWriter(buf, key)
 	N := 25000 // More than one block, less than two.
@@ -300,7 +313,7 @@ func TestLazyWriteOversize(t *testing.T) {
 
 	// Verify content
 	reader := NewReader(buf, key)
-	decrypted, err := ioutil.ReadAll(reader)
+	decrypted, err := io.ReadAll(reader)
 	if len(decrypted) != N {
 		t.Errorf("Wrong number of bytes out: %d", len(decrypted))
 	}
@@ -314,12 +327,12 @@ func TestLazyWriteOversize(t *testing.T) {
 
 func TestLazyWriteConcurrentFlush(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	buf := new(bytes.Buffer)
 	writer := NewWriter(buf, key)
 	header := []byte{1, 2, 3, 4}
 	n, err := writer.LazyWrite(header)
-	require.Nilf(t, err, "LazyWrite failed: %v", err)
+	require.NoError(t, err, "LazyWrite failed: %v", err)
 	require.Equalf(t, len(header), n, "Wrong write size: %d", n)
 	require.Equal(t, 0, buf.Len(), "LazyWrite isn't lazy: %v", buf.Bytes())
 
@@ -329,7 +342,7 @@ func TestLazyWriteConcurrentFlush(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		n, err := writer.ReadFrom(r)
-		require.Nilf(t, err, "ReadFrom: %v", err)
+		require.NoError(t, err, "ReadFrom: %v", err)
 		require.Equalf(t, int64(len(body)), n, "ReadFrom: Wrong read size %d", n)
 		wg.Done()
 	}()
@@ -345,7 +358,7 @@ func TestLazyWriteConcurrentFlush(t *testing.T) {
 
 	// Check that normal writes now work
 	n, err = w.Write(body)
-	require.Nilf(t, err, "Write failed: %v", err)
+	require.NoError(t, err, "Write failed: %v", err)
 	require.Equalf(t, len(body), n, "Wrong write size: %d", n)
 
 	w.Close()
@@ -357,12 +370,12 @@ func TestLazyWriteConcurrentFlush(t *testing.T) {
 	decrypted := make([]byte, len(header)+len(body))
 	n, err = reader.Read(decrypted)
 	require.Equal(t, len(header), n, "Wrong number of bytes out")
-	require.Nilf(t, err, "Read failed: %v", err)
+	require.NoError(t, err, "Read failed: %v", err)
 
 	require.Equal(t, header, decrypted[:len(header)], "Wrong final content")
 
 	n, err = reader.Read(decrypted[len(header):])
-	require.Nilf(t, err, "Read failed: %v", err)
+	require.NoError(t, err, "Read failed: %v", err)
 	require.Equal(t, len(body), n, "Wrong number of bytes out")
 	require.Equal(t, body, decrypted[len(header):], "Wrong final content")
 }
@@ -383,14 +396,14 @@ func BenchmarkWriter(b *testing.B) {
 	b.ResetTimer()
 
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
-	require.Nil(b, err)
+	require.NoError(b, err)
 	writer := NewWriter(new(nullIO), key)
 
 	start := time.Now()
 	b.StartTimer()
 	io.CopyN(writer, new(nullIO), int64(b.N))
 	b.StopTimer()
-	elapsed := time.Now().Sub(start)
+	elapsed := time.Since(start)
 
 	megabits := 8 * float64(b.N) * 1e-6
 	b.ReportMetric(megabits/(elapsed.Seconds()), "mbps")

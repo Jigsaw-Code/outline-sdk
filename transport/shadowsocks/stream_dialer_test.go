@@ -53,14 +53,17 @@ func TestStreamDialer_DialNoPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
+	// Extend the wait to be safer.
+	d.ClientDataWait = 0 * time.Millisecond
+
 	conn, err := d.Dial(context.Background(), testTargetAddr)
 	if err != nil {
 		t.Fatalf("StreamDialer.Dial failed: %v", err)
 	}
 
-	// Wait for more than 10 milliseconds to ensure that the target
+	// Wait for more than 100 milliseconds to ensure that the target
 	// address is sent.
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	// Force the echo server to verify the target address.
 	conn.Close()
 
@@ -71,7 +74,7 @@ func TestStreamDialer_DialNoPayload(t *testing.T) {
 func TestStreamDialer_DialFastClose(t *testing.T) {
 	// Set up a listener that verifies no data is sent.
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
-	require.Nilf(t, err, "ListenTCP failed: %v", err)
+	require.NoError(t, err, "ListenTCP failed: %v", err)
 	defer listener.Close()
 
 	var running sync.WaitGroup
@@ -80,7 +83,7 @@ func TestStreamDialer_DialFastClose(t *testing.T) {
 	go func() {
 		defer running.Done()
 		conn, err := listener.Accept()
-		require.Nil(t, err)
+		require.NoError(t, err)
 		defer conn.Close()
 		buf := make([]byte, 64)
 		n, err := conn.Read(buf)
@@ -95,12 +98,12 @@ func TestStreamDialer_DialFastClose(t *testing.T) {
 		key := makeTestKey(t)
 		proxyEndpoint := &transport.TCPEndpoint{Address: listener.Addr().String()}
 		d, err := NewStreamDialer(proxyEndpoint, key)
-		require.Nilf(t, err, "Failed to create StreamDialer: %v", err)
+		require.NoError(t, err, "Failed to create StreamDialer: %v", err)
 		// Extend the wait to be safer.
 		d.ClientDataWait = 100 * time.Millisecond
 
 		conn, err := d.Dial(context.Background(), testTargetAddr)
-		require.Nilf(t, err, "StreamDialer.Dial failed: %v", err)
+		require.NoError(t, err, "StreamDialer.Dial failed: %v", err)
 
 		// Wait for less than 100 milliseconds to ensure that the target
 		// address is not sent.
@@ -199,7 +202,9 @@ func startShadowsocksTCPEchoProxy(key *EncryptionKey, expectedTgtAddr string, t 
 		for {
 			clientConn, err := listener.AcceptTCP()
 			if err != nil {
-				t.Logf("AcceptTCP failed: %v", err)
+				if err != net.ErrClosed {
+					t.Logf("AcceptTCP failed: %v", err)
+				}
 				return
 			}
 			running.Add(1)

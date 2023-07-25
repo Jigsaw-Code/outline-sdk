@@ -37,21 +37,51 @@ type UDPEndpoint struct {
 
 var _ PacketEndpoint = (*UDPEndpoint)(nil)
 
-// Connect implements [PacketEndpoint.Connect].
+// Connect implements [PacketEndpoint].Connect.
 func (e UDPEndpoint) Connect(ctx context.Context) (net.Conn, error) {
 	return e.Dialer.DialContext(ctx, "udp", e.Address)
 }
 
-// PacketListenerEndpoint is a [PacketEndpoint] that connects to the given address using the given [PacketListener].
-type PacketListenerEndpoint struct {
-	// The Dialer used to create the net.Conn on Connect(). Must be non nil.
-	Listener PacketListener
-	// The endpoint address (host:port) to bind the connection to.
-	// If the host is a domain name, consider pre-resolving it to avoid resolution calls.
+// PacketDialerEndpoint is a [PacketEndpoint] that connects to the given address using the given [PacketDialer].
+type PacketDialerEndpoint struct {
+	Dialer  PacketDialer
 	Address string
 }
 
-var _ PacketEndpoint = (*PacketListenerEndpoint)(nil)
+var _ PacketEndpoint = (*PacketDialerEndpoint)(nil)
+
+// Connect implements [PacketEndpoint].Connect.
+func (e *PacketDialerEndpoint) Connect(ctx context.Context) (net.Conn, error) {
+	return e.Dialer.Dial(ctx, e.Address)
+}
+
+// PacketDialer provides a way to dial a destination and establish datagram connections.
+type PacketDialer interface {
+	// Dial connects to `raddr`.
+	// `raddr` has the form `host:port`, where `host` can be a domain name or IP address.
+	Dial(ctx context.Context, addr string) (net.Conn, error)
+}
+
+// UDPPacketDialer is a [PacketDialer] that uses the standard [net.Dialer] to dial.
+// It provides a convenient way to use a [net.Dialer] when you need a [PacketDialer].
+type UDPPacketDialer struct {
+	Dialer net.Dialer
+}
+
+var _ PacketDialer = (*UDPPacketDialer)(nil)
+
+// Dial implements [PacketDialer].Dial.
+func (d *UDPPacketDialer) Dial(ctx context.Context, addr string) (net.Conn, error) {
+	return d.Dialer.DialContext(ctx, "udp", addr)
+}
+
+// PacketListenerDialer is a [PacketDialer] that connects to the destination using the given [PacketListener].
+type PacketListenerDialer struct {
+	// The PacketListener that is used to create the net.PacketConn to bind on Dial. Must be non nil.
+	Listener PacketListener
+}
+
+var _ PacketDialer = (*PacketListenerDialer)(nil)
 
 type boundPacketConn struct {
 	net.PacketConn
@@ -60,12 +90,17 @@ type boundPacketConn struct {
 
 var _ net.Conn = (*boundPacketConn)(nil)
 
-func (e PacketListenerEndpoint) Connect(ctx context.Context) (net.Conn, error) {
+// Dial implements [PacketDialer].Dial.
+// The address is a host:port and the host must be a full IP address (not [::]) or a domain
+// The address must be supported by the WriteTo call of the PacketConn
+// returned by the PacketListener. For instance, a [net.UDPConn] only supports IP addresses, not domain names.
+// If the host is a domain name, consider pre-resolving it to avoid resolution calls.
+func (e PacketListenerDialer) Dial(ctx context.Context, address string) (net.Conn, error) {
 	packetConn, err := e.Listener.ListenPacket(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("could not create PacketConn: %#v", err)
+		return nil, fmt.Errorf("could not create PacketConn: %w", err)
 	}
-	netAddr, err := MakeNetAddr("udp", e.Address)
+	netAddr, err := MakeNetAddr("udp", address)
 	if err != nil {
 		return nil, err
 	}
@@ -75,6 +110,7 @@ func (e PacketListenerEndpoint) Connect(ctx context.Context) (net.Conn, error) {
 	}, nil
 }
 
+// Read implements [net.Conn].Read.
 func (c *boundPacketConn) Read(packet []byte) (int, error) {
 	for {
 		n, remoteAddr, err := c.PacketConn.ReadFrom(packet)
@@ -88,11 +124,14 @@ func (c *boundPacketConn) Read(packet []byte) (int, error) {
 	}
 }
 
+// Write implements [net.Conn].Write.
 func (c *boundPacketConn) Write(packet []byte) (int, error) {
+	// This may return syscall.EINVAL if remoteAddr is a name like localhost or [::].
 	n, err := c.PacketConn.WriteTo(packet, c.remoteAddr)
 	return n, err
 }
 
+// RemoteAddr implements [net.Conn].RemoteAddr.
 func (c *boundPacketConn) RemoteAddr() net.Addr {
 	return c.remoteAddr
 }
@@ -112,6 +151,7 @@ type UDPPacketListener struct {
 
 var _ PacketListener = (*UDPPacketListener)(nil)
 
+// ListenPacket implements [PacketListener].ListenPacket
 func (l UDPPacketListener) ListenPacket(ctx context.Context) (net.PacketConn, error) {
 	return l.ListenConfig.ListenPacket(ctx, "udp", l.Address)
 }

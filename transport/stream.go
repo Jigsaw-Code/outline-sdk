@@ -87,13 +87,26 @@ type TCPEndpoint struct {
 
 var _ StreamEndpoint = (*TCPEndpoint)(nil)
 
-// Connect implements [StreamEndpoint.Connect].
+// Connect implements [StreamEndpoint].Connect.
 func (e *TCPEndpoint) Connect(ctx context.Context) (StreamConn, error) {
 	conn, err := e.Dialer.DialContext(ctx, "tcp", e.Address)
 	if err != nil {
 		return nil, err
 	}
 	return conn.(*net.TCPConn), nil
+}
+
+// StreamDialerEndpoint is a [StreamEndpoint] that connects to the given address using the given [StreamDialer].
+type StreamDialerEndpoint struct {
+	Dialer  StreamDialer
+	Address string
+}
+
+var _ StreamEndpoint = (*StreamDialerEndpoint)(nil)
+
+// Connect implements [StreamEndpoint].Connect.
+func (e *StreamDialerEndpoint) Connect(ctx context.Context) (StreamConn, error) {
+	return e.Dialer.Dial(ctx, e.Address)
 }
 
 // StreamDialer provides a way to dial a destination and establish stream connections.

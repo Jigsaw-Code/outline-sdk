@@ -25,7 +25,7 @@ func TestMakeNetAddrType(t *testing.T) {
 	for _, address := range []string{"example.com:53", "127.0.0.1:443", "[::1]:443"} {
 		for _, network := range []string{"tcp", "udp"} {
 			netAddr, err := MakeNetAddr(network, address)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			require.Equal(t, network, netAddr.Network())
 			require.Equal(t, address, netAddr.String())
 			if address == "example.com:53" {
@@ -44,24 +44,24 @@ func TestMakeNetAddrType(t *testing.T) {
 
 func TestMakeNetAddrDomainCase(t *testing.T) {
 	netAddr, err := MakeNetAddr("tcp", "Example.Com:83")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, "Example.Com:83", netAddr.String())
 }
 
 func TestMakeNetAddrIP4(t *testing.T) {
 	netAddr, err := MakeNetAddr("tcp", "127.0.0.1:83")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, "127.0.0.1:83", netAddr.String())
 }
 
 func TestMakeNetAddrIP6(t *testing.T) {
 	netAddr, err := MakeNetAddr("tcp", "[0000:0000:0000::0001]:83")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, "[::1]:83", netAddr.String())
 }
 
 func TestMakeNetAddrResolvePort(t *testing.T) {
 	netAddr, err := MakeNetAddr("udp", "example.com:domain")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, "example.com:53", netAddr.String())
 }
