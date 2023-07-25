@@ -10,9 +10,10 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-internal-sdk/network"
+	"github.com/Jigsaw-Code/outline-internal-sdk/network/dnstruncate"
+	"github.com/Jigsaw-Code/outline-internal-sdk/network/lwip2transport"
 	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
 	"github.com/Jigsaw-Code/outline-internal-sdk/transport/shadowsocks"
-	"github.com/Jigsaw-Code/outline-internal-sdk/tun2socks/lwip"
 	"github.com/songgao/water"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
@@ -36,7 +37,7 @@ const OUTLINE_ROUTING_TABLE = 233
 //	<svt-port>   : the outline server port (e.g. 21532)
 //	<svr-pass>   : the outline server password
 func main() {
-	fmt.Println("OutlineVPN CLI (experimental-05092000)")
+	fmt.Println("OutlineVPN CLI (experimental-07211507)")
 
 	svrIp := os.Args[1]
 	svrIpCidr := svrIp + "/32"
@@ -107,7 +108,7 @@ func main() {
 
 	go func() {
 		fmt.Printf("debug: start forwarding t2s data to tun %v\n", tun.Name())
-		if _, err = io.Copy(tun, t2s); err != nil {
+		if _, err := io.Copy(tun, t2s); err != nil {
 			fmt.Printf("warning: failed to forward t2s data to tun: %v\n", err)
 		} else {
 			fmt.Printf("debug: t2s -> %v eof\n", tun.Name())
@@ -324,7 +325,7 @@ func cleanUpRule(rule *netlink.Rule) error {
 func startTun2Socks(tun *water.Interface, ip, pass string, port int) (network.IPDevice, error) {
 	fmt.Println("starting outline-go-tun2socks...")
 
-	cipher, err := shadowsocks.NewCipher("chacha20-ietf-poly1305", pass)
+	cipher, err := shadowsocks.NewEncryptionKey("chacha20-ietf-poly1305", pass)
 	if err != nil {
 		fmt.Printf("fatal error: failed to create Shadowsocks cipher, %v\n", err)
 		return nil, err
@@ -335,22 +336,29 @@ func startTun2Socks(tun *water.Interface, ip, pass string, port int) (network.IP
 		fmt.Printf("fatal error: failed to resolve proxy address, %v\n", err)
 		return nil, err
 	}
-	proxyTCPEndpoint := transport.TCPEndpoint{RemoteAddr: net.TCPAddr{IP: proxyIP.IP, Port: port}}
-	proxyUDPEndpoint := transport.UDPEndpoint{RemoteAddr: net.UDPAddr{IP: proxyIP.IP, Port: port}}
+	proxyAddress := net.JoinHostPort(proxyIP.String(), fmt.Sprint(port))
 
-	sd, err := shadowsocks.NewStreamDialer(proxyTCPEndpoint, cipher)
+	sd, err := shadowsocks.NewStreamDialer(&transport.TCPEndpoint{Address: proxyAddress}, cipher)
 	if err != nil {
 		fmt.Printf("fatal error: failed to create StreamDialer, %v\n", err)
 		return nil, err
 	}
 
-	pl, err := shadowsocks.NewPacketListener(proxyUDPEndpoint, cipher)
+	// pl, err := shadowsocks.NewPacketListener(&transport.UDPEndpoint{Address: proxyAddress}, cipher)
+	// pl, err := dnsovertcp.NewPacketListener(sd)
+	// pl, err := dnstruncate.NewPacketListener()
 	if err != nil {
 		fmt.Printf("fatal error: failed to create PacketListener, %v\n", err)
 		return nil, err
 	}
+	// ph, err := network.NewPacketProxyFromPacketListener(pl)
+	ph, err := dnstruncate.NewPacketProxy()
+	if err != nil {
+		fmt.Printf("fatal error: failed to create PacketProxy, %v\n", err)
+		return nil, err
+	}
 
-	t2s, err := lwip.NewTun2SocksDevice(sd, pl)
+	t2s, err := lwip2transport.ConfigureDevice(sd, ph)
 	if err != nil {
 		fmt.Printf("fatal error: failed to create Tun2Socks device, %v\n", err)
 		return nil, err
