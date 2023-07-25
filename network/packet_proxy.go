@@ -14,7 +14,10 @@
 
 package network
 
-import "net"
+import (
+	"net"
+	"net/netip"
+)
 
 // PacketProxy handles UDP traffic from the upstream network stack. The upstream network stack uses the NewSession
 // function to create a new UDP session that can send or receive UDP packets from PacketProxy.
@@ -43,7 +46,7 @@ type PacketRequestSender interface {
 	// to stop early.
 	//
 	// `p` must not be modified, and it must not be referenced after WriteTo returns.
-	WriteTo(p []byte, destination net.Addr) (int, error)
+	WriteTo(p []byte, destination netip.AddrPort) (int, error)
 
 	// Close indicates that the sender is no longer accepting new requests. Any future attempts to call WriteTo on the
 	// sender will fail with ErrClosed.
