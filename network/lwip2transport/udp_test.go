@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Make sure we can successfully Close the request sender and response receiver only once
-func TestUDPResponseWriterClose(t *testing.T) {
+// Make sure we can successfully Close the request sender and response receiver wihout deadlock
+func TestUDPResponseWriterCloseNoDeadlock(t *testing.T) {
 	proxy := &noopSingleSessionPacketProxy{}
 	h := newUDPHandler(proxy)
 
@@ -39,7 +39,7 @@ func TestUDPResponseWriterClose(t *testing.T) {
 	// udpHandler must make sure only one `Close()` is called, and there should be no deadlocks
 	err = proxy.Close()
 	require.NoError(t, err)
-	require.Exactly(t, 1, proxy.closeCnt)
+	require.Exactly(t, 2, proxy.closeCnt) // called by proxy.Close and proxy.respWriter.udpHandler.senders.Close()
 }
 
 /********** Test Utilities **********/
@@ -62,7 +62,7 @@ func (p *noopSingleSessionPacketProxy) Close() error {
 	return p.respWriter.Close()
 }
 
-func (p *noopSingleSessionPacketProxy) WriteTo([]byte, net.Addr) (int, error) {
+func (p *noopSingleSessionPacketProxy) WriteTo([]byte, netip.AddrPort) (int, error) {
 	return 0, nil
 }
 
