@@ -14,7 +14,7 @@ The Outline SDK helps developers:
 
 
 > ⚠️ **Warning**: This code is under development and in Alpha state. There's no guarantee of stability.
-> Give it a try and help us shape the APIs that will help you.
+> Give it a try and help us shape the APIs that you need.
 
 
 ## Advantages
