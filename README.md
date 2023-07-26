@@ -42,8 +42,6 @@ The launch will have two milestones: Alpha and Beta. We are currently in Alpha. 
 ### Alpha
 The goal of the Alpha release is to make it available to potential developers early so they can provide feedback on the SDK and help shape the interfaces, processes and tools.
 
-The code in this repository will move to https://github.com/Jigsaw-Code/outline-sdk and versions will be tagged.
-
 Alpha tasks:
 
 - Transport-level libraries
