@@ -1,22 +1,21 @@
-# Outline SDK (Under Development, DO NOT USE)
+# Outline SDK (Alpha)
 
 [![Build Status](https://github.com/Jigsaw-Code/outline-internal-sdk/actions/workflows/test.yml/badge.svg)](https://github.com/Jigsaw-Code/outline-internal-sdk/actions/workflows/test.yml?query=branch%3Amain)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Jigsaw-Code/outline-internal-sdk)](https://goreportcard.com/report/github.com/Jigsaw-Code/outline-internal-sdk)
 [![Go Reference](https://pkg.go.dev/badge/github.com/Jigsaw-Code/outline-internal-sdk.svg)](https://pkg.go.dev/github.com/Jigsaw-Code/outline-internal-sdk)
 
-[![Mattermost](https://badgen.net/badge/Mattermost/Outline%20Community/blue)](https://community.internetfreedomfestival.org/community/channels/outline-community)
-[![Reddit](https://badgen.net/badge/Reddit/r%2Foutlinevpn/orange)](https://www.reddit.com/r/outlinevpn/)
-
 <p align="center">
 <img src="https://github.com/Jigsaw-Code/outline-brand/blob/main/assets/powered_by_outline/color/logo.png?raw=true" width=400pt />
 </p>
 
-> **Warning**
-> This code is not ready to be used by the public. There's no guarantee of stability.
-
 The Outline SDK helps developers:
 - Create tools to protect against network-level interference
 - Add network-level interference protection to existing apps, such as content or communication apps
+
+
+> ⚠️ **Warning**: This code is under development and in Alpha state. There's no guarantee of stability.
+> Give it a try and help us shape the APIs that will help you.
+
 
 ## Advantages
 
@@ -30,7 +29,7 @@ The Outline SDK is written in Go. There are multiple ways to integrate the Outli
 
 - As a **Go library** ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-internal-sdk)), in a Go application (CLI or graphical app with frameworks like [Fyne.io](https://fyne.io/), [Wails](https://wails.io/), [Qt for Go](https://therecipe.github.io/qt/), or [Go Mobile app](https://pkg.go.dev/golang.org/x/mobile/app))
 - As a **C library**, generated using the appropriate [Go build mode](https://pkg.go.dev/cmd/go#hdr-Build_modes).
-- As a native **mobile library**, using [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile) to generate Java and Objective-C bindings for Android, iOS and macOS.
+- As a native **mobile library**, using [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile) to generate [Java and Objective-C bindings](https://pkg.go.dev/golang.org/x/mobile/cmd/gobind) for Android, iOS and macOS.
 - As a **side service**, built as a standalone Go binary that your main application talks to. Note that this is not possible on iOS, due to the limitation on starting sub-processes.
 
 The Outline Client uses the mobile library approach on Android, iOS and macOS (based on Cordova) and the side service on Windows and Linux (based on Electron).
@@ -38,7 +37,7 @@ The Outline Client uses the mobile library approach on Android, iOS and macOS (b
 
 ## Tentative Roadmap
 
-The launch will have two milestones: Alpha and Beta. We are currently in pre-Alpha. Note that most of the code is not new. It's the code being used by the production Outline Client and Server. The SDK work is repackaging code from [outline-ss-server](https://github.com/Jigsaw-Code/outline-ss-server) and [outline-go-tun2socks](https://github.com/Jigsaw-Code/outline-go-tun2socks) in a way that is easier to reuse and extend.
+The launch will have two milestones: Alpha and Beta. We are currently in Alpha. Note that most of the code is not new. It's the code being used by the production Outline Client and Server. The SDK work is repackaging code from [outline-ss-server](https://github.com/Jigsaw-Code/outline-ss-server) and [outline-go-tun2socks](https://github.com/Jigsaw-Code/outline-go-tun2socks) in a way that is easier to reuse and extend.
 
 ### Alpha
 The goal of the Alpha release is to make it available to potential developers early so they can provide feedback on the SDK and help shape the interfaces, processes and tools.
