@@ -1,4 +1,4 @@
-# Outline SDK
+# Outline SDK (Alpha)
 
 [![Build Status](https://github.com/Jigsaw-Code/outline-internal-sdk/actions/workflows/test.yml/badge.svg)](https://github.com/Jigsaw-Code/outline-internal-sdk/actions/workflows/test.yml?query=branch%3Amain)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Jigsaw-Code/outline-internal-sdk)](https://goreportcard.com/report/github.com/Jigsaw-Code/outline-internal-sdk)
@@ -20,7 +20,7 @@ The Outline SDK allows you to:
 
 | Multi-Platform | Proven Technology | Composable |
 |:-:|:-:|:-:|
-| The Outline SDK can be used on Android, iOS, Windows, macOS and Linux. | The Outline Client and Server have been using the code in the SDK for years, helping millions of users access the internet in even the harshest conditions. | The SDK interfaces were carefully designed to allow for composition and reuse, so you can craft your own transport. |
+| The Outline SDK can be used to build tools that run on Android, iOS, Windows, macOS and Linux. | The Outline Client and Server have been using the code in the SDK for years, helping millions of users access the internet in even the harshest conditions. | The SDK interfaces were carefully designed to allow for composition and reuse, so you can craft your own transport. |
 
 
 ## Integration
