@@ -62,7 +62,7 @@ Alpha features:
 
 ### Beta
 
-The goal of the Beta release is to make the SDK available for broader consumption, after the APIs are stable and we have all supporting resources in place (website, documentation, examples, and so on)
+The goal of the Beta release is to make the SDK available for broader consumption, once we no longer expect major changes to the APIs and we have all supporting resources in place (website, documentation, examples, and so on).
 
 Beta features:
 
