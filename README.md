@@ -9,7 +9,7 @@
 </p>
 
 > ⚠️ **Warning**: This code is in early stages and is not guaranteed to be stable. If you are
-> interested in integrating with it, we'd love your feedback.
+> interested in integrating with it, we'd love your [feedback](https://github.com/Jigsaw-Code/outline-internal-sdk/issues/new).
 
 The Outline SDK allows you to:
 - Create tools to protect against network-level interference
