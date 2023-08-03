@@ -125,6 +125,26 @@ func TestSetProxyWithNilValue(t *testing.T) {
 	require.Error(t, err)
 }
 
+// Make sure we can SetProxy to different types
+func TestSetProxyOfDifferentTypes(t *testing.T) {
+	defProxy := &sessionCountPacketProxy{}
+	newProxy := &noopPacketProxy{}
+
+	p, err := NewDelegatePacketProxy(defProxy)
+	require.NotNil(t, p)
+	require.NoError(t, err)
+
+	// SetProxy should not return error
+	err = p.SetProxy(newProxy)
+	require.NoError(t, err)
+
+	// NewSession' should not go to defProxy
+	snd, err := p.NewSession(nil)
+	require.Nil(t, snd)
+	require.NoError(t, err)
+	require.Exactly(t, 0, defProxy.Count())
+}
+
 // sessionCountPacketProxy logs the count of the NewSession calls, and returns a nil PacketRequestSender
 type sessionCountPacketProxy struct {
 	cnt atomic.Int32
@@ -137,4 +157,11 @@ func (sp *sessionCountPacketProxy) NewSession(respWriter PacketResponseReceiver)
 
 func (sp *sessionCountPacketProxy) Count() int {
 	return int(sp.cnt.Load())
+}
+
+type noopPacketProxy struct {
+}
+
+func (noopPacketProxy) NewSession(PacketResponseReceiver) (PacketRequestSender, error) {
+	return nil, nil
 }
