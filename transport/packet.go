@@ -57,8 +57,8 @@ func (e *PacketDialerEndpoint) Connect(ctx context.Context) (net.Conn, error) {
 
 // PacketDialer provides a way to dial a destination and establish datagram connections.
 type PacketDialer interface {
-	// Dial connects to `raddr`.
-	// `raddr` has the form `host:port`, where `host` can be a domain name or IP address.
+	// Dial connects to `addr`.
+	// `addr` has the form `host:port`, where `host` can be a domain name or IP address.
 	Dial(ctx context.Context, addr string) (net.Conn, error)
 }
 
