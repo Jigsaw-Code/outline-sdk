@@ -78,15 +78,15 @@ func TestDNSOverTCPResolver(ctx context.Context, testDomain string) error {
 	return nil
 }
 
-func resolve(ctx context.Context, testDomain string, use_tcp bool, c chan net.IP) (net.IP, error) {
-	tcpClient := dns.Client{}
-	if use_tcp {
-		tcpClient.Net = "tcp"
+func resolve(ctx context.Context, testDomain string, protocol string, c chan net.IP) (net.IP, error) {
+	dnsClient := dns.Client{}
+	if protocol == "tcp" {
+		dnsClient.Net = "tcp"
 	}
 	msg := dns.Msg{}
 	msg.SetQuestion(dns.Fqdn(testDomain), dns.TypeA)
 
-	response, _, err := tcpClient.Exchange(&msg, "8.8.8.8:53")
+	response, _, err := dnsClient.Exchange(&msg, "8.8.8.8:53")
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 		return nil, makeTestError("Exchange", err)
@@ -95,7 +95,7 @@ func resolve(ctx context.Context, testDomain string, use_tcp bool, c chan net.IP
 	for _, answer := range response.Answer {
 		fmt.Printf("%v\n", answer)
 		if a, ok := answer.(*dns.A); ok {
-			fmt.Printf("use_tcp:%v A record IP: %s\n", use_tcp, a.A)
+			fmt.Printf("protocol:%s A record IP: %s\n", protocol, a.A)
 			c <- a.A
 			return a.A, nil
 		}
@@ -107,8 +107,8 @@ func resolve(ctx context.Context, testDomain string, use_tcp bool, c chan net.IP
 // multiResolver attempts resolving a given domain using both TCP and UDP concurrently.
 func multiResolver(ctx context.Context, testDomain string) (net.IP, error) {
 	var c chan net.IP = make(chan net.IP)
-	go resolve(ctx, testDomain, true /* tcp */, c)
-	go resolve(ctx, testDomain, false /* udp */, c)
+	go resolve(ctx, testDomain, "tcp", c)
+	go resolve(ctx, testDomain, "udp", c)
 	select {
 	case ip := <-c:
 		return ip, nil
