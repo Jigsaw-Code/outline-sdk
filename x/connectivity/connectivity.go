@@ -58,65 +58,6 @@ func TestResolverPacketConnectivity(ctx context.Context, resolver transport.Pack
 	return testResolver(ctx, resolver.Connect, testDomain)
 }
 
-// TestDNSOverTCPResolver connects to a DNS resolver over TCP.
-func TestDNSOverTCPResolver(ctx context.Context, testDomain string) error {
-	client := dns.Client{}
-	client.Net = "tcp"
-	msg := dns.Msg{}
-	msg.SetQuestion(dns.Fqdn(testDomain), dns.TypeA)
-
-	response, _, err := client.Exchange(&msg, "8.8.8.8:53")
-	if err != nil {
-		fmt.Printf("Error: %s\n", err)
-		return makeTestError("Exchange", err)
-	}
-
-	for _, answer := range response.Answer {
-		fmt.Printf("%v\n", answer)
-	}
-
-	return nil
-}
-
-func resolve(ctx context.Context, testDomain string, protocol string, c chan net.IP) (net.IP, error) {
-	dnsClient := dns.Client{}
-	if protocol == "tcp" {
-		dnsClient.Net = "tcp"
-	}
-	msg := dns.Msg{}
-	msg.SetQuestion(dns.Fqdn(testDomain), dns.TypeA)
-
-	response, _, err := dnsClient.Exchange(&msg, "8.8.8.8:53")
-	if err != nil {
-		fmt.Printf("Error: %s\n", err)
-		return nil, makeTestError("Exchange", err)
-	}
-
-	for _, answer := range response.Answer {
-		fmt.Printf("%v\n", answer)
-		if a, ok := answer.(*dns.A); ok {
-			fmt.Printf("protocol:%s A record IP: %s\n", protocol, a.A)
-			c <- a.A
-			return a.A, nil
-		}
-	}
-
-	return nil, nil
-}
-
-// multiResolver attempts resolving a given domain using both TCP and UDP concurrently.
-func multiResolver(ctx context.Context, testDomain string) (net.IP, error) {
-	var c chan net.IP = make(chan net.IP)
-	go resolve(ctx, testDomain, "tcp", c)
-	go resolve(ctx, testDomain, "udp", c)
-	select {
-	case ip := <-c:
-		return ip, nil
-	case <-time.After(time.Second):
-		return nil, errors.New("UDP resolution did not find an A record")
-	}
-}
-
 func isTimeout(err error) bool {
 	var timeErr interface{ Timeout() bool }
 	return errors.As(err, &timeErr) && timeErr.Timeout()
