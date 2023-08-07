@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Jigsaw-Code/outline-internal-sdk/transport/shadowsocks"
+	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 )
 
 type sessionConfig struct {

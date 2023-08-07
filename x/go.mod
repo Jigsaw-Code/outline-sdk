@@ -1,9 +1,9 @@
-module github.com/Jigsaw-Code/outline-internal-sdk/x
+module github.com/Jigsaw-Code/outline-sdk/x
 
 go 1.20
 
 require (
-	github.com/Jigsaw-Code/outline-internal-sdk v0.0.0-20230522161920-4652a0839de2
+	github.com/Jigsaw-Code/outline-sdk v0.0.2
 	github.com/miekg/dns v1.1.54
 	github.com/stretchr/testify v1.8.2
 	golang.org/x/sys v0.8.0

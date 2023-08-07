@@ -27,9 +27,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
-	"github.com/Jigsaw-Code/outline-internal-sdk/transport/shadowsocks"
-	"github.com/Jigsaw-Code/outline-internal-sdk/x/connectivity"
+	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
+	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
 )
 
 var debugLog log.Logger = *log.New(io.Discard, "", 0)
