@@ -41,7 +41,10 @@ var errInvalidProxy = errors.New("the underlying proxy must not be nil")
 var _ DelegatePacketProxy = (*delegatePacketProxy)(nil)
 
 type delegatePacketProxy struct {
-	proxy atomic.Value
+	// The underlying PacketProxy when create NewSession.
+	// Note that we must not use atomic.Value; otherwise TestSetProxyOfDifferentTypes will panic with
+	// "store inconsistently typed value".
+	proxy atomic.Pointer[PacketProxy]
 }
 
 // NewDelegatePacketProxy creates a new [DelegatePacketProxy] that forwards calls to the `proxy` [PacketProxy].
@@ -51,13 +54,13 @@ func NewDelegatePacketProxy(proxy PacketProxy) (DelegatePacketProxy, error) {
 		return nil, errInvalidProxy
 	}
 	dp := delegatePacketProxy{}
-	dp.proxy.Store(proxy)
+	dp.proxy.Store(&proxy)
 	return &dp, nil
 }
 
 // NewSession implements PacketProxy.NewSession, and it will forward the call to the underlying PacketProxy.
 func (p *delegatePacketProxy) NewSession(respWriter PacketResponseReceiver) (PacketRequestSender, error) {
-	return p.proxy.Load().(PacketProxy).NewSession(respWriter)
+	return (*p.proxy.Load()).NewSession(respWriter)
 }
 
 // SetProxy implements DelegatePacketProxy.SetProxy.
@@ -65,6 +68,6 @@ func (p *delegatePacketProxy) SetProxy(proxy PacketProxy) error {
 	if proxy == nil {
 		return errInvalidProxy
 	}
-	p.proxy.Store(proxy)
+	p.proxy.Store(&proxy)
 	return nil
 }
