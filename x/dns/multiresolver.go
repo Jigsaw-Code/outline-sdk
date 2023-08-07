@@ -24,6 +24,20 @@ import (
 	"github.com/miekg/dns"
 )
 
+// multiResolver attempts resolving a given domain using TCP and UDP concurrently.
+// Whichever resolutpions succeeds first wins.
+func multiResolver(ctx context.Context, domain string) ([]net.IP, error) {
+	var c chan []net.IP = make(chan []net.IP)
+	go resolve(ctx, domain, "tcp", c)
+	go resolve(ctx, domain, "udp", c)
+	select {
+	case ip := <-c:
+		return ip, nil
+	case <-time.After(time.Second):
+		return nil, errors.New("UDP resolution did not find an A record")
+	}
+}
+
 // TestDNSOverTCPResolver connects to a DNS resolver over TCP.
 func TestDNSOverTCPResolver(ctx context.Context, testDomain string) error {
 	client := dns.Client{}
@@ -44,7 +58,7 @@ func TestDNSOverTCPResolver(ctx context.Context, testDomain string) error {
 	return nil
 }
 
-func resolve(ctx context.Context, domain string, protocol string, c chan net.IP) (net.IP, error) {
+func resolve(ctx context.Context, domain string, protocol string, c chan []net.IP) ([]net.IP, error) {
 	dnsClient := dns.Client{}
 	if protocol == "tcp" {
 		dnsClient.Net = "tcp"
@@ -58,27 +72,15 @@ func resolve(ctx context.Context, domain string, protocol string, c chan net.IP)
 		return nil, err
 	}
 
+	ips := []net.IP{}
 	for _, answer := range response.Answer {
 		fmt.Printf("%v\n", answer)
 		if a, ok := answer.(*dns.A); ok {
 			fmt.Printf("protocol:%s A record IP: %s\n", protocol, a.A)
-			c <- a.A
-			return a.A, nil
+			ips = append(ips, a.A)
 		}
 	}
+	c <- ips
 
-	return nil, nil
-}
-
-// multiResolver attempts resolving a given domain using both TCP and UDP concurrently.
-func multiResolver(ctx context.Context, domain string) (net.IP, error) {
-	var c chan net.IP = make(chan net.IP)
-	go resolve(ctx, domain, "tcp", c)
-	go resolve(ctx, domain, "udp", c)
-	select {
-	case ip := <-c:
-		return ip, nil
-	case <-time.After(time.Second):
-		return nil, errors.New("UDP resolution did not find an A record")
-	}
+	return ips, nil
 }
