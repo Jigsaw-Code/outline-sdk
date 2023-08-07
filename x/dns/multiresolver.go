@@ -44,13 +44,13 @@ func TestDNSOverTCPResolver(ctx context.Context, testDomain string) error {
 	return nil
 }
 
-func resolve(ctx context.Context, testDomain string, protocol string, c chan net.IP) (net.IP, error) {
+func resolve(ctx context.Context, domain string, protocol string, c chan net.IP) (net.IP, error) {
 	dnsClient := dns.Client{}
 	if protocol == "tcp" {
 		dnsClient.Net = "tcp"
 	}
 	msg := dns.Msg{}
-	msg.SetQuestion(dns.Fqdn(testDomain), dns.TypeA)
+	msg.SetQuestion(dns.Fqdn(domain), dns.TypeA)
 
 	response, _, err := dnsClient.Exchange(&msg, "8.8.8.8:53")
 	if err != nil {
@@ -71,10 +71,10 @@ func resolve(ctx context.Context, testDomain string, protocol string, c chan net
 }
 
 // multiResolver attempts resolving a given domain using both TCP and UDP concurrently.
-func multiResolver(ctx context.Context, testDomain string) (net.IP, error) {
+func multiResolver(ctx context.Context, domain string) (net.IP, error) {
 	var c chan net.IP = make(chan net.IP)
-	go resolve(ctx, testDomain, "tcp", c)
-	go resolve(ctx, testDomain, "udp", c)
+	go resolve(ctx, domain, "tcp", c)
+	go resolve(ctx, domain, "udp", c)
 	select {
 	case ip := <-c:
 		return ip, nil
