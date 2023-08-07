@@ -19,8 +19,8 @@ import (
 	"io"
 	"sync"
 
-	"github.com/Jigsaw-Code/outline-internal-sdk/network"
-	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/network"
+	"github.com/Jigsaw-Code/outline-sdk/transport"
 	lwip "github.com/eycorsican/go-tun2socks/core"
 )
 

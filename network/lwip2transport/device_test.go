@@ -22,8 +22,8 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/Jigsaw-Code/outline-internal-sdk/network"
-	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/network"
+	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/stretchr/testify/require"
 )
 
