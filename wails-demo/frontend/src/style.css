@@ -1,0 +1,19 @@
+:root {
+  font-size: clamp(16px, 1.5vw, 21px);
+}
+
+html, body {
+  all: initial;
+}
+
+@font-face {
+  font-family: 'Jigsaw Sans';
+  src: url('assets/fonts/jigsaw-sans/JigsawSans-Regular.woff2') format('woff2');
+  font-weight: normal;
+}
+
+@font-face {
+  font-family: 'Jigsaw Sans';
+  src: url('assets/fonts/jigsaw-sans/JigsawSans-Bold.woff2') format('woff2');
+  font-weight: bold;
+}

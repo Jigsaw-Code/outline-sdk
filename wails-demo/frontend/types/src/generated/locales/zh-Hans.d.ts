@@ -1,0 +1,23 @@
+export declare const templates: {
+    s8c34dccae2549cc0: string;
+    s6054cde6ff29afb6: string;
+    s95c4107f0168a51a: string;
+    s0adc3d6bfa41bcaa: string;
+    s9518e2a9ee5b3e73: string;
+    s8e931c7629a8134e: string;
+    sed6a005d7b0c7a71: string;
+    s4997e567d26705e6: string;
+    sefcf950b3cc4fc3b: string;
+    saab875d8cfcfe712: string;
+    sa81e2cdaf6921adc: string;
+    s3b0ab4b52326316f: string;
+    sac895c732f350ac5: string;
+    s480fd2e6a8201911: string;
+    s0260cc39b0a41c0f: string;
+    s5f343a43e7ea9f91: string;
+    s61e136c0658e27d5: string;
+    sa2f0f4c94c8e8409: string;
+    s50fed8c6357d587b: string;
+    sefa832f16108ab03: string;
+    se9bee119c6a37b89: string;
+};
