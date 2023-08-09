@@ -31,7 +31,7 @@ type SessionConfig struct {
 	Hostname  string
 	Port      int
 	CryptoKey *shadowsocks.EncryptionKey
-	Prefix    []byte
+	Prefix    Prefix
 }
 
 func (p Prefix) String() string {

@@ -60,15 +60,10 @@ func NewOutlineDevice(accessKey string) (*OutlineDevice, error) {
 		return nil, fmt.Errorf("invalid outline access key: %w", err)
 	}
 
-	cipher, err := shadowsocks.NewEncryptionKey(config.Cipher, config.Password)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cipher `%v`: %w", config.Cipher, err)
-	}
-
 	ssAddress := net.JoinHostPort(config.Hostname, strconv.Itoa(config.Port))
 
 	// Create Shadowsocks TCP StreamDialer
-	d.ssStreamDialer, err = shadowsocks.NewStreamDialer(&transport.TCPEndpoint{Address: ssAddress}, cipher)
+	d.ssStreamDialer, err = shadowsocks.NewStreamDialer(&transport.TCPEndpoint{Address: ssAddress}, config.CryptoKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TCP dialer: %w", err)
 	}
@@ -80,7 +75,7 @@ func NewOutlineDevice(accessKey string) (*OutlineDevice, error) {
 	}
 
 	// Create Shadowsocks UDP PacketProxy
-	d.ssPktListener, err = shadowsocks.NewPacketListener(&transport.UDPEndpoint{Address: ssAddress}, cipher)
+	d.ssPktListener, err = shadowsocks.NewPacketListener(&transport.UDPEndpoint{Address: ssAddress}, config.CryptoKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create UDP listener: %w", err)
 	}
