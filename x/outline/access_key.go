@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package outline
 
 import (
 	"encoding/base64"
@@ -25,14 +25,14 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 )
 
-type sessionConfig struct {
+type Prefix []byte
+
+type SessionConfig struct {
 	Hostname  string
 	Port      int
 	CryptoKey *shadowsocks.EncryptionKey
-	Prefix    Prefix
+	Prefix    []byte
 }
-
-type Prefix []byte
 
 func (p Prefix) String() string {
 	runes := make([]rune, len(p))
@@ -42,13 +42,14 @@ func (p Prefix) String() string {
 	return string(runes)
 }
 
-// TODO(fortuna): provide this as a reusable library. Perhaps as x/shadowsocks or x/outline.
-func parseAccessKey(accessKey string) (*sessionConfig, error) {
-	var config sessionConfig
+func ParseAccessKey(accessKey string) (*SessionConfig, error) {
+	var config SessionConfig
+
 	accessKeyURL, err := url.Parse(accessKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse access key: %w", err)
 	}
+
 	var portString string
 	// Host is a <host>:<port> string
 	config.Hostname, portString, err = net.SplitHostPort(accessKeyURL.Host)
@@ -59,9 +60,10 @@ func parseAccessKey(accessKey string) (*sessionConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse port number: %w", err)
 	}
+
 	cipherInfoBytes, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(accessKeyURL.User.String())
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode cipher info [%v]: %v", accessKeyURL.User.String(), err)
+		return nil, fmt.Errorf("failed to decode cipher info [%v]: %w", accessKeyURL.User.String(), err)
 	}
 	cipherName, secret, found := strings.Cut(string(cipherInfoBytes), ":")
 	if !found {
@@ -71,6 +73,7 @@ func parseAccessKey(accessKey string) (*sessionConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher: %w", err)
 	}
+
 	prefixStr := accessKeyURL.Query().Get("prefix")
 	if len(prefixStr) > 0 {
 		config.Prefix, err = ParseStringPrefix(prefixStr)

@@ -30,6 +30,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
+	"github.com/Jigsaw-Code/outline-sdk/x/outline"
 )
 
 var debugLog log.Logger = *log.New(io.Discard, "", 0)
@@ -121,7 +122,7 @@ func main() {
 	// - Server IPv4 dial support
 	// - Server IPv6 dial support
 
-	config, err := parseAccessKey(*accessKeyFlag)
+	config, err := outline.ParseAccessKey(*accessKeyFlag)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
