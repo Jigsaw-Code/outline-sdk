@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
+
 package main
 
 import (
@@ -22,7 +24,6 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/songgao/water"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
@@ -30,7 +31,7 @@ import (
 const OUTLINE_TUN_NAME = "outline233"
 const OUTLINE_TUN_IP = "10.233.233.1"
 const OUTLINE_TUN_MTU = 1500 // todo: we can read this from netlink
-const OUTLINE_TUN_SUBNET = "10.233.233.1/32"
+// const OUTLINE_TUN_SUBNET = "10.233.233.1/32"
 const OUTLINE_GW_SUBNET = "10.233.233.2/32"
 const OUTLINE_GW_IP = "10.233.233.2"
 const OUTLINE_ROUTING_PRIORITY = 23333
@@ -60,21 +61,12 @@ func main() {
 	bgWait := &sync.WaitGroup{}
 	defer bgWait.Wait()
 
-	tun, err := setupTunDevice()
+	tun, err := NewTunDevice(OUTLINE_TUN_NAME, OUTLINE_TUN_IP)
 	if err != nil {
+		fmt.Printf("fatal error: %v\n", err)
 		return
 	}
-	defer cleanUpTunDevice(tun)
-
-	if err := showTunDevice(); err != nil {
-		return
-	}
-	if err := configureTunDevice(); err != nil {
-		return
-	}
-	if err := showTunDevice(); err != nil {
-		return
-	}
+	defer tun.Close()
 
 	ss, err := NewOutlineDevice(&OutlineConfig{
 		Hostname: svrIp,
@@ -122,83 +114,6 @@ func main() {
 	signal.Notify(sigc, os.Interrupt, unix.SIGTERM, unix.SIGHUP)
 	s := <-sigc
 	fmt.Printf("\nReceived %v, cleaning up resources...\n", s)
-}
-
-func showTunDevice() error {
-	l, err := netlink.LinkByName(OUTLINE_TUN_NAME)
-	if err != nil {
-		fmt.Printf("fatal error: %v\n", err)
-		return err
-	}
-	if tun, ok := l.(*netlink.Tuntap); ok {
-		mode := "unknown"
-		if tun.Mode == netlink.TUNTAP_MODE_TUN {
-			mode = "tun"
-		} else if tun.Mode == netlink.TUNTAP_MODE_TAP {
-			mode = "tap"
-		}
-		persist := "persist"
-		if tun.NonPersist {
-			persist = "non-persist"
-		}
-		fmt.Printf("\t%v %v %v mtu=%v attr=%v stat=%v\n", tun.Name, mode, persist, tun.MTU, tun.Attrs(), tun.Statistics)
-		return nil
-	} else {
-		fmt.Printf("fatal error: %v is not a tun device\n", OUTLINE_TUN_NAME)
-		return fmt.Errorf("tun device not found")
-	}
-}
-
-func setupTunDevice() (*water.Interface, error) {
-	fmt.Println("setting up tun device...")
-	conf := water.Config{
-		DeviceType: water.TUN,
-		PlatformSpecificParams: water.PlatformSpecificParams{
-			Name:    OUTLINE_TUN_NAME,
-			Persist: false,
-		},
-	}
-	r, err := water.New(conf)
-	if err == nil {
-		fmt.Println("tun device created")
-	} else {
-		fmt.Printf("fatal error: %v\n", err)
-	}
-	return r, err
-}
-
-func configureTunDevice() error {
-	fmt.Println("configuring tun device ip...")
-	tun, err := netlink.LinkByName(OUTLINE_TUN_NAME)
-	if err != nil {
-		fmt.Printf("fatal error: %v\n", err)
-		return err
-	}
-	addr, err := netlink.ParseAddr(OUTLINE_TUN_SUBNET)
-	if err != nil {
-		fmt.Printf("fatal error: %v\n", err)
-		return err
-	}
-	if err := netlink.AddrAdd(tun, addr); err != nil {
-		fmt.Printf("fatal error: %v\n", err)
-		return err
-	}
-	if err := netlink.LinkSetUp(tun); err != nil {
-		fmt.Printf("fatal error: %v\n", err)
-		return err
-	}
-	return nil
-}
-
-func cleanUpTunDevice(tun *water.Interface) error {
-	fmt.Println("cleaning up tun device...")
-	err := tun.Close()
-	if err == nil {
-		fmt.Println("tun device deleted")
-	} else {
-		fmt.Printf("clean up error: %v\n", err)
-	}
-	return err
 }
 
 func showRouting() error {
