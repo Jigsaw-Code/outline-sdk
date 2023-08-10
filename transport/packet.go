@@ -26,11 +26,11 @@ type PacketEndpoint interface {
 	Connect(ctx context.Context) (net.Conn, error)
 }
 
-// UDPEndpoint is a [PacketEndpoint] that connects to the given address via UDP
+// UDPEndpoint is a [PacketEndpoint] that connects to the specified address using UDP
 type UDPEndpoint struct {
 	// The Dialer used to create the net.Conn on Connect().
 	Dialer net.Dialer
-	// The endpoint address (host:port) to pass to Dial.
+	// The endpoint address ("host:port") to pass to Dial.
 	// If the host is a domain name, consider pre-resolving it to avoid resolution calls.
 	Address string
 }
@@ -42,7 +42,7 @@ func (e UDPEndpoint) Connect(ctx context.Context) (net.Conn, error) {
 	return e.Dialer.DialContext(ctx, "udp", e.Address)
 }
 
-// PacketDialerEndpoint is a [PacketEndpoint] that connects to the given address using the given [PacketDialer].
+// PacketDialerEndpoint is a [PacketEndpoint] that connects to the given address using the specified [PacketDialer].
 type PacketDialerEndpoint struct {
 	Dialer  PacketDialer
 	Address string
@@ -57,8 +57,8 @@ func (e *PacketDialerEndpoint) Connect(ctx context.Context) (net.Conn, error) {
 
 // PacketDialer provides a way to dial a destination and establish datagram connections.
 type PacketDialer interface {
-	// Dial connects to `raddr`.
-	// `raddr` has the form `host:port`, where `host` can be a domain name or IP address.
+	// Dial connects to `addr`.
+	// `addr` has the form "host:port", where "host" can be a domain name or IP address.
 	Dial(ctx context.Context, addr string) (net.Conn, error)
 }
 
@@ -91,9 +91,9 @@ type boundPacketConn struct {
 var _ net.Conn = (*boundPacketConn)(nil)
 
 // Dial implements [PacketDialer].Dial.
-// The address is a host:port and the host must be a full IP address (not [::]) or a domain
-// The address must be supported by the WriteTo call of the PacketConn
-// returned by the PacketListener. For instance, a [net.UDPConn] only supports IP addresses, not domain names.
+// The address is in "host:port" format and the host must be either a full IP address (not "[::]") or a domain.
+// The address must be supported by the WriteTo call of the [net.PacketConn] returned by the [PacketListener].
+// For example, a [net.UDPConn] only supports IP addresses, not domain names.
 // If the host is a domain name, consider pre-resolving it to avoid resolution calls.
 func (e PacketListenerDialer) Dial(ctx context.Context, address string) (net.Conn, error) {
 	packetConn, err := e.Listener.ListenPacket(ctx)
@@ -138,7 +138,7 @@ func (c *boundPacketConn) RemoteAddr() net.Addr {
 
 // PacketListener provides a way to create a local unbound packet connection to send packets to different destinations.
 type PacketListener interface {
-	// ListenPacket creates a PacketConn that can be used to relay packets (such as UDP) through some proxy.
+	// ListenPacket creates a PacketConn that can be used to relay packets (such as UDP) through a proxy.
 	ListenPacket(ctx context.Context) (net.PacketConn, error)
 }
 
