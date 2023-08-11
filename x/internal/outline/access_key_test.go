@@ -47,7 +47,7 @@ func TestParseKeyNormalKey(t *testing.T) {
 	}{
 		{
 			// standard access key (chacha encryption)
-			input: "ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpteXBhc3M@test.google.com:1234/?outline=1",
+			input: "ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpteXBhc3M@test.google.com:1234",
 			host:  "test.google.com",
 			port:  1234,
 		},
@@ -58,13 +58,13 @@ func TestParseKeyNormalKey(t *testing.T) {
 			port:  4321,
 		},
 		{
-			// access key with tags
+			// access key with IPv6 and tags
 			input: "ss://YWVzLTE5Mi1nY206bXlwYXNz@[fe80:0:0:4444:5555:6666:7777:8888]:9999/?outline=1#Test%20Server",
 			host:  "fe80:0:0:4444:5555:6666:7777:8888",
 			port:  9999,
 		},
 		{
-			// access key with a prefix
+			// access key with prefix
 			input:  "ss://QUVTLTI1Ni1nY206bXlwYXNz@xxx.www.outline.yyy.zzz:80/?outline=1&prefix=HTTP%2F1.1%20#random-server",
 			host:   "xxx.www.outline.yyy.zzz",
 			port:   80,
