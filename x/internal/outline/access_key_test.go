@@ -36,3 +36,49 @@ func TestParseKeyInvalidString(t *testing.T) {
 		require.Nil(t, out)
 	}
 }
+
+// Make sure ParseKey works for a normal Outline access key
+func TestParseKeyNormalKey(t *testing.T) {
+	cases := []struct {
+		input  string
+		host   string
+		port   int
+		prefix []byte
+	}{
+		{
+			// standard access key (chacha encryption)
+			input: "ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpteXBhc3M@test.google.com:1234/?outline=1",
+			host:  "test.google.com",
+			port:  1234,
+		},
+		{
+			// access key with AES encryption
+			input: "ss://YWVzLTEyOC1nY206bXlwYXNz@127.0.0.1:4321/?plugin=v2ray-plugin",
+			host:  "127.0.0.1",
+			port:  4321,
+		},
+		{
+			// access key with tags
+			input: "ss://YWVzLTE5Mi1nY206bXlwYXNz@[fe80:0:0:4444:5555:6666:7777:8888]:9999/?outline=1#Test%20Server",
+			host:  "fe80:0:0:4444:5555:6666:7777:8888",
+			port:  9999,
+		},
+		{
+			// access key with a prefix
+			input:  "ss://QUVTLTI1Ni1nY206bXlwYXNz@xxx.www.outline.yyy.zzz:80/?outline=1&prefix=HTTP%2F1.1%20#random-server",
+			host:   "xxx.www.outline.yyy.zzz",
+			port:   80,
+			prefix: []byte("HTTP/1.1 "),
+		},
+	}
+
+	for _, c := range cases {
+		out, err := ParseAccessKey(c.input)
+		require.NoError(t, err)
+		require.NotNil(t, out)
+
+		require.Exactly(t, c.host, out.Hostname)
+		require.Exactly(t, c.port, out.Port)
+		require.Equal(t, c.prefix, []byte(out.Prefix))
+	}
+}
