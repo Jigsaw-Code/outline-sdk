@@ -28,29 +28,13 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
-	"github.com/Jigsaw-Code/outline-sdk/x/outline"
+	"github.com/Jigsaw-Code/outline-sdk/x/internal/outline"
 )
 
 var debugLog log.Logger = *log.New(io.Discard, "", 0)
 
 // var errorLog log.Logger = *log.New(os.Stderr, "[ERROR] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
-
-func makeStreamDialer(proxyAddress string, cryptoKey *shadowsocks.EncryptionKey, prefix []byte) (transport.StreamDialer, error) {
-	proxyDialer, err := shadowsocks.NewStreamDialer(&transport.TCPEndpoint{Address: proxyAddress}, cryptoKey)
-	if err != nil {
-		return nil, err
-	}
-	if len(prefix) > 0 {
-		proxyDialer.SaltGenerator = shadowsocks.NewPrefixSaltGenerator(prefix)
-	}
-	return proxyDialer, nil
-}
-
-func makePacketListener(proxyAddress string, cryptoKey *shadowsocks.EncryptionKey) (transport.PacketListener, error) {
-	return shadowsocks.NewPacketListener(&transport.UDPEndpoint{Address: proxyAddress}, cryptoKey)
-}
 
 type jsonRecord struct {
 	// Inputs
@@ -138,7 +122,7 @@ func main() {
 	jsonEncoder.SetEscapeHTML(false)
 	// TODO: limit number of IPs. Or force an input IP?
 	for _, hostIP := range proxyIPs {
-		proxyAddress := net.JoinHostPort(hostIP.String(), fmt.Sprint(config.Port))
+		config.Hostname = hostIP.String()
 		for _, resolverHost := range strings.Split(*resolverFlag, ",") {
 			resolverHost := strings.TrimSpace(resolverHost)
 			resolverAddress := net.JoinHostPort(resolverHost, "53")
@@ -150,14 +134,14 @@ func main() {
 				var testDuration time.Duration
 				switch proto {
 				case "tcp":
-					dialer, err := makeStreamDialer(proxyAddress, config.CryptoKey, config.Prefix)
+					dialer, err := outline.NewOutlineStreamDialer(config)
 					if err != nil {
 						log.Fatalf("Failed to create StreamDialer: %v", err)
 					}
 					resolver := &transport.StreamDialerEndpoint{Dialer: dialer, Address: resolverAddress}
 					testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, *domainFlag)
 				case "udp":
-					listener, err := makePacketListener(proxyAddress, config.CryptoKey)
+					listener, err := outline.NewOutlinePacketListener(config)
 					if err != nil {
 						log.Fatalf("Failed to create PacketListener: %v", err)
 					}
@@ -172,7 +156,7 @@ func main() {
 					success = true
 				}
 				record := jsonRecord{
-					Proxy:      proxyAddress,
+					Proxy:      net.JoinHostPort(hostIP.String(), fmt.Sprint(config.Port)),
 					Resolver:   resolverAddress,
 					Proto:      proto,
 					Prefix:     config.Prefix.String(),
