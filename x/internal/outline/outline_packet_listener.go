@@ -23,20 +23,12 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 )
 
-func NewOutlineStreamDialer(accessKey string) (transport.StreamDialer, error) {
+func NewOutlinePacketListener(accessKey string) (transport.PacketListener, error) {
 	config, err := ParseAccessKey(accessKey)
 	if err != nil {
 		return nil, fmt.Errorf("access key in invalid: %w", err)
 	}
 
 	ssAddress := net.JoinHostPort(config.Hostname, strconv.Itoa(config.Port))
-	dialer, err := shadowsocks.NewStreamDialer(&transport.TCPEndpoint{Address: ssAddress}, config.CryptoKey)
-	if err != nil {
-		return nil, err
-	}
-	if len(config.Prefix) > 0 {
-		dialer.SaltGenerator = shadowsocks.NewPrefixSaltGenerator(config.Prefix)
-	}
-
-	return dialer, nil
+	return shadowsocks.NewPacketListener(&transport.UDPEndpoint{Address: ssAddress}, config.CryptoKey)
 }

@@ -17,21 +17,12 @@ package outline
 import (
 	"context"
 	"fmt"
-	"net"
-	"strconv"
 
 	"github.com/Jigsaw-Code/outline-sdk/network"
 	"github.com/Jigsaw-Code/outline-sdk/network/dnstruncate"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
 )
-
-type OutlinePacketProxy interface {
-	network.PacketProxy
-
-	TestConnectivityAndRefresh(resolver, domain string) error
-}
 
 type outlinePacketProxy struct {
 	network.DelegatePacketProxy
@@ -40,9 +31,7 @@ type outlinePacketProxy struct {
 	remote, fallback  network.PacketProxy
 }
 
-var _ OutlinePacketProxy = (*outlinePacketProxy)(nil)
-
-func NewOutlinePacketProxy(config *SessionConfig) (opp OutlinePacketProxy, err error) {
+func newOutlinePacketProxy(accessKey string) (opp *outlinePacketProxy, err error) {
 	proxy := outlinePacketProxy{}
 
 	proxy.fallback, err = dnstruncate.NewPacketProxy()
@@ -51,7 +40,7 @@ func NewOutlinePacketProxy(config *SessionConfig) (opp OutlinePacketProxy, err e
 	}
 
 	// Create Shadowsocks UDP PacketProxy
-	proxy.remotePktListener, err = NewOutlinePacketListener(config)
+	proxy.remotePktListener, err = NewOutlinePacketListener(accessKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create UDP listener: %w", err)
 	}
@@ -70,7 +59,7 @@ func NewOutlinePacketProxy(config *SessionConfig) (opp OutlinePacketProxy, err e
 	return &proxy, nil
 }
 
-func (proxy *outlinePacketProxy) TestConnectivityAndRefresh(resolver, domain string) error {
+func (proxy *outlinePacketProxy) testConnectivityAndRefresh(resolver, domain string) error {
 	dialer := transport.PacketListenerDialer{Listener: proxy.remotePktListener}
 	dnsResolver := &transport.PacketDialerEndpoint{Dialer: dialer, Address: resolver}
 	_, err := connectivity.TestResolverPacketConnectivity(context.Background(), dnsResolver, domain)
@@ -80,9 +69,4 @@ func (proxy *outlinePacketProxy) TestConnectivityAndRefresh(resolver, domain str
 	} else {
 		return proxy.SetProxy(proxy.remote)
 	}
-}
-
-func NewOutlinePacketListener(config *SessionConfig) (transport.PacketListener, error) {
-	ssAddress := net.JoinHostPort(config.Hostname, strconv.Itoa(config.Port))
-	return shadowsocks.NewPacketListener(&transport.UDPEndpoint{Address: ssAddress}, config.CryptoKey)
 }
