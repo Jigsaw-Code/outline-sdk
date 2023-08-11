@@ -25,6 +25,11 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
+const (
+	connectivityTestDNSResolver  = "1.1.1.1:53"
+	connectivityTestTargetDomain = "www.google.com"
+)
+
 type OutlineDevice struct {
 	t2s network.IPDevice
 	pp  *outlinePacketProxy
@@ -57,7 +62,7 @@ func (d *OutlineDevice) Close() error {
 }
 
 func (d *OutlineDevice) Refresh() error {
-	return d.pp.testConnectivityAndRefresh("1.1.1.1:53", "www.google.com")
+	return d.pp.testConnectivityAndRefresh(connectivityTestDNSResolver, connectivityTestTargetDomain)
 }
 
 // RelayTraffic copies all traffic between an IPDevice (`netDev`) and the OutlineDevice (`d`) in both directions.
