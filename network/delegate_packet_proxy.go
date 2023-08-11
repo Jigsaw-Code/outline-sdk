@@ -19,9 +19,10 @@ import (
 	"sync/atomic"
 )
 
-// DelegatePacketProxy is a [PacketProxy] that forwards calls (like NewSession) to another [PacketProxy]. To create a
-// DelegatePacketProxy with the default PacketProxy, use [NewDelegatePacketProxy]. To change the underlying
-// [PacketProxy], use SetProxy.
+// DelegatePacketProxy is a [PacketProxy] that forwards calls (like NewSession) to another [PacketProxy],
+// so that the caller can replace the underlying [PacketProxy] without changing the original reference.
+// To create a DelegatePacketProxy with the default PacketProxy, use [NewDelegatePacketProxy]. To change
+// the underlying [PacketProxy], use SetProxy.
 //
 // Note: After the underlying [PacketProxy] is changed, only new NewSession calls will be routed to the new
 // [PacketProxy]. Existing sessions will not be affected.
