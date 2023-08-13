@@ -45,7 +45,6 @@ func NewStreamDialer(endpoint transport.StreamEndpoint) (*StreamDialer, error) {
 	if endpoint == nil {
 		return nil, errors.New("argument endpoint must not be nil")
 	}
-	// TODO: use the endpoint
 	proxyDialer := &streamDialerAdaptor{endpoint: endpoint}
 	socks5Dialer, err := proxy.SOCKS5("tcp", "unused", nil, proxyDialer)
 	if err != nil {
@@ -83,11 +82,6 @@ func (c *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 	if err != nil {
 		return nil, err
 	}
-	// streamConn, ok := netConn.(transport.StreamConn)
-	// if !ok {
-	// 	// This should never happen.
-	// 	return nil, fmt.Errorf("SOCKS5 net.Conn (type %T) is not a transport.StreamConn", netConn)
-	// }
 	return &streamConnAdaptor{netConn}, err
 }
 
