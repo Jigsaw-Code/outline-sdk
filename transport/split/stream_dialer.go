@@ -51,12 +51,13 @@ func (w *splitWriter) Write(data []byte) (int, error) {
 	defer func() {
 		w.bytesCopied += int64(written)
 	}()
-	if prefixLength > 0 {
-		n, err := w.Write(data[:prefixLength])
+	if 0 < prefixLength && prefixLength < int64(len(data)) {
+		n, err := w.writer.Write(data[:prefixLength])
 		written += n
 		if err != nil {
 			return n, err
 		}
+		data = data[prefixLength:]
 	}
 	n, err := w.writer.Write(data)
 	written += n
