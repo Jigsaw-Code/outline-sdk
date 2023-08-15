@@ -26,7 +26,7 @@ type PacketEndpoint interface {
 	Connect(ctx context.Context) (net.Conn, error)
 }
 
-// UDPEndpoint is a [PacketEndpoint] that connects to the specified address using UDP
+// UDPEndpoint is a [PacketEndpoint] that connects to the specified address using UDP.
 type UDPEndpoint struct {
 	// The Dialer used to create the net.Conn on Connect().
 	Dialer net.Dialer
