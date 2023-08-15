@@ -16,7 +16,7 @@
 The network package defines interfaces and provides utilities for network layer (OSI layer 3) functionalities. For
 example, you can use the [IPDevice] interface to read and write IP packets from a physical or virtual network device.
 
-In addition, the sub-packages include user-space network stack implementations (such as network/lwip2transport) that
+In addition, the sub-packages include user-space network stack implementations (such as [network/lwip2transport]) that
 can translate raw IP packets into TCP/UDP flows. You can implement a [PacketProxy] to handle UDP traffic, and a
 [transport.StreamDialer] to handle TCP traffic.
 */
