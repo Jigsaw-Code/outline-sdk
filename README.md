@@ -70,17 +70,27 @@ Beta features:
   - [ ] Use network libraries in the Outline Client
   - [ ] Add extensive testing
 
-- Serverless transport libraries
-  - [ ] Encrypted DNS
-  - [ ] Packet splitting
+- Transport client strategies
+  - Proxyless strategies
+    - [ ] Encrypted DNS
+    - [ ] Packet splitting
+  - Proxy-based strategies
+    - [ ] HTTP Connect
+    - [ ] SOCKS5
 
-- Proxy transport libraries
-  - [ ] HTTP Connect
-  - [ ] SOCKS5
+- Integration resources
+  - [ ] Library to run a local SOCKS5 or HTTP-Connect proxy
+  - [ ] Documentation on how to integrate the SDK into mobile apps
+    - [ ] Connectivity Test cross-platform example app (Wails + Capacitory)
+  - [ ] Go example command-line apps
+    - [ ] Connectivity Test
+    - [ ] Outline Client
+    - [ ] Page fetch
+    - [ ] Local proxy
 
-- Add Resources
+- Server-side libraries
+  - [ ] To be defined
+
+- Add Other Resources
   - [ ] Website
   - [ ] Bindings
-  - [ ] Integration documentation
-  - [ ] Example command-line apps
-  - [ ] Example graphical apps
