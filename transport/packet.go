@@ -20,7 +20,7 @@ import (
 	"net"
 )
 
-// PacketEndpoint represents an endpoint that can be used to established packet connections (like UDP) to a fixed destination.
+// PacketEndpoint represents an endpoint that can be used to establish packet connections (like UDP) to a fixed destination.
 type PacketEndpoint interface {
 	// Connect creates a connection bound to an endpoint, returning the connection.
 	Connect(ctx context.Context) (net.Conn, error)
