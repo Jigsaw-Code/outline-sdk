@@ -29,7 +29,7 @@ type PacketProxy interface {
 	// PacketRequestSender object to handle requests from this session, and it also uses the PacketResponseReceiver
 	// to send responses back to the upstream network stack.
 	//
-	// Note that, it is possible for a session to receive UDP packets without sending any requests.
+	// Note that it is possible for a session to receive UDP packets without sending any requests.
 	NewSession(PacketResponseReceiver) (PacketRequestSender, error)
 }
 
