@@ -31,7 +31,7 @@ import (
 type DelegatePacketProxy interface {
 	PacketProxy
 
-	// SetProxy updates the underlying PacketProxy to `proxy`. And `proxy` must not be nil. After this function
+	// SetProxy updates the underlying PacketProxy to `proxy`; `proxy` must not be nil. After this function
 	// returns, all new PacketProxy calls will be forwarded to the `proxy`. Existing sessions will not be affected.
 	SetProxy(proxy PacketProxy) error
 }
