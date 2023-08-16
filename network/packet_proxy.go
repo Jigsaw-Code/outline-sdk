@@ -62,7 +62,7 @@ type PacketRequestSender interface {
 // Multiple goroutines can simultaneously invoke methods on a PacketResponseReceiver.
 type PacketResponseReceiver interface {
 	// WriteFrom is a callback function that is called by a PacketProxy when a UDP response packet is received. The
-	// `source` identifies the remote server that sent the packet; and the `p` contains the packet payload. WriteFrom
+	// `source` identifies the remote server that sent the packet and the `p` contains the packet payload. WriteFrom
 	// returns the number of bytes written from `p` and any error encountered that caused the function to stop early.
 	//
 	// `p` must not be modified, and it must not be referenced after WriteFrom returns.
