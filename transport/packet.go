@@ -75,7 +75,7 @@ func (d *UDPPacketDialer) Dial(ctx context.Context, addr string) (net.Conn, erro
 	return d.Dialer.DialContext(ctx, "udp", addr)
 }
 
-// PacketListenerDialer is a [PacketDialer] that connects to the destination using the given [PacketListener].
+// PacketListenerDialer is a [PacketDialer] that connects to the destination using the specified [PacketListener].
 type PacketListenerDialer struct {
 	// The PacketListener that is used to create the net.PacketConn to bind on Dial. Must be non nil.
 	Listener PacketListener
