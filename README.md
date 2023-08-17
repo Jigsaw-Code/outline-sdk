@@ -93,6 +93,6 @@ Beta features:
 - Server-side libraries
   - [ ] To be defined
 
-- Add Other Resources
+- Other Resources
   - [ ] Website
   - [ ] Bindings
