@@ -110,7 +110,7 @@ func main() {
 
 	println("Proxy server started on ", proxy.GetAddr())
 
-	// wait for kill/interrupt signal to stop the proxy with a timeout of 5 seconds.
+	// Wait for kill/interrupt signal to stop the proxy with a timeout of 5 seconds.
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill)
