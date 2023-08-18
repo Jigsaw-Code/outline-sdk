@@ -1,4 +1,4 @@
-git # Outline Local Proxy
+# Outline Local Proxy
 
 This app illustrates the use of the Local Proxy type of libraries with transports that are available in SDK.
 It parse `-transport` key and start a local proxy on `-addr` address using that transport.
