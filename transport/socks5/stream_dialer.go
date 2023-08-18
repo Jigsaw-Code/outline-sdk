@@ -17,72 +17,56 @@ package socks5
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"golang.org/x/net/proxy"
 )
 
-type streamDialerAdaptor struct {
-	endpoint transport.StreamEndpoint
-}
-
-func (d *streamDialerAdaptor) Dial(network, addr string) (c net.Conn, err error) {
-	return d.endpoint.Connect(context.Background())
-}
-
-func (d *streamDialerAdaptor) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
-	return d.endpoint.Connect(ctx)
-}
-
-var _ proxy.Dialer = (*streamDialerAdaptor)(nil)
-var _ proxy.ContextDialer = (*streamDialerAdaptor)(nil)
-
 // NewStreamDialer creates a client that routes connections to a SOCKS5 proxy listening at
 // the given [transport.StreamEndpoint].
-func NewStreamDialer(endpoint transport.StreamEndpoint) (*StreamDialer, error) {
+func NewStreamDialer(endpoint transport.StreamEndpoint) (transport.StreamDialer, error) {
 	// See https://pkg.go.dev/golang.org/x/net/proxy#SOCKS5
 	if endpoint == nil {
 		return nil, errors.New("argument endpoint must not be nil")
 	}
-	proxyDialer := &streamDialerAdaptor{endpoint: endpoint}
-	socks5Dialer, err := proxy.SOCKS5("tcp", "unused", nil, proxyDialer)
-	if err != nil {
-		return nil, err
-	}
-	contextDialer, ok := socks5Dialer.(proxy.ContextDialer)
-	if !ok {
-		// This should never happen.
-		return nil, errors.New("SOCKS5 dialer is not a proxy.ContextDialer")
-	}
-	d := StreamDialer{dialer: contextDialer}
-	return &d, nil
+	return &StreamDialer{proxyEndpoint: endpoint}, nil
 }
 
 type StreamDialer struct {
-	dialer proxy.ContextDialer
-}
-
-type streamConnAdaptor struct {
-	net.Conn
-}
-
-func (a *streamConnAdaptor) CloseRead() error {
-	return nil
-}
-
-func (a *streamConnAdaptor) CloseWrite() error {
-	return a.Close()
-}
-
-var _ transport.StreamConn = (*streamConnAdaptor)(nil)
-
-func (c *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
-	netConn, err := c.dialer.DialContext(ctx, "tcp", remoteAddr)
-	if err != nil {
-		return nil, err
-	}
-	return &streamConnAdaptor{netConn}, err
+	proxyEndpoint transport.StreamEndpoint
 }
 
 var _ transport.StreamDialer = (*StreamDialer)(nil)
+
+func (c *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
+	proxyConn, err := c.proxyEndpoint.Connect(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("could not connect to SOCKS5 proxy: %w", err)
+	}
+	socks5Dialer, err := proxy.SOCKS5("tcp", "unused", nil, &fixedConnDialer{proxyConn})
+	if err != nil {
+		return nil, err
+	}
+	socks5Conn, err := socks5Dialer.(proxy.ContextDialer).DialContext(ctx, "tcp", remoteAddr)
+	if err != nil {
+		return nil, fmt.Errorf("could not establish SOCKS5 tunnel: %w", err)
+	}
+	return transport.WrapConn(proxyConn, socks5Conn, socks5Conn), nil
+}
+
+type fixedConnDialer struct {
+	conn net.Conn
+}
+
+func (d *fixedConnDialer) Dial(network, addr string) (c net.Conn, err error) {
+	return d.conn, nil
+}
+
+func (d *fixedConnDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return d.conn, nil
+}
+
+var _ proxy.Dialer = (*fixedConnDialer)(nil)
+var _ proxy.ContextDialer = (*fixedConnDialer)(nil)
