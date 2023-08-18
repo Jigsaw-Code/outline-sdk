@@ -83,7 +83,7 @@ func TestSOCKS5Dialer_Dial(t *testing.T) {
 		n, err := serverConn.Write(requestText)
 		require.NoError(t, err)
 		require.Equal(t, len(requestText), n)
-		assert.Nil(t, serverConn.CloseWrite())
+		assert.NoError(t, serverConn.CloseWrite())
 
 		err = iotest.TestReader(serverConn, responseText)
 		require.NoError(t, err, "Response read failed: %v", err)
