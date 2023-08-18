@@ -62,6 +62,9 @@ func TestSOCKS5Dialer_Dial(t *testing.T) {
 		_, err = clientConn.Write([]byte{5, 0, 0, 1, 0, 0, 0, 0, 0, 0})
 		assert.NoError(t, err, "Write failed: %v", err)
 
+		err = iotest.TestReader(clientConn, requestText)
+		assert.NoError(t, err, "Request read failed: %v", err)
+
 		n, err := clientConn.Write(responseText)
 		require.NoError(t, err)
 		require.Equal(t, len(responseText), n)
