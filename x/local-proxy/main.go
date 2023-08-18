@@ -108,7 +108,7 @@ func main() {
 		log.Fatal("Proxy server failed")
 	}
 
-	println("Proxy server started on ", proxy.GetAddr())
+	log.Println("Proxy server started on ", proxy.GetAddr())
 
 	// Wait for kill/interrupt signal to stop the proxy with a timeout of 5 seconds.
 
@@ -116,7 +116,7 @@ func main() {
 	signal.Notify(sig, os.Interrupt, os.Kill)
 
 	<-sig
-	println("Shutting down the proxy server")
+	log.Println("Shutting down the proxy server")
 
 	serverStopped := make(chan struct{})
 
