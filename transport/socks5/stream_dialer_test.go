@@ -43,13 +43,14 @@ func TestSOCKS5Dialer_Dial(t *testing.T) {
 		defer running.Done()
 		clientConn, err := listener.AcceptTCP()
 		require.NoError(t, err, "AcceptTCP failed: %v", err)
-
 		defer clientConn.Close()
-		// Client version (5) and 1 authentication method (0=no auth)
+
+		// See https://datatracker.ietf.org/doc/html/rfc1928#autoid-3
+		// VER = 5, NMETHODS = 1, METHODS = 0 (no auth)
 		err = iotest.TestReader(io.LimitReader(clientConn, 3), []byte{5, 1, 0})
 		assert.NoError(t, err, "Request read failed: %v", err)
 
-		// Version (5) and selected method (0)
+		// VER = 5, METHOD = 0
 		_, err = clientConn.Write([]byte{5, 0})
 		assert.NoError(t, err, "Write failed: %v", err)
 
