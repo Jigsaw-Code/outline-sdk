@@ -20,15 +20,15 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"os"
+	"os/signal"
 	"strings"
+	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 	"github.com/Jigsaw-Code/outline-sdk/transport/socks5"
-	"github.com/Jigsaw-Code/outline-sdk/x/local-proxy/proxy/httpproxy"
-	"os"
-	"os/signal"
-	"time"
+	"github.com/Jigsaw-Code/outline-sdk/x/local-proxy/proxy/httpproxywrapper"
 )
 
 func makeStreamDialer(transportConfig string) (transport.StreamDialer, error) {

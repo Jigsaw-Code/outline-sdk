@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/Jigsaw-Code/outline-sdk v0.0.3-0.20230812162845-b713debcd966
+	github.com/go-httpproxy/httpproxy v0.0.0-20180417134941-6977c68bf38e
 	github.com/miekg/dns v1.1.54
 	github.com/stretchr/testify v1.8.2
 	golang.org/x/sys v0.8.0
