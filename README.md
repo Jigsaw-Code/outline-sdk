@@ -12,16 +12,15 @@
 > interested in integrating with it, we'd love your [feedback](https://github.com/Jigsaw-Code/outline-sdk/issues/new).
 
 The Outline SDK allows you to:
+
 - Create tools to protect against network-level interference
 - Add network-level interference protection to existing apps, such as content or communication apps
-
 
 ## Advantages
 
 | Multi-Platform | Proven Technology | Composable |
 |:-:|:-:|:-:|
 | The Outline SDK can be used to build tools that run on Android, iOS, Windows, macOS and Linux. | The Outline Client and Server have been using the code in the SDK for years, helping millions of users access the internet in even the harshest conditions. | The SDK interfaces were carefully designed to allow for composition and reuse, so you can craft your own transport. |
-
 
 ## Integration
 
@@ -34,11 +33,9 @@ The Outline SDK is written in Go. There are multiple ways to integrate the Outli
 
 The Outline Client uses the mobile library approach on Android, iOS and macOS (based on Cordova) and the side service on Windows and Linux (based on Electron).
 
-
 ## Tentative Roadmap
 
 The launch will have two milestones: Alpha and Beta. We are currently in Alpha. Most of the code is not new. It's the same code that is currently being used by the production Outline Client and Server. The SDK repackages code from [outline-ss-server](https://github.com/Jigsaw-Code/outline-ss-server) and [outline-go-tun2socks](https://github.com/Jigsaw-Code/outline-go-tun2socks) in a way that is easier to reuse and extend.
-
 
 ### Alpha
 
@@ -51,14 +48,13 @@ Alpha features:
   - [x] Add TCP and UDP client implementations
   - [x] Add Shadowsocks client implementations
   - [x] Use transport libraries in the Outline Client
-  - [x] Use transport libraries in the Outline Server 
+  - [x] Use transport libraries in the Outline Server
 
 - Network-level libraries
   - [x] Add IP Device abstraction
   - [x] Add IP Device implementation based on go-tun2socks (LWIP)
   - [x] Add UDP handler to fallback to DNS-over-TCP
   - [x] Add DelegatePacketProxy for runtime PacketProxy replacement
-
 
 ### Beta
 
@@ -76,7 +72,8 @@ Beta features:
 
 - Proxy transport libraries
   - [ ] HTTP Connect
-  - [ ] SOCKS5
+  - [x] SOCKS5 StreamDialer
+  - [ ] SOCKS5 PacketDialer
 
 - Add Resources
   - [ ] Website
