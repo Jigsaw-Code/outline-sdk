@@ -18,10 +18,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
+	"io"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"golang.org/x/net/proxy"
 )
 
 // NewStreamDialer creates a client that routes connections to a SOCKS5 proxy listening at
@@ -45,28 +44,82 @@ func (c *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to SOCKS5 proxy: %w", err)
 	}
-	socks5Dialer, err := proxy.SOCKS5("tcp", "unused", nil, &fixedConnDialer{proxyConn})
+	dialSuccess := false
+	defer func() {
+		if !dialSuccess {
+			proxyConn.Close()
+		}
+	}()
+
+	// For protocol details, see https://datatracker.ietf.org/doc/html/rfc1928#autoid-3
+
+	// Buffer large enough for a FQDN address
+	header := [3 + 4 + 256 + 2]byte{}
+
+	// Method request:
+	// VER = 5, NMETHODS = 1, METHODS = 0 (no auth)
+	b := append(header[0:0], 5, 1, 0)
+
+	// Connect request:
+	// VER = 5, CMD = 1 (connect), RSV = 0
+	b = append(b, 5, 1, 0)
+	// Destination address Address (ATYP, DST.ADDR, DST.PORT)
+	b, err = appendSOCKS5Address(b, remoteAddr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create SOCKS5 address: %w", err)
 	}
-	socks5Conn, err := socks5Dialer.(proxy.ContextDialer).DialContext(ctx, "tcp", remoteAddr)
+
+	// We merge the method and connect requests because we send a single authentication
+	// method, so there's no point in waiting for the response. This eliminates a roundtrip.
+	_, err = proxyConn.Write(b)
 	if err != nil {
-		return nil, fmt.Errorf("could not establish SOCKS5 tunnel: %w", err)
+		return nil, fmt.Errorf("failed to write SOCKS5 request: %w", err)
 	}
-	return transport.WrapConn(proxyConn, socks5Conn, socks5Conn), nil
-}
 
-type fixedConnDialer struct {
-	conn net.Conn
-}
+	// Read method response (VER, METHOD).
+	if _, err = io.ReadFull(proxyConn, header[:2]); err != nil {
+		return nil, fmt.Errorf("failed to read method server response")
+	}
+	if header[0] != 5 {
+		return nil, fmt.Errorf("invalid protocol version %v. Expected 5", header[0])
+	}
+	if header[1] != 0 {
+		return nil, fmt.Errorf("unsupported SOCKS authentication method %v. Expected 0 (no auth)", header[1])
+	}
 
-func (d *fixedConnDialer) Dial(network, addr string) (c net.Conn, err error) {
-	return d.conn, nil
-}
+	// Read connect response (VER, REP, RSV, ATYP, BND.ADDR, BND.PORT).
+	// See https://datatracker.ietf.org/doc/html/rfc1928#section-6.
+	if _, err = io.ReadFull(proxyConn, header[:4]); err != nil {
+		return nil, fmt.Errorf("failed to read connect server response")
+	}
+	if header[0] != 5 {
+		return nil, fmt.Errorf("invalid protocol version %v. Expected 5", header[0])
+	}
+	toRead := 0
+	switch header[3] {
+	case addrTypeIPv4:
+		toRead = 4
+	case addrTypeIPv6:
+		toRead = 16
+	case addrTypeDomainName:
+		_, err := io.ReadFull(proxyConn, header[:1])
+		if err != nil {
+			return nil, fmt.Errorf("failed to read address length in connect response: %w", err)
+		}
+		toRead = int(header[0])
+	}
+	// Reads the bound address and port, but we currently ignore them.
+	// TODO(fortuna): Should we expose the remote bound address as the net.Conn.LocalAddr()?
+	_, err = io.ReadFull(proxyConn, header[:toRead])
+	if err != nil {
+		return nil, fmt.Errorf("failed to read address in connect response: %w", err)
+	}
+	// We also ignore the remote bound port number.
+	_, err = io.ReadFull(proxyConn, header[:2])
+	if err != nil {
+		return nil, fmt.Errorf("failed to read port number in connect response: %w", err)
+	}
 
-func (d *fixedConnDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
-	return d.conn, nil
+	dialSuccess = true
+	return proxyConn, nil
 }
-
-var _ proxy.Dialer = (*fixedConnDialer)(nil)
-var _ proxy.ContextDialer = (*fixedConnDialer)(nil)
