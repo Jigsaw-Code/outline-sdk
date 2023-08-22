@@ -20,14 +20,14 @@ import (
 )
 
 var (
-	// ErrMsgSize is the error returned by a Write on a network device that the size of the message to be sent is bigger
-	// than the maximum message size the device can process.
+	// ErrMsgSize is the error returned by a Write on a network device. It means that the size of the message to be
+	// sent is bigger than the maximum message size the device can process.
 	ErrMsgSize = fmt.Errorf("packet size is too big: %w", syscall.EMSGSIZE)
 )
 
 // IPDevice is a generic network device that reads and writes IP packets. It extends the [io.ReadWriteCloser]
-// interface. For better memory efficiency, we also recommend implementing the [io.ReaderFrom] and
-// [io.WriterTo] interfaces if possible.
+// interface. For better memory efficiency, we also recommend that you implement the [io.ReaderFrom] and [io.WriterTo]
+// interfaces if possible.
 //
 // Some examples of IPDevices are a virtual network adapter or a local IP proxy.
 type IPDevice interface {

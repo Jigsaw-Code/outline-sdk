@@ -66,18 +66,30 @@ Beta features:
   - [ ] Use network libraries in the Outline Client
   - [ ] Add extensive testing
 
-- Serverless transport libraries
-  - [ ] Encrypted DNS
-  - [ ] Packet splitting
+- Transport client strategies
+  - Proxyless strategies
+    - [ ] Encrypted DNS
+    - [ ] Packet splitting
+  - Proxy-based strategies
+    - [ ] HTTP Connect
+    - [x] SOCKS5 StreamDialer
+    - [ ] SOCKS5 PacketDialer
 
-- Proxy transport libraries
-  - [ ] HTTP Connect
-  - [x] SOCKS5 StreamDialer
-  - [ ] SOCKS5 PacketDialer
+- Integration resources
+  - For Mobile apps
+    - [ ] Library to run a local SOCKS5 or HTTP-Connect proxy
+    - [ ] Documentation on how to integrate the SDK into mobile apps
+    - [ ] Connectivity Test mobile app using [Capacitor](https://capacitorjs.com/)
+  - For Go apps
+    - [ ] Connectivity Test example [Wails](https://wails.io/) graphical app
+    - [ ] Connectivity Test example command-line app
+    - [ ] Outline Client example command-line app
+    - [ ] Page fetch example command-line app
+    - [ ] Local proxy example command-line app
 
-- Add Resources
+- Server-side libraries
+  - [ ] To be defined
+
+- Other Resources
   - [ ] Website
   - [ ] Bindings
-  - [ ] Integration documentation
-  - [ ] Example command-line apps
-  - [ ] Example graphical apps
