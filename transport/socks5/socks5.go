@@ -47,7 +47,7 @@ func appendSOCKS5Address(b []byte, address string) ([]byte, error) {
 		}
 	} else {
 		if len(host) > 255 {
-			return nil, fmt.Errorf("FQDN length (%v) is over 255", len(host))
+			return nil, fmt.Errorf("domain name length = %v is over 255", len(host))
 		}
 		b = append(b, addrTypeDomainName)
 		b = append(b, byte(len(host)))
