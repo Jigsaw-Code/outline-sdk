@@ -38,7 +38,8 @@ type streamDialer struct {
 
 var _ transport.StreamDialer = (*streamDialer)(nil)
 
-// Dial implements [transport.StreamDialer].Dial
+// Dial implements [transport.StreamDialer].Dial using SOCKS5.
+// It will send the method and the connect requests in one packet, to avoid an unnecessary roundtrip.
 func (c *streamDialer) Dial(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
 	proxyConn, err := c.proxyEndpoint.Connect(ctx)
 	if err != nil {
