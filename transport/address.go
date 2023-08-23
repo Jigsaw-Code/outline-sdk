@@ -35,12 +35,12 @@ func (a *domainAddr) String() string {
 var _ net.Addr = (*domainAddr)(nil)
 
 // MakeNetAddr returns a [net.Addr] based on the network and address.
-// This is a helper for code that need to return or provide a net.Addr
-// The address must be in host:port format, with the host being a domain name, IPv4 or IPv6.
-// Network must be "tcp" or "udp".
+// This is a helper for code that needs to return or provide a [net.Addr].
+// The address must be in "host:port" format with the host being a domain name, IPv4 or IPv6.
+// The network must be "tcp" or "udp".
 // For IP hosts, the returned address will be of type [*net.TCPAddr] or [*net.UDPAddr], based on the network argument.
-// This is important because some of the standard library functions inspect the type of the address and may return an
-// "invalid argument" error if the type is not the right one.
+// This is important because some of the standard library functions inspect the type of the address and might return an
+// "invalid argument" error if the type is not the correct one.
 func MakeNetAddr(network, address string) (net.Addr, error) {
 	host, port, err := net.SplitHostPort(address)
 	if err != nil {
