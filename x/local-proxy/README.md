@@ -8,7 +8,7 @@ developers to start local proxy using it.
 
 Suggested interfaces are:
 ```Go
-someproxy.NewConnectHanlder(d transport.StreamDialer)
+someproxy.NewConnectHandler(d transport.StreamDialer)
 someproxy.RunProxy(d transport.StreamDialer, addr string)
 ```
 

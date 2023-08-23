@@ -93,7 +93,7 @@ func parseStringPrefix(utf8Str string) ([]byte, error) {
 
 func main() {
 	transportFlag := flag.String("transport", "", "Transport config")
-	addrFlag := flag.String("addr", "localhost:54321", "Local proxy addr")
+	addrFlag := flag.String("addr", ":54321", "Local proxy addr")
 	flag.Parse()
 
 	dialer, err := makeStreamDialer(*transportFlag)

@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"time"
-
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/local-proxy/proxy"
 	"github.com/go-httpproxy/httpproxy"
@@ -62,20 +60,12 @@ func (prx *ProxyHandler) StartServer(addr string) (err error) {
 		prx.address = addr
 	}
 
-	switch prx.address {
-	case "":
-		prx.l, err = net.Listen("tcp", "localhost:0")
-		if err != nil {
-			return fmt.Errorf("failed to listen on random localhost port: %w", err)
-		}
-
-		prx.address = prx.l.Addr().String()
-	default:
-		prx.l, err = net.Listen("tcp", prx.address)
-		if err != nil {
-			return fmt.Errorf("failed to listen on %s: %w", prx.address, err)
-		}
+	prx.l, err = net.Listen("tcp", prx.address)
+	if err != nil {
+		return fmt.Errorf("failed to listen on %s: %w", prx.address, err)
 	}
+
+	prx.address = prx.l.Addr().String()
 
 	go func() {
 		if err = http.Serve(prx.l, prx); err != nil {
@@ -83,15 +73,7 @@ func (prx *ProxyHandler) StartServer(addr string) (err error) {
 		}
 	}()
 
-	// sleep some time to check if server failed to start
-	time.Sleep(100 * time.Millisecond)
-
-	select {
-	case err = <-prx.errC:
-		return fmt.Errorf("failed to start server: %w", err)
-	default:
-		return nil
-	}
+	return nil
 }
 
 func (prx *ProxyHandler) StopServer() error {
