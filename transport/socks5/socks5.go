@@ -21,10 +21,18 @@ import (
 	"strconv"
 )
 
-const addrTypeIPv4 = 0x01
-const addrTypeDomainName = 0x03
-const addrTypeIPv6 = 0x04
+// SOCKS address types defined at https://datatracker.ietf.org/doc/html/rfc1928#section-5
+const (
+	// Address is an IPv4 address (SOCKS4, SOCKS4a and SOCKS5).
+	addrTypeIPv4 = 0x01
+	// Address is a domain name (SOCKS4a and SOCKS5)
+	addrTypeDomainName = 0x03
+	// Address is an IPv6 address (SOCKS5 only).
+	addrTypeIPv6 = 0x04
+)
 
+// appendSOCKS5Address adds the address to buffer b in SOCKS5 format,
+// as specified in https://datatracker.ietf.org/doc/html/rfc1928#section-4
 func appendSOCKS5Address(b []byte, address string) ([]byte, error) {
 	host, portStr, err := net.SplitHostPort(address)
 	if err != nil {
@@ -34,6 +42,13 @@ func appendSOCKS5Address(b []byte, address string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The SOCKS address format is as follows:
+	//     +------+----------+----------+
+	//     | ATYP | DST.ADDR | DST.PORT |
+	//     +------+----------+----------+
+	//     |  1   | Variable |    2     |
+	//     +------+----------+----------+
+	// See https://datatracker.ietf.org/doc/html/rfc1928#section-5 for DST.ADDR details.
 	if ip := net.ParseIP(host); ip != nil {
 		if ip4 := ip.To4(); ip4 != nil {
 			b = append(b, addrTypeIPv4)
