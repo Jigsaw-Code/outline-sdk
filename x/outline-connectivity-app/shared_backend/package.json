@@ -1,0 +1,17 @@
+{
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "nodemon": "^3.0.1"
+  },
+  "module": "index.ts",
+  "name": "shared_backend",
+  "scripts": {
+    "_types:export": "tygo generate",
+    "build": "concurrently 'yarn:build:*' --kill-others-on-fail",
+    "build:android": "gomobile bind -target android -o output/SharedBackend.aar outline_sdk_connectivity_test/shared_backend",
+    "build:ios": "gomobile bind -target ios,iossimulator -o output/SharedBackend.xcframework outline_sdk_connectivity_test/shared_backend",
+    "clean": "rm -rf output",
+    "go": "go",
+    "watch": "nodemon --exec 'yarn build' --ext go"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "OutlineConnectivityTest",
+  "build:dir": "output",
+  "frontend:dir": ".",
+  "frontend:install": "yarn",
+  "frontend:build": "yarn build:frontend",
+  "frontend:dev:watcher": "yarn watch:frontend",
+  "frontend:dev:serverUrl": "auto",
+  "wailsjsdir": "generated",
+  "author": {
+    "name": "Daniel LaCosse",
+    "email": "daniellacosse@google.com"
+  }
+}
