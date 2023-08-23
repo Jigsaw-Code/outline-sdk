@@ -51,7 +51,7 @@ func (c *streamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 		}
 	}()
 
-	// For protocol details, see https://datatracker.ietf.org/doc/html/rfc1928#autoid-3
+	// For protocol details, see https://datatracker.ietf.org/doc/html/rfc1928#section-3
 
 	// Buffer large enough for method and connect requests with a domain name address
 	header := [3 + 4 + 256 + 2]byte{}
