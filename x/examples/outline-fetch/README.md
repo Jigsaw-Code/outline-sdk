@@ -5,7 +5,7 @@ This app illustrates how to use different transports to fetch a URL in Go.
 Direct fetch:
 
 ```sh
-$ go run ./x/outline-fetch/main.go https://ipinfo.io
+$ go run ./x/examples/outline-fetch/main.go https://ipinfo.io
 {
   ...
   "city": "Amsterdam",
@@ -18,7 +18,7 @@ $ go run ./x/outline-fetch/main.go https://ipinfo.io
 Using a Shadowsocks server:
 
 ```sh
-$ go run ./x/outline-fetch/main.go -transport ss://[redacted]@[redacted]:80 https://ipinfo.io
+$ go run ./x/examples/outline-fetch/main.go -transport ss://[redacted]@[redacted]:80 https://ipinfo.io
 {
   ...
   "region": "New Jersey",
@@ -31,7 +31,7 @@ $ go run ./x/outline-fetch/main.go -transport ss://[redacted]@[redacted]:80 http
 Using a SOCKS5 server:
 
 ```sh
-$ go run ./x/outline-fetch/main.go -transport socks5://[redacted]:5703 https://ipinfo.io
+$ go run ./x/examples/outline-fetch/main.go -transport socks5://[redacted]:5703 https://ipinfo.io
 {
   ... 
   "city": "Berlin",
@@ -44,7 +44,7 @@ $ go run ./x/outline-fetch/main.go -transport socks5://[redacted]:5703 https://i
 <!-- Using packet splitting:
 
 ```sh
-$ go run ./x/outline-fetch/main.go -transport split://3  https://ipinfo.io
+$ go run ./x/examples/outline-fetch/main.go -transport split://3  https://ipinfo.io
 {
   ...
   "city": "Amsterdam",
