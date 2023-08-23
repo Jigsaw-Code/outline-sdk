@@ -23,23 +23,23 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
-// NewStreamDialer creates a client that routes connections to a SOCKS5 proxy listening at
-// the given [transport.StreamEndpoint].
+// NewStreamDialer creates a [transport.StreamDialer] that routes connections to a SOCKS5
+// proxy listening at the given [transport.StreamEndpoint].
 func NewStreamDialer(endpoint transport.StreamEndpoint) (transport.StreamDialer, error) {
-	// See https://pkg.go.dev/golang.org/x/net/proxy#SOCKS5
 	if endpoint == nil {
 		return nil, errors.New("argument endpoint must not be nil")
 	}
-	return &StreamDialer{proxyEndpoint: endpoint}, nil
+	return &streamDialer{proxyEndpoint: endpoint}, nil
 }
 
-type StreamDialer struct {
+type streamDialer struct {
 	proxyEndpoint transport.StreamEndpoint
 }
 
-var _ transport.StreamDialer = (*StreamDialer)(nil)
+var _ transport.StreamDialer = (*streamDialer)(nil)
 
-func (c *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
+// Dial implements [transport.StreamDialer].Dial
+func (c *streamDialer) Dial(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
 	proxyConn, err := c.proxyEndpoint.Connect(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to SOCKS5 proxy: %w", err)
@@ -53,12 +53,12 @@ func (c *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 
 	// For protocol details, see https://datatracker.ietf.org/doc/html/rfc1928#autoid-3
 
-	// Buffer large enough for a domain name address
+	// Buffer large enough for method and connect requests with a domain name address
 	header := [3 + 4 + 256 + 2]byte{}
 
 	// Method request:
 	// VER = 5, NMETHODS = 1, METHODS = 0 (no auth)
-	b := append(header[0:0], 5, 1, 0)
+	b := append(header[:0], 5, 1, 0)
 
 	// Connect request:
 	// VER = 5, CMD = 1 (connect), RSV = 0
