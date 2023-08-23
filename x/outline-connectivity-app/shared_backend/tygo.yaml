@@ -1,0 +1,9 @@
+packages:
+  - path: "outline_sdk_connectivity_test/shared_backend"
+    output_path: "generated/types.ts"
+    type_mappings:
+      time.Time: "string"
+      null.String: "string | null"
+      null.Bool: "boolean | null"
+      uuid.UUID: "string"
+      uuid.NullUUID: "string | null"
