@@ -116,7 +116,7 @@ func parseShadowsocksURL(url *url.URL) (*shadowsocksConfig, error) {
 	config.serverAddress = url.Host
 	cipherInfoBytes, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(url.User.String())
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode cipher info [%v]: %v", url.User.String(), err)
+		return nil, fmt.Errorf("failed to decode cipher info [%v]: %w", url.User.String(), err)
 	}
 	cipherName, secret, found := strings.Cut(string(cipherInfoBytes), ":")
 	if !found {
