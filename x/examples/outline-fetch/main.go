@@ -41,14 +41,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not create dialer: %v", err)
 	}
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				if !strings.HasPrefix(network, "tcp") {
-					return nil, fmt.Errorf("protocol not supported: %v", network)
-				}
-				return dialer.Dial(ctx, addr)
-			}}}
+	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if !strings.HasPrefix(network, "tcp") {
+			return nil, fmt.Errorf("protocol not supported: %v", network)
+		}
+		return dialer.Dial(ctx, addr)
+	}
+	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}}
 
 	resp, err := httpClient.Get(url)
 	if err != nil {
