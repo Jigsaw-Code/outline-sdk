@@ -19,18 +19,19 @@ import (
 	"sync/atomic"
 )
 
-// DelegatePacketProxy is a PacketProxy that forwards calls (like NewSession) to another PacketProxy. To create a
-// DelegatePacketProxy with the default PacketProxy, use NewDelegatePacketProxy. To change the underlying PacketProxy,
-// use SetProxy.
+// DelegatePacketProxy is a [PacketProxy] that forwards calls (like NewSession) to another [PacketProxy],
+// so that the caller can replace the underlying [PacketProxy] without changing the original reference.
+// To create a DelegatePacketProxy with the default PacketProxy, use [NewDelegatePacketProxy]. To change
+// the underlying [PacketProxy], use SetProxy.
 //
-// Note: After changing the underlying PacketProxy, only new NewSession calls will be routed to the new PacketProxy.
-// Existing sessions will not be affected.
+// Note: After the underlying [PacketProxy] is changed, only new NewSession calls will be routed to the new
+// [PacketProxy]. Existing sessions will not be affected.
 //
-// Multiple goroutines may invoke methods on a DelegatePacketProxy simultaneously.
+// Multiple goroutines can simultaneously invoke methods on a DelegatePacketProxy.
 type DelegatePacketProxy interface {
 	PacketProxy
 
-	// SetProxy updates the underlying PacketProxy to `proxy`. And `proxy` must not be nil. After this function
+	// SetProxy updates the underlying PacketProxy to `proxy`; `proxy` must not be nil. After this function
 	// returns, all new PacketProxy calls will be forwarded to the `proxy`. Existing sessions will not be affected.
 	SetProxy(proxy PacketProxy) error
 }
