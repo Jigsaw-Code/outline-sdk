@@ -73,7 +73,14 @@ func TestSOCKS5Dialer_DialError(t *testing.T) {
 	require.NoError(t, err, "Failed to create TCP listener: %v", err)
 	defer listener.Close()
 
+	testExchange(t, listener, "example.com:443", nil, nil, ErrGeneralServerFailure)
+	testExchange(t, listener, "example.com:443", nil, nil, ErrConnectionNotAllowedByRuleset)
+	testExchange(t, listener, "example.com:443", nil, nil, ErrNetworkUnreachable)
+	testExchange(t, listener, "example.com:443", nil, nil, ErrHostUnreachable)
+	testExchange(t, listener, "example.com:443", nil, nil, ErrConnectionRefused)
+	testExchange(t, listener, "example.com:443", nil, nil, ErrTTLExpired)
 	testExchange(t, listener, "example.com:443", nil, nil, ErrCommandNotSupported)
+	testExchange(t, listener, "example.com:443", nil, nil, ErrAddressTypeNotSupported)
 	testExchange(t, listener, "example.com:443", nil, nil, ReplyCode(0xff))
 }
 

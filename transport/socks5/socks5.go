@@ -25,14 +25,14 @@ type ReplyCode byte
 
 // SOCKS reply codes, as enumerated in https://datatracker.ietf.org/doc/html/rfc1928#section-6.
 const (
-	ErrGeneralServerFailure         = ReplyCode(0x01)
-	ErrConnectionNotAllowedByRulese = ReplyCode(0x02)
-	ErrNetworkUnreachable           = ReplyCode(0x03)
-	ErrHostUnreachable              = ReplyCode(0x04)
-	ErrConnectionRefused            = ReplyCode(0x05)
-	ErrTTLExpired                   = ReplyCode(0x06)
-	ErrCommandNotSupported          = ReplyCode(0x07)
-	ErrAddressTypeNotSupported      = ReplyCode(0x08)
+	ErrGeneralServerFailure          = ReplyCode(0x01)
+	ErrConnectionNotAllowedByRuleset = ReplyCode(0x02)
+	ErrNetworkUnreachable            = ReplyCode(0x03)
+	ErrHostUnreachable               = ReplyCode(0x04)
+	ErrConnectionRefused             = ReplyCode(0x05)
+	ErrTTLExpired                    = ReplyCode(0x06)
+	ErrCommandNotSupported           = ReplyCode(0x07)
+	ErrAddressTypeNotSupported       = ReplyCode(0x08)
 )
 
 var _ error = (ReplyCode)(0)
@@ -41,7 +41,7 @@ func (e ReplyCode) Error() string {
 	switch e {
 	case ErrGeneralServerFailure:
 		return "general SOCKS server failure"
-	case ErrConnectionNotAllowedByRulese:
+	case ErrConnectionNotAllowedByRuleset:
 		return "connection not allowed by ruleset"
 	case ErrNetworkUnreachable:
 		return "network unreachable"
