@@ -3,6 +3,7 @@ module github.com/Jigsaw-Code/outline-sdk/x
 go 1.20
 
 require (
+	github.com/go-httpproxy/httpproxy v0.0.0-20180417134941-6977c68bf38e
 	github.com/Jigsaw-Code/outline-sdk v0.0.4
 	github.com/miekg/dns v1.1.54
 	github.com/stretchr/testify v1.8.2
