@@ -16,6 +16,7 @@ package socks5
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -55,73 +56,94 @@ func TestSOCKS5Dialer_BadAddress(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestSOCKS5Dialer_Dial(t *testing.T) {
-	requestText := []byte("Request")
-	responseText := []byte("Response")
+func TestSOCKS5Dialer_DialAddressTypes(t *testing.T) {
+	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	require.NoError(t, err, "Failed to create TCP listener: %v", err)
+	defer listener.Close()
 
 	for _, destAddress := range []string{"example.com:443", "8.8.8.8:444", "[2001:4860:4860::8888]:853"} {
 		t.Run(fmt.Sprintf("addr=%v", destAddress), func(t *testing.T) {
-			listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
-			require.NoError(t, err, "Failed to create TCP listener: %v", err)
-			defer listener.Close()
-
-			var running sync.WaitGroup
-			running.Add(2)
-
-			// Client
-			go func() {
-				defer running.Done()
-				dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String()})
-				require.NoError(t, err)
-				serverConn, err := dialer.Dial(context.Background(), destAddress)
-				require.NoError(t, err, "Dial failed")
-				require.Equal(t, listener.Addr().String(), serverConn.RemoteAddr().String())
-				defer serverConn.Close()
-
-				n, err := serverConn.Write(requestText)
-				require.NoError(t, err)
-				require.Equal(t, len(requestText), n)
-				assert.NoError(t, serverConn.CloseWrite())
-
-				err = iotest.TestReader(serverConn, responseText)
-				require.NoError(t, err, "Response read failed: %v", err)
-			}()
-
-			// Server
-			go func() {
-				defer running.Done()
-				clientConn, err := listener.AcceptTCP()
-				require.NoError(t, err, "AcceptTCP failed: %v", err)
-				defer clientConn.Close()
-
-				// See https://datatracker.ietf.org/doc/html/rfc1928#autoid-3
-				// This reads method and connect requests at once, demonstrating they are both sent before a server response.
-				// Method request: VER = 5, NMETHODS = 1, METHODS = 0 (no auth)
-				// Connect request: VER = 5, CMD = 1, RSV = 0, ATYP, DST.ADDR, DST.PORT
-				expected := []byte{5, 1, 0, 5, 1, 0}
-				expected, err = appendSOCKS5Address(expected, destAddress)
-				require.NoError(t, err)
-				err = iotest.TestReader(io.LimitReader(clientConn, int64(len(expected))), expected)
-				assert.NoError(t, err, "Request read failed: %v", err)
-
-				// Write the method and connect responses
-				// Method response: VER = 5, METHOD = 0
-				// Connect response: VER = 5, REP = 0 (success), RSV = 0, ATYP = 1 (IPv4), BND.ADDR, BND.PORT
-				_, err = clientConn.Write([]byte{5, 0, 5, 0, 0, 1, 0, 0, 0, 0, 0, 0})
-				assert.NoError(t, err, "Write failed: %v", err)
-
-				err = iotest.TestReader(clientConn, requestText)
-				assert.NoError(t, err, "Request read failed: %v", err)
-
-				n, err := clientConn.Write(responseText)
-				require.NoError(t, err)
-				require.Equal(t, len(responseText), n)
-
-				err = clientConn.CloseWrite()
-				assert.NoError(t, err, "CloseWrite failed: %v", err)
-			}()
-
-			running.Wait()
+			testExchange(t, listener, destAddress, []byte("Request"), []byte("Response"), 0)
 		})
 	}
+}
+
+func TestSOCKS5Dialer_DialError(t *testing.T) {
+	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	require.NoError(t, err, "Failed to create TCP listener: %v", err)
+	defer listener.Close()
+
+	testExchange(t, listener, "example.com:443", nil, nil, ErrCommandNotSupported)
+	testExchange(t, listener, "example.com:443", nil, nil, ReplyCode(0xff))
+}
+
+func testExchange(tb testing.TB, listener *net.TCPListener, destAddr string, request []byte, response []byte, replyCode ReplyCode) {
+	var running sync.WaitGroup
+	running.Add(2)
+
+	// Client
+	go func() {
+		defer running.Done()
+		dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String()})
+		require.NoError(tb, err)
+		serverConn, err := dialer.Dial(context.Background(), destAddr)
+		if replyCode != 0 {
+			require.ErrorIs(tb, err, replyCode)
+			var extractedReplyCode ReplyCode
+			require.True(tb, errors.As(err, &extractedReplyCode))
+			require.Equal(tb, replyCode, extractedReplyCode)
+			return
+		}
+		require.NoError(tb, err, "Dial failed")
+		require.Equal(tb, listener.Addr().String(), serverConn.RemoteAddr().String())
+		defer serverConn.Close()
+
+		n, err := serverConn.Write(request)
+		require.NoError(tb, err)
+		require.Equal(tb, len(request), n)
+		assert.NoError(tb, serverConn.CloseWrite())
+
+		err = iotest.TestReader(serverConn, response)
+		require.NoError(tb, err, "Response read failed: %v", err)
+	}()
+
+	// Server
+	go func() {
+		defer running.Done()
+		clientConn, err := listener.AcceptTCP()
+		require.NoError(tb, err, "AcceptTCP failed: %v", err)
+		defer clientConn.Close()
+
+		// See https://datatracker.ietf.org/doc/html/rfc1928#autoid-3
+		// This reads method and connect requests at once, demonstrating they are both sent before a server response.
+		// Method request: VER = 5, NMETHODS = 1, METHODS = 0 (no auth)
+		// Connect request: VER = 5, CMD = 1, RSV = 0, ATYP, DST.ADDR, DST.PORT
+		expected := []byte{5, 1, 0, 5, 1, 0}
+		expected, err = appendSOCKS5Address(expected, destAddr)
+		require.NoError(tb, err)
+		err = iotest.TestReader(io.LimitReader(clientConn, int64(len(expected))), expected)
+		assert.NoError(tb, err, "Request read failed: %v", err)
+
+		// Write the method and connect responses
+		// Method response: VER = 5, METHOD = 0
+		// Connect response: VER = 5, REP, RSV = 0, ATYP = 1 (IPv4), BND.ADDR, BND.PORT
+		_, err = clientConn.Write([]byte{5, 0, 5, byte(replyCode), 0, 1, 0, 0, 0, 0, 0, 0})
+		assert.NoError(tb, err, "Write failed: %v", err)
+
+		if request != nil {
+			err = iotest.TestReader(clientConn, request)
+			assert.NoError(tb, err, "Request read failed: %v", err)
+		}
+
+		if response != nil {
+			n, err := clientConn.Write(response)
+			require.NoError(tb, err)
+			require.Equal(tb, len(response), n)
+		}
+
+		err = clientConn.CloseWrite()
+		assert.NoError(tb, err, "CloseWrite failed: %v", err)
+	}()
+
+	running.Wait()
 }

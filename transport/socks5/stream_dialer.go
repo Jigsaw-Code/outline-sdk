@@ -40,6 +40,8 @@ var _ transport.StreamDialer = (*streamDialer)(nil)
 
 // Dial implements [transport.StreamDialer].Dial using SOCKS5.
 // It will send the method and the connect requests in one packet, to avoid an unnecessary roundtrip.
+// The returned [error] will be of type [ReplyCode] if the server sends a SOCKS error reply code, which
+// you can check against the error constants in this package using [errors.Is].
 func (c *streamDialer) Dial(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
 	proxyConn, err := c.proxyEndpoint.Connect(ctx)
 	if err != nil {
@@ -96,6 +98,12 @@ func (c *streamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 	if header[0] != 5 {
 		return nil, fmt.Errorf("invalid protocol version %v. Expected 5", header[0])
 	}
+
+	// Check reply code (REP)
+	if header[1] != 0 {
+		return nil, ReplyCode(header[1])
+	}
+
 	toRead := 0
 	switch header[3] {
 	case addrTypeIPv4:
