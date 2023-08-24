@@ -85,7 +85,7 @@ Beta features:
     - [ ] Connectivity Test example command-line app
     - [ ] Outline Client example command-line app
     - [ ] Page fetch example command-line app
-    - [ ] Local proxy example command-line app
+    - [x] Local proxy example command-line app
 
 - Server-side libraries
   - [ ] To be defined
