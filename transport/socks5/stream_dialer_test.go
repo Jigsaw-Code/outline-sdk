@@ -17,7 +17,6 @@ package socks5
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -61,11 +60,9 @@ func TestSOCKS5Dialer_DialAddressTypes(t *testing.T) {
 	require.NoError(t, err, "Failed to create TCP listener: %v", err)
 	defer listener.Close()
 
-	for _, destAddress := range []string{"example.com:443", "8.8.8.8:444", "[2001:4860:4860::8888]:853"} {
-		t.Run(fmt.Sprintf("addr=%v", destAddress), func(t *testing.T) {
-			testExchange(t, listener, destAddress, []byte("Request"), []byte("Response"), 0)
-		})
-	}
+	testExchange(t, listener, "example.com:443", []byte("Request"), []byte("Response"), 0)
+	testExchange(t, listener, "8.8.8.8:444", []byte("Request"), []byte("Response"), 0)
+	testExchange(t, listener, "[2001:4860:4860::8888]:853", []byte("Request"), []byte("Response"), 0)
 }
 
 func TestSOCKS5Dialer_DialError(t *testing.T) {
