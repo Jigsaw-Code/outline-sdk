@@ -120,7 +120,7 @@ func parseShadowsocksURL(url *url.URL) (*shadowsocksConfig, error) {
 	}
 	cipherName, secret, found := strings.Cut(string(cipherInfoBytes), ":")
 	if !found {
-		return nil, fmt.Errorf("invalid cipher info: no ':' separator")
+		return nil, errors.New("invalid cipher info: no ':' separator")
 	}
 	config.cryptoKey, err = shadowsocks.NewEncryptionKey(cipherName, secret)
 	if err != nil {
