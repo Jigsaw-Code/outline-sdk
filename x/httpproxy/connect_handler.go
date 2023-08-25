@@ -28,8 +28,9 @@ type handler struct {
 
 var _ http.Handler = (*handler)(nil)
 
-// handleConnect handles the HTTP CONNECT method.
+// ServeHTTP implements [http.Handler].ServeHTTP for CONNECT requests, using the internal [transport.StreamDialer].
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// TODO(fortuna): For public services (not local), we need authentication and drain on failures to avoid fingerprinting.
 	if r.Method != http.MethodConnect {
 		http.Error(w, fmt.Sprintf("Method %v is not supported", r.Method), http.StatusMethodNotAllowed)
 		return
@@ -62,6 +63,11 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	httpConn.Close()
 }
 
+// NewConnectHandler creates a [http.Handler] that handles CONNECT requests and forwards
+// the requests using the given [transport.StreamDialer].
+//
+// The resulting handler is currently vulnerable to probing attacks. It's ok as a localhost proxy
+// but it may be vulnerable if used as a public proxy.
 func NewConnectHandler(dialer transport.StreamDialer) http.Handler {
 	return &handler{dialer}
 }
