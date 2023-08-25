@@ -21,6 +21,7 @@ import (
 	"strconv"
 )
 
+// ReplyCode is byte unsigned number that represents a SOCKS error as indicated in the REP field of the server response.
 type ReplyCode byte
 
 // SOCKS reply codes, as enumerated in https://datatracker.ietf.org/doc/html/rfc1928#section-6.
@@ -37,6 +38,7 @@ const (
 
 var _ error = (ReplyCode)(0)
 
+// Error returns a human-readable description of the error, based on the SOCKS5 RFC.
 func (e ReplyCode) Error() string {
 	switch e {
 	case ErrGeneralServerFailure:
