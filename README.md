@@ -82,10 +82,10 @@ Beta features:
     - [ ] Connectivity Test mobile app using [Capacitor](https://capacitorjs.com/)
   - For Go apps
     - [ ] Connectivity Test example [Wails](https://wails.io/) graphical app
-    - [ ] Connectivity Test example command-line app
+    - [x] Connectivity Test example command-line app ([source](./x/examples/outline-connectivity/))
     - [ ] Outline Client example command-line app
-    - [ ] Page fetch example command-line app
-    - [x] Local proxy example command-line app
+    - [x] Page fetch example command-line app ([source](./x/examples/outline-fetch/))
+    - [x] Local proxy example command-line app ([source](./x/examples/http2transport/))
 
 - Server-side libraries
   - [ ] To be defined
