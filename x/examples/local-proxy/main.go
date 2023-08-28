@@ -15,13 +15,14 @@
 package main
 
 import (
+	"context"
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/x/examples/internal/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
@@ -34,23 +35,32 @@ func main() {
 
 	dialer, err := config.MakeStreamDialer(*transportFlag)
 	if err != nil {
-		log.Fatalf("Could not create dialer: %+v\n", err)
+		log.Fatalf("Could not create dialer: %v", err)
 	}
 
 	listener, err := net.Listen("tcp", *addrFlag)
 	if err != nil {
 		log.Fatalf("Could not listen on address %v: %v", *addrFlag, err)
 	}
-	fmt.Printf("Proxy listening on %v\n", listener.Addr().String())
+	defer listener.Close()
+	log.Printf("Proxy listening on %v", listener.Addr().String())
 
+	server := http.Server{Handler: httpproxy.NewConnectHandler(dialer)}
 	go func() {
-		if err := http.Serve(listener, httpproxy.NewConnectHandler(dialer)); err != nil {
-			log.Fatalf("Error starting web server: %v", err)
+		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Error running web server: %v", err)
 		}
 	}()
 
-	// Wait for interrupt signal to stop the proxy with a timeout of 5 seconds.
+	// Wait for interrupt signal to stop the proxy.
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 	<-sig
+	log.Print("Shutting down")
+	// Gracefully shut down the server, with a 5s timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("Failed to shutdown gracefully: %v", err)
+	}
 }

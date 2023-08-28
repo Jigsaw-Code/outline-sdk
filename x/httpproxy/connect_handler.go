@@ -17,6 +17,7 @@ package httpproxy
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -36,7 +37,19 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Dial the target
+	// Validate the target address.
+	_, portStr, err := net.SplitHostPort(r.Host)
+	if err != nil {
+		http.Error(w, "Authority is not a valid host:port", http.StatusBadRequest)
+		return
+	}
+	if portStr == "" {
+		// As per https://httpwg.org/specs/rfc9110.html#CONNECT.
+		http.Error(w, "Port number must be specified", http.StatusBadRequest)
+		return
+	}
+
+	// Dial the target.
 	targetConn, err := h.dialer.Dial(r.Context(), r.Host)
 	if err != nil {
 		http.Error(w, "Failed to connect to target", http.StatusServiceUnavailable)
@@ -44,23 +57,29 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer targetConn.Close()
 
-	// Inform the client that the connection has been established
-	httpConn, _, err := w.(http.Hijacker).Hijack()
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "Webserver doesn't support hijacking", http.StatusInternalServerError)
+		return
+	}
+
+	httpConn, _, err := hijacker.Hijack()
 	if err != nil {
 		http.Error(w, "Failed to hijack connection", http.StatusInternalServerError)
 		return
 	}
 	defer httpConn.Close()
 
+	// Inform the client that the connection has been established.
 	httpConn.Write([]byte("HTTP/1.1 200 Connection established\r\n\r\n"))
 
-	// Relay data between client and target in both directions
+	// Relay data between client and target in both directions.
 	go func() {
 		io.Copy(targetConn, httpConn)
 		targetConn.CloseWrite()
 	}()
 	io.Copy(httpConn, targetConn)
-	httpConn.Close()
+	// httpConn is closed by the defer httpConn.Close() above.
 }
 
 // NewConnectHandler creates a [http.Handler] that handles CONNECT requests and forwards
