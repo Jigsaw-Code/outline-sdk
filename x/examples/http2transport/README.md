@@ -1,7 +1,10 @@
-# Outline Local Proxy
+# HTTP-to-Transport
 
-This app illustrates the use of the Local Proxy type of libraries with transports that are available in SDK.
-It parse `-transport` key and start a local proxy on `-addr` address using that transport.
+This app runs a local HTTP-CONNECT proxy that dials the target using the transport configured in the command-line.
+
+Flags:
+- `-transport` for the transport to use.
+- `-addr` for the local address to listen on, in host:port format. Use `localhost:0` if you want the system to dynamically pick a port for you.
 
 Example:
 ```
