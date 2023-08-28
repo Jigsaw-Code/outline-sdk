@@ -17,52 +17,9 @@ package split
 import (
 	"context"
 	"errors"
-	"io"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
-
-type splitWriter struct {
-	writer      io.Writer
-	splitPoint  int64
-	bytesCopied int64
-}
-
-var _ io.ReaderFrom = (*splitWriter)(nil)
-
-func (w *splitWriter) ReadFrom(source io.Reader) (int64, error) {
-	var written int64
-	defer func() {
-		w.bytesCopied += written
-	}()
-	n, err := io.CopyN(w.writer, source, w.splitPoint-w.bytesCopied)
-	written += n
-	if err != nil {
-		return n, err
-	}
-	n, err = io.Copy(w.writer, source)
-	written += n
-	return n, err
-}
-
-func (w *splitWriter) Write(data []byte) (int, error) {
-	var written int
-	prefixLength := w.splitPoint - w.bytesCopied
-	defer func() {
-		w.bytesCopied += int64(written)
-	}()
-	if 0 < prefixLength && prefixLength < int64(len(data)) {
-		n, err := w.writer.Write(data[:prefixLength])
-		written += n
-		if err != nil {
-			return n, err
-		}
-		data = data[prefixLength:]
-	}
-	n, err := w.writer.Write(data)
-	written += n
-	return written, err
-}
 
 type splitDialer struct {
 	dialer     transport.StreamDialer
@@ -79,10 +36,11 @@ func NewStreamDialer(dialer transport.StreamDialer, splitPoint int64) (transport
 	return &splitDialer{dialer: dialer, splitPoint: splitPoint}, nil
 }
 
+// Dial implements [transport.StreamDialer].Dial.
 func (d *splitDialer) Dial(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
 	innerConn, err := d.dialer.Dial(ctx, remoteAddr)
 	if err != nil {
 		return nil, err
 	}
-	return transport.WrapConn(innerConn, innerConn, &splitWriter{writer: innerConn, splitPoint: d.splitPoint}), nil
+	return transport.WrapConn(innerConn, innerConn, NewWriter(innerConn, d.splitPoint)), nil
 }
