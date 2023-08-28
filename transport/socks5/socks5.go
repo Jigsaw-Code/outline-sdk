@@ -21,6 +21,47 @@ import (
 	"strconv"
 )
 
+// ReplyCode is byte unsigned number that represents a SOCKS error as indicated in the REP field of the server response.
+type ReplyCode byte
+
+// SOCKS reply codes, as enumerated in https://datatracker.ietf.org/doc/html/rfc1928#section-6.
+const (
+	ErrGeneralServerFailure          = ReplyCode(0x01)
+	ErrConnectionNotAllowedByRuleset = ReplyCode(0x02)
+	ErrNetworkUnreachable            = ReplyCode(0x03)
+	ErrHostUnreachable               = ReplyCode(0x04)
+	ErrConnectionRefused             = ReplyCode(0x05)
+	ErrTTLExpired                    = ReplyCode(0x06)
+	ErrCommandNotSupported           = ReplyCode(0x07)
+	ErrAddressTypeNotSupported       = ReplyCode(0x08)
+)
+
+var _ error = (ReplyCode)(0)
+
+// Error returns a human-readable description of the error, based on the SOCKS5 RFC.
+func (e ReplyCode) Error() string {
+	switch e {
+	case ErrGeneralServerFailure:
+		return "general SOCKS server failure"
+	case ErrConnectionNotAllowedByRuleset:
+		return "connection not allowed by ruleset"
+	case ErrNetworkUnreachable:
+		return "network unreachable"
+	case ErrHostUnreachable:
+		return "host unreachable"
+	case ErrConnectionRefused:
+		return "connection refused"
+	case ErrTTLExpired:
+		return "TTL expired"
+	case ErrCommandNotSupported:
+		return "command not supported"
+	case ErrAddressTypeNotSupported:
+		return "address type not supported"
+	default:
+		return "reply code " + strconv.Itoa(int(e))
+	}
+}
+
 // SOCKS address types defined at https://datatracker.ietf.org/doc/html/rfc1928#section-5
 const (
 	// Address is an IPv4 address (SOCKS4, SOCKS4a and SOCKS5).
