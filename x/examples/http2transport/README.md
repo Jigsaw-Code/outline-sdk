@@ -6,5 +6,5 @@ It parse `-transport` key and start a local proxy on `-addr` address using that 
 Example:
 ```
 KEY=ss://ENCRYPTION_KEY@HOST:PORT/
-go run github.com/Jigsaw-Code/outline-sdk/x/examples/local-proxy@latest -transport "$KEY" -addr localhost:54321
+go run github.com/Jigsaw-Code/outline-sdk/x/examples/http2transport@latest -transport "$KEY" -addr localhost:54321
 ```
