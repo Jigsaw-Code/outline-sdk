@@ -20,14 +20,15 @@ The Outline SDK allows you to:
 
 | Multi-Platform | Proven Technology | Composable |
 |:-:|:-:|:-:|
-| The Outline SDK can be used to build tools that run on Android, iOS, Windows, macOS and Linux. | The Outline Client and Server have been using the code in the SDK for years, helping millions of users access the internet in even the harshest conditions. | The SDK interfaces were carefully designed to allow for composition and reuse, so you can craft your own transport. |
+| Supports Android, iOS, Windows, macOS and Linux. | Field-tested in the Outline Client and Server, helping millions to access the internet under harsh conditions. | Designed for modularity and reuse, allowing you to craft custom transports. |
+
 
 ## Integration Methods
 
-The Outline SDK is written in Go. Choose from one of the following methods to integrate the Outline SDK:
+Choose from one of the following methods to integrate the Outline SDK into your project:
 
-- **Generated Mobile Library**: Ideal for Android, iOS, and macOS apps. Uses [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile) for generating Java and Objective-C bindings.
-- **Side Service**: Suitable for desktop and Android applications to run a standalone Go binary that your application talks to. Not available on iOS due to subprocess limitations.
+- **Generated Mobile Library**: For Android, iOS, and macOS apps. Uses [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile) for generating Java and Objective-C bindings.
+- **Side Service**: For desktop and Android apps. Runs a standalone Go binary that your application communicates with (not available on iOS due to subprocess limitations).
 - **Go Library**: Directly import the SDK into your Go application. [API Reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk).
 - **Generated C Library**: Generate C bindings using [`go build`](https://pkg.go.dev/cmd/go#hdr-Build_modes).
 
@@ -37,31 +38,30 @@ Below we provide more details on the integration approaches.
 
 ### Generated Mobile Library
 
-To integrate the Outline SDK into a mobile application, you'll need to generate Java and Objective-C bindings. Direct dependency on Go libraries is not supported in mobile apps.
+To integrate the SDK into a mobile app, follow these steps:
 
 Steps:
 1. **Create a Go library**: Create a Go package that wraps the SDK functionalities you need.
 1. **Generate mobile library**: Use [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile) to generate Android Archives (AAR) and Apple Frameworks with Java and Objective-C bindings.
     - Android examples: [Outline Android Archive](https://github.com/Jigsaw-Code/outline-go-tun2socks/blob/dada2652ae2c6205f2daa3f88c805bbd6b28a713/Makefile#L27), [Intra Android Archive](https://github.com/Jigsaw-Code/outline-go-tun2socks/blob/dada2652ae2c6205f2daa3f88c805bbd6b28a713/Makefile#L21).
     - Apple examples: [Outline iOS Framework](https://github.com/Jigsaw-Code/outline-go-tun2socks/blob/dada2652ae2c6205f2daa3f88c805bbd6b28a713/Makefile#L30), [Outline macOS Framework](https://github.com/Jigsaw-Code/outline-go-tun2socks/blob/dada2652ae2c6205f2daa3f88c805bbd6b28a713/Makefile#L36).
-1. **Integrate into your app**: Add the generated library to your app. For more details, refer to Go Mobile's [SDK applications and generating bindings](https://github.com/golang/go/wiki/Mobile#sdk-applications-and-generating-bindings).
+1. **Integrate into your app**: Add the generated library to your app. For more details, see Go Mobile's [SDK applications and generating bindings](https://github.com/golang/go/wiki/Mobile#sdk-applications-and-generating-bindings).
 
-> **Note**: You must call Go Mobile on a package you create. Calling it on the SDK packages will not work.
+> **Note**: You must use `gomobile bind` on a package you create, not directly on the SDK packages.
 
 
 ### Side Service
 
-You can build a Go binary that can easily integrate with the SDK as a regular Go library dependency. Your application can then run the binary as a subprocess. You can communicate with the binary using a predefined protocol via an inter-process communication mechanism (IPC) (for example, sockets, standard I/O, command-line flags).
+To integrate the SDK as a side service, follow these steps:
 
-Steps:
-1. **Define the IPC mechanism**
-1. **Build the service** in Go, using the SDK. Include the server-side of the IPC.
+1. **Define IPC mechanism**: Choose an inter-process communication (IPC) mechanism (e.g., sockets, standard I/O).
+1. **Build the service**: Create a Go binary that includes the server-side of the IPC and used the SDK.
     - Examples: [Outline Electron backend code](https://github.com/Jigsaw-Code/outline-go-tun2socks/blob/master/outline/electron/main.go), [Outline Windows Client backend build](https://github.com/Jigsaw-Code/outline-go-tun2socks/blob/dada2652ae2c6205f2daa3f88c805bbd6b28a713/Makefile#L67), [Outline Linux Client backend build](https://github.com/Jigsaw-Code/outline-go-tun2socks/blob/dada2652ae2c6205f2daa3f88c805bbd6b28a713/Makefile#L56).
-1. **Bundle the service** into your application bundle.
+3. **Bundle the service**: Include the Go binary in your application bundle.
     - Examples: [Outline Windows Client](https://github.com/Jigsaw-Code/outline-client/blob/b06819922037230ee3ba9471097c40793af819e8/src/electron/electron-builder.json#L21), [Outline Linux Client](https://github.com/Jigsaw-Code/outline-client/blob/b06819922037230ee3ba9471097c40793af819e8/src/electron/electron-builder.json#L10)
-1. **Add code to start the service** in your app, by launching it as a sub-process.
+4. **Start the service**: Launch the Go binary as a subprocess from your application.
     - Example: [Outline Electron Clients](https://github.com/Jigsaw-Code/outline-client/blob/b06819922037230ee3ba9471097c40793af819e8/src/electron/go_vpn_tunnel.ts#L227)
-1. **Add the service calls** for your app to communicate with the service.
+5. **Service Calls**: Add code to your app for communication with the service.
 
 
 ### Go Library
@@ -71,7 +71,7 @@ To integrate the Outline SDK as a Go library, you can directly import it into yo
 
 This approach is suitable for both command-line and GUI-based applications. You can build GUI-based applications in Go with frameworks like [Wails](https://wails.io/), [Fyne.io](https://fyne.io/), [Qt for Go](https://therecipe.github.io/qt/), or [Go Mobile app](https://pkg.go.dev/golang.org/x/mobile/app).
 
-You can find multiple examples of Go applications using the SDK in [x/examples](./x/examples/).
+For examples, see [x/examples](./x/examples/).
 
 ### Generated C Library
 
