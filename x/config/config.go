@@ -30,27 +30,47 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/split"
 )
 
-// MakeStreamDialer creates a new [transport.StreamDialer] according to the given config.
-func MakeStreamDialer(transportConfig string) (transport.StreamDialer, error) {
+// NewStreamDialer creates a new [transport.StreamDialer] according to the given config.
+func NewStreamDialer(transportConfig string) (dialer transport.StreamDialer, err error) {
+	dialer = &transport.TCPStreamDialer{}
+	transportConfig = strings.TrimSpace(transportConfig)
 	if transportConfig == "" {
-		return &transport.TCPStreamDialer{}, nil
+		return dialer, nil
 	}
-
-	accessKeyURL, err := url.Parse(transportConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse access key: %w", err)
-	}
-	switch accessKeyURL.Scheme {
-
-	case "socks5":
-		return socks5.NewStreamDialer(&transport.TCPEndpoint{Address: accessKeyURL.Host})
-
-	case "ss":
-		config, err := parseShadowsocksURL(accessKeyURL)
+	for _, part := range strings.Split(transportConfig, "|") {
+		dialer, err = newStreamDialerFromPart(dialer, part)
 		if err != nil {
 			return nil, err
 		}
-		dialer, err := shadowsocks.NewStreamDialer(&transport.TCPEndpoint{Address: config.serverAddress}, config.cryptoKey)
+	}
+	return dialer, nil
+}
+
+func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig string) (transport.StreamDialer, error) {
+	oneDialerConfig = strings.TrimSpace(oneDialerConfig)
+
+	if oneDialerConfig == "" {
+		return nil, errors.New("empty config part")
+	}
+
+	url, err := url.Parse(oneDialerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse config part: %w", err)
+	}
+
+	switch url.Scheme {
+
+	case "socks5":
+		endpoint := transport.StreamDialerEndpoint{Dialer: innerDialer, Address: url.Host}
+		return socks5.NewStreamDialer(&endpoint)
+
+	case "ss":
+		config, err := parseShadowsocksURL(url)
+		if err != nil {
+			return nil, err
+		}
+		endpoint := &transport.StreamDialerEndpoint{Dialer: innerDialer, Address: config.serverAddress}
+		dialer, err := shadowsocks.NewStreamDialer(endpoint, config.cryptoKey)
 		if err != nil {
 			return nil, err
 		}
@@ -60,39 +80,58 @@ func MakeStreamDialer(transportConfig string) (transport.StreamDialer, error) {
 		return dialer, nil
 
 	case "split":
-		prefixBytesStr := accessKeyURL.Opaque
+		prefixBytesStr := url.Opaque
 		prefixBytes, err := strconv.Atoi(prefixBytesStr)
 		if err != nil {
 			return nil, fmt.Errorf("prefixBytes is not a number: %v. Split config should be in split:<number> format", prefixBytesStr)
 		}
-		return split.NewStreamDialer(&transport.TCPStreamDialer{}, int64(prefixBytes))
+		return split.NewStreamDialer(innerDialer, int64(prefixBytes))
 
 	default:
-		return nil, fmt.Errorf("access key scheme %v:// is not supported", accessKeyURL.Scheme)
+		return nil, fmt.Errorf("access key scheme %v:// is not supported", url.Scheme)
 	}
 }
 
-// MakePacketDialer creates a new [transport.PacketDialer] according to the given config.
-func MakePacketDialer(transportConfig string) (transport.PacketDialer, error) {
+// NewPacketDialer creates a new [transport.PacketDialer] according to the given config.
+func NewPacketDialer(transportConfig string) (dialer transport.PacketDialer, err error) {
+	dialer = &transport.UDPPacketDialer{}
+	transportConfig = strings.TrimSpace(transportConfig)
 	if transportConfig == "" {
-		return &transport.UDPPacketDialer{}, nil
+		return dialer, nil
+	}
+	for _, part := range strings.Split(transportConfig, "|") {
+		dialer, err = newPacketDialerFromPart(dialer, part)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return dialer, nil
+}
+
+func newPacketDialerFromPart(innerDialer transport.PacketDialer, oneDialerConfig string) (transport.PacketDialer, error) {
+	oneDialerConfig = strings.TrimSpace(oneDialerConfig)
+
+	if oneDialerConfig == "" {
+		return nil, errors.New("empty config part")
 	}
 
-	accessKeyURL, err := url.Parse(transportConfig)
+	url, err := url.Parse(oneDialerConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse access key: %w", err)
+		return nil, fmt.Errorf("failed to parse config part: %w", err)
 	}
-	switch accessKeyURL.Scheme {
+
+	switch url.Scheme {
 
 	case "socks5":
 		return nil, errors.New("SOCKS5 PacketDialer is not implemented")
 
 	case "ss":
-		config, err := parseShadowsocksURL(accessKeyURL)
+		config, err := parseShadowsocksURL(url)
 		if err != nil {
 			return nil, err
 		}
-		listener, err := shadowsocks.NewPacketListener(&transport.UDPEndpoint{Address: config.serverAddress}, config.cryptoKey)
+		endpoint := &transport.PacketDialerEndpoint{Dialer: innerDialer, Address: config.serverAddress}
+		listener, err := shadowsocks.NewPacketListener(endpoint, config.cryptoKey)
 		if err != nil {
 			return nil, err
 		}
@@ -103,7 +142,7 @@ func MakePacketDialer(transportConfig string) (transport.PacketDialer, error) {
 		return nil, errors.New("split is not supported for PacketDialers")
 
 	default:
-		return nil, fmt.Errorf("access key scheme %v:// is not supported", accessKeyURL.Scheme)
+		return nil, fmt.Errorf("access key scheme %v:// is not supported", url.Scheme)
 	}
 }
 

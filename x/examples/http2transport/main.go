@@ -33,7 +33,7 @@ func main() {
 	addrFlag := flag.String("localAddr", "localhost:1080", "Local proxy address")
 	flag.Parse()
 
-	dialer, err := config.MakeStreamDialer(*transportFlag)
+	dialer, err := config.NewStreamDialer(*transportFlag)
 	if err != nil {
 		log.Fatalf("Could not create dialer: %v", err)
 	}
