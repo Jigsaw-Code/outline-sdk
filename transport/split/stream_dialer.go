@@ -28,7 +28,8 @@ type splitDialer struct {
 
 var _ transport.StreamDialer = (*splitDialer)(nil)
 
-// NewStreamDialer creates a [transport.StreamDialer] that splits the outgoing stream after writing "prefixBytes" bytes.
+// NewStreamDialer creates a [transport.StreamDialer] that splits the outgoing stream after writing "prefixBytes" bytes
+// using [SplitWriter].
 func NewStreamDialer(dialer transport.StreamDialer, prefixBytes int64) (transport.StreamDialer, error) {
 	if dialer == nil {
 		return nil, errors.New("argument dialer must not be nil")

@@ -29,6 +29,7 @@ var _ io.ReaderFrom = (*SplitWriter)(nil)
 
 // NewWriter creates a [io.Writer] that ensures the byte sequence is split at prefixBytes,
 // meaning a write will end right after byte index prefixBytes - 1, before a write starting at byte index prefixBytes.
+// For example, if you have a write of [0123456789] and prefixBytes = 3, you will get writes [012] and [3456789].
 func NewWriter(writer io.Writer, prefixBytes int64) *SplitWriter {
 	return &SplitWriter{writer, prefixBytes}
 }
