@@ -3,7 +3,7 @@ module outline_sdk_connectivity_test
 go 1.20
 
 require (
-	github.com/Jigsaw-Code/outline-sdk v0.0.2
+	github.com/Jigsaw-Code/outline-sdk v0.0.4
 	github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20230807220427-893de7fdc6b8
 	github.com/wailsapp/wails/v2 v2.5.1
 	golang.org/x/mobile v0.0.0-20230531173138-3c911d8e3eda
