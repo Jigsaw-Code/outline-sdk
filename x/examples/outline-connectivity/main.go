@@ -27,8 +27,8 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
-	"github.com/Jigsaw-Code/outline-sdk/x/examples/internal/config"
 )
 
 var debugLog log.Logger = *log.New(io.Discard, "", 0)

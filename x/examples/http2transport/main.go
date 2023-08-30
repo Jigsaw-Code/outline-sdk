@@ -24,7 +24,7 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/examples/internal/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
 )
 

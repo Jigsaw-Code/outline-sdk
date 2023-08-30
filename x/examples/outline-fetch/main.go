@@ -25,7 +25,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/examples/internal/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/config"
 )
 
 func main() {

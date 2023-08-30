@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package config provides convenience functions to create [transport.StreamDialer] and [transport.PacketDialer]
+// objects based on a text config. This is experimental and mostly for illustrative purposes at this point.
 package config
 
 import (
@@ -19,13 +21,16 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 	"github.com/Jigsaw-Code/outline-sdk/transport/socks5"
+	"github.com/Jigsaw-Code/outline-sdk/transport/split"
 )
 
+// MakeStreamDialer creates a new [transport.StreamDialer] according to the given config.
 func MakeStreamDialer(transportConfig string) (transport.StreamDialer, error) {
 	if transportConfig == "" {
 		return &transport.TCPStreamDialer{}, nil
@@ -55,19 +60,19 @@ func MakeStreamDialer(transportConfig string) (transport.StreamDialer, error) {
 		return dialer, nil
 
 	case "split":
-		return nil, fmt.Errorf("split is not yet implemented")
-		// TODO(fortuna): enable the code below after the split transport is submitted.
-		// splitPoint, err := strconv.Atoi(accessKeyURL.Host)
-		// if err != nil {
-		// 	return nil, fmt.Errorf("splitPoint is not a number: %v. Split config should be in split:<number> format", accessKeyURL.Host)
-		// }
-		// return split.NewStreamDialer(&transport.TCPStreamDialer{}, int64(splitPoint))
+		prefixBytesStr := accessKeyURL.Opaque
+		prefixBytes, err := strconv.Atoi(prefixBytesStr)
+		if err != nil {
+			return nil, fmt.Errorf("prefixBytes is not a number: %v. Split config should be in split:<number> format", prefixBytesStr)
+		}
+		return split.NewStreamDialer(&transport.TCPStreamDialer{}, int64(prefixBytes))
 
 	default:
 		return nil, fmt.Errorf("access key scheme %v:// is not supported", accessKeyURL.Scheme)
 	}
 }
 
+// MakePacketDialer creates a new [transport.PacketDialer] according to the given config.
 func MakePacketDialer(transportConfig string) (transport.PacketDialer, error) {
 	if transportConfig == "" {
 		return &transport.UDPPacketDialer{}, nil
@@ -80,7 +85,7 @@ func MakePacketDialer(transportConfig string) (transport.PacketDialer, error) {
 	switch accessKeyURL.Scheme {
 
 	case "socks5":
-		return nil, fmt.Errorf("SOCKS5 PacketDialer is not implemented")
+		return nil, errors.New("SOCKS5 PacketDialer is not implemented")
 
 	case "ss":
 		config, err := parseShadowsocksURL(accessKeyURL)
@@ -95,7 +100,7 @@ func MakePacketDialer(transportConfig string) (transport.PacketDialer, error) {
 		return dialer, nil
 
 	case "split":
-		return nil, fmt.Errorf("split is not yet implemented")
+		return nil, errors.New("split is not supported for PacketDialers")
 
 	default:
 		return nil, fmt.Errorf("access key scheme %v:// is not supported", accessKeyURL.Scheme)
