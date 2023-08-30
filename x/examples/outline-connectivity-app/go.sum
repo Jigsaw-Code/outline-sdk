@@ -1,7 +1,7 @@
-github.com/Jigsaw-Code/outline-sdk v0.0.2 h1:uCuyJMaWj57IYEG/Hdml8YMdk9chU60ZkSxJXBhyGHU=
-github.com/Jigsaw-Code/outline-sdk v0.0.2/go.mod h1:hhlKz0+r9wSDFT8usvN8Zv/BFToCIFAUn1P2Qk8G2CM=
-github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20230807220427-893de7fdc6b8 h1:BxOHmmuppPM8K0DGUsfvajKF4PKfGxv9boNDhmbszFU=
-github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20230807220427-893de7fdc6b8/go.mod h1:tBqJXpVm+kym+EAUdwNodcFxy872FfjVErfj8Br+gs0=
+github.com/Jigsaw-Code/outline-sdk v0.0.5-0.20230828133257-302b739dffcd h1:D+LZn6P/Ip5G4JIplBWkvTDU3fjG8s5einDFdjelFWg=
+github.com/Jigsaw-Code/outline-sdk v0.0.5-0.20230828133257-302b739dffcd/go.mod h1:hhlKz0+r9wSDFT8usvN8Zv/BFToCIFAUn1P2Qk8G2CM=
+github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20230828133257-302b739dffcd h1:xlXtOWkpRF35wCCNh6LQMiKwEInc25Pq2oVRvhyE524=
+github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20230828133257-302b739dffcd/go.mod h1:98Xp2Mmhl5S3k/pfrOC3Qm5xajM4Mla4qk1gyLzJpk0=
 github.com/bep/debounce v1.2.1 h1:v67fRdBA9UQu2NhLFXrSg0Brw7CexQekrBwDMM8bzeY=
 github.com/bep/debounce v1.2.1/go.mod h1:H8yggRPQKLUhUoqrJC1bO2xNya7vanpDl7xR3ISbCJ0=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
