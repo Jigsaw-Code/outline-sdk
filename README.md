@@ -119,7 +119,7 @@ Beta features:
 - Transport client strategies
   - Proxyless strategies
     - [ ] Encrypted DNS
-    - [ ] Packet splitting
+    - [x] Packet splitting
   - Proxy-based strategies
     - [ ] HTTP Connect
     - [x] SOCKS5 StreamDialer
