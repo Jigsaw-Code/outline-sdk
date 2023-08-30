@@ -28,12 +28,12 @@ type splitDialer struct {
 
 var _ transport.StreamDialer = (*splitDialer)(nil)
 
-// NewStreamDialer creates a client that splits the outgoing strean at byte splitpoint.
-func NewStreamDialer(dialer transport.StreamDialer, splitPoint int64) (transport.StreamDialer, error) {
+// NewStreamDialer creates a [transport.StreamDialer] that splits the outgoing stream after writing "prefixBytes" bytes.
+func NewStreamDialer(dialer transport.StreamDialer, prefixBytes int64) (transport.StreamDialer, error) {
 	if dialer == nil {
 		return nil, errors.New("argument dialer must not be nil")
 	}
-	return &splitDialer{dialer: dialer, splitPoint: splitPoint}, nil
+	return &splitDialer{dialer: dialer, splitPoint: prefixBytes}, nil
 }
 
 // Dial implements [transport.StreamDialer].Dial.

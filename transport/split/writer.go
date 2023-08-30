@@ -20,23 +20,23 @@ import (
 )
 
 type SplitWriter struct {
-	writer     io.Writer
-	splitPoint int64
+	writer      io.Writer
+	prefixBytes int64
 }
 
 var _ io.Writer = (*SplitWriter)(nil)
 var _ io.ReaderFrom = (*SplitWriter)(nil)
 
-// NewWriter creates a [io.Writer] that ensures the byte sequence is split at splitPoint,
-// meaning a write will end at byte splitPoint - 1, before a write starting at byte splitPoint.
-func NewWriter(writer io.Writer, splitPoint int64) *SplitWriter {
-	return &SplitWriter{writer, splitPoint}
+// NewWriter creates a [io.Writer] that ensures the byte sequence is split at prefixBytes,
+// meaning a write will end right after byte index prefixBytes - 1, before a write starting at byte index prefixBytes.
+func NewWriter(writer io.Writer, prefixBytes int64) *SplitWriter {
+	return &SplitWriter{writer, prefixBytes}
 }
 
 func (w *SplitWriter) ReadFrom(source io.Reader) (written int64, err error) {
-	if w.splitPoint > 0 {
-		written, err = io.CopyN(w.writer, source, w.splitPoint)
-		w.splitPoint -= written
+	if w.prefixBytes > 0 {
+		written, err = io.CopyN(w.writer, source, w.prefixBytes)
+		w.prefixBytes -= written
 		if errors.Is(err, io.EOF) {
 			return written, nil
 		}
@@ -50,9 +50,9 @@ func (w *SplitWriter) ReadFrom(source io.Reader) (written int64, err error) {
 }
 
 func (w *SplitWriter) Write(data []byte) (written int, err error) {
-	if 0 < w.splitPoint && w.splitPoint < int64(len(data)) {
-		written, err = w.writer.Write(data[:w.splitPoint])
-		w.splitPoint -= int64(written)
+	if 0 < w.prefixBytes && w.prefixBytes < int64(len(data)) {
+		written, err = w.writer.Write(data[:w.prefixBytes])
+		w.prefixBytes -= int64(written)
 		if err != nil {
 			return written, err
 		}
@@ -60,6 +60,6 @@ func (w *SplitWriter) Write(data []byte) (written int, err error) {
 	}
 	n, err := w.writer.Write(data)
 	written += n
-	w.splitPoint -= int64(n)
+	w.prefixBytes -= int64(n)
 	return written, err
 }
