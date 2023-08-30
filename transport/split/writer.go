@@ -27,7 +27,7 @@ type SplitWriter struct {
 var _ io.Writer = (*SplitWriter)(nil)
 var _ io.ReaderFrom = (*SplitWriter)(nil)
 
-// NewWriter creates a Writer that ensures that the byte sequence is split at splitPoint,
+// NewWriter creates a [io.Writer] that ensures the byte sequence is split at splitPoint,
 // meaning a write will end at byte splitPoint - 1, before a write starting at byte splitPoint.
 func NewWriter(writer io.Writer, splitPoint int64) *SplitWriter {
 	return &SplitWriter{writer, splitPoint}
