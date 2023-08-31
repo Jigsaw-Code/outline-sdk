@@ -17,7 +17,6 @@
 package config
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -25,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 	"github.com/Jigsaw-Code/outline-sdk/transport/socks5"
 	"github.com/Jigsaw-Code/outline-sdk/transport/split"
 )
@@ -59,25 +57,12 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 	}
 
 	switch url.Scheme {
-
 	case "socks5":
 		endpoint := transport.StreamDialerEndpoint{Dialer: innerDialer, Address: url.Host}
 		return socks5.NewStreamDialer(&endpoint)
 
 	case "ss":
-		config, err := parseShadowsocksURL(url)
-		if err != nil {
-			return nil, err
-		}
-		endpoint := &transport.StreamDialerEndpoint{Dialer: innerDialer, Address: config.serverAddress}
-		dialer, err := shadowsocks.NewStreamDialer(endpoint, config.cryptoKey)
-		if err != nil {
-			return nil, err
-		}
-		if len(config.prefix) > 0 {
-			dialer.SaltGenerator = shadowsocks.NewPrefixSaltGenerator(config.prefix)
-		}
-		return dialer, nil
+		return newShadowsocksStreamDialerFromURL(innerDialer, url)
 
 	case "split":
 		prefixBytesStr := url.Opaque
@@ -88,7 +73,7 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 		return split.NewStreamDialer(innerDialer, int64(prefixBytes))
 
 	default:
-		return nil, fmt.Errorf("access key scheme %v:// is not supported", url.Scheme)
+		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
 	}
 }
 
@@ -121,73 +106,16 @@ func newPacketDialerFromPart(innerDialer transport.PacketDialer, oneDialerConfig
 	}
 
 	switch url.Scheme {
-
 	case "socks5":
-		return nil, errors.New("SOCKS5 PacketDialer is not implemented")
+		return nil, errors.New("socks5 is not supported for PacketDialers")
 
 	case "ss":
-		config, err := parseShadowsocksURL(url)
-		if err != nil {
-			return nil, err
-		}
-		endpoint := &transport.PacketDialerEndpoint{Dialer: innerDialer, Address: config.serverAddress}
-		listener, err := shadowsocks.NewPacketListener(endpoint, config.cryptoKey)
-		if err != nil {
-			return nil, err
-		}
-		dialer := transport.PacketListenerDialer{Listener: listener}
-		return dialer, nil
+		return newShadowsocksPacketDialerFromURL(innerDialer, url)
 
 	case "split":
 		return nil, errors.New("split is not supported for PacketDialers")
 
 	default:
-		return nil, fmt.Errorf("access key scheme %v:// is not supported", url.Scheme)
+		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
 	}
-}
-
-type shadowsocksConfig struct {
-	serverAddress string
-	cryptoKey     *shadowsocks.EncryptionKey
-	prefix        []byte
-}
-
-func parseShadowsocksURL(url *url.URL) (*shadowsocksConfig, error) {
-	config := &shadowsocksConfig{}
-	if url.Host == "" {
-		return nil, errors.New("host not specified")
-	}
-	config.serverAddress = url.Host
-	cipherInfoBytes, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(url.User.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode cipher info [%v]: %w", url.User.String(), err)
-	}
-	cipherName, secret, found := strings.Cut(string(cipherInfoBytes), ":")
-	if !found {
-		return nil, errors.New("invalid cipher info: no ':' separator")
-	}
-	config.cryptoKey, err = shadowsocks.NewEncryptionKey(cipherName, secret)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cipher: %w", err)
-	}
-	prefixStr := url.Query().Get("prefix")
-	if len(prefixStr) > 0 {
-		config.prefix, err = parseStringPrefix(prefixStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse prefix: %w", err)
-		}
-	}
-	return config, nil
-}
-
-func parseStringPrefix(utf8Str string) ([]byte, error) {
-	runes := []rune(utf8Str)
-	rawBytes := make([]byte, len(runes))
-	for i, r := range runes {
-		if (r & 0xFF) != r {
-			return nil, fmt.Errorf("character out of range: %d", r)
-		}
-		rawBytes[i] = byte(r)
-	}
-	return rawBytes, nil
 }
