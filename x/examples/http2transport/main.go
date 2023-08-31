@@ -24,7 +24,7 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/examples/internal/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
 )
 
@@ -33,7 +33,7 @@ func main() {
 	addrFlag := flag.String("localAddr", "localhost:1080", "Local proxy address")
 	flag.Parse()
 
-	dialer, err := config.MakeStreamDialer(*transportFlag)
+	dialer, err := config.NewStreamDialer(*transportFlag)
 	if err != nil {
 		log.Fatalf("Could not create dialer: %v", err)
 	}

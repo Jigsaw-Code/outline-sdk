@@ -27,8 +27,8 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
-	"github.com/Jigsaw-Code/outline-sdk/x/examples/internal/config"
 )
 
 var debugLog log.Logger = *log.New(io.Discard, "", 0)
@@ -116,14 +116,14 @@ func main() {
 			var testDuration time.Duration
 			switch proto {
 			case "tcp":
-				streamDialer, err := config.MakeStreamDialer(*transportFlag)
+				streamDialer, err := config.NewStreamDialer(*transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create StreamDialer: %v", err)
 				}
 				resolver := &transport.StreamDialerEndpoint{Dialer: streamDialer, Address: resolverAddress}
 				testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, *domainFlag)
 			case "udp":
-				packetDialer, err := config.MakePacketDialer(*transportFlag)
+				packetDialer, err := config.NewPacketDialer(*transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create PacketDialer: %v", err)
 				}

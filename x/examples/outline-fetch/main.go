@@ -25,7 +25,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/examples/internal/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/config"
 )
 
 func main() {
@@ -37,7 +37,7 @@ func main() {
 		log.Fatal("Need to pass the URL to fetch in the command-line")
 	}
 
-	dialer, err := config.MakeStreamDialer(*transportFlag)
+	dialer, err := config.NewStreamDialer(*transportFlag)
 	if err != nil {
 		log.Fatalf("Could not create dialer: %v", err)
 	}
