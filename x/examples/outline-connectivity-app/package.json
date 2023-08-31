@@ -3,7 +3,7 @@
   "dependencies": {
     "lit": "^2.7.6"
   },
-  "description": "A basic cross-platform demo of the Outline SDK",
+  "description": "A cross-platform connectivity test app using the Outline SDK",
   "devDependencies": {
     "@yarnpkg/sdks": "^3.0.0-rc.48",
     "typescript": "^5.1.6"
