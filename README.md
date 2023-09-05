@@ -119,15 +119,15 @@ Beta features:
 - Transport client strategies
   - Proxyless strategies
     - [ ] Encrypted DNS
-    - [x] Packet splitting
+    - [x] Packet splitting ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/split))
   - Proxy-based strategies
     - [ ] HTTP Connect
-    - [x] SOCKS5 StreamDialer
+    - [x] SOCKS5 StreamDialer ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/socks5))
     - [ ] SOCKS5 PacketDialer
 
 - Integration resources
   - For Mobile apps
-    - [ ] Library to run a local SOCKS5 or HTTP-Connect proxy
+    - [x] Library to run a local SOCKS5 or HTTP-Connect proxy ([source](./x/appproxy/), [example Go usage](./x/examples/fetch-proxy/), [example mobile usage](./x/examples/mobileproxy)).
     - [x] Documentation on how to integrate the SDK into mobile apps
     - [ ] Connectivity Test mobile app using [Capacitor](https://capacitorjs.com/)
   - For Go apps
