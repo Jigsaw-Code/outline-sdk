@@ -1,4 +1,4 @@
-# App Proxy Library
+# Local Proxy Library for Mobile Apps
 
 This package illustrates the use Go Mobile to generarate a mobile library to run a local proxy and configure your app networking libraries.
 
