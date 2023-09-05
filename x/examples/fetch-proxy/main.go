@@ -39,7 +39,7 @@ func main() {
 		log.Fatalf("Could not start proxy: %v", err)
 	}
 
-	httpClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(&url.URL{Scheme: "http", Host: proxy.Address})}}
+	httpClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(&url.URL{Scheme: "http", Host: proxy.Address()})}}
 
 	resp, err := httpClient.Get(urlToFetch)
 	if err != nil {
