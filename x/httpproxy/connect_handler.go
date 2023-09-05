@@ -15,7 +15,6 @@
 package httpproxy
 
 import (
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -25,47 +24,83 @@ import (
 
 type handler struct {
 	dialer transport.StreamDialer
+	client http.Client
 }
 
 var _ http.Handler = (*handler)(nil)
 
 // ServeHTTP implements [http.Handler].ServeHTTP for CONNECT requests, using the internal [transport.StreamDialer].
-func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *handler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Request) {
 	// TODO(fortuna): For public services (not local), we need authentication and drain on failures to avoid fingerprinting.
-	if r.Method != http.MethodConnect {
-		http.Error(w, fmt.Sprintf("Method %v is not supported", r.Method), http.StatusMethodNotAllowed)
+	if proxyReq.Method == http.MethodConnect {
+		h.handleConnect(proxyResp, proxyReq)
+		return
+	} else if proxyReq.URL.Host != "" {
+		h.handleHTTPProxyRequest(proxyResp, proxyReq)
+	} else {
+		http.Error(proxyResp, "Not Found", http.StatusNotFound)
+	}
+}
+
+func (h *handler) handleHTTPProxyRequest(proxyResp http.ResponseWriter, proxyReq *http.Request) {
+	targetReq, err := http.NewRequestWithContext(proxyReq.Context(), proxyReq.Method, proxyReq.URL.String(), proxyReq.Body)
+	if err != nil {
+		http.Error(proxyResp, "Error creating target request", http.StatusInternalServerError)
 		return
 	}
-
-	// Validate the target address.
-	_, portStr, err := net.SplitHostPort(r.Host)
+	for key, values := range proxyReq.Header {
+		for _, value := range values {
+			targetReq.Header.Add(key, value)
+		}
+	}
+	targetResp, err := h.client.Do(targetReq)
 	if err != nil {
-		http.Error(w, "Authority is not a valid host:port", http.StatusBadRequest)
+		http.Error(proxyResp, "Failed to fetch destination", http.StatusServiceUnavailable)
+		return
+	}
+	defer targetResp.Body.Close()
+	for key, values := range targetResp.Header {
+		for _, value := range values {
+			proxyResp.Header().Add(key, value)
+		}
+	}
+	_, err = io.Copy(proxyResp, targetResp.Body)
+	if err != nil {
+		http.Error(proxyResp, "Failed write response", http.StatusServiceUnavailable)
+		return
+	}
+}
+
+func (h *handler) handleConnect(proxyResp http.ResponseWriter, proxyReq *http.Request) {
+	// Validate the target address.
+	_, portStr, err := net.SplitHostPort(proxyReq.Host)
+	if err != nil {
+		http.Error(proxyResp, "Authority is not a valid host:port", http.StatusBadRequest)
 		return
 	}
 	if portStr == "" {
 		// As per https://httpwg.org/specs/rfc9110.html#CONNECT.
-		http.Error(w, "Port number must be specified", http.StatusBadRequest)
+		http.Error(proxyResp, "Port number must be specified", http.StatusBadRequest)
 		return
 	}
 
 	// Dial the target.
-	targetConn, err := h.dialer.Dial(r.Context(), r.Host)
+	targetConn, err := h.dialer.Dial(proxyReq.Context(), proxyReq.Host)
 	if err != nil {
-		http.Error(w, "Failed to connect to target", http.StatusServiceUnavailable)
+		http.Error(proxyResp, "Failed to connect to target", http.StatusServiceUnavailable)
 		return
 	}
 	defer targetConn.Close()
 
-	hijacker, ok := w.(http.Hijacker)
+	hijacker, ok := proxyResp.(http.Hijacker)
 	if !ok {
-		http.Error(w, "Webserver doesn't support hijacking", http.StatusInternalServerError)
+		http.Error(proxyResp, "Webserver doesn't support hijacking", http.StatusInternalServerError)
 		return
 	}
 
 	httpConn, _, err := hijacker.Hijack()
 	if err != nil {
-		http.Error(w, "Failed to hijack connection", http.StatusInternalServerError)
+		http.Error(proxyResp, "Failed to hijack connection", http.StatusInternalServerError)
 		return
 	}
 	defer httpConn.Close()
@@ -88,5 +123,5 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // The resulting handler is currently vulnerable to probing attacks. It's ok as a localhost proxy
 // but it may be vulnerable if used as a public proxy.
 func NewConnectHandler(dialer transport.StreamDialer) http.Handler {
-	return &handler{dialer}
+	return &handler{dialer, *http.DefaultClient}
 }
