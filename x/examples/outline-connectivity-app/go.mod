@@ -1,4 +1,4 @@
-module outline_sdk_connectivity_test
+module github.com/Jigsaw-Code/outline-sdk/x/examples/outline-connectivity-app
 
 go 1.20
 
