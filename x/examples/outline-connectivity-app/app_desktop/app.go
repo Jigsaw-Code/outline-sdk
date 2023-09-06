@@ -17,7 +17,7 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"outline_sdk_connectivity_test/shared_backend"
+	"github.com/Jigsaw-Code/outline-sdk/x/examples/outline-connectivity-app/shared_backend"
 )
 
 // App struct

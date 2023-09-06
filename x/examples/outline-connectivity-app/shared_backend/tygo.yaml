@@ -1,5 +1,5 @@
 packages:
-  - path: "outline_sdk_connectivity_test/shared_backend"
+  - path: "github.com/Jigsaw-Code/outline-sdk/x/examples/outline-connectivity-app/shared_backend"
     output_path: "output/types.ts"
     type_mappings:
       time.Time: "string"
