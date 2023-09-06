@@ -4,5 +4,6 @@ node_modules
 .yarn/sdks
 .yarn/unplugged
 .yarn/install-state.gz
+.pnp.*
 .DS_Store
 .vscode/settings.json
