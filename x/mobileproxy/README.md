@@ -20,7 +20,7 @@ PATH="$(pwd)/out:$PATH" gomobile bind -target=android -o "$(pwd)/out/mobileproxy
 Note: Gomobile expects gobind to be in the PATH, that's why we need to prebuild it, and set up the PATH accordingly.
 
 <details>
-<summary>iOS generated Code</summary>
+<summary>Sample iOS generated Code</summary>
 
 `Mobileproxy.objc.h`:
 
@@ -72,7 +72,7 @@ FOUNDATION_EXPORT MobileproxyProxy* _Nullable MobileproxyRunProxy(NSString* _Nul
 </details>
 
 <details>
-  <summary>Android generated Code</summary>
+  <summary>Sample Android generated Code</summary>
 
 `mobileproxy.java`:
 
