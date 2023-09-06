@@ -48,7 +48,7 @@ To integrate the SDK into a mobile app, follow these steps:
 
 > **Note**: You must use `gomobile bind` on a package you create, not directly on the SDK packages.
 
-The easiest way to integrate with the SDK in a mobile app is by using the [`x/mobileproxy` library](./x/mobileproxy/) 
+An easy way to integrate with the SDK in a mobile app is by using the [`x/mobileproxy` library](./x/mobileproxy/) 
 to run a local web proxy that you can use to configure your app's networking libraries.
 
 ### Side Service
