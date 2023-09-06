@@ -1,6 +1,6 @@
-# Local Proxy Library for Mobile Apps
+# Mobileproxy: Local Proxy Library for Mobile Apps
 
-This package enabled the use Go Mobile to generate a mobile library to run a local proxy and configure your app networking libraries.
+This package enables the use Go Mobile to generate a mobile library to run a local proxy and configure your app networking libraries.
 
 ### Build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
 
