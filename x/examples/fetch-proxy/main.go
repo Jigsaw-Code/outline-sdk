@@ -22,7 +22,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/appproxy"
+	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
 )
 
 func main() {
@@ -34,9 +34,9 @@ func main() {
 		log.Fatal("Need to pass the URL to fetch in the command-line")
 	}
 
-	proxy, err := appproxy.RunProxy("localhost:0", *transportFlag)
+	proxy, err := mobileproxy.RunProxy("localhost:0", *transportFlag)
 	if err != nil {
-		log.Fatalf("Could not start proxy: %v", err)
+		log.Fatalf("Cmobileproxy start proxy: %v", err)
 	}
 
 	httpClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(&url.URL{Scheme: "http", Host: proxy.Address()})}}

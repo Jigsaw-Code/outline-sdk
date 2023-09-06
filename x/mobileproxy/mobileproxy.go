@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package appproxy provides convenience utilities to help applications run a local proxy
+// Package mobileproxy provides convenience utilities to help applications run a local proxy
 // and use that to configure their networking libraries.
 //
 // This package is suitable for use with Go Mobile, making it a convenient way to integrate with mobile apps.
-package appproxy
+package mobileproxy
 
 import (
 	"context"
