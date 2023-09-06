@@ -4,6 +4,8 @@ This package enables the use Go Mobile to generate a mobile library to run a loc
 
 ### Build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
 
+From the `x/` directory:
+
 ```bash
 go build -o ./out/ golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
 ```
