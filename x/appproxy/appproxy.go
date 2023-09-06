@@ -41,7 +41,8 @@ func (p *Proxy) Address() string {
 	return p.address
 }
 
-// Stops gracefully stops the proxy service, waiting for at most timeout seconds before forcefully closing it.
+// Stop gracefully stops the proxy service, waiting for at most timeout seconds before forcefully closing it.
+// The function takes a timeoutSeconds number instead of a [time.Duration] so it's compatible with Go Mobile.
 func (p *Proxy) Stop(timeoutSeconds int) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
@@ -52,7 +53,7 @@ func (p *Proxy) Stop(timeoutSeconds int) {
 }
 
 // RunProxy runs a local web proxy that listens on localAddress, and uses the transportConfig to
-// create the [transport.StreamDialer] to use to connect to the destination from the proxy requests.
+// create a [transport.StreamDialer] that is used to connect to the requested destination.
 func RunProxy(localAddress string, transportConfig string) (*Proxy, error) {
 	dialer, err := config.NewStreamDialer(transportConfig)
 	if err != nil {

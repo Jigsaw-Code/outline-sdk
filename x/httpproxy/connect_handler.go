@@ -43,6 +43,7 @@ func (h *handler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Reques
 }
 
 func (h *handler) handleHTTPProxyRequest(proxyResp http.ResponseWriter, proxyReq *http.Request) {
+	// We create a new request that uses a relative path + Host header, instead of the absolute URL in the proxy request.
 	targetReq, err := http.NewRequestWithContext(proxyReq.Context(), proxyReq.Method, proxyReq.URL.String(), proxyReq.Body)
 	if err != nil {
 		http.Error(proxyResp, "Error creating target request", http.StatusInternalServerError)
