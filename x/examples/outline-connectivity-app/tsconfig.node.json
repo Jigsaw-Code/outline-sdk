@@ -1,4 +1,5 @@
 {
+  "extends": "./tsconfig.google.json",
   "compilerOptions": {
     "composite": true,
     "module": "ESNext",

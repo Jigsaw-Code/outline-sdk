@@ -1,4 +1,5 @@
 {
+  "extends": "../tsconfig.google.json",
   "compilerOptions": {
     "experimentalDecorators": true,
     "useDefineForClassFields": false,

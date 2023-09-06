@@ -34,8 +34,8 @@ import (
 )
 
 type ConnectivityTestProtocolConfig struct {
-	Tcp bool `json:"tcp"`
-	Udp bool `json:"udp"`
+	TCP bool `json:"tcp"`
+	UDP bool `json:"udp"`
 }
 
 type ConnectivityTestResult struct {
@@ -95,7 +95,7 @@ func ConnectivityTest(input ConnectivityTestInput) ([]ConnectivityTestResult, er
 			resolverHost := strings.TrimSpace(resolverHost)
 			resolverAddress := net.JoinHostPort(resolverHost, "53")
 
-			if input.Protocols.Tcp {
+			if input.Protocols.TCP {
 				testTime := time.Now()
 				var testErr error
 				var testDuration time.Duration
@@ -119,7 +119,7 @@ func ConnectivityTest(input ConnectivityTestInput) ([]ConnectivityTestResult, er
 				})
 			}
 
-			if input.Protocols.Udp {
+			if input.Protocols.UDP {
 				testTime := time.Now()
 				var testErr error
 				var testDuration time.Duration
@@ -264,7 +264,7 @@ func SendRawCall(rawInputMessage []byte) []byte {
 
 	parseInputError := json.Unmarshal(rawInputMessage, &inputMessage)
 
-	outputMessage := CallOutputMessage{Result: "", Errors: []string{}}
+	var outputMessage CallOutputMessage
 
 	if parseInputError != nil {
 		outputMessage.Errors = append(outputMessage.Errors, "SendRawCall: error parsing raw input string")

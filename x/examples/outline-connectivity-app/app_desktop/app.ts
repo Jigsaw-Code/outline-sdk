@@ -14,7 +14,7 @@
 
 // backend
 import * as SharedBackend from "shared_backend";
-import * as DesktopBackend from "./generated/wailsjs/go/main/App";
+import * as DesktopBackend from "./output/wailsjs/go/main/App";
 
 // frontend
 import * as SharedFrontend from "shared_frontend";

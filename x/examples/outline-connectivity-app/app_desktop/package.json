@@ -12,10 +12,10 @@
   "name": "app_desktop",
   "scripts": {
     "build": "concurrently -n linux,macos,windows 'yarn build:linux' 'yarn build:macos' 'yarn build:windows'",
-    "build:linux": "wails build -platform linux",
-    "build:macos": "wails build -platform darwin",
+    "build:linux": "wails generate module && wails build -platform linux",
+    "build:macos": "wails generate module && wails build -platform darwin",
     "build:frontend": "vite build",
-    "build:windows": "wails build -platform windows",
+    "build:windows": "wails generate module && wails build -platform windows",
     "clean": "rm -rf output node_modules",
     "go": "go",
     "watch": "wails dev",

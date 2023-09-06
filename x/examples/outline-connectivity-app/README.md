@@ -1,4 +1,4 @@
-# Outline Connectivity Test App
+# Outline Connectivity App
 
 ## Overview
 
@@ -98,6 +98,7 @@ export class AppMain extends LitElement {
 
 1. Clone this repo
 1. `cd` into the repo
+1. if using xcode, copy the `settings.example.json` to `settings.json` if it looks good to you
 1. `yarn`
 
 If at any point you run into issues during development, try `yarn reset`.
@@ -122,4 +123,6 @@ If at any point you run into issues during development, try `yarn reset`.
 1. <span style="color:red">**\[P0\]** add server url to an ENV var somehow... pretty dumb capacitor...</span>
 1. **\[P1\]** Results dialog isn't rendering as intended (likely because of the `{ all: initial }`)
 1. **\[P2\]** `cap ___ run` breaks (have workaround and [issue filed](https://github.com/ionic-team/capacitor/issues/6791))
+1. **\[P2\]** Create a logo for the app
+1. **\[P2\]** Introducing some kind of tracing into the test
 1. <span style="color:gray">**\[P3\]** spurious lit localize TS error</span>

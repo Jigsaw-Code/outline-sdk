@@ -1,6 +1,6 @@
 {
-  "name": "App",
-  "short_name": "App",
+  "name": "Outline Connectivity App",
+  "short_name": "outline connect",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#31d53d",

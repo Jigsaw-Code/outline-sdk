@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { ConnectivityTestInput, ConnectivityTestResult } from "./generated/types"
+import { ConnectivityTestInput, ConnectivityTestResult } from "./output/types"
 
 export function from(backend: Invokable) {
   return {

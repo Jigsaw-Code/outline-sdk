@@ -1,6 +1,6 @@
 packages:
   - path: "outline_sdk_connectivity_test/shared_backend"
-    output_path: "generated/types.ts"
+    output_path: "output/types.ts"
     type_mappings:
       time.Time: "string"
       null.String: "string | null"

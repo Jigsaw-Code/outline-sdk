@@ -7,7 +7,7 @@
   "frontend:build": "yarn build:frontend",
   "frontend:dev:watcher": "yarn watch:frontend",
   "frontend:dev:serverUrl": "auto",
-  "wailsjsdir": "generated",
+  "wailsjsdir": "output",
   "author": {
     "name": "Daniel LaCosse",
     "email": "daniellacosse@google.com"

@@ -6,8 +6,7 @@
   "module": "index.ts",
   "name": "shared_backend",
   "scripts": {
-    "_types:export": "tygo generate",
-    "build": "concurrently 'yarn:build:*' --kill-others-on-fail",
+    "build": "tygo generate && concurrently 'yarn:build:*' --kill-others-on-fail",
     "build:android": "gomobile bind -target android -o output/SharedBackend.aar outline_sdk_connectivity_test/shared_backend",
     "build:ios": "gomobile bind -target ios,iossimulator -o output/SharedBackend.xcframework outline_sdk_connectivity_test/shared_backend",
     "clean": "rm -rf output",
