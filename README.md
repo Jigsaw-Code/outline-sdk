@@ -48,6 +48,8 @@ To integrate the SDK into a mobile app, follow these steps:
 
 > **Note**: You must use `gomobile bind` on a package you create, not directly on the SDK packages.
 
+An easy way to integrate with the SDK in a mobile app is by using the [`x/mobileproxy` library](./x/mobileproxy/) 
+to run a local web proxy that you can use to configure your app's networking libraries.
 
 ### Side Service
 
@@ -119,15 +121,15 @@ Beta features:
 - Transport client strategies
   - Proxyless strategies
     - [ ] Encrypted DNS
-    - [x] Packet splitting
+    - [x] Packet splitting ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/split))
   - Proxy-based strategies
     - [ ] HTTP Connect
-    - [x] SOCKS5 StreamDialer
+    - [x] SOCKS5 StreamDialer ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/socks5))
     - [ ] SOCKS5 PacketDialer
 
 - Integration resources
   - For Mobile apps
-    - [ ] Library to run a local SOCKS5 or HTTP-Connect proxy
+    - [x] Library to run a local SOCKS5 or HTTP-Connect proxy ([source](./x/mobileproxy/mobileproxy.go), [example Go usage](./x/examples/fetch-proxy/main.go), [example mobile usage](./x/examples/mobileproxy)).
     - [x] Documentation on how to integrate the SDK into mobile apps
     - [ ] Connectivity Test mobile app using [Capacitor](https://capacitorjs.com/)
   - For Go apps
