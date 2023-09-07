@@ -98,7 +98,6 @@ export class AppMain extends LitElement {
 
 1. Clone this repo
 1. `cd` into the repo
-1. if using xcode, copy the `settings.example.json` to `settings.json` if it looks good to you
 1. `yarn`
 
 If at any point you run into issues during development, try `yarn reset`.

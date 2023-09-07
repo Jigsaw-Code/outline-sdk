@@ -59,7 +59,7 @@ type ConnectivityTestError struct {
 	Msg string `json:"message"`
 }
 
-type ConnectivityTestInput struct {
+type ConnectivityTestRequest struct {
 	AccessKey string                         `json:"accessKey"`
 	Domain    string                         `json:"domain"`
 	Resolvers []string                       `json:"resolvers"`
@@ -75,7 +75,7 @@ type sessionConfig struct {
 
 type Prefix []byte
 
-func ConnectivityTest(input ConnectivityTestInput) ([]ConnectivityTestResult, error) {
+func ConnectivityTest(input ConnectivityTestRequest) ([]ConnectivityTestResult, error) {
 	config, err := parseAccessKey(input.AccessKey)
 	if err != nil {
 		return nil, err
@@ -246,61 +246,4 @@ func ParseStringPrefix(utf8Str string) (Prefix, error) {
 		rawBytes[i] = byte(r)
 	}
 	return rawBytes, nil
-}
-
-/* INFRASTRUCTURE (to be generalized via reflection/generics and moved) */
-type CallInputMessage struct {
-	Method string `json:"method"`
-	Input  string `json:"input"`
-}
-
-type CallOutputMessage struct {
-	Result string   `json:"result"`
-	Errors []string `json:"errors"`
-}
-
-func SendRawCall(rawInputMessage []byte) []byte {
-	var inputMessage CallInputMessage
-
-	parseInputError := json.Unmarshal(rawInputMessage, &inputMessage)
-
-	var outputMessage CallOutputMessage
-
-	if parseInputError != nil {
-		outputMessage.Errors = append(outputMessage.Errors, "SendRawCall: error parsing raw input string")
-	}
-
-	if inputMessage.Method != "ConnectivityTest" {
-		outputMessage.Errors = append(outputMessage.Errors, "SendRawCall: method to call not found")
-	}
-
-	var methodInput ConnectivityTestInput
-
-	unmarshallingInputError := json.Unmarshal([]byte(inputMessage.Input), &methodInput)
-
-	if unmarshallingInputError != nil {
-		outputMessage.Errors = append(outputMessage.Errors, "SendRawCall: error parsing method input")
-	}
-
-	result, testError := ConnectivityTest(methodInput)
-
-	if testError != nil {
-		outputMessage.Errors = append(outputMessage.Errors, testError.Error())
-	}
-
-	rawResult, marshallingResultError := json.Marshal(result)
-
-	if marshallingResultError != nil {
-		outputMessage.Errors = append(outputMessage.Errors, "SendRawCall: error serializing method result")
-	}
-
-	outputMessage.Result = string(rawResult)
-
-	rawOutputMessage, marshallingOutputError := json.Marshal(outputMessage)
-
-	if marshallingOutputError != nil {
-		fmt.Println("[ERROR] failed to properly marshal SendRawCall output")
-	}
-
-	return rawOutputMessage
 }

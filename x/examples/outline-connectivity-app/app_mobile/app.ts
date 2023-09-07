@@ -14,9 +14,8 @@
 
 // backend
 import { registerPlugin } from "@capacitor/core";
-import * as SharedBackend from "shared_backend";
 
-const MobileBackend = registerPlugin<SharedBackend.Invokable>("MobileBackend");
+const MobileBackend = registerPlugin("MobileBackend");
 
 // frontend
 import { LitElement, html } from "lit";
@@ -28,9 +27,9 @@ SharedFrontend.registerAllElements();
 // main
 @customElement("app-main")
 export class AppMain extends LitElement {
-  backend = SharedBackend.from(MobileBackend)
-
   render() {
-    return html`<connectivity-test-page .onSubmit=${this.backend.connectivityTest} />`;
+    return html`<connectivity-test-page .onSubmit=${
+      parameters => MobileBackend.Request("ConnectivityTest", parameters)
+    } />`;
   }
 }

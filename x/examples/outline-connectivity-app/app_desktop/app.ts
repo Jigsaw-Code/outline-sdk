@@ -13,7 +13,6 @@
 // limitations under the License.
 
 // backend
-import * as SharedBackend from "shared_backend";
 import * as DesktopBackend from "./generated/wailsjs/go/main/App";
 
 // frontend
@@ -26,9 +25,9 @@ SharedFrontend.registerAllElements();
 // main
 @customElement("app-main")
 export class AppMain extends LitElement {
-  backend = SharedBackend.from(DesktopBackend);
-
   render() {
-    return html`<connectivity-test-page .onSubmit=${this.backend.connectivityTest} />`;
+    return html`<connectivity-test-page .onSubmit=${
+      parameters => DesktopBackend.Request("ConnectivityTest", parameters)
+    } />`;
   }
 }

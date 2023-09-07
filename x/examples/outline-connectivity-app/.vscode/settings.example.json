@@ -1,8 +1,0 @@
-{
-  "typescript.tsdk": "x/examples/outline-connectivity-app/.yarn/sdks/typescript/lib",
-  "typescript.enablePromptUseWorkspaceTsdk": true,
-  "search.exclude": {
-    "**/.yarn": true,
-    "**/.pnp.*": true
-  }
-}

@@ -15,4 +15,4 @@
 #import <Foundation/Foundation.h>
 #import <Capacitor/Capacitor.h>
 
-CAP_PLUGIN(BackendPlugin, "MobileBackend", CAP_PLUGIN_METHOD(Invoke, CAPPluginReturnPromise);)
+CAP_PLUGIN(MobileBackendPlugin, "MobileBackend", CAP_PLUGIN_METHOD(Request, CAPPluginReturnPromise);)

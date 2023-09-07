@@ -16,45 +16,45 @@ import Foundation
 import Capacitor
 import SharedBackend
 
-struct RawBackendCallInputMessage: Codable {
-    var method: String
-    var input: String
+struct Request: Codable {
+    var name: String
+    var parameters: String
 }
 
-struct RawBackendCallOutputMessage: Decodable {
-    var result: String
-    var errors: [String]
+struct Response: Decodable {
+    var body: String
+    var error: String
 }
 
-@objc(BackendPlugin)
-public class BackendPlugin: CAPPlugin {
-    @objc func Invoke(_ call: CAPPluginCall) {
-        let outputMessage: RawBackendCallOutputMessage
+@objc(MobileBackendPlugin)
+public class MobileBackendPlugin: CAPPlugin {
+    @objc func Request(_ call: CAPPluginCall) {
+        let response: Response
 
         let encoder = JSONEncoder()
         let decoder = JSONDecoder()
 
         do {
-            let rawInputMessage = try encoder.encode(
-                RawBackendCallInputMessage(
-                    method: call.getString("method")!,
-                    input: call.getString("input")!
+            let rawRequest = try encoder.encode(
+                Request(
+                    name: call.getString("name")!,
+                    parameters: call.getString("parameters")!
                 )
             )
             
-            outputMessage = try decoder.decode(
-                RawBackendCallOutputMessage.self,
-                from: Shared_backendSendRawCall(rawInputMessage)!
+            response = try decoder.decode(
+                Response.self,
+                from: Shared_backendHandleRequest(rawRequest)!
             )
         } catch {
             return call.resolve([
-                "errors": [error]
+                "error": error
             ])
         }
             
         return call.resolve([
-            "result": outputMessage.result,
-            "errors": outputMessage.errors
+            "body": response.body,
+            "error": response.error
         ])
     }
 }

@@ -36,20 +36,20 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
-func (a *App) Invoke(input shared_backend.CallInputMessage) shared_backend.CallOutputMessage {
-	rawInputMessage, marshallingError := json.Marshal(input)
+func (a *App) Request(name string, &parameters {}) &body {} {
+	rawRequest, marshallingError := json.Marshal(input)
 
 	if marshallingError != nil {
-		return shared_backend.CallOutputMessage{Result: "", Errors: []string{"Invoke: failed to serialize raw invocation input"}}
+		return nil, "MakeRequest: failed to serialize raw invocation input"
 	}
 
-	var outputMessage shared_backend.CallOutputMessage
+	var response shared_backend.IPCResponse
 
-	unmarshallingError := json.Unmarshal(shared_backend.SendRawCall(rawInputMessage), &outputMessage)
+	unmarshallingError := json.Unmarshal(shared_backend.HandleRequest(rawRequest), &response)
 
 	if unmarshallingError != nil {
-		return shared_backend.CallOutputMessage{Result: "", Errors: []string{"Invoke: failed to parse invocation result"}}
+		return nil, "Invoke: failed to parse invocation result"
 	}
 
-	return outputMessage
+	return response
 }

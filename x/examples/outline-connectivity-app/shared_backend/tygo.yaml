@@ -1,9 +1,0 @@
-packages:
-  - path: "github.com/Jigsaw-Code/outline-sdk/x/examples/outline-connectivity-app/shared_backend"
-    output_path: "output/types.ts"
-    type_mappings:
-      time.Time: "string"
-      null.String: "string | null"
-      null.Bool: "boolean | null"
-      uuid.UUID: "string"
-      uuid.NullUUID: "string | null"

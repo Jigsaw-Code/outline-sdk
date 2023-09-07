@@ -6,4 +6,4 @@ node_modules
 .yarn/install-state.gz
 .pnp.*
 .DS_Store
-.vscode/settings.json
+.vscode
