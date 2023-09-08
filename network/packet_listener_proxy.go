@@ -51,19 +51,11 @@ type packetListenerRequestSender struct {
 	writeIdleTimer   *time.Timer
 }
 
-// NewPacketProxyFromPacketListener creates a new [PacketProxy] that uses the existing [transport.PacketListener]
-// to create connections to a proxy. You can use this function if you already have an implementation of
-// [transport.PacketListener] and would like to inject it into one of the network stacks (for example,
-// network/lwip2transport) as UDP traffic handlers.
-func NewPacketProxyFromPacketListener(pl transport.PacketListener) (*PacketListenerProxy, error) {
-	return NewPacketProxyFromPacketListenerWithOptions(pl)
-}
-
-// NewPacketProxyFromPacketListenerWithTimeout creates a new [PacketProxy] that uses the existing
-// [transport.PacketListener] to create connections to a proxy. You can also specify additional options.
+// NewPacketProxyFromPacketListener creates a new [PacketProxy] that uses the existing [transport.PacketListener] to
+// create connections to a proxy. You can also specify additional options.
 // This function is useful if you already have an implementation of [transport.PacketListener] and you want to use it
 // with one of the network stacks (for example, network/lwip2transport) as a UDP traffic handler.
-func NewPacketProxyFromPacketListenerWithOptions(pl transport.PacketListener, options ...func(*PacketListenerProxy) error) (*PacketListenerProxy, error) {
+func NewPacketProxyFromPacketListener(pl transport.PacketListener, options ...func(*PacketListenerProxy) error) (*PacketListenerProxy, error) {
 	if pl == nil {
 		return nil, errors.New("pl must not be nil")
 	}
