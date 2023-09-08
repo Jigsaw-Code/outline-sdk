@@ -56,12 +56,28 @@ type packetListenerRequestSender struct {
 // [transport.PacketListener] and would like to inject it into one of the network stacks (for example,
 // network/lwip2transport) as UDP traffic handlers.
 func NewPacketProxyFromPacketListener(pl transport.PacketListener) (PacketProxy, error) {
+	return NewPacketProxyFromPacketListenerWithTimeout(pl, 30*time.Second)
+}
+
+// NewPacketProxyFromPacketListenerWithTimeout creates a new [PacketProxy] that uses the existing
+// [transport.PacketListener] to create connections to a proxy. You can also specify a timeout for UDP sessions created
+// by NewSession.
+//
+// This function is useful if you already have an implementation of [transport.PacketListener] and you want to use it
+// with one of the network stacks (for example, network/lwip2transport) as a UDP traffic handler.
+//
+// The timeout is the write idle timeout. This means that if there are no WriteTo operations on the UDP session created
+// by NewSession for the specified amount of time, the proxy will end this session.
+func NewPacketProxyFromPacketListenerWithTimeout(pl transport.PacketListener, timeout time.Duration) (PacketProxy, error) {
 	if pl == nil {
 		return nil, errors.New("pl must not be nil")
 	}
+	if timeout <= 0 {
+		return nil, errors.New("timeout must be greater than 0")
+	}
 	return &packetListenerProxyAdapter{
 		listener:         pl,
-		writeIdleTimeout: 30 * time.Second,
+		writeIdleTimeout: timeout,
 	}, nil
 }
 
