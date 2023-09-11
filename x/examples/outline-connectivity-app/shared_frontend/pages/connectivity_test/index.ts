@@ -581,6 +581,7 @@ export class ConnectivityTestPage extends LitElement {
   `;
 
   render() {
+    // TODO: move language definitions to a centralized place
     return html`<main dir="${this.locale === "fa-IR" ? "rtl" : "ltr"}">
       <header class="header">
         <h1 class="header-text">${msg("Outline Connectivity Test")}</h1>
