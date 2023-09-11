@@ -14,15 +14,20 @@
 
 package shared_backend
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 /* INFRASTRUCTURE (to be generalized via reflection/generics and moved) */
 type Request struct {
-	Name string `json:"method"`
-	Parameters  string `json:"input"`
+	Name       string `json:"method"`
+	Parameters string `json:"input"`
 }
 
 type Response struct {
-	Body string   `json:"result"`
-	Error string    `json:"error"`
+	Body  string `json:"result"`
+	Error string `json:"error"`
 }
 
 func HandleRequest(rawRequest []byte) []byte {
@@ -33,15 +38,15 @@ func HandleRequest(rawRequest []byte) []byte {
 	var response Response
 
 	if unmarshallRequestError != nil {
-		response.Error = "HandleIPC: error parsing raw input string";
+		response.Error = "HandleIPC: error parsing raw input string"
 	}
 
 	/* TODO: generalize, make non-blocking */
 	if request.Name != "ConnectivityTest" {
-		response.Error = "HandleIPC: method name not found";
+		response.Error = "HandleIPC: method name not found"
 	}
 
-	var parameters ConnectivityTestParameters
+	var parameters ConnectivityTestRequest
 
 	unmarshallingParametersError := json.Unmarshal([]byte(request.Parameters), &parameters)
 
@@ -60,7 +65,7 @@ func HandleRequest(rawRequest []byte) []byte {
 	if marshallingBodyError != nil {
 		response.Error = "HandleIPC: error serializing method result"
 	}
-  /* END TODO: generalize, make non-blocking */
+	/* END TODO: generalize, make non-blocking */
 
 	response.Body = string(rawBody)
 

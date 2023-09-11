@@ -17,9 +17,9 @@ package shared_backend
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"net/url"
 	"strconv"
@@ -75,8 +75,8 @@ type sessionConfig struct {
 
 type Prefix []byte
 
-func ConnectivityTest(input ConnectivityTestRequest) ([]ConnectivityTestResult, error) {
-	config, err := parseAccessKey(input.AccessKey)
+func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult, error) {
+	config, err := parseAccessKey(request.AccessKey)
 	if err != nil {
 		return nil, err
 	}
@@ -91,11 +91,19 @@ func ConnectivityTest(input ConnectivityTestRequest) ([]ConnectivityTestResult, 
 	for _, hostIP := range proxyIPs {
 		proxyAddress := net.JoinHostPort(hostIP.String(), fmt.Sprint(config.Port))
 
-		for _, resolverHost := range input.Resolvers {
+		for _, resolverHost := range request.Resolvers {
 			resolverHost := strings.TrimSpace(resolverHost)
 			resolverAddress := net.JoinHostPort(resolverHost, "53")
 
-			if input.Protocols.TCP {
+			if request.Protocols.TCP {
+
+				streamDialer, err := config.NewStreamDialer(*transportFlag)
+				if err != nil {
+					log.Fatalf("Failed to create StreamDialer: %v", err)
+				}
+				resolver := &transport.StreamDialerEndpoint{Dialer: streamDialer, Address: resolverAddress}
+				testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, *domainFlag)
+
 				testTime := time.Now()
 				var testErr error
 				var testDuration time.Duration
@@ -106,7 +114,7 @@ func ConnectivityTest(input ConnectivityTestRequest) ([]ConnectivityTestResult, 
 				}
 
 				resolver := &transport.StreamDialerEndpoint{Dialer: dialer, Address: resolverAddress}
-				testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, input.Domain)
+				testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, request.Domain)
 
 				results = append(results, ConnectivityTestResult{
 					Proxy:      proxyAddress,
@@ -119,7 +127,7 @@ func ConnectivityTest(input ConnectivityTestRequest) ([]ConnectivityTestResult, 
 				})
 			}
 
-			if input.Protocols.UDP {
+			if request.Protocols.UDP {
 				testTime := time.Now()
 				var testErr error
 				var testDuration time.Duration
@@ -131,7 +139,7 @@ func ConnectivityTest(input ConnectivityTestRequest) ([]ConnectivityTestResult, 
 
 				dialer := transport.PacketListenerDialer{Listener: listener}
 				resolver := &transport.PacketDialerEndpoint{Dialer: dialer, Address: resolverAddress}
-				testDuration, testErr = connectivity.TestResolverPacketConnectivity(context.Background(), resolver, input.Domain)
+				testDuration, testErr = connectivity.TestResolverPacketConnectivity(context.Background(), resolver, request.Domain)
 
 				results = append(results, ConnectivityTestResult{
 					Proxy:      proxyAddress,

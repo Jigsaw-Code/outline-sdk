@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/Jigsaw-Code/outline-sdk/x/examples/outline-connectivity-app/shared_backend"
 )
 
@@ -36,19 +37,19 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
-func (a *App) Request(name string, &parameters {}) &body {} {
-	rawRequest, marshallingError := json.Marshal(input)
+func (a *App) Request(resourceName string, parameters interface{}) interface{} {
+	rawRequest, marshallingError := json.Marshal(parameters)
 
 	if marshallingError != nil {
-		return nil, "MakeRequest: failed to serialize raw invocation input"
+		return nil, "Request: failed to serialize request parameters"
 	}
 
-	var response shared_backend.IPCResponse
+	var response shared_backend.Response
 
 	unmarshallingError := json.Unmarshal(shared_backend.HandleRequest(rawRequest), &response)
 
 	if unmarshallingError != nil {
-		return nil, "Invoke: failed to parse invocation result"
+		return nil, "Request: failed to parse request result"
 	}
 
 	return response
