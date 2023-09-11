@@ -17,46 +17,50 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
 	"os"
-	"strings"
+	"os/signal"
+	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
 )
 
 func main() {
 	transportFlag := flag.String("transport", "", "Transport config")
+	addrFlag := flag.String("localAddr", "localhost:1080", "Local proxy address")
 	flag.Parse()
-
-	url := flag.Arg(0)
-	if url == "" {
-		log.Fatal("Need to pass the URL to fetch in the command-line")
-	}
 
 	dialer, err := config.NewStreamDialer(*transportFlag)
 	if err != nil {
 		log.Fatalf("Could not create dialer: %v", err)
 	}
-	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		if !strings.HasPrefix(network, "tcp") {
-			return nil, fmt.Errorf("protocol not supported: %v", network)
+
+	listener, err := net.Listen("tcp", *addrFlag)
+	if err != nil {
+		log.Fatalf("Could not listen on address %v: %v", *addrFlag, err)
+	}
+	defer listener.Close()
+	log.Printf("Proxy listening on %v", listener.Addr().String())
+
+	server := http.Server{Handler: httpproxy.NewConnectHandler(dialer)}
+	go func() {
+		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Error running web server: %v", err)
 		}
-		return dialer.Dial(ctx, addr)
-	}
-	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}}
+	}()
 
-	resp, err := httpClient.Get(url)
-	if err != nil {
-		log.Fatalf("URL GET failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	_, err = io.Copy(os.Stdout, resp.Body)
-	if err != nil {
-		log.Fatalf("Read of page body failed: %v", err)
+	// Wait for interrupt signal to stop the proxy.
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt)
+	<-sig
+	log.Print("Shutting down")
+	// Gracefully shut down the server, with a 5s timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("Failed to shutdown gracefully: %v", err)
 	}
 }

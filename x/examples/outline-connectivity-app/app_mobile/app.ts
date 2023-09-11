@@ -15,7 +15,9 @@
 // backend
 import { registerPlugin } from "@capacitor/core";
 
-const MobileBackend = registerPlugin("MobileBackend");
+const MobileBackend = registerPlugin<{
+  Request: <T, K>(name: string, parameters: T) => Promise<K>;
+}>("MobileBackend");
 
 // frontend
 import { LitElement, html } from "lit";
@@ -28,8 +30,10 @@ SharedFrontend.registerAllElements();
 @customElement("app-main")
 export class AppMain extends LitElement {
   render() {
-    return html`<connectivity-test-page .onSubmit=${
-      parameters => MobileBackend.Request("ConnectivityTest", parameters)
-    } />`;
+    return html`<connectivity-test-page 
+      .onSubmit=${
+        (parameters: SharedFrontend.ConnectivityTestRequest) =>
+          MobileBackend.Request<SharedFrontend.ConnectivityTestRequest, SharedFrontend.ConnectivityTestResponse>("ConnectivityTest", parameters)
+      } />`;
   }
 }

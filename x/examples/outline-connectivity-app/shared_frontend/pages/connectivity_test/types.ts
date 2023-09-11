@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export interface ConnectivityTestPageSubmitInput {
+export interface ConnectivityTestRequest {
   accessKey: string;
   domain: string;
   resolvers: string[];
@@ -22,7 +22,7 @@ export interface ConnectivityTestPageSubmitInput {
   };
 }
 
-export interface ConnectivityTestPageSubmitResult {
+export interface ConnectivityTestResult {
   time: string;
   durationMs: number;
   proto: string;
@@ -33,3 +33,5 @@ export interface ConnectivityTestPageSubmitResult {
     message: string;
   };
 }
+
+export type ConnectivityTestResponse =  ConnectivityTestResult[] | Error | null;

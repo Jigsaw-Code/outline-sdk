@@ -28,6 +28,7 @@ import (
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
+	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
 
 	_ "golang.org/x/mobile/bind"
@@ -76,12 +77,12 @@ type sessionConfig struct {
 type Prefix []byte
 
 func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult, error) {
-	config, err := parseAccessKey(request.AccessKey)
+	accessKeyParameters, err := parseAccessKey(request.AccessKey)
 	if err != nil {
 		return nil, err
 	}
 
-	proxyIPs, err := net.DefaultResolver.LookupIP(context.Background(), "ip", config.Hostname)
+	proxyIPs, err := net.DefaultResolver.LookupIP(context.Background(), "ip", accessKeyParameters.Hostname)
 	if err != nil {
 		return nil, err
 	}
@@ -89,38 +90,29 @@ func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult
 	// TODO: limit number of IPs. Or force an input IP?
 	var results []ConnectivityTestResult
 	for _, hostIP := range proxyIPs {
-		proxyAddress := net.JoinHostPort(hostIP.String(), fmt.Sprint(config.Port))
+		proxyAddress := net.JoinHostPort(hostIP.String(), fmt.Sprint(accessKeyParameters.Port))
 
 		for _, resolverHost := range request.Resolvers {
 			resolverHost := strings.TrimSpace(resolverHost)
 			resolverAddress := net.JoinHostPort(resolverHost, "53")
 
 			if request.Protocols.TCP {
-
-				streamDialer, err := config.NewStreamDialer(*transportFlag)
-				if err != nil {
-					log.Fatalf("Failed to create StreamDialer: %v", err)
-				}
-				resolver := &transport.StreamDialerEndpoint{Dialer: streamDialer, Address: resolverAddress}
-				testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, *domainFlag)
-
 				testTime := time.Now()
 				var testErr error
 				var testDuration time.Duration
 
-				dialer, err := makeStreamDialer(proxyAddress, config.CryptoKey, config.Prefix)
+				streamDialer, err := config.NewStreamDialer("")
 				if err != nil {
-					return nil, err
+					log.Fatalf("Failed to create StreamDialer: %v", err)
 				}
-
-				resolver := &transport.StreamDialerEndpoint{Dialer: dialer, Address: resolverAddress}
-				testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, request.Domain)
+				resolver := &transport.StreamDialerEndpoint{Dialer: streamDialer, Address: resolverAddress}
+				testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, resolverAddress)
 
 				results = append(results, ConnectivityTestResult{
 					Proxy:      proxyAddress,
 					Resolver:   resolverAddress,
 					Proto:      "tcp",
-					Prefix:     config.Prefix.String(),
+					Prefix:     accessKeyParameters.Prefix.String(),
 					Time:       testTime.UTC().Truncate(time.Second),
 					DurationMs: testDuration.Milliseconds(),
 					Error:      makeErrorRecord(testErr),
@@ -132,20 +124,18 @@ func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult
 				var testErr error
 				var testDuration time.Duration
 
-				listener, err := makePacketListener(proxyAddress, config.CryptoKey)
+				streamDialer, err := config.NewPacketDialer("")
 				if err != nil {
-					return nil, err
+					log.Fatalf("Failed to create StreamDialer: %v", err)
 				}
-
-				dialer := transport.PacketListenerDialer{Listener: listener}
-				resolver := &transport.PacketDialerEndpoint{Dialer: dialer, Address: resolverAddress}
-				testDuration, testErr = connectivity.TestResolverPacketConnectivity(context.Background(), resolver, request.Domain)
+				resolver := &transport.PacketDialerEndpoint{Dialer: streamDialer, Address: resolverAddress}
+				testDuration, testErr = connectivity.TestResolverPacketConnectivity(context.Background(), resolver, resolverAddress)
 
 				results = append(results, ConnectivityTestResult{
 					Proxy:      proxyAddress,
 					Resolver:   resolverAddress,
 					Proto:      "udp",
-					Prefix:     config.Prefix.String(),
+					Prefix:     accessKeyParameters.Prefix.String(),
 					Time:       testTime.UTC().Truncate(time.Second),
 					DurationMs: testDuration.Milliseconds(),
 					Error:      makeErrorRecord(testErr),
@@ -155,21 +145,6 @@ func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult
 	}
 
 	return results, nil
-}
-
-func makeStreamDialer(proxyAddress string, cryptoKey *shadowsocks.EncryptionKey, prefix []byte) (transport.StreamDialer, error) {
-	proxyDialer, err := shadowsocks.NewStreamDialer(&transport.TCPEndpoint{Address: proxyAddress}, cryptoKey)
-	if err != nil {
-		return nil, err
-	}
-	if len(prefix) > 0 {
-		proxyDialer.SaltGenerator = shadowsocks.NewPrefixSaltGenerator(prefix)
-	}
-	return proxyDialer, nil
-}
-
-func makePacketListener(proxyAddress string, cryptoKey *shadowsocks.EncryptionKey) (transport.PacketListener, error) {
-	return shadowsocks.NewPacketListener(&transport.UDPEndpoint{Address: proxyAddress}, cryptoKey)
 }
 
 func makeErrorRecord(err error) *ConnectivityTestError {

@@ -10,7 +10,7 @@ The overarching goal of this application is to demonstrate how the Outline SDK e
 
 We achieve this by first writing a [`shared_backend`](./shared_backend) package in Go - which contains the UDP/TCP connectivity test implemented with the Outline SDK - and a [`shared_frontend`](./shared_frontend/) GUI built with TypeScript and Lit which contains an HTML form for entering the required connectivity test parameters.
 
-Each platform used - [Wails](https://wails.app/) for desktop and [Capacitor](https://capacitorjs.com/) for mobile - then has a thin wrapper around the shared code that handles the platform-specific details.
+Each platform used - [Wails](https://wails.app/) for desktop and [Capacitor](https://capacitorjs.com/) for mobile - then has a thin wrapper around the shared code that handles the platform-specific details. The following diagram illustrates how the shared code is built and used across platforms:
 
 ```mermaid
 graph LR
@@ -55,30 +55,30 @@ graph LR
 
 For Mobile, we use `gomobile` to build the `shared_backend` package into a `xcframework` for iOS and an `aar` for Android. You can see this for yourself by running `yarn shared_backend build`. For Desktop, Wails simply refers to the `shared_backend` package directly.
 
-Then we implement a small piece of middleware called `Invokable` that enables the frontend to speak to the backend via the given platform.
+Then we implement a small piece of middleware that enables the frontend to make requests to the backend via the given platform.
 
 ```ts
-interface Invokable {
-  Invoke(parameters: { method: string; input: string; }): Promise<{ result: string; errors: string[] }>
+interface Backend {
+  Request<T, K>(resourceName: string, parameters: T): Promise<K>
 }
 ```
 
-In an `Invoke` call, the frontend passes a `method` and `input` to the backend, and the backend returns a `result` and `errors`. The `method` is the name of a function in the `shared_backend` package, and the `input` is a JSON string that is passed to that function. The `result` is a JSON string returned by the function, and the `errors` are any errors that occurred during the function call.
+In a `Request` call, the frontend passes a `resourceName` and `parameters` to the backend, and the backend returns a promise either containing the result or which throws an error. The `resource` is the name of a function in the `shared_backend` package, and the `parameters` are are passed to that function.
 
-With this simple Invokable binding to whatever native backend the frontend is running on, we can then build the frontend convenience bindings with typing and examples, like so:
+With this middleware implemented, we can now use the shared code in the frontend. For example, in the mobile app, we can use the shared code like so:
 
 ```ts
 @customElement("app-main")
 export class AppMain extends LitElement {
-  backend = SharedBackend.from(MobileBackend)
-
   render() {
-    // this.backend.connectivityTest's input is a ConnectivityTestParameters interface, output is a ConnectivityTestResult[]
-    return html`<connectivity-test-page .onSubmit=${this.backend.connectivityTest} />`;
+    return html`<connectivity-test-page 
+      .onSubmit=${
+        (parameters: SharedFrontend.ConnectivityTestRequest) =>
+          MobileBackend.Request<SharedFrontend.ConnectivityTestRequest, SharedFrontend.ConnectivityTestResponse>("ConnectivityTest", parameters)
+      } />`;
   }
 }
 ```
-
 
 ## Development
 
@@ -108,7 +108,7 @@ If at any point you run into issues during development, try `yarn reset`.
 
 ### Build
 
-> NOTE: You will need credentials to build for iOS and Android. Talk to @jigsaw.
+> TODO: how to generate credentials
 
 `yarn build`
 

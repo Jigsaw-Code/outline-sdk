@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     https://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,11 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import "./theme.css";
-import { ConnectivityTestPage } from "./pages";
+//go:build tools
+// +build tools
 
-export * from "./pages";
+// See https://github.com/golang/go/wiki/Modules#how-can-i-track-tool-dependencies-for-a-module
+// and https://github.com/go-modules-by-example/index/blob/master/010_tools/README.md
 
-export function registerAllElements() {
-  window.customElements.define("connectivity-test-page", ConnectivityTestPage);
-}
+package tools
+
+import (
+	_ "github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
+	_ "golang.org/x/mobile/cmd/gobind"
+	_ "golang.org/x/mobile/cmd/gomobile"
+)

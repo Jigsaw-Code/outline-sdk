@@ -15,41 +15,33 @@
 package main
 
 import (
-	"context"
 	"flag"
-	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
+	"net/url"
 	"os"
-	"strings"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
 )
 
 func main() {
 	transportFlag := flag.String("transport", "", "Transport config")
 	flag.Parse()
 
-	url := flag.Arg(0)
-	if url == "" {
+	urlToFetch := flag.Arg(0)
+	if urlToFetch == "" {
 		log.Fatal("Need to pass the URL to fetch in the command-line")
 	}
 
-	dialer, err := config.NewStreamDialer(*transportFlag)
+	proxy, err := mobileproxy.RunProxy("localhost:0", *transportFlag)
 	if err != nil {
-		log.Fatalf("Could not create dialer: %v", err)
+		log.Fatalf("Cmobileproxy start proxy: %v", err)
 	}
-	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		if !strings.HasPrefix(network, "tcp") {
-			return nil, fmt.Errorf("protocol not supported: %v", network)
-		}
-		return dialer.Dial(ctx, addr)
-	}
-	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}}
 
-	resp, err := httpClient.Get(url)
+	httpClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(&url.URL{Scheme: "http", Host: proxy.Address()})}}
+
+	resp, err := httpClient.Get(urlToFetch)
 	if err != nil {
 		log.Fatalf("URL GET failed: %v", err)
 	}
@@ -59,4 +51,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Read of page body failed: %v", err)
 	}
+
+	proxy.Stop(5)
 }

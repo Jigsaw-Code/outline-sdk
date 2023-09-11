@@ -16,7 +16,9 @@ import { configureLocalization, msg, localized } from "@lit/localize";
 import { css, html, LitElement } from "lit";
 import { property } from "lit/decorators.js";
 import { sourceLocale, targetLocales } from "./generated/messages";
-import type { ConnectivityTestPageSubmitInput, ConnectivityTestPageSubmitResult } from "./types";
+import type { ConnectivityTestRequest, ConnectivityTestResponse, ConnectivityTestResult } from "./types";
+
+export * from "./types";
 
 // TODO: only call this once
 const Localization = configureLocalization({
@@ -30,13 +32,13 @@ const Localization = configureLocalization({
 @localized()
 export class ConnectivityTestPage extends LitElement {
   @property({ type: Function })
-  onSubmit: (input: ConnectivityTestPageSubmitInput) => Promise<ConnectivityTestPageSubmitResult[]>;
+  onSubmit?: (request: ConnectivityTestRequest) => Promise<ConnectivityTestResponse>;
 
   @property({ attribute: false })
   isSubmitting = false;
 
   @property({ attribute: false })
-  testResults: ConnectivityTestPageSubmitResult[] | Error | null = null;
+  testResponse: ConnectivityTestResponse = null;
 
   get locale() {
     return Localization.getLocale();
@@ -92,9 +94,9 @@ export class ConnectivityTestPage extends LitElement {
     this.isSubmitting = true;
 
     try {
-      this.testResults = await this.onSubmit(this.formData);
+      this.testResponse = (await this.onSubmit?.(this.formData)) ?? null;
     } catch (error) {
-      this.testResults = new Error(error as string);
+      this.testResponse = new Error(error as string);
     } finally {
       this.isSubmitting = false;
     }
@@ -740,7 +742,7 @@ export class ConnectivityTestPage extends LitElement {
   }
 
   renderResults() {
-    if (!this.testResults) {
+    if (!this.testResponse) {
       return;
     }
 
@@ -749,24 +751,24 @@ export class ConnectivityTestPage extends LitElement {
         <h2 class="results-header-text">${msg("Test Results")}</h2>
         <button
           class="results-header-close"
-          @click=${() => (this.testResults = null)}
+          @click=${() => (this.testResponse = null)}
         >
           ✕
         </button>
       </header>
-      ${this.renderResultsList(this.testResults)}
+      ${this.renderResultsList(this.testResponse)}
     </dialog>`;
   }
 
-  renderResultsList(results: ConnectivityTestPageSubmitResult[] | Error) {
-    if (results instanceof Error) {
+  renderResultsList(response: ConnectivityTestResult[] | Error) {
+    if (response instanceof Error) {
       return html`
         <ul class="results-list">
           <li class="results-list-item results-list-item--failure">
             <i class="results-list-item-status">✖</i>
             <dl class="results-list-item-data">
               <dt class="results-list-item-data-key">${msg("Error")}</dt>
-              <dd class="results-list-item-data-value">${results.message}</dd>
+              <dd class="results-list-item-data-value">${response.message}</dd>
             </dl>
           </li>
         </ul>
@@ -774,7 +776,7 @@ export class ConnectivityTestPage extends LitElement {
     }
 
     return html` <ul class="results-list">
-      ${results.map((result) => {
+      ${response.map((result) => {
         const isSuccess = !result.error;
 
         return html`<li

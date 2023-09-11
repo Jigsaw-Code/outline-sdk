@@ -26,8 +26,7 @@ SharedFrontend.registerAllElements();
 @customElement("app-main")
 export class AppMain extends LitElement {
   render() {
-    return html`<connectivity-test-page .onSubmit=${
-      parameters => DesktopBackend.Request("ConnectivityTest", parameters)
-    } />`;
+    return html`<connectivity-test-page .onSubmit=${(parameters: SharedFrontend.ConnectivityTestRequest) => DesktopBackend.Request("ConnectivityTest", parameters)
+      } />`;
   }
 }
