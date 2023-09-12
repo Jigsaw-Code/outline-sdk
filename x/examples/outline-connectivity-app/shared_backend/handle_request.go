@@ -19,14 +19,14 @@ import (
 	"fmt"
 )
 
-/* INFRASTRUCTURE (to be generalized via reflection/generics and moved) */
+/* TODO: generalize via reflection/generics and move */
 type Request struct {
-	Name       string `json:"method"`
-	Parameters string `json:"input"`
+	ResourceName string `json:"resourceName"`
+	Parameters   string `json:"parameters"`
 }
 
 type Response struct {
-	Body  string `json:"result"`
+	Body  string `json:"body"`
 	Error string `json:"error"`
 }
 
@@ -41,12 +41,7 @@ func HandleRequest(rawRequest []byte) []byte {
 		response.Error = "HandleIPC: error parsing raw input string"
 	}
 
-	/* TODO: generalize, make non-blocking */
-	if request.Name != "ConnectivityTest" {
-		response.Error = "HandleIPC: method name not found"
-	}
-
-	var parameters ConnectivityTestRequest
+	var parameters interface{}
 
 	unmarshallingParametersError := json.Unmarshal([]byte(request.Parameters), &parameters)
 
@@ -54,10 +49,23 @@ func HandleRequest(rawRequest []byte) []byte {
 		response.Error = "HandleIPC: error parsing method input"
 	}
 
-	result, testError := ConnectivityTest(parameters)
+	var result interface{}
+	var resultError error
 
-	if testError != nil {
-		response.Error = testError.Error()
+	if request.ResourceName == "ConnectivityTest" {
+		parameters, isConnectivityTestRequest := parameters.(ConnectivityTestRequest)
+
+		if !isConnectivityTestRequest {
+			response.Error = "HandleIPC: error parsing method input"
+		}
+
+		result, resultError = ConnectivityTest(parameters)
+	} else {
+		response.Error = "HandleIPC: method name not found"
+	}
+
+	if resultError != nil {
+		response.Error = resultError.Error()
 	}
 
 	rawBody, marshallingBodyError := json.Marshal(result)
@@ -65,7 +73,6 @@ func HandleRequest(rawRequest []byte) []byte {
 	if marshallingBodyError != nil {
 		response.Error = "HandleIPC: error serializing method result"
 	}
-	/* END TODO: generalize, make non-blocking */
 
 	response.Body = string(rawBody)
 

@@ -44,6 +44,7 @@ public class MobileBackendPlugin: CAPPlugin {
             
             response = try decoder.decode(
                 Response.self,
+                // TODO: make this non blocking: https://stackoverflow.com/a/69381330
                 from: Shared_backendHandleRequest(rawRequest)!
             )
         } catch {

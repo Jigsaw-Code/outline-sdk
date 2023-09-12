@@ -47,6 +47,7 @@ func (a *App) Request(resourceName string, parameters interface{}) (shared_backe
 		return response, errors.New("Request: failed to serialize request parameters")
 	}
 
+	// TODO: make this non-blocking with goroutines/channels
 	unmarshallingError := json.Unmarshal(shared_backend.HandleRequest(rawRequest), &response)
 
 	if unmarshallingError != nil {
