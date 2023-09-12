@@ -41,11 +41,12 @@ type StreamDialer struct {
 	key      *EncryptionKey
 
 	// SaltGenerator is used by Shadowsocks to generate the connection salts.
-	// `SaltGenerator` may be `nil`, which defaults to [shadowsocks.RandomSaltGenerator].
+	// `SaltGenerator` can be `nil`, which defaults to [shadowsocks.RandomSaltGenerator].
 	SaltGenerator SaltGenerator
 
 	// ClientDataWait specifies the amount of time to wait for client data before sending
-	// the Shadowsocks connection request to the proxy server. It's 10 milliseconds by default.
+	// the Shadowsocks connection request to the proxy server. This value is 10 milliseconds
+	// by default.
 	//
 	// StreamDialer has an optimization to send the initial client payload along with
 	// the Shadowsocks connection request.  This saves one packet during connection, and also
@@ -56,13 +57,13 @@ type StreamDialer struct {
 	// expect the server to send data first, in which case there is no client payload.
 	// We therefore use a short delay by default (10ms), longer than any reasonable IPC but shorter than
 	// typical network latency.  (In an Android emulator, the 90th percentile delay
-	// was ~1 ms.)  If no client payload is received by this time, we connect without it.
+	// is ~1 ms.)  If no client payload is received by this time, we connect without it.
 	ClientDataWait time.Duration
 }
 
 var _ transport.StreamDialer = (*StreamDialer)(nil)
 
-// Dial implements StreamDialer.Dial via a Shadowsocks server.
+// Dial implements StreamDialer.Dial using a Shadowsocks server.
 //
 // The Shadowsocks StreamDialer returns a connection after the connection to the proxy is established,
 // but before the connection to the target is established. That means we cannot signal "connection refused"
