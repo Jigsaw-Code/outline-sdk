@@ -19,7 +19,7 @@ import (
 	"fmt"
 )
 
-/* TODO: generalize via reflection/generics and move */
+// TODO: generalize via reflection/generics and move to infrastructure
 type Request struct {
 	ResourceName string `json:"resourceName"`
 	Parameters   string `json:"parameters"`

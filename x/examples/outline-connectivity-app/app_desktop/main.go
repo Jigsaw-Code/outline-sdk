@@ -22,8 +22,6 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 )
 
-// TODO: build in root folder of workspace and link: https://stackoverflow.com/a/67357103
-
 //go:embed all:output/frontend
 var assets embed.FS
 
@@ -39,7 +37,7 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		OnStartup:        app.startup,
+		OnStartup: app.startup,
 		Bind: []interface{}{
 			app,
 		},
