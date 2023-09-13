@@ -24,7 +24,7 @@ graph LR
   end
   subgraph app_desktop
     H["index.html"]
-    G["DesktopBackend.Invoke()"]
+    G["DesktopBackend.Request()"]
   end
   subgraph app_mobile
     subgraph ios
@@ -34,7 +34,7 @@ graph LR
       J["MobileBackendPlugin.kt"]
     end
     K["index.html"]
-    L["MobileBackend.Invoke()"]
+    L["MobileBackend.Request()"]
   end
 
   A -.-> |gomobile| C
@@ -49,8 +49,10 @@ graph LR
   L --> K
   G --> H
 
-  style K fill:blue;text-color:white;
-  style H fill:blue;text-color:white;
+  style K fill:blue;
+  style K color:white;
+  style H fill:blue;
+  style H color:white;
 ```
 
 For Mobile, we use `gomobile` to build the `shared_backend` package into a `xcframework` for iOS and an `aar` for Android. You can see this for yourself by running `yarn shared_backend build`. For Desktop, Wails simply refers to the `shared_backend` package directly.
