@@ -49,8 +49,8 @@ graph LR
   L --> K
   G --> H
 
-  style K fill:blue;
-  style H fill:blue;
+  style K fill:blue;text-color:white;
+  style H fill:blue;text-color:white;
 ```
 
 For Mobile, we use `gomobile` to build the `shared_backend` package into a `xcframework` for iOS and an `aar` for Android. You can see this for yourself by running `yarn shared_backend build`. For Desktop, Wails simply refers to the `shared_backend` package directly.
@@ -117,6 +117,7 @@ If at any point you run into issues during development, try `yarn reset`.
 1. **\[P1\]** android (in progress)
 1. **\[P1\]** read browser language on load, centralize language list, and only localize once
 1. **\[P1\]** documentation on how to generate mobile app build credentials
+1. **\[P2\]** use x/config to parse the access key and showcase the different transports (see: https://github.com/Jigsaw-Code/outline-sdk/blob/main/x/examples/outline-connectivity/main.go)
 1. **\[P2\]** generalize request handler via generics/reflection
 1. **\[P2\]** Create a logo for the app
 1. **\[P2\]** Make backend request calls non-blocking
