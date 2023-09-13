@@ -16,12 +16,12 @@ import Foundation
 import Capacitor
 import SharedBackend
 
-struct Request: Codable {
-    var name: String
+struct FrontendRequest: Codable {
+    var resourceName: String
     var parameters: String
 }
 
-struct Response: Decodable {
+struct FrontendResponse: Decodable {
     var body: String
     var error: String
 }
@@ -29,21 +29,21 @@ struct Response: Decodable {
 @objc(MobileBackendPlugin)
 public class MobileBackendPlugin: CAPPlugin {
     @objc func Request(_ call: CAPPluginCall) {
-        let response: Response
+        let response: FrontendResponse
 
         let encoder = JSONEncoder()
         let decoder = JSONDecoder()
 
         do {
             let rawRequest = try encoder.encode(
-                Request(
-                    name: call.getString("name")!,
+                FrontendRequest(
+                    resourceName: call.getString("resourceName")!,
                     parameters: call.getString("parameters")!
                 )
             )
             
             response = try decoder.decode(
-                Response.self,
+                FrontendResponse.self,
                 // TODO: make this non blocking: https://stackoverflow.com/a/69381330
                 from: Shared_backendHandleRequest(rawRequest)!
             )

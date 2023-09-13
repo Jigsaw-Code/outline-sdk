@@ -15,8 +15,19 @@
 // backend
 import * as DesktopBackend from "./generated/wailsjs/go/main/App";
 
+async function requestBackend<T, K>(resourceName: string, parameters: T): Promise<K> {
+  const response = await DesktopBackend.Request(resourceName, JSON.stringify(parameters));
+
+  if (response.error) {
+    throw new Error(response.error);
+  }
+  
+  return JSON.parse(response.body);
+}
+
 // frontend
 import * as SharedFrontend from "shared_frontend";
+import type { ConnectivityTestRequest, ConnectivityTestResponse } from "shared_frontend";
 import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
 
@@ -26,7 +37,11 @@ SharedFrontend.registerAllElements();
 @customElement("app-main")
 export class AppMain extends LitElement {
   render() {
-    return html`<connectivity-test-page .onSubmit=${(parameters: SharedFrontend.ConnectivityTestRequest) => DesktopBackend.Request("ConnectivityTest", parameters)
-      } />`;
+    return html`<connectivity-test-page .onSubmit=${
+      (parameters: ConnectivityTestRequest) =>
+        requestBackend<ConnectivityTestRequest, ConnectivityTestResponse>(
+          "ConnectivityTest", parameters 
+        )
+     } />`;
   }
 }

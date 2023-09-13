@@ -38,20 +38,22 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
-func (a *App) Request(resourceName string, parameters interface{}) (shared_backend.Response, error) {
-	rawRequest, marshallingError := json.Marshal(parameters)
-
+func (a *App) Request(resourceName string, parameters string) (shared_backend.Response, error) {
 	var response shared_backend.Response
 
-	if marshallingError != nil {
-		return response, errors.New("Request: failed to serialize request parameters")
+	request := shared_backend.Request{ResourceName: resourceName, Parameters: parameters}
+
+	rawRequest, requestSerializeError := json.Marshal(request)
+
+	if requestSerializeError != nil {
+		return response, errors.New("DesktopBackend.Request: failed to serialize request")
 	}
 
 	// TODO: make this non-blocking with goroutines/channels
-	unmarshallingError := json.Unmarshal(shared_backend.HandleRequest(rawRequest), &response)
+	responseParseError := json.Unmarshal(shared_backend.HandleRequest(rawRequest), &response)
 
-	if unmarshallingError != nil {
-		return response, errors.New("Request: failed to parse request result")
+	if responseParseError != nil {
+		return response, errors.New("DesktopBackend.Request: failed to parse response")
 	}
 
 	return response, nil

@@ -1,7 +1,7 @@
 export namespace shared_backend {
 	
 	export class Response {
-	    result: string;
+	    body: string;
 	    error: string;
 	
 	    static createFrom(source: any = {}) {
@@ -10,7 +10,7 @@ export namespace shared_backend {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.result = source["result"];
+	        this.body = source["body"];
 	        this.error = source["error"];
 	    }
 	}

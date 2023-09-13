@@ -38,30 +38,24 @@ func HandleRequest(rawRequest []byte) []byte {
 	var response Response
 
 	if unmarshallRequestError != nil {
-		response.Error = "HandleIPC: error parsing raw input string"
-	}
-
-	var parameters interface{}
-
-	unmarshallingParametersError := json.Unmarshal([]byte(request.Parameters), &parameters)
-
-	if unmarshallingParametersError != nil {
-		response.Error = "HandleIPC: error parsing method input"
+		response.Error = "HandleRequest: error parsing raw input string"
 	}
 
 	var result interface{}
 	var resultError error
 
 	if request.ResourceName == "ConnectivityTest" {
-		parameters, isConnectivityTestRequest := parameters.(ConnectivityTestRequest)
+		var parameters ConnectivityTestRequest
 
-		if !isConnectivityTestRequest {
-			response.Error = "HandleIPC: error parsing method input"
+		unmarshallingParametersError := json.Unmarshal([]byte(request.Parameters), &parameters)
+
+		if unmarshallingParametersError != nil {
+			response.Error = "HandleRequest: error parsing method input"
 		}
 
 		result, resultError = ConnectivityTest(parameters)
 	} else {
-		response.Error = "HandleIPC: method name not found"
+		response.Error = "HandleRequest: method name not found"
 	}
 
 	if resultError != nil {
@@ -71,7 +65,7 @@ func HandleRequest(rawRequest []byte) []byte {
 	rawBody, marshallingBodyError := json.Marshal(result)
 
 	if marshallingBodyError != nil {
-		response.Error = "HandleIPC: error serializing method result"
+		response.Error = "HandleRequest: error serializing method result"
 	}
 
 	response.Body = string(rawBody)
@@ -79,7 +73,7 @@ func HandleRequest(rawRequest []byte) []byte {
 	rawResponse, marshallingResponseError := json.Marshal(response)
 
 	if marshallingResponseError != nil {
-		fmt.Println("[ERROR] failed to properly marshal HandleIPC output")
+		fmt.Println("[ERROR] failed to properly marshal HandleRequest output")
 	}
 
 	return rawResponse

@@ -124,11 +124,11 @@ func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult
 				var testErr error
 				var testDuration time.Duration
 
-				streamDialer, err := config.NewPacketDialer("")
+				packetDialer, err := config.NewPacketDialer("")
 				if err != nil {
-					log.Fatalf("Failed to create StreamDialer: %v", err)
+					log.Fatalf("Failed to create PacketDialer: %v", err)
 				}
-				resolver := &transport.PacketDialerEndpoint{Dialer: streamDialer, Address: resolverAddress}
+				resolver := &transport.PacketDialerEndpoint{Dialer: packetDialer, Address: resolverAddress}
 				testDuration, testErr = connectivity.TestResolverPacketConnectivity(context.Background(), resolver, resolverAddress)
 
 				results = append(results, ConnectivityTestResult{
