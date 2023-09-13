@@ -13,8 +13,8 @@
 
 The Outline SDK allows you to:
 
-- Create tools to protect against network-level interference
-- Add network-level interference protection to existing apps, such as content or communication apps
+- Create tools to protect against network-level interference.
+- Add network-level interference protection to existing apps, such as content or communication apps.
 
 ## Advantages
 
@@ -27,14 +27,14 @@ The Outline SDK allows you to:
 
 Choose from one of the following methods to integrate the Outline SDK into your project:
 
-- **Generated Mobile Library**: For Android, iOS, and macOS apps. Uses [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile) for generating Java and Objective-C bindings.
+- **Generated Mobile Library**: For Android, iOS, and macOS apps. Uses [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile) to generate Java and Objective-C bindings.
 - **Side Service**: For desktop and Android apps. Runs a standalone Go binary that your application communicates with (not available on iOS due to subprocess limitations).
 - **Go Library**: Directly import the SDK into your Go application. [API Reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk).
 - **Generated C Library**: Generate C bindings using [`go build`](https://pkg.go.dev/cmd/go#hdr-Build_modes).
 
 The Outline Client uses a **generated mobile library** on Android, iOS and macOS (based on Cordova) and a **side service** on Windows and Linux (based on Electron).
 
-Below we provide more details on the integration approaches.
+Below we provide more details on each integration approach.
 
 ### Generated Mobile Library
 
@@ -46,7 +46,7 @@ To integrate the SDK into a mobile app, follow these steps:
     - Apple examples: [Outline iOS Framework](https://github.com/Jigsaw-Code/outline-go-tun2socks/blob/dada2652ae2c6205f2daa3f88c805bbd6b28a713/Makefile#L30), [Outline macOS Framework](https://github.com/Jigsaw-Code/outline-go-tun2socks/blob/dada2652ae2c6205f2daa3f88c805bbd6b28a713/Makefile#L36).
 1. **Integrate into your app**: Add the generated library to your app. For more details, see Go Mobile's [SDK applications and generating bindings](https://github.com/golang/go/wiki/Mobile#sdk-applications-and-generating-bindings).
 
-> **Note**: You must use `gomobile bind` on a package you create, not directly on the SDK packages.
+> **Note**: You must use `gomobile bind` on the package you create, not directly on the SDK packages.
 
 An easy way to integrate with the SDK in a mobile app is by using the [`x/mobileproxy` library](./x/mobileproxy/) 
 to run a local web proxy that you can use to configure your app's networking libraries.
@@ -55,7 +55,7 @@ to run a local web proxy that you can use to configure your app's networking lib
 
 To integrate the SDK as a side service, follow these steps:
 
-1. **Define IPC mechanism**: Choose an inter-process communication (IPC) mechanism (e.g., sockets, standard I/O).
+1. **Define IPC mechanism**: Choose an inter-process communication (IPC) mechanism (for example, sockets, standard I/O).
 1. **Build the service**: Create a Go binary that includes the server-side of the IPC and used the SDK.
     - Examples: [Outline Electron backend code](https://github.com/Jigsaw-Code/outline-go-tun2socks/blob/master/outline/electron/main.go), [Outline Windows Client backend build](https://github.com/Jigsaw-Code/outline-go-tun2socks/blob/dada2652ae2c6205f2daa3f88c805bbd6b28a713/Makefile#L67), [Outline Linux Client backend build](https://github.com/Jigsaw-Code/outline-go-tun2socks/blob/dada2652ae2c6205f2daa3f88c805bbd6b28a713/Makefile#L56).
 3. **Bundle the service**: Include the Go binary in your application bundle.
@@ -76,72 +76,66 @@ For examples, see [x/examples](./x/examples/).
 
 ### Generated C Library
 
-For applications that require C bindings. This approach is similar to the Generated Mobile Library approach, where you need to first create a Go library to generate bindings for.
+This approach is suited for applications that require C bindings. It is similar to the Generated Mobile Library approach, where you need to first create a Go library to generate bindings for.
 
 Steps:
 
-1. **Create a Go library**: Create a Go package that wraps the SDK functionalities you need. Functions to be exported must be marked with `//export`, as per the [cgo documentation](https://pkg.go.dev/cmd/cgo#hdr-C_references_to_Go).
+1. **Create a Go library**: Create a Go package that wraps the SDK functionalities you need. Functions to be exported must be marked with `//export`, as described in the [cgo documentation](https://pkg.go.dev/cmd/cgo#hdr-C_references_to_Go).
 1. **Generate C library**: Use `go build` with the [appropriate `-buildmode` flag](https://pkg.go.dev/cmd/go#hdr-Build_modes). Anternatively, you can use [SWIG](https://swig.org/Doc4.1/Go.html#Go).
 1. **Integrate into your app**: Add the generated C library to your application, according to your build system.
 
 
 ## Tentative Roadmap
 
-The launch will have two milestones: Alpha and Beta. We are currently in Alpha. Most of the code is not new. It's the same code that is currently being used by the production Outline Client and Server. The SDK repackages code from [outline-ss-server](https://github.com/Jigsaw-Code/outline-ss-server) and [outline-go-tun2socks](https://github.com/Jigsaw-Code/outline-go-tun2socks) in a way that is easier to reuse and extend.
-
-### Alpha
-
-The goal of the Alpha release is to make it available to potential developers early, so they can provide feedback on the SDK and help shape the interfaces, processes and tools.
-
-Alpha features:
-
-- Transport-level libraries
-  - [x] Add generic transport client primitives (`StreamDialer`, `PacketListener` and Endpoints)
-  - [x] Add TCP and UDP client implementations
-  - [x] Add Shadowsocks client implementations
-  - [x] Use transport libraries in the Outline Client
-  - [x] Use transport libraries in the Outline Server
-
-- Network-level libraries
-  - [x] Add IP Device abstraction
-  - [x] Add IP Device implementation based on go-tun2socks (LWIP)
-  - [x] Add UDP handler to fallback to DNS-over-TCP
-  - [x] Add DelegatePacketProxy for runtime PacketProxy replacement
+This launch is currently in Beta. Most of the code is not new. It's the same code that is currently being used by the production Outline Client and Server. The SDK repackages code from [outline-ss-server](https://github.com/Jigsaw-Code/outline-ss-server) and [outline-go-tun2socks](https://github.com/Jigsaw-Code/outline-go-tun2socks) in a way that is easier to reuse and extend.
 
 ### Beta
 
-The goal of the Beta release is to make the SDK available for broader consumption, once we no longer expect major changes to the APIs and we have all supporting resources in place (website, documentation, examples, and so on).
+The goal of the Beta release is to make the SDK available for broad consumption, with no major expected changes to the APIs and all supporting resources in place (website, documentation, examples, and so on).
 
 Beta features:
 
-- Network libraries
-  - [ ] Use network libraries in the Outline Client
-  - [ ] Add extensive testing
+- Network-level libraries
+  - [x] Add IP Device abstraction (v 0.0.2)
+  - [x] Add IP Device implementation based on go-tun2socks (LWIP) (v 0.0.2)
+  - [x] Add UDP handler to fallback to DNS-over-TCP (v 0.0.2)
+  - [x] Add DelegatePacketProxy for runtime PacketProxy replacement (v 0.0.2)
+
+- Network library implementations
+  - [ ] Use network libraries in the Outline Client (coming soon)
+  - [ ] Add extensive testing (coming soon)
+
+- Transport-level libraries
+  - [x] Add generic transport client primitives (`StreamDialer`, `PacketListener` and Endpoints) (v 0.0.2)
+  - [x] Add TCP and UDP client implementations (v 0.0.2)
+  - [x] Add Shadowsocks client implementations (v 0.0.2)
+  - [x] Use transport libraries in the Outline Client (v 0.0.2)
+  - [x] Use transport libraries in the Outline Server (v 0.0.2)
 
 - Transport client strategies
   - Proxyless strategies
-    - [ ] Encrypted DNS
-    - [x] Packet splitting ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/split))
+    - [ ] Encrypted DNS (coming soon)
+    - [x] Packet splitting ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/split)) (v 0.0.6)
   - Proxy-based strategies
-    - [ ] HTTP Connect
-    - [x] SOCKS5 StreamDialer ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/socks5))
-    - [ ] SOCKS5 PacketDialer
+    - [ ] HTTP Connect (coming soon)
+    - [x] SOCKS5 StreamDialer ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/socks5)) (v 0.0.6)
+    - [ ] SOCKS5 PacketDialer (coming soon)
 
 - Integration resources
   - For Mobile apps
-    - [x] Library to run a local SOCKS5 or HTTP-Connect proxy ([source](./x/mobileproxy/mobileproxy.go), [example Go usage](./x/examples/fetch-proxy/main.go), [example mobile usage](./x/examples/mobileproxy)).
-    - [x] Documentation on how to integrate the SDK into mobile apps
-    - [ ] Connectivity Test mobile app using [Capacitor](https://capacitorjs.com/)
+    - [x] Library to run a local SOCKS5 or HTTP-Connect proxy ([source](./x/mobileproxy/mobileproxy.go), [example Go usage](./x/examples/fetch-proxy/main.go), [example mobile usage](./x/examples/mobileproxy)). (v 0.0.6)
+    - [x] Documentation on how to integrate the SDK into mobile apps (v 0.0.6)
+    - [ ] Connectivity Test mobile app using [Capacitor](https://capacitorjs.com/) (coming soon)
   - For Go apps
-    - [ ] Connectivity Test example [Wails](https://wails.io/) graphical app
-    - [x] Connectivity Test example command-line app ([source](./x/examples/outline-connectivity/))
-    - [ ] Outline Client example command-line app
-    - [x] Page fetch example command-line app ([source](./x/examples/outline-fetch/))
-    - [x] Local proxy example command-line app ([source](./x/examples/http2transport/))
+    - [ ] Connectivity Test example [Wails](https://wails.io/) graphical app (coming soon)
+    - [x] Connectivity Test example command-line app ([source](./x/examples/outline-connectivity/)) (v 0.0.6)
+    - [ ] Outline Client example command-line app (coming soon)
+    - [x] Page fetch example command-line app ([source](./x/examples/outline-fetch/)) (v 0.0.6)
+    - [x] Local proxy example command-line app ([source](./x/examples/http2transport/)) (v 0.0.6)
 
 - Server-side libraries
-  - [ ] To be defined
+  - [ ] To be defined (coming soon)
 
 - Other Resources
-  - [ ] Website
-  - [ ] Bindings
+  - [ ] Website (coming soon)
+  - [ ] Bindings (coming soon)
