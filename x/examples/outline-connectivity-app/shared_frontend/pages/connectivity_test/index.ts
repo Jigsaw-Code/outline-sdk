@@ -24,7 +24,7 @@ export * from "./types";
 const Localization = configureLocalization({
   sourceLocale,
   targetLocales,
-  loadLocale: (locale: string) => import(`./messages/locales/${locale}.ts`),
+  loadLocale: (locale: string) => import(`./generated/messages/locales/${locale}.ts`),
 });
 
 // TODO: TS says this class doesn't implement ReactiveElement, but it does
