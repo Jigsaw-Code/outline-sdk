@@ -23,6 +23,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@capacitor/android@npm:^5.3.0":
+  version: 5.3.0
+  resolution: "@capacitor/android@npm:5.3.0"
+  peerDependencies:
+    "@capacitor/core": ^5.3.0
+  checksum: f8ab19135943cbec1f75e210ab814272219fd04c6b0c66e9a548d3d92f6dd1ad0cea25846dc49ddf3a4a9e91c06df9edc91c201260e183770e124dff0b7dd382
+  languageName: node
+  linkType: hard
+
 "@capacitor/cli@npm:latest":
   version: 5.2.2
   resolution: "@capacitor/cli@npm:5.2.2"
@@ -616,6 +625,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "app_mobile@workspace:app_mobile"
   dependencies:
+    "@capacitor/android": ^5.3.0
     "@capacitor/cli": latest
     "@capacitor/core": latest
     "@capacitor/ios": ^5.2.2
