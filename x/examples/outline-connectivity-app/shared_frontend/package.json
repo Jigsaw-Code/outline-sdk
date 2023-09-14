@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "@lit/localize": "^0.11.4",
+    "lit": "^2.7.6",
+    "shared_backend": "workspace:^"
+  },
+  "devDependencies": {
+    "@lit/localize-tools": "^0.6.9"
+  },
+  "module": "index.ts",
+  "name": "shared_frontend",
+  "scripts": {
+    "_translations:export": "lit-localize extract --config ./pages/main/localize.json",
+    "_translations:import": "lit-localize build --config ./pages/main/localize.json",
+    "clean": "rm -rf node_modules output"
+  }
+}
