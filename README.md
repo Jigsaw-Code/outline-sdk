@@ -96,42 +96,42 @@ The goal of the Beta release is to make the SDK available for broad consumption,
 Beta features:
 
 - Network-level libraries
-  - [x] Add IP Device abstraction (v 0.0.2)
-  - [x] Add IP Device implementation based on go-tun2socks (LWIP) (v 0.0.2)
-  - [x] Add UDP handler to fallback to DNS-over-TCP (v 0.0.2)
-  - [x] Add DelegatePacketProxy for runtime PacketProxy replacement (v 0.0.2)
+  - [x] Add IP Device abstraction (v0.0.2)
+  - [x] Add IP Device implementation based on go-tun2socks (LWIP) (v0.0.2)
+  - [x] Add UDP handler to fallback to DNS-over-TCP (v0.0.2)
+  - [x] Add DelegatePacketProxy for runtime PacketProxy replacement (v0.0.2)
 
 - Network library implementations
   - [ ] Use network libraries in the Outline Client (coming soon)
   - [ ] Add extensive testing (coming soon)
 
 - Transport-level libraries
-  - [x] Add generic transport client primitives (`StreamDialer`, `PacketListener` and Endpoints) (v 0.0.2)
-  - [x] Add TCP and UDP client implementations (v 0.0.2)
-  - [x] Add Shadowsocks client implementations (v 0.0.2)
-  - [x] Use transport libraries in the Outline Client (v 0.0.2)
-  - [x] Use transport libraries in the Outline Server (v 0.0.2)
+  - [x] Add generic transport client primitives (`StreamDialer`, `PacketListener` and Endpoints) (v0.0.2)
+  - [x] Add TCP and UDP client implementations (v0.0.2)
+  - [x] Add Shadowsocks client implementations (v0.0.2)
+  - [x] Use transport libraries in the Outline Client (v0.0.2)
+  - [x] Use transport libraries in the Outline Server (v0.0.2)
 
 - Transport client strategies
   - Proxyless strategies
     - [ ] Encrypted DNS (coming soon)
-    - [x] Packet splitting ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/split)) (v 0.0.6)
+    - [x] Packet splitting ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/split)) (v0.0.6)
   - Proxy-based strategies
     - [ ] HTTP Connect (coming soon)
-    - [x] SOCKS5 StreamDialer ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/socks5)) (v 0.0.6)
+    - [x] SOCKS5 StreamDialer ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/socks5)) (v0.0.6)
     - [ ] SOCKS5 PacketDialer (coming soon)
 
 - Integration resources
   - For Mobile apps
-    - [x] Library to run a local SOCKS5 or HTTP-Connect proxy ([source](./x/mobileproxy/mobileproxy.go), [example Go usage](./x/examples/fetch-proxy/main.go), [example mobile usage](./x/examples/mobileproxy)). (v 0.0.6)
-    - [x] Documentation on how to integrate the SDK into mobile apps (v 0.0.6)
+    - [x] Library to run a local SOCKS5 or HTTP-Connect proxy ([source](./x/mobileproxy/mobileproxy.go), [example Go usage](./x/examples/fetch-proxy/main.go), [example mobile usage](./x/examples/mobileproxy)). (v0.0.6)
+    - [x] Documentation on how to integrate the SDK into mobile apps (v0.0.6)
     - [ ] Connectivity Test mobile app using [Capacitor](https://capacitorjs.com/) (coming soon)
   - For Go apps
     - [ ] Connectivity Test example [Wails](https://wails.io/) graphical app (coming soon)
-    - [x] Connectivity Test example command-line app ([source](./x/examples/outline-connectivity/)) (v 0.0.6)
+    - [x] Connectivity Test example command-line app ([source](./x/examples/outline-connectivity/)) (v0.0.6)
     - [ ] Outline Client example command-line app (coming soon)
-    - [x] Page fetch example command-line app ([source](./x/examples/outline-fetch/)) (v 0.0.6)
-    - [x] Local proxy example command-line app ([source](./x/examples/http2transport/)) (v 0.0.6)
+    - [x] Page fetch example command-line app ([source](./x/examples/outline-fetch/)) (v0.0.6)
+    - [x] Local proxy example command-line app ([source](./x/examples/http2transport/)) (v0.0.6)
 
 - Server-side libraries
   - [ ] To be defined (coming soon)
