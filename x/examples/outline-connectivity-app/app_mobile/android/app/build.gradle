@@ -1,5 +1,18 @@
 apply plugin: 'com.android.application'
 
+buildscript {
+    ext.kotlin_version = '1.5.20'
+
+    repositories {
+        google()
+        jcenter()
+    }
+
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
 android {
     namespace "org.outline.sdk.connectivity"
     compileSdkVersion rootProject.ext.compileSdkVersion
