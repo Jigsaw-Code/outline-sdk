@@ -57,7 +57,7 @@ type StreamDialer struct {
 	// expect the server to send data first, in which case there is no client payload.
 	// We therefore use a short delay by default (10ms), longer than any reasonable IPC but shorter than
 	// typical network latency.  (In an Android emulator, the 90th percentile delay
-	// is ~1 ms.)  If no client payload is received by this time, we connect without it.
+	// was ~1 ms.)  If no client payload is received by this time, we connect without it.
 	ClientDataWait time.Duration
 }
 
