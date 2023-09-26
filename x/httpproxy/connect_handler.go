@@ -15,9 +15,12 @@
 package httpproxy
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
@@ -124,5 +127,11 @@ func (h *handler) handleConnect(proxyResp http.ResponseWriter, proxyReq *http.Re
 // The resulting handler is currently vulnerable to probing attacks. It's ok as a localhost proxy
 // but it may be vulnerable if used as a public proxy.
 func NewConnectHandler(dialer transport.StreamDialer) http.Handler {
-	return &handler{dialer, *http.DefaultClient}
+	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if !strings.HasPrefix(network, "tcp") {
+			return nil, fmt.Errorf("protocol not supported: %v", network)
+		}
+		return dialer.Dial(ctx, addr)
+	}
+	return &handler{dialer, http.Client{Transport: &http.Transport{DialContext: dialContext}}}
 }
