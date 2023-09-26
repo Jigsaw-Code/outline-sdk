@@ -38,11 +38,12 @@ func (h *handler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Reques
 	if proxyReq.Method == http.MethodConnect {
 		h.handleConnect(proxyResp, proxyReq)
 		return
-	} else if proxyReq.URL.Host != "" {
-		h.handleHTTPProxyRequest(proxyResp, proxyReq)
-	} else {
-		http.Error(proxyResp, "Not Found", http.StatusNotFound)
 	}
+	if proxyReq.URL.Host != "" {
+		h.handleHTTPProxyRequest(proxyResp, proxyReq)
+		return
+	}
+	http.Error(proxyResp, "Not Found", http.StatusNotFound)
 }
 
 func (h *handler) handleHTTPProxyRequest(proxyResp http.ResponseWriter, proxyReq *http.Request) {
