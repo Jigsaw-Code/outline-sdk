@@ -86,21 +86,28 @@ export class AppMain extends LitElement {
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/)
-- [Yarn](https://yarnpkg.com/)
-- [Go](https://golang.org/)
-- [Wails](https://wails.app/)
-- [Capacitor](https://capacitorjs.com/)
-- [CocoaPods](https://cocoapods.org/)
-- [Xcode](https://developer.apple.com/xcode/)
-- [Android SDK](https://developer.android.com/studio)
-- [Android NDK](https://developer.android.com/ndk)
+- Javascript
+  - [Node.js](https://nodejs.org/)
+  - [Yarn](https://yarnpkg.com/)
+- Golang
+  - [Go](https://golang.org/)
+    - `PATH=$PATH:$(go env GOPATH)/bin`
+  - [Wails](https://wails.app/)
+  - [Gomobile](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile)
+    - `gomobile init`
+- Apple
+  - [Xcode](https://developer.apple.com/xcode/)
+  - [CocoaPods](https://cocoapods.org/)
+- Android
+  - [Android SDK](https://developer.android.com/studio)
+  - [Android NDK](https://developer.android.com/ndk)
 
-### Setup
+### Setting up this project
 
 1. Clone this repo
 1. `cd` into the repo
-1. `yarn`
+1. `yarn setup`
+1. if vscode: `yarn setup:vscode`
 
 If at any point you run into issues during development, try `yarn reset`.
 

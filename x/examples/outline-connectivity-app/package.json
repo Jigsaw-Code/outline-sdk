@@ -20,6 +20,8 @@
     "build": "yarn workspaces foreach -ptiv run build",
     "clean": "yarn workspaces foreach -piv run clean && rm -rf node_modules .yarn/cache .yarn/sdks .yarn/unplugged .yarn/install-state.",
     "reset": "yarn clean && yarn && yarn sdks vscode",
+    "setup": "yarn && yarn workspaces foreach -piv run setup",
+    "setup:vscode": "yarn sdks vscode",
     "shared_backend": "yarn workspace shared_backend",
     "shared_frontend": "yarn workspace shared_frontend",
     "watch": "yarn workspaces foreach -piv run watch"

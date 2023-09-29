@@ -3,7 +3,7 @@
   "appName": "@outline_sdk_connectivity_demo/app_mobile",
   "webDir": "output/frontend",
   "server": {
-    "url": "http://localhost:3000",
+    "url": "http://10.0.2.2:3000",
     "cleartext": true
   }
 }
