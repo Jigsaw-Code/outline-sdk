@@ -123,7 +123,7 @@ If at any point you run into issues during development, try `yarn reset`.
 
 ### Needed Improvements
 
-1. **\[P1\]** android (in progress)
+1. **\[P1\]** platform-specific styles
 1. **\[P1\]** read browser language on load, centralize language list, and only localize once
 1. **\[P1\]** documentation on how to generate mobile app build credentials
 1. **\[P1\]** add individual test result errors to the test result output UI
@@ -135,7 +135,6 @@ If at any point you run into issues during development, try `yarn reset`.
 
 ### Current Issues
 
-1. <span style="color:red">**\[P0\]** add server url to an ENV var somehow... pretty dumb capacitor...</span>
 1. **\[P1\]** Results dialog isn't rendering as intended (likely because of the `{ all: initial }`)
 1. **\[P2\]** `cap ___ run` breaks (have workaround and [issue filed](https://github.com/ionic-team/capacitor/issues/6791))
 1. <span style="color:gray">**\[P3\]** spurious lit localize TS error</span>
