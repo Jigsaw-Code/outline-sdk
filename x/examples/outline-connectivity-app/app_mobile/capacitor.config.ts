@@ -1,7 +1,7 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 let config: CapacitorConfig = {
-  appId: "org.outline.sdk.connectivity",
+  appId: "org.getoutline.sdk.example.connectivity",
   appName: "@outline_sdk_connectivity_demo/app_mobile",
   webDir: "output/frontend",
   server: {

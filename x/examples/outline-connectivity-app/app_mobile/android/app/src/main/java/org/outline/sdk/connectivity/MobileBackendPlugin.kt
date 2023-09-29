@@ -1,4 +1,4 @@
-package org.outline.sdk.connectivity
+package org.getoutline.sdk.example.connectivity
 
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin

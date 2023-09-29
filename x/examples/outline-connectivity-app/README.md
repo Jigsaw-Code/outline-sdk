@@ -91,10 +91,8 @@ export class AppMain extends LitElement {
   - [Yarn](https://yarnpkg.com/)
 - Golang
   - [Go](https://golang.org/)
-    - `PATH=$PATH:$(go env GOPATH)/bin`
   - [Wails](https://wails.app/)
-  - [Gomobile](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile)
-    - `gomobile init`
+  - [Gomobile](../../mobileproxy/README.md#build-the-ios-and-android-libraries-with-gomobile-bind)
 - Apple
   - [Xcode](https://developer.apple.com/xcode/)
   - [CocoaPods](https://cocoapods.org/)
@@ -123,15 +121,15 @@ If at any point you run into issues during development, try `yarn reset`.
 
 ### Needed Improvements
 
-1. **\[P1\]** platform-specific styles
+1. **\[P1\]** android-specific CSS
 1. **\[P1\]** read browser language on load, centralize language list, and only localize once
 1. **\[P1\]** documentation on how to generate mobile app build credentials
 1. **\[P1\]** add individual test result errors to the test result output UI
 1. **\[P2\]** use x/config to parse the access key and showcase the different transports (see: https://github.com/Jigsaw-Code/outline-sdk/blob/main/x/examples/outline-connectivity/main.go)
 1. **\[P2\]** generalize request handler via generics/reflection
-1. **\[P2\]** Create a logo for the app
-1. **\[P2\]** Make backend request calls non-blocking
-1. **\[P2\]** Introducing some kind of tracing into the test
+1. **\[P2\]** create a logo for the app
+1. **\[P2\]** make backend request calls non-blocking
+1. **\[P2\]** introducing some kind of tracing into the test
 
 ### Current Issues
 

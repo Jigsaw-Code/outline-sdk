@@ -3,10 +3,10 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "kotlinx-serialization"
 
 android {
-    namespace "org.outline.sdk.connectivity"
+    namespace "org.getoutline.sdk.example.connectivity"
     compileSdkVersion rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "org.outline.sdk.connectivity"
+        applicationId "org.getoutline.sdk.example.connectivity"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

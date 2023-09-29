@@ -1,4 +1,4 @@
-package org.outline.sdk.connectivity
+package org.getoutline.sdk.example.connectivity
 
 import kotlinx.serialization.Serializable
 

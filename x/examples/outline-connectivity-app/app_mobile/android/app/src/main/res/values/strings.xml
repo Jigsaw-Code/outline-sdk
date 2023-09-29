@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">@outline_sdk_connectivity_demo/app_mobile</string>
     <string name="title_activity_main">@outline_sdk_connectivity_demo/app_mobile</string>
-    <string name="package_name">org.outline.sdk.connectivity</string>
-    <string name="custom_url_scheme">org.outline.sdk.connectivity</string>
+    <string name="package_name">org.getoutline.sdk.example.connectivity</string>
+    <string name="custom_url_scheme">org.getoutline.sdk.example.connectivity</string>
 </resources>

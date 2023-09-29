@@ -1,4 +1,4 @@
-package org.outline.sdk.connectivity
+package org.getoutline.sdk.example.connectivity
 
 import android.os.Bundle
 import com.getcapacitor.BridgeActivity
