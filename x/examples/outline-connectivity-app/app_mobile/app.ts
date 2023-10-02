@@ -18,7 +18,7 @@ import { registerPlugin } from "@capacitor/core";
 // Capacitor requires passing in a root object to each native call,
 // that is then accessed via APIs like `call.getString("objectKey")`.
 const MobileBackend = registerPlugin<{
-  Request: <T, K>(request: { resourceName: string; parameters: T}) => Promise<K>;
+  Request(request: { resourceName: string; parameters: string}): Promise<{ error: string; body: string}>;
 }>("MobileBackend");
 
 async function requestBackend<T, K>(resourceName: string, parameters: T): Promise<K> {

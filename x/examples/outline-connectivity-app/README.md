@@ -86,21 +86,26 @@ export class AppMain extends LitElement {
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/)
-- [Yarn](https://yarnpkg.com/)
-- [Go](https://golang.org/)
-- [Wails](https://wails.app/)
-- [Capacitor](https://capacitorjs.com/)
-- [CocoaPods](https://cocoapods.org/)
-- [Xcode](https://developer.apple.com/xcode/)
-- [Android SDK](https://developer.android.com/studio)
-- [Android NDK](https://developer.android.com/ndk)
+- Javascript
+  - [Node.js](https://nodejs.org/)
+  - [Yarn](https://yarnpkg.com/)
+- Golang
+  - [Go](https://golang.org/)
+  - [Wails](https://wails.app/)
+  - [Gomobile](../../mobileproxy/README.md#build-the-ios-and-android-libraries-with-gomobile-bind)
+- Apple
+  - [Xcode](https://developer.apple.com/xcode/)
+  - [CocoaPods](https://cocoapods.org/)
+- Android
+  - [Android SDK](https://developer.android.com/studio)
+  - [Android NDK](https://developer.android.com/ndk)
 
-### Setup
+### Setting up this project
 
 1. Clone this repo
 1. `cd` into the repo
-1. `yarn`
+1. `yarn setup`
+1. if vscode: `yarn setup:vscode`
 
 If at any point you run into issues during development, try `yarn reset`.
 
@@ -116,19 +121,18 @@ If at any point you run into issues during development, try `yarn reset`.
 
 ### Needed Improvements
 
-1. **\[P1\]** android (in progress)
+1. **\[P1\]** android-specific CSS
 1. **\[P1\]** read browser language on load, centralize language list, and only localize once
 1. **\[P1\]** documentation on how to generate mobile app build credentials
 1. **\[P1\]** add individual test result errors to the test result output UI
 1. **\[P2\]** use x/config to parse the access key and showcase the different transports (see: https://github.com/Jigsaw-Code/outline-sdk/blob/main/x/examples/outline-connectivity/main.go)
 1. **\[P2\]** generalize request handler via generics/reflection
-1. **\[P2\]** Create a logo for the app
-1. **\[P2\]** Make backend request calls non-blocking
-1. **\[P2\]** Introducing some kind of tracing into the test
+1. **\[P2\]** create a logo for the app
+1. **\[P2\]** make backend request calls non-blocking
+1. **\[P2\]** introducing some kind of tracing into the test
 
 ### Current Issues
 
-1. <span style="color:red">**\[P0\]** add server url to an ENV var somehow... pretty dumb capacitor...</span>
 1. **\[P1\]** Results dialog isn't rendering as intended (likely because of the `{ all: initial }`)
 1. **\[P2\]** `cap ___ run` breaks (have workaround and [issue filed](https://github.com/ionic-team/capacitor/issues/6791))
 1. <span style="color:gray">**\[P3\]** spurious lit localize TS error</span>
