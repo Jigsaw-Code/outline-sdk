@@ -15,6 +15,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -22,6 +23,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -89,6 +91,7 @@ func main() {
 	domainFlag := flag.String("domain", "example.com.", "Domain name to resolve in the test")
 	resolverFlag := flag.String("resolver", "8.8.8.8,2001:4860:4860::8888", "Comma-separated list of addresses of DNS resolver to use for the test")
 	protoFlag := flag.String("proto", "tcp,udp", "Comma-separated list of the protocols to test. Muse be \"tcp\", \"udp\", or a combination of them")
+	collectorFlag := flag.String("collector", "", "URL to send JSON error reports to")
 
 	flag.Parse()
 	if *verboseFlag {
@@ -149,6 +152,41 @@ func main() {
 			err := jsonEncoder.Encode(record)
 			if err != nil {
 				log.Fatalf("Failed to output JSON: %v", err)
+			}
+			if testErr != nil && *collectorFlag != "" {
+				// Send jsonRecord including error to the
+				// collector if provided by -collector flag
+				// Encode record as JSON
+				jsonData, err := json.Marshal(record)
+				if err != nil {
+					log.Fatalf("Error encoding JSON: %s\n", err)
+					return
+				}
+				// Create a new request using http:
+				req, err := http.NewRequest("POST", *collectorFlag, bytes.NewBuffer(jsonData))
+				if err != nil {
+					debugLog.Printf("Error creating the HTTP request: %s\n", err)
+					return
+				}
+				// Set headers
+				req.Header.Set("Content-Type", "application/json; charset=utf-8")
+				// Send req using http Client
+				client := &http.Client{}
+				resp, err := client.Do(req)
+				if err != nil {
+					log.Fatalf("Error sending the HTTP request: %s\n", err)
+					return
+				}
+				defer resp.Body.Close()
+
+				// Read response body
+				respBody, err := io.ReadAll(resp.Body)
+				if err != nil {
+					debugLog.Printf("Error reading the HTTP response body: %s\n", err)
+					return
+				}
+
+				debugLog.Printf("Response: %s\n", respBody)
 			}
 		}
 	}
