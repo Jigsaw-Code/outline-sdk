@@ -22,6 +22,7 @@ import (
 	"log"
 	"net"
 	"net/url"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -145,6 +146,15 @@ func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult
 	}
 
 	return results, nil
+}
+
+type PlatformMetadata struct {
+	OS string `json:"os"`
+	Arch string `json:"architecture"`
+}
+
+func Platform() PlatformMetadata {
+	return []PlatformMetadata{ OS: runtime.GOOS, Arch: runtime.GOARCH }
 }
 
 func makeErrorRecord(err error) *ConnectivityTestError {
