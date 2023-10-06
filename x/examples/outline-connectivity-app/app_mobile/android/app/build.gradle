@@ -27,9 +27,9 @@ android {
 }
 
 repositories {
-    flatDir{
+    flatDir {
         dirs "../capacitor-cordova-android-plugins/src/main/libs", "libs"
-        dirs "/Users/avaldez/Documents/code/outline-sdk/x/examples/outline-connectivity-app/shared_backend/output"
+        dirs "../../../shared_backend/output"
     }
 }
 
