@@ -55,7 +55,7 @@ func HandleRequest(rawRequest []byte) []byte {
 
 		result, resultError = ConnectivityTest(parameters)
 	} else if request.ResourceName == "Platform"
-		result, resultError = Platform(parameters)
+		result = Platform(parameters)
 	} else {
 		response.Error = "HandleRequest: method name not found"
 	}
