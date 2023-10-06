@@ -14,17 +14,11 @@
 
 package dns
 
-/*
-	A resolver is a function that resolves a hostname to a list of IP addresses.
-
-	TODO: provide factory methods to create a Resolver. For example:
-
-	```go
-		manualDns := makeManualResolver(
-			map[string][]string{ "example.com": []string{"255.255.255.255:80" }
-		})	
-	
-		dialer := &shadowsocks.NewStreamDialer(endpoint, key, manualDns)
-	````
-*/
+// A resolver is a function that resolves a hostname to a list of IP addresses.
+// TODO: provide factory methods to create a Resolver. For example:
+//  manualDns := makeLocalResolver(
+//    map[string][]string{ "example.com": []string{"255.255.255.255:80" }
+//  })
+//
+//  dialer := &shadowsocks.NewStreamDialer(endpoint, key, manualDns)
 type Resolver func(host string) ([]string, error)
