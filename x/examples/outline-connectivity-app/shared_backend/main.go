@@ -149,7 +149,7 @@ func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult
 }
 
 type PlatformMetadata struct {
-	OS string `json:"os"`
+	OS string `json:"operatingSystem"`
 	Arch string `json:"architecture"`
 }
 
