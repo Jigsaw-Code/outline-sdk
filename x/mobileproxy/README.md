@@ -19,6 +19,8 @@ PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=android -androida
 
 Note: Gomobile expects gobind to be in the PATH, that's why we need to prebuild it, and set up the PATH accordingly.
 
+The `-ldflags='-s -w'` flag strips debug symbols to reduce the size of the output library.
+
 <details>
 <summary>Sample iOS generated Code</summary>
 
