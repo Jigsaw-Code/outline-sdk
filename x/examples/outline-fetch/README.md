@@ -55,5 +55,6 @@ $ go run github.com/Jigsaw-Code/outline-sdk/x/examples/outline-fetch@latest -tra
 ```
 
 You should see this on Wireshark:
+
 <img width="652" alt="image" src="https://github.com/Jigsaw-Code/outline-sdk/assets/113565/9c19667d-d0fb-4d33-b0a6-275674481dce">
 
