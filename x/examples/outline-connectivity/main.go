@@ -154,7 +154,7 @@ func main() {
 				log.Fatalf("Failed to output JSON: %v", err)
 			}
 			// Send error report to collector if specified
-			if success == false && *collectorFlag != "" {
+			if !success && *collectorFlag != "" {
 				jsonData, err := json.Marshal(record)
 				if err != nil {
 					log.Fatalf("Error encoding JSON: %s\n", err)
