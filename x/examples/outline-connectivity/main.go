@@ -153,24 +153,21 @@ func main() {
 			if err != nil {
 				log.Fatalf("Failed to output JSON: %v", err)
 			}
-			if testErr != nil && *collectorFlag != "" {
-				// Send jsonRecord including error to the
-				// collector if provided by -collector flag
-				// Encode record as JSON
+			// Send error report to collector if specified
+			if success == false && *collectorFlag != "" {
 				jsonData, err := json.Marshal(record)
 				if err != nil {
 					log.Fatalf("Error encoding JSON: %s\n", err)
 					return
 				}
-				// Create a new request using http:
+
 				req, err := http.NewRequest("POST", *collectorFlag, bytes.NewBuffer(jsonData))
 				if err != nil {
 					debugLog.Printf("Error creating the HTTP request: %s\n", err)
 					return
 				}
-				// Set headers
+
 				req.Header.Set("Content-Type", "application/json; charset=utf-8")
-				// Send req using http Client
 				client := &http.Client{}
 				resp, err := client.Do(req)
 				if err != nil {
@@ -179,7 +176,6 @@ func main() {
 				}
 				defer resp.Body.Close()
 
-				// Read response body
 				respBody, err := io.ReadAll(resp.Body)
 				if err != nil {
 					debugLog.Printf("Error reading the HTTP response body: %s\n", err)
