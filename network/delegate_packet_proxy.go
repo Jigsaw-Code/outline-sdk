@@ -19,18 +19,19 @@ import (
 	"sync/atomic"
 )
 
-// DelegatePacketProxy is a PacketProxy that forwards calls (like NewSession) to another PacketProxy. To create a
-// DelegatePacketProxy with the default PacketProxy, use NewDelegatePacketProxy. To change the underlying PacketProxy,
-// use SetProxy.
+// DelegatePacketProxy is a [PacketProxy] that forwards calls (like NewSession) to another [PacketProxy],
+// so that the caller can replace the underlying [PacketProxy] without changing the original reference.
+// To create a DelegatePacketProxy with the default PacketProxy, use [NewDelegatePacketProxy]. To change
+// the underlying [PacketProxy], use SetProxy.
 //
-// Note: After changing the underlying PacketProxy, only new NewSession calls will be routed to the new PacketProxy.
-// Existing sessions will not be affected.
+// Note: After the underlying [PacketProxy] is changed, only new NewSession calls will be routed to the new
+// [PacketProxy]. Existing sessions will not be affected.
 //
-// Multiple goroutines may invoke methods on a DelegatePacketProxy simultaneously.
+// Multiple goroutines can simultaneously invoke methods on a DelegatePacketProxy.
 type DelegatePacketProxy interface {
 	PacketProxy
 
-	// SetProxy updates the underlying PacketProxy to `proxy`. And `proxy` must not be nil. After this function
+	// SetProxy updates the underlying PacketProxy to `proxy`; `proxy` must not be nil. After this function
 	// returns, all new PacketProxy calls will be forwarded to the `proxy`. Existing sessions will not be affected.
 	SetProxy(proxy PacketProxy) error
 }
@@ -41,7 +42,10 @@ var errInvalidProxy = errors.New("the underlying proxy must not be nil")
 var _ DelegatePacketProxy = (*delegatePacketProxy)(nil)
 
 type delegatePacketProxy struct {
-	proxy atomic.Value
+	// The underlying PacketProxy when create NewSession.
+	// Note that we must not use atomic.Value; otherwise TestSetProxyOfDifferentTypes will panic with
+	// "store inconsistently typed value".
+	proxy atomic.Pointer[PacketProxy]
 }
 
 // NewDelegatePacketProxy creates a new [DelegatePacketProxy] that forwards calls to the `proxy` [PacketProxy].
@@ -51,13 +55,13 @@ func NewDelegatePacketProxy(proxy PacketProxy) (DelegatePacketProxy, error) {
 		return nil, errInvalidProxy
 	}
 	dp := delegatePacketProxy{}
-	dp.proxy.Store(proxy)
+	dp.proxy.Store(&proxy)
 	return &dp, nil
 }
 
 // NewSession implements PacketProxy.NewSession, and it will forward the call to the underlying PacketProxy.
 func (p *delegatePacketProxy) NewSession(respWriter PacketResponseReceiver) (PacketRequestSender, error) {
-	return p.proxy.Load().(PacketProxy).NewSession(respWriter)
+	return (*p.proxy.Load()).NewSession(respWriter)
 }
 
 // SetProxy implements DelegatePacketProxy.SetProxy.
@@ -65,6 +69,6 @@ func (p *delegatePacketProxy) SetProxy(proxy PacketProxy) error {
 	if proxy == nil {
 		return errInvalidProxy
 	}
-	p.proxy.Store(proxy)
+	p.proxy.Store(&proxy)
 	return nil
 }

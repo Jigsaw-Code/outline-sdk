@@ -1,4 +1,4 @@
-module github.com/Jigsaw-Code/outline-internal-sdk
+module github.com/Jigsaw-Code/outline-sdk
 
 go 1.20
 

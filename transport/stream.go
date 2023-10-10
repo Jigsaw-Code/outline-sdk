@@ -20,14 +20,13 @@ import (
 	"net"
 )
 
-// StreamConn is a net.Conn that allows for closing only the reader or writer end of
-// it, supporting half-open state.
+// StreamConn is a [net.Conn] that allows for closing only the reader or writer end of it, supporting half-open state.
 type StreamConn interface {
 	net.Conn
 	// Closes the Read end of the connection, allowing for the release of resources.
 	// No more reads should happen.
 	CloseRead() error
-	// Closes the Write end of the connection. An EOF or FIN signal may be
+	// Closes the Write end of the connection. An EOF or FIN signal can be
 	// sent to the connection target.
 	CloseWrite() error
 }
@@ -59,8 +58,8 @@ func (dc *duplexConnAdaptor) CloseWrite() error {
 	return dc.StreamConn.CloseWrite()
 }
 
-// WrapDuplexConn wraps an existing [StreamConn] with new Reader and Writer, but
-// preserving the original [StreamConn.CloseRead] and [StreamConn.CloseWrite].
+// WrapConn wraps an existing [StreamConn] with a new [io.Reader] and [io.Writer], but preserves the original
+// [StreamConn].CloseRead and [StreamConn].CloseWrite.
 func WrapConn(c StreamConn, r io.Reader, w io.Writer) StreamConn {
 	conn := c
 	// We special-case duplexConnAdaptor to avoid multiple levels of nesting.
@@ -70,13 +69,14 @@ func WrapConn(c StreamConn, r io.Reader, w io.Writer) StreamConn {
 	return &duplexConnAdaptor{StreamConn: conn, r: r, w: w}
 }
 
-// StreamEndpoint represents an endpoint that can be used to established stream connections (like TCP) to a fixed destination.
+// StreamEndpoint represents an endpoint that can be used to establish stream connections (like TCP) to a fixed
+// destination.
 type StreamEndpoint interface {
 	// Connect establishes a connection with the endpoint, returning the connection.
 	Connect(ctx context.Context) (StreamConn, error)
 }
 
-// TCPEndpoint is a [StreamEndpoint] that connects to the given address using the given [StreamDialer].
+// TCPEndpoint is a [StreamEndpoint] that connects to the specified address using the specified [StreamDialer].
 type TCPEndpoint struct {
 	// The Dialer used to create the net.Conn on Connect().
 	Dialer net.Dialer
@@ -96,7 +96,8 @@ func (e *TCPEndpoint) Connect(ctx context.Context) (StreamConn, error) {
 	return conn.(*net.TCPConn), nil
 }
 
-// StreamDialerEndpoint is a [StreamEndpoint] that connects to the given address using the given [StreamDialer].
+// StreamDialerEndpoint is a [StreamEndpoint] that connects to the specified address using the specified
+// [StreamDialer].
 type StreamDialerEndpoint struct {
 	Dialer  StreamDialer
 	Address string
@@ -112,7 +113,7 @@ func (e *StreamDialerEndpoint) Connect(ctx context.Context) (StreamConn, error) 
 // StreamDialer provides a way to dial a destination and establish stream connections.
 type StreamDialer interface {
 	// Dial connects to `raddr`.
-	// `raddr` has the form `host:port`, where `host` can be a domain name or IP address.
+	// `raddr` has the form "host:port", where "host" can be a domain name or IP address.
 	Dial(ctx context.Context, raddr string) (StreamConn, error)
 }
 

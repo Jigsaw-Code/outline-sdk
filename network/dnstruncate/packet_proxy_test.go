@@ -21,7 +21,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/Jigsaw-Code/outline-internal-sdk/network"
+	"github.com/Jigsaw-Code/outline-sdk/network"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/stretchr/testify/require"

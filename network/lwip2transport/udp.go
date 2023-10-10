@@ -17,8 +17,9 @@ package lwip2transport
 import (
 	"net"
 	"sync"
+	"sync/atomic"
 
-	"github.com/Jigsaw-Code/outline-internal-sdk/network"
+	"github.com/Jigsaw-Code/outline-sdk/network"
 	lwip "github.com/eycorsican/go-tun2socks/core"
 )
 
@@ -69,7 +70,10 @@ func (h *udpHandler) ReceiveTo(tunConn lwip.UDPConn, data []byte, destAddr *net.
 // newSession creates a new PacketRequestSender related to conn. The caller needs to put the new PacketRequestSender
 // to the h.senders map.
 func (h *udpHandler) newSession(conn lwip.UDPConn) (network.PacketRequestSender, error) {
-	respWriter := &udpConnResponseWriter{conn, h}
+	respWriter := &udpConnResponseWriter{
+		conn: conn,
+		h:    h,
+	}
 	reqSender, err := h.proxy.NewSession(respWriter)
 	if err != nil {
 		respWriter.Close()
@@ -93,12 +97,17 @@ func (h *udpHandler) closeSession(conn lwip.UDPConn) error {
 
 // The PacketResponseWriter that will write responses to the lwip network stack.
 type udpConnResponseWriter struct {
-	conn lwip.UDPConn
-	h    *udpHandler
+	closed atomic.Bool
+	conn   lwip.UDPConn
+	h      *udpHandler
 }
 
 // Write relays packets from the proxy to the lwIP TUN device.
 func (r *udpConnResponseWriter) WriteFrom(p []byte, source net.Addr) (int, error) {
+	if r.closed.Load() {
+		return 0, network.ErrClosed
+	}
+
 	// net.Addr -> *net.UDPAddr, because r.conn.WriteFrom requires *net.UDPAddr
 	// and this is more reliable than type assertion
 	// also the source address host will be an IP address, no actual resolution will be done
@@ -106,10 +115,14 @@ func (r *udpConnResponseWriter) WriteFrom(p []byte, source net.Addr) (int, error
 	if err != nil {
 		return 0, err
 	}
+
 	return r.conn.WriteFrom(p, srcAddr)
 }
 
 // Close informs the udpHandler to close the UDPConn and clean up the UDP session.
 func (r *udpConnResponseWriter) Close() error {
-	return r.h.closeSession(r.conn)
+	if r.closed.CompareAndSwap(false, true) {
+		return r.h.closeSession(r.conn)
+	}
+	return network.ErrClosed
 }

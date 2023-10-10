@@ -22,26 +22,26 @@ import (
 // PacketProxy handles UDP traffic from the upstream network stack. The upstream network stack uses the NewSession
 // function to create a new UDP session that can send or receive UDP packets from PacketProxy.
 //
-// Multiple goroutines may invoke methods on a PacketProxy simultaneously.
+// Multiple goroutines can simultaneously invoke methods on a PacketProxy.
 type PacketProxy interface {
 	// NewSession function tells the PacketProxy that a new UDP socket session has been started (using socket as an
 	// example, a session will be started by calling the bind() function). The PacketProxy then creates a
 	// PacketRequestSender object to handle requests from this session, and it also uses the PacketResponseReceiver
 	// to send responses back to the upstream network stack.
 	//
-	// Note that, it is possible for a session to receive UDP packets without sending any requests.
+	// Note that it is possible for a session to receive UDP packets without sending any requests.
 	NewSession(PacketResponseReceiver) (PacketRequestSender, error)
 }
 
 // PacketRequestSender sends UDP request packets to the [PacketProxy]. It should be implemented by the [PacketProxy],
-// who must implement the WriteTo method to process the request packets. PacketRequestSender is typically called by an
-// upstream component (such as a network stack). Once the Close method is called, there will be no more requests sent
-// to the sender, and all resources can be freed.
+// which must implement the WriteTo method to process the request packets. PacketRequestSender is typically called by
+// an upstream component (such as a network stack). After the Close method is called, there will be no more requests
+// sent to the sender, and all resources can be freed.
 //
-// Multiple goroutines may invoke methods on a PacketRequestSender simultaneously.
+// Multiple goroutines can simultaneously invoke methods on a PacketRequestSender.
 type PacketRequestSender interface {
-	// WriteTo sends a UDP request packet to the [PacketProxy]. The packet is destined for the remote server identified
-	// by `destination`; and the payload of the packet is stored in `p`. If `p` is empty, the request packet will be
+	// WriteTo sends a UDP request packet to the PacketProxy. The packet is destined for the remote server identified
+	// by `destination` and the payload of the packet is stored in `p`. If `p` is empty, the request packet will be
 	// ignored. WriteTo returns the number of bytes written from `p` and any error encountered that caused the function
 	// to stop early.
 	//
@@ -53,16 +53,16 @@ type PacketRequestSender interface {
 	Close() error
 }
 
-// PacketResponseReceiver receives UDP response packets from the [PacketProxy]. It is usually implemented by the
-// upstream component (such as a network stack). When creating a new UDP session, a valid instance
-// PacketResponseReceiver is passed to the PacketProxy.NewSession function. Then the [PacketProxy] must use this
-// instance to send UDP responses all the time; and it must call the Close function to indicate there will be no more
-// responses send to this receiver.
+// PacketResponseReceiver receives UDP response packets from the [PacketProxy]. It is usually implemented by an
+// upstream component (such as a network stack). When a new UDP session is created, a valid instance of
+// PacketResponseReceiver is passed to the PacketProxy.NewSession function. The [PacketProxy] must then use this
+// instance to send UDP responses. It must then call the Close function to indicate that there will be no more
+// responses sent to this receiver.
 //
-// Multiple goroutines may invoke methods on a PacketResponseReceiver simultaneously.
+// Multiple goroutines can simultaneously invoke methods on a PacketResponseReceiver.
 type PacketResponseReceiver interface {
 	// WriteFrom is a callback function that is called by a PacketProxy when a UDP response packet is received. The
-	// `source` identifies the remote server that sent the packet; and the `p` contains the packet payload. WriteFrom
+	// `source` identifies the remote server that sent the packet and the `p` contains the packet payload. WriteFrom
 	// returns the number of bytes written from `p` and any error encountered that caused the function to stop early.
 	//
 	// `p` must not be modified, and it must not be referenced after WriteFrom returns.

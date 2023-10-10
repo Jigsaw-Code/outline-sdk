@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-internal-sdk/internal/slicepool"
-	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/internal/slicepool"
+	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
 // this was the buffer size used before, we may consider update it in the future
@@ -34,10 +34,10 @@ const packetMaxSize = 2048
 var packetBufferPool = slicepool.MakePool(packetMaxSize)
 
 // Compilation guard against interface implementation
-var _ PacketProxy = (*packetListenerProxyAdapter)(nil)
+var _ PacketProxy = (*PacketListenerProxy)(nil)
 var _ PacketRequestSender = (*packetListenerRequestSender)(nil)
 
-type packetListenerProxyAdapter struct {
+type PacketListenerProxy struct {
 	listener         transport.PacketListener
 	writeIdleTimeout time.Duration
 }
@@ -51,23 +51,44 @@ type packetListenerRequestSender struct {
 	writeIdleTimer   *time.Timer
 }
 
-// NewPacketProxyFromPacketListener creates a new [PacketProxy] that uses the existing [transport.PacketListener]
-// to create connections to a proxy. You can use this function if you already have an implementation of
-// [transport.PacketListener] and would like to inject it into one of the network stacks (for example,
-// network/lwip2transport) as UDP traffic handlers.
-func NewPacketProxyFromPacketListener(pl transport.PacketListener) (PacketProxy, error) {
+// NewPacketProxyFromPacketListener creates a new [PacketProxy] that uses the existing [transport.PacketListener] to
+// create connections to a proxy. You can also specify additional options.
+// This function is useful if you already have an implementation of [transport.PacketListener] and you want to use it
+// with one of the network stacks (for example, network/lwip2transport) as a UDP traffic handler.
+func NewPacketProxyFromPacketListener(pl transport.PacketListener, options ...func(*PacketListenerProxy) error) (*PacketListenerProxy, error) {
 	if pl == nil {
 		return nil, errors.New("pl must not be nil")
 	}
-	return &packetListenerProxyAdapter{
+	p := &PacketListenerProxy{
 		listener:         pl,
 		writeIdleTimeout: 30 * time.Second,
-	}, nil
+	}
+	for _, opt := range options {
+		if err := opt(p); err != nil {
+			return nil, err
+		}
+	}
+	return p, nil
+}
+
+// WithPacketListenerWriteIdleTimeout sets the write idle timeout of the [PacketListenerProxy].
+// This means that if there are no WriteTo operations on the UDP session created by NewSession for the specified amount
+// of time, the proxy will end this session.
+//
+// This should be used together with the [NewPacketProxyFromPacketListenerWithOptions] function.
+func WithPacketListenerWriteIdleTimeout(timeout time.Duration) func(*PacketListenerProxy) error {
+	return func(p *PacketListenerProxy) error {
+		if timeout <= 0 {
+			return errors.New("timeout must be greater than 0")
+		}
+		p.writeIdleTimeout = timeout
+		return nil
+	}
 }
 
 // NewSession implements [PacketProxy].NewSession function. It uses [transport.PacketListener].ListenPacket to create
 // a [net.PacketConn], and constructs a new [PacketRequestSender] that is based on this [net.PacketConn].
-func (proxy *packetListenerProxyAdapter) NewSession(respWriter PacketResponseReceiver) (PacketRequestSender, error) {
+func (proxy *PacketListenerProxy) NewSession(respWriter PacketResponseReceiver) (PacketRequestSender, error) {
 	if respWriter == nil {
 		return nil, errors.New("respWriter must not be nil")
 	}
