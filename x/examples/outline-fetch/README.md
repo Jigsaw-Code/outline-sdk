@@ -41,10 +41,10 @@ $ go run github.com/Jigsaw-Code/outline-sdk/x/examples/outline-fetch@latest -tra
 }
 ```
 
-<!-- Using packet splitting:
+Using packet splitting:
 
 ```sh
-$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/outline-fetch@latest -transport split://3  https://ipinfo.io
+$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/outline-fetch@latest -transport split:3  https://ipinfo.io
 {
   ...
   "city": "Amsterdam",
@@ -55,5 +55,5 @@ $ go run github.com/Jigsaw-Code/outline-sdk/x/examples/outline-fetch@latest -tra
 ```
 
 You should see this on Wireshark:
-<img width="652" alt="image" src="https://github.com/Jigsaw-Code/outline-sdk/assets/113565/9c19667d-d0fb-4d33-b0a6-275674481dce"> -->
+<img width="652" alt="image" src="https://github.com/Jigsaw-Code/outline-sdk/assets/113565/9c19667d-d0fb-4d33-b0a6-275674481dce">
 
