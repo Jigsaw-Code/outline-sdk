@@ -5,7 +5,7 @@ This app illustrates how to use different transports to fetch a URL in Go.
 Direct fetch:
 
 ```sh
-$ go run ./x/examples/outline-fetch/main.go https://ipinfo.io
+$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/outline-fetch@latest https://ipinfo.io
 {
   ...
   "city": "Amsterdam",
@@ -18,7 +18,7 @@ $ go run ./x/examples/outline-fetch/main.go https://ipinfo.io
 Using a Shadowsocks server:
 
 ```sh
-$ go run ./x/examples/outline-fetch/main.go -transport ss://[redacted]@[redacted]:80 https://ipinfo.io
+$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/outline-fetch@latest -transport ss://[redacted]@[redacted]:80 https://ipinfo.io
 {
   ...
   "region": "New Jersey",
@@ -31,7 +31,7 @@ $ go run ./x/examples/outline-fetch/main.go -transport ss://[redacted]@[redacted
 Using a SOCKS5 server:
 
 ```sh
-$ go run ./x/examples/outline-fetch/main.go -transport socks5://[redacted]:5703 https://ipinfo.io
+$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/outline-fetch@latest -transport socks5://[redacted]:5703 https://ipinfo.io
 {
   ... 
   "city": "Berlin",
@@ -41,10 +41,10 @@ $ go run ./x/examples/outline-fetch/main.go -transport socks5://[redacted]:5703 
 }
 ```
 
-<!-- Using packet splitting:
+Using packet splitting:
 
 ```sh
-$ go run ./x/examples/outline-fetch/main.go -transport split://3  https://ipinfo.io
+$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/outline-fetch@latest -transport split:3  https://ipinfo.io
 {
   ...
   "city": "Amsterdam",
@@ -55,5 +55,6 @@ $ go run ./x/examples/outline-fetch/main.go -transport split://3  https://ipinfo
 ```
 
 You should see this on Wireshark:
-<img width="652" alt="image" src="https://github.com/Jigsaw-Code/outline-sdk/assets/113565/9c19667d-d0fb-4d33-b0a6-275674481dce"> -->
+
+<img width="652" alt="image" src="https://github.com/Jigsaw-Code/outline-sdk/assets/113565/9c19667d-d0fb-4d33-b0a6-275674481dce">
 
