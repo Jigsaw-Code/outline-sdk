@@ -233,12 +233,12 @@ val client = OkHttpClient.Builder().proxy(proxy).build()
 https://square.github.io/okhttp/4.x/okhttp/okhttp3/-ok-http-client/-builder/proxy/
 
 
-### Java
+### JVM (Java, Kotlin)
 
 In the JVM, you can configure the proxy to use with [system properties](https://docs.oracle.com/javase/8/docs/technotes/guides/net/proxies.html):
-```java
-System.setProperty("http.proxyHost", "localhost");
-System.setProperty("http.proxyPort", "1234");
+```kotlin
+System.setProperty("http.proxyHost", "localhost")
+System.setProperty("http.proxyPort", "1234")
 ```
 
 Note that this may not fully work on Android, since it will only affect the JVM, not native code. You should also make sure you set this early in your code.
