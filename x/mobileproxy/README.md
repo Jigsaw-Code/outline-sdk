@@ -189,16 +189,16 @@ To add the library to your mobile project, see Go Mobile's [Building and deployi
 
 You need to call the `RunProxy` function passing the local address to use, and the transport configuration.
 
-In Java, you have:
-```java
+On Android, you can have the following Kotlin code:
+```kotlin
 // Use port zero to let the system pick an open port for you.
-mobileproxy.Proxy proxy = mobileproxy.runProxy("localhost:0", "split:3");
+val proxy = mobileproxy.runProxy("localhost:0", "split:3")
 // Find the address the local proxy is bound to.
-String proxyAddress = proxy.address();
+val proxyAddress = proxy.address()
 // Configure your networking library with proxyAddress.
-...
-// Stops the proxy.
-proxy.stop();
+// ...
+// Stop running the proxy.
+proxy.stop()
 ```
 
 ## Configure your HTTP client or networking library
