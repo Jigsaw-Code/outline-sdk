@@ -205,9 +205,12 @@ proxy.stop();
 
 You need to configure your networking library to use the local proxy. How you do it depends on the networking library you are using.
 
-### Flutter HttpClient
 
-Set the proxy with the the [HttpClient.findProxy]([url](https://api.flutter.dev/flutter/dart-io/HttpClient/findProxy.html)) function. Example:
+### Dart/Flutter HttpClient
+
+Set the proxy with the [`HttpClient.findProxy`]([url](https://api.flutter.dev/flutter/dart-io/HttpClient/findProxy.html)) function.
+
+Dart example:
 
 ```dart
   HttpClient client = HttpClient();
@@ -218,6 +221,27 @@ Set the proxy with the the [HttpClient.findProxy]([url](https://api.flutter.dev/
 
 
 ### OkHttp (Android only)
+
+Set the proxy with [`OkHttpClient.Builder.proxy`](https://square.github.io/okhttp/4.x/okhttp/okhttp3/-ok-http-client/-builder/proxy/).
+
+Kotlin example:
+
+```kotlin
+val proxy = Proxy(Proxy.Type.HTTP, InetSocketAddress("localhost", 1234))
+val client = OkHttpClient.Builder().proxy(proxy).build()
+```
+https://square.github.io/okhttp/4.x/okhttp/okhttp3/-ok-http-client/-builder/proxy/
+
+
+### Java
+
+In the JVM, you can configure the proxy to use with [system properties](https://docs.oracle.com/javase/8/docs/technotes/guides/net/proxies.html):
+```java
+System.setProperty("http.proxyHost", "localhost");
+System.setProperty("http.proxyPort", "1234");
+```
+
+Note that this may not fully work on Android, since it will only affect the JVM, not native code. You should also make sure you set this early in your code.
 
 
 ## Clean up
