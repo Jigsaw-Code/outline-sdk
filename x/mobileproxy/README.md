@@ -2,7 +2,7 @@
 
 This package enables the use Go Mobile to generate a mobile library to run a local proxy and configure your app networking libraries.
 
-### Build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
+## Build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
 
 From the `x/` directory:
 
@@ -10,7 +10,7 @@ From the `x/` directory:
 go build -o ./out/ golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
 ```
 
-### Build the iOS and Android libraries with [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile#hdr-Build_a_library_for_Android_and_iOS)
+## Build the iOS and Android libraries with [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile#hdr-Build_a_library_for_Android_and_iOS)
 
 ```bash
 PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -o "$(pwd)/out/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
@@ -181,12 +181,46 @@ public final class Proxy implements Seq.Proxy {
 
 </details>
 
-### Integrate into your mobile project
+## Add the library to your mobile project
 
 To add the library to your mobile project, see Go Mobile's [Building and deploying to iOS](https://github.com/golang/go/wiki/Mobile#building-and-deploying-to-ios-1) and [Building and deploying to Android](https://github.com/golang/go/wiki/Mobile#building-and-deploying-to-android-1).
 
+## Use the library
 
-### Clean up
+You need to call the `RunProxy` function passing the local address to use, and the transport configuration.
+
+In Java, you have:
+```java
+// Use port zero to let the system pick an open port for you.
+mobileproxy.Proxy proxy = mobileproxy.runProxy("localhost:0", "split:3");
+// Find the address the local proxy is bound to.
+String proxyAddress = proxy.address();
+// Configure your networking library with proxyAddress.
+...
+// Stops the proxy.
+proxy.stop();
+```
+
+## Configure your HTTP client or networking library
+
+You need to configure your networking library to use the local proxy. How you do it depends on the networking library you are using.
+
+### Flutter HttpClient
+
+Set the proxy with the the [HttpClient.findProxy]([url](https://api.flutter.dev/flutter/dart-io/HttpClient/findProxy.html)) function. Example:
+
+```dart
+  HttpClient client = HttpClient();
+  client.findProxy = (Uri uri) {
+    return "PROXY localhost:1234";
+  };
+```
+
+
+### OkHttp (Android only)
+
+
+## Clean up
 
 ```bash
 rm -rf ./out/
