@@ -13,10 +13,10 @@
 // limitations under the License.
 
 import { configureLocalization, msg, localized } from "@lit/localize";
-import { css, html, LitElement } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { property } from "lit/decorators.js";
 import { sourceLocale, targetLocales } from "./generated/messages";
-import type { ConnectivityTestRequest, ConnectivityTestResponse, ConnectivityTestResult } from "./types";
+import { ConnectivityTestRequest, ConnectivityTestResponse, ConnectivityTestResult, OperatingSystem, PlatformMetadata } from "./types";
 
 export * from "./types";
 
@@ -32,13 +32,19 @@ const Localization = configureLocalization({
 @localized()
 export class ConnectivityTestPage extends LitElement {
   @property({ type: Function })
+  resolvePlatform?: () => Promise<PlatformMetadata>;
+
+  @property({ type: Function })
   onSubmit?: (request: ConnectivityTestRequest) => Promise<ConnectivityTestResponse>;
+
+  @property({ attribute: false })
+  platform?: PlatformMetadata;
 
   @property({ attribute: false })
   isSubmitting = false;
 
   @property({ attribute: false })
-  testResponse: ConnectivityTestResponse = null;
+  testResponse?: ConnectivityTestResponse;
 
   get locale() {
     return Localization.getLocale();
@@ -82,6 +88,14 @@ export class ConnectivityTestPage extends LitElement {
       protocols,
       prefix,
     };
+  }
+
+  protected async performUpdate() {
+    if (!this.platform && this.resolvePlatform) {
+      this.platform = await this.resolvePlatform();
+    }
+
+    super.performUpdate();
   }
 
   async testConnectivity(event: SubmitEvent) {
@@ -572,17 +586,13 @@ export class ConnectivityTestPage extends LitElement {
       .field-header-info {
         display: none;
       }
-
-      /* if ios */
-      .header {
-        padding-top: 3.7rem;
-      }
     }
   `;
 
   render() {
     // TODO: move language definitions to a centralized place
     return html`<main dir="${this.locale === "fa-IR" ? "rtl" : "ltr"}">
+      ${this.renderPlatformStyles()}
       <header class="header">
         <h1 class="header-text">${msg("Outline Connectivity Test")}</h1>
       </header>
@@ -742,9 +752,28 @@ export class ConnectivityTestPage extends LitElement {
     </main>`;
   }
 
+  renderPlatformStyles() {
+    if (!this.platform) {
+      return nothing;
+    }
+
+    // TODO: changes how switches look on android
+    switch (this.platform.operatingSystem) {
+      case OperatingSystem.IOS:
+        return html`
+        <style>
+          .header {
+            padding-top: 3.7rem;
+          }
+        </style>`;
+      default:
+        return nothing;
+    }
+  }
+
   renderResults() {
     if (!this.testResponse) {
-      return;
+      return nothing;
     }
 
     return html`<dialog open class="results">
