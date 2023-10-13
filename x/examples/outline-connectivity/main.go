@@ -85,6 +85,37 @@ func unwrapAll(err error) error {
 	}
 }
 
+func sendReport(record jsonRecord, collectorFlag *string) error {
+	jsonData, err := json.Marshal(record)
+	if err != nil {
+		log.Fatalf("Error encoding JSON: %s\n", err)
+		return err
+	}
+
+	req, err := http.NewRequest("POST", *collectorFlag, bytes.NewBuffer(jsonData))
+	if err != nil {
+		debugLog.Printf("Error creating the HTTP request: %s\n", err)
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatalf("Error sending the HTTP request: %s\n", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		debugLog.Printf("Error reading the HTTP response body: %s\n", err)
+		return err
+	}
+	debugLog.Printf("Response: %s\n", respBody)
+	return nil
+}
+
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
 	transportFlag := flag.String("transport", "", "Transport config")
@@ -155,34 +186,10 @@ func main() {
 			}
 			// Send error report to collector if specified
 			if !success && *collectorFlag != "" {
-				jsonData, err := json.Marshal(record)
+				err = sendReport(record, collectorFlag)
 				if err != nil {
-					log.Fatalf("Error encoding JSON: %s\n", err)
-					return
+					log.Fatalf("HTTP request failed: %v", err)
 				}
-
-				req, err := http.NewRequest("POST", *collectorFlag, bytes.NewReader(jsonData))
-				if err != nil {
-					debugLog.Printf("Error creating the HTTP request: %s\n", err)
-					return
-				}
-
-				req.Header.Set("Content-Type", "application/json; charset=utf-8")
-				client := &http.Client{}
-				resp, err := client.Do(req)
-				if err != nil {
-					log.Fatalf("Error sending the HTTP request: %s\n", err)
-					return
-				}
-				defer resp.Body.Close()
-
-				respBody, err := io.ReadAll(resp.Body)
-				if err != nil {
-					debugLog.Printf("Error reading the HTTP response body: %s\n", err)
-					return
-				}
-
-				debugLog.Printf("Response: %s\n", respBody)
 			}
 		}
 	}
