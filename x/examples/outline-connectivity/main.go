@@ -161,7 +161,7 @@ func main() {
 					return
 				}
 
-				req, err := http.NewRequest("POST", *collectorFlag, bytes.NewBuffer(jsonData))
+				req, err := http.NewRequest("POST", *collectorFlag, bytes.NewReader(jsonData))
 				if err != nil {
 					debugLog.Printf("Error creating the HTTP request: %s\n", err)
 					return
