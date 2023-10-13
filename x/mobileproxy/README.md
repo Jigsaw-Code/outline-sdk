@@ -2,7 +2,7 @@
 
 This package enables the use Go Mobile to generate a mobile library to run a local proxy and configure your app networking libraries.
 
-### Build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
+## Build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
 
 From the `x/` directory:
 
@@ -10,7 +10,7 @@ From the `x/` directory:
 go build -o ./out/ golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
 ```
 
-### Build the iOS and Android libraries with [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile#hdr-Build_a_library_for_Android_and_iOS)
+## Build the iOS and Android libraries with [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile#hdr-Build_a_library_for_Android_and_iOS)
 
 ```bash
 PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -o "$(pwd)/out/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
@@ -181,12 +181,79 @@ public final class Proxy implements Seq.Proxy {
 
 </details>
 
-### Integrate into your mobile project
+## Add the library to your mobile project
 
 To add the library to your mobile project, see Go Mobile's [Building and deploying to iOS](https://github.com/golang/go/wiki/Mobile#building-and-deploying-to-ios-1) and [Building and deploying to Android](https://github.com/golang/go/wiki/Mobile#building-and-deploying-to-android-1).
 
+## Use the library
 
-### Clean up
+You need to call the `RunProxy` function passing the local address to use, and the transport configuration.
+
+On Android, you can have the following Kotlin code:
+```kotlin
+// Use port zero to let the system pick an open port for you.
+val proxy = mobileproxy.runProxy("localhost:0", "split:3")
+// Find the address the local proxy is bound to.
+val proxyAddress = proxy.address()
+// Configure your networking library with proxyAddress.
+// ...
+// Stop running the proxy.
+proxy.stop()
+```
+
+## Configure your HTTP client or networking library
+
+You need to configure your networking library to use the local proxy. How you do it depends on the networking library you are using.
+
+
+### Dart/Flutter HttpClient
+
+Set the proxy with the [`HttpClient.findProxy`]([url](https://api.flutter.dev/flutter/dart-io/HttpClient/findProxy.html)) function.
+
+Dart example:
+
+```dart
+  HttpClient client = HttpClient();
+  client.findProxy = (Uri uri) {
+    return "PROXY localhost:1234";
+  };
+```
+
+
+### OkHttp (Android only)
+
+Set the proxy with [`OkHttpClient.Builder.proxy`](https://square.github.io/okhttp/4.x/okhttp/okhttp3/-ok-http-client/-builder/proxy/).
+
+Kotlin example:
+
+```kotlin
+val proxy = Proxy(Proxy.Type.HTTP, InetSocketAddress("localhost", 1234))
+val client = OkHttpClient.Builder().proxy(proxy).build()
+```
+https://square.github.io/okhttp/4.x/okhttp/okhttp3/-ok-http-client/-builder/proxy/
+
+
+### JVM (Java, Kotlin)
+
+In the JVM, you can configure the proxy to use with [system properties](https://docs.oracle.com/javase/8/docs/technotes/guides/net/proxies.html):
+```kotlin
+System.setProperty("http.proxyHost", "localhost")
+System.setProperty("http.proxyPort", "1234")
+System.setProperty("https.proxyHost", "localhost")
+System.setProperty("https.proxyPort", "1234")
+```
+
+Note that this may not fully work on Android, since it will only affect the JVM, not native code. You should also make sure you set this early in your code.
+
+### Web View
+
+We are working on instructions on how use the local proxy in a Webview.
+
+On Android, you will likely have to implement [WebViewClient.shouldInterceptRequest](https://developer.android.com/reference/android/webkit/WebViewClient#shouldInterceptRequest(android.webkit.WebView,%20android.webkit.WebResourceRequest)) to fulfill requests using an HTTP client that uses the local proxy.
+
+On iOS, we are still looking for ideas. There's [WKWebViewConfiguration.setURLSchemeHandler](https://developer.apple.com/documentation/webkit/wkwebviewconfiguration/2875766-seturlschemehandler), but the documentation says it can't be used to intercept HTTPS. If you know how to use a proxy with the WKWebView, please let us know!
+
+## Clean up
 
 ```bash
 rm -rf ./out/
