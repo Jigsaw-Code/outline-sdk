@@ -50,7 +50,7 @@ func (g prefixSaltGenerator) GetSalt(salt []byte) error {
 	return err
 }
 
-// NewPrefixSaltGenerator returns a SaltGenerator whose output consists of
+// NewPrefixSaltGenerator returns a SaltGenerator with output including
 // the provided prefix, followed by random bytes. This is useful to change
 // how shadowsocks traffic is classified by middleboxes.
 //
