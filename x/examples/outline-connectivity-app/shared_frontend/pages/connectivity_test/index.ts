@@ -191,7 +191,8 @@ export class ConnectivityTestPage extends LitElement {
       width: 100vw;
     }
 
-    .header {
+    .header,
+    .header--ios {
       background: var(--color-background-brand);
       display: flex;
       justify-content: center;
@@ -199,6 +200,10 @@ export class ConnectivityTestPage extends LitElement {
       position: sticky;
       top: 0;
       width: 100%;
+    }
+
+    .header--ios {
+      padding-top: 3.7rem;
     }
 
     .header-text {
@@ -593,7 +598,7 @@ export class ConnectivityTestPage extends LitElement {
     // TODO: move language definitions to a centralized place
     return html`<main dir="${this.locale === "fa-IR" ? "rtl" : "ltr"}">
       ${this.renderPlatformStyles()}
-      <header class="header">
+      <header class=${this.platform?.operatingSystem === OperatingSystem.IOS ? "header--ios" : "header"}>
         <h1 class="header-text">${msg("Outline Connectivity Test")}</h1>
       </header>
       ${this.renderResults()}
@@ -750,25 +755,6 @@ export class ConnectivityTestPage extends LitElement {
         </div>
       </footer>
     </main>`;
-  }
-
-  renderPlatformStyles() {
-    if (!this.platform) {
-      return nothing;
-    }
-
-    // TODO: changes how switches look on android
-    switch (this.platform.operatingSystem) {
-      case OperatingSystem.IOS:
-        return html`
-        <style>
-          .header {
-            padding-top: 3.7rem;
-          }
-        </style>`;
-      default:
-        return nothing;
-    }
   }
 
   renderResults() {
