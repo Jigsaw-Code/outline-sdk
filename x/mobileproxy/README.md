@@ -230,8 +230,6 @@ Kotlin example:
 val proxy = Proxy(Proxy.Type.HTTP, InetSocketAddress("localhost", 1234))
 val client = OkHttpClient.Builder().proxy(proxy).build()
 ```
-https://square.github.io/okhttp/4.x/okhttp/okhttp3/-ok-http-client/-builder/proxy/
-
 
 ### JVM (Java, Kotlin)
 
