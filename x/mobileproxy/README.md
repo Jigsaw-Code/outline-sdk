@@ -239,10 +239,19 @@ In the JVM, you can configure the proxy to use with [system properties](https://
 ```kotlin
 System.setProperty("http.proxyHost", "localhost")
 System.setProperty("http.proxyPort", "1234")
+System.setProperty("https.proxyHost", "localhost")
+System.setProperty("https.proxyPort", "1234")
 ```
 
 Note that this may not fully work on Android, since it will only affect the JVM, not native code. You should also make sure you set this early in your code.
 
+### Web View
+
+We are working on instructions on how use the local proxy in a Webview.
+
+On Android, you will likely have to implement [WebViewClient.shouldInterceptRequest](https://developer.android.com/reference/android/webkit/WebViewClient#shouldInterceptRequest(android.webkit.WebView,%20android.webkit.WebResourceRequest)) to fulfill requests using an HTTP client that uses the local proxy.
+
+On iOS, we are still looking for ideas. There's [WKWebViewConfiguration.setURLSchemeHandler](https://developer.apple.com/documentation/webkit/wkwebviewconfiguration/2875766-seturlschemehandler), but the documentation says it can't be used to intercept HTTPS. If you know how do use a proxy with WKWebView, please let us know!
 
 ## Clean up
 
