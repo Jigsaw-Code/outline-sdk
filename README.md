@@ -34,7 +34,7 @@ Choose from one of the following methods to integrate the Outline SDK into your 
 
 The Outline Client uses a **generated mobile library** on Android, iOS and macOS (based on Cordova) and a **side service** on Windows and Linux (based on Electron).
 
-Below we provide more details on each integration approach.
+Below we provide more details on each integration approach. For more details about setting up and using Outline SDK features, see the [Discussions tab](https://github.com/Jigsaw-Code/outline-sdk/discussions).
 
 ### Generated Mobile Library
 
