@@ -91,7 +91,7 @@ func main() {
 	domainFlag := flag.String("domain", "example.com.", "Domain name to resolve in the test")
 	resolverFlag := flag.String("resolver", "8.8.8.8,2001:4860:4860::8888", "Comma-separated list of addresses of DNS resolver to use for the test")
 	protoFlag := flag.String("proto", "tcp,udp", "Comma-separated list of the protocols to test. Muse be \"tcp\", \"udp\", or a combination of them")
-	collectorFlag := flag.String("collector", "", "URL to send JSON error reports to")
+	collectorFlag := flag.String("report-to", "", "URL to send JSON error reports to")
 
 	flag.Parse()
 	if *verboseFlag {
