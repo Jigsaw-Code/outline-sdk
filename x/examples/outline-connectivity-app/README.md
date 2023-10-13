@@ -121,13 +121,13 @@ If at any point you run into issues during development, try `yarn reset`.
 
 ### Needed Improvements
 
-1. **\[P1\]** android-specific CSS
 1. **\[P1\]** read browser language on load, centralize language list, and only localize once
 1. **\[P1\]** documentation on how to generate mobile app build credentials
 1. **\[P1\]** add individual test result errors to the test result output UI
 1. **\[P2\]** use x/config to parse the access key and showcase the different transports (see: https://github.com/Jigsaw-Code/outline-sdk/blob/main/x/examples/outline-connectivity/main.go)
 1. **\[P2\]** generalize request handler via generics/reflection
 1. **\[P2\]** create a logo for the app
+1. **\[P2\]** android-specific toggle CSS
 1. **\[P2\]** make backend request calls non-blocking
 1. **\[P2\]** introducing some kind of tracing into the test
 
