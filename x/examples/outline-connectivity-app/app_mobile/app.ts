@@ -46,7 +46,9 @@ SharedFrontend.registerAllElements();
 @customElement("app-main")
 export class AppMain extends LitElement {
   render() {
-    return html`<connectivity-test-page .onSubmit=${
+    return html`<connectivity-test-page 
+    .resolvePlatform=${() => requestBackend<void, SharedFrontend.PlatformMetadata>("PlatformMetadata", void 0)}
+    .onSubmit=${
       (parameters: ConnectivityTestRequest) =>
         requestBackend<ConnectivityTestRequest, ConnectivityTestResponse>(
           "ConnectivityTest", parameters 
