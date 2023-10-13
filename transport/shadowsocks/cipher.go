@@ -137,7 +137,7 @@ func simpleEVPBytesToKey(data []byte, keyLen int) ([]byte, error) {
 	return derived[:keyLen], nil
 }
 
-// NewEncryptionKey creates a Cipher given a cipher name and a secret.
+// NewEncryptionKey creates a Cipher with a cipher name and a secret.
 // The cipher name must be the IETF name (as per https://www.iana.org/assignments/aead-parameters/aead-parameters.xhtml)
 // or the Shadowsocks alias from https://shadowsocks.org/guide/aead.html.
 func NewEncryptionKey(cipherName string, secretText string) (*EncryptionKey, error) {
