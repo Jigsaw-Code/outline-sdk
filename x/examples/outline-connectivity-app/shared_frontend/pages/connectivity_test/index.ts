@@ -41,7 +41,7 @@ export class ConnectivityTestPage extends LitElement {
   isSubmitting = false;
 
   @property({ attribute: false })
-  testResponse: ConnectivityTestResponse = null;
+  testResponse?: ConnectivityTestResponse;
 
   get locale() {
     return Localization.getLocale();
@@ -105,83 +105,37 @@ export class ConnectivityTestPage extends LitElement {
     }
   }
 
-  static styles = css`
-    @media (prefers-color-scheme: dark) {
-      :host {
-        --color-text: var(--jigsaw-gray-medium);
-        --color-text-brand: var(--jigsaw-white);
-        --color-text-highlight: var(--jigsaw-white);
-        --color-text-muted: hsl(0, 0%, 31%);
-        --color-background: var(--jigsaw-black);
-        --color-background-brand: var(--jigsaw-green);
-        --color-background-highlight: var(--jigsaw-green-medium);
-        --color-background-muted: hsl(0, 0%, 15%);
-        --color-success-text: var(--jigsaw-white);
-        --color-success-background: hsl(156, 50%, 31%);
-        --color-error-text: var(--jigsaw-white);
-        --color-error-background: hsl(0, 50%, 45%);
-      }
-    }
+  // TODO: not exactly sure how to replicate this
+  // static styles = css`
+  //   @media (prefers-color-scheme: dark) {
+  //     :host {
+  //       --color-text: var(--jigsaw-gray-medium);
+  //       --color-text-brand: var(--jigsaw-white);
+  //       --color-text-highlight: var(--jigsaw-white);
+  //       --color-text-muted: hsl(0, 0%, 31%);
+  //       --color-background: var(--jigsaw-black);
+  //       --color-background-brand: var(--jigsaw-green);
+  //       --color-background-highlight: var(--jigsaw-green-medium);
+  //       --color-background-muted: hsl(0, 0%, 15%);
+  //       --color-success-text: var(--jigsaw-white);
+  //       --color-success-background: hsl(156, 50%, 31%);
+  //       --color-error-text: var(--jigsaw-white);
+  //       --color-error-background: hsl(0, 50%, 45%);
+  //     }
+  //   }
 
-    @media (prefers-contrast: more) {
-      :host {
-        --size-border: 2px;
-      }
-    }
-
-      .results-list-item-data-key,
-      .results-list-item-data-value {
-        opacity: 1;
-        color: var(--color-text);
-      }
-
-      .footer {
-        border-top: var(--size-border) solid var(--color-text);
-        background: var(--color-background);
-      }
-
-      .footer-separator {
-        color: var(--color-text);
-      }
-
-      .footer-selector-label {
-        color: var(--color-text);
-      }
-
-      .footer-selector {
-        background: var(--color-text);
-        color: var(--color-background);
-      }
-    }
-
-    @media only screen and (max-width: 480px) {
-      /* if mobile */
-      .results-list-item-data {
-        display: flex;
-        flex-direction: column;
-        gap: var(--size-gap-inner);
-      }
-
-      .footer {
-        display: none;
-      }
-
-      .field-header-info {
-        display: none;
-      }
-
-      /* if ios */
-      .header {
-        padding-top: 3.7rem;
-      }
-    }
-  `;
+  //   @media (prefers-contrast: more) {
+  //     :host {
+  //       --size-border: 2px;
+  //     }
+  //   }
+  // `;
 
   render() {
     // TODO: move language definitions to a centralized place
     return html`<main class=${Styles.Main} dir="${this.locale === "fa-IR" ? "rtl" : "ltr"}">
       ${Components.Header()}
-      ${Components.Results()}
+      ${Components.Results(() => (this.testResponse = null), this.testResponse)}
       ${Components.Form(this.testConnectivity, this.isSubmitting)}
       ${Components.Footer(({ target }: { target: HTMLSelectElement }) => (this.locale = target.value))}
     </main>`;

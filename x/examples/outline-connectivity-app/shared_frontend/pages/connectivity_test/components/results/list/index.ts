@@ -2,9 +2,9 @@ import { html, nothing } from "lit";
 import { msg } from "@lit/localize";
 
 import * as Styles from "./styles.css";
-import { ConnectivityTestResponse } from "../../../types";
+import { ConnectivityTestResult } from "../../../types";
 
-export const List = (response: ConnectivityTestResponse[] | null) => {
+export const List = (response?: ConnectivityTestResult[]) => {
   if (!response) return nothing;
 
   return html`

@@ -8,6 +8,10 @@ export const Main = style({
   position: "absolute",
   width: "100%",
   "@media": {
+    '(prefers-contrast: more)': {
+      borderTop: `${App.Theme.size.border} solid ${App.Theme.color.text}`,
+      background: App.Theme.color.background,
+    },
     [`only screen and (min-width: ${App.Theme.size.appWidthMin})`]: {
       display: "none"
     }
@@ -27,6 +31,11 @@ export const Separator = style({
   color: App.Theme.color.textMuted,
   fontFamily: App.Theme.font.sansSerif,
   fontSize: App.Theme.size.fontSmall,
+  "@media": {
+    '(prefers-contrast: more)': {
+      color: App.Theme.color.text,
+    }
+  }
 });
 
 const selectorInteraction = {
@@ -45,4 +54,10 @@ export const Selector = style({
   padding: `${App.Theme.size.gapInner} ${App.Theme.size.gapNarrow}`,
   ':focus': selectorInteraction,
   ':hover': selectorInteraction,
+  "@media": {
+    '(prefers-contrast: more)': {
+      background: App.Theme.color.text,
+      color: App.Theme.color.background,
+    }
+  }
 });

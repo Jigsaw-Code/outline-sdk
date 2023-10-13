@@ -9,8 +9,8 @@ import * as Styles from "./styles.css";
 import { ConnectivityTestResponse } from "../../types";
 import { List } from "./list";
 
-export const Results = (cancelHandler: () => void, response?: ConnectivityTestResponse[]) => {
-  if (!response) return nothing;
+export const Results = (cancelHandler: () => void, response?: ConnectivityTestResponse) => {
+  if (!response || response instanceof Error) return nothing;
 
   return html`<dialog open class="${style({
     background: App.Theme.color.backgroundMuted,
