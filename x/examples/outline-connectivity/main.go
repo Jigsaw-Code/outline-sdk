@@ -20,11 +20,13 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -114,6 +116,13 @@ func sendReport(record jsonRecord, collectorFlag *string) error {
 	}
 	debugLog.Printf("Response: %s\n", respBody)
 	return nil
+}
+
+func init() {
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags...]\n", path.Base(os.Args[0]))
+		flag.PrintDefaults()
+	}
 }
 
 func main() {

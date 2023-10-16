@@ -23,18 +23,36 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 )
 
+var debugLog log.Logger = *log.New(io.Discard, "", 0)
+
+func init() {
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags...] <url>\n", path.Base(os.Args[0]))
+		flag.PrintDefaults()
+	}
+}
+
 func main() {
+	verboseFlag := flag.Bool("v", false, "Enable debug output")
 	transportFlag := flag.String("transport", "", "Transport config")
+
 	flag.Parse()
+
+	if *verboseFlag {
+		debugLog = *log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
+	}
 
 	url := flag.Arg(0)
 	if url == "" {
-		log.Fatal("Need to pass the URL to fetch in the command-line")
+		log.Print("Need to pass the URL to fetch in the command-line")
+		flag.Usage()
+		os.Exit(1)
 	}
 
 	dialer, err := config.NewStreamDialer(*transportFlag)
@@ -54,6 +72,12 @@ func main() {
 		log.Fatalf("URL GET failed: %v", err)
 	}
 	defer resp.Body.Close()
+
+	if *verboseFlag {
+		for k, v := range resp.Header {
+			debugLog.Printf("%v: %v", k, v)
+		}
+	}
 
 	_, err = io.Copy(os.Stdout, resp.Body)
 	if err != nil {
