@@ -38,7 +38,7 @@ public class MobileBackendPlugin: CAPPlugin {
             let rawRequest = try encoder.encode(
                 FrontendRequest(
                     resourceName: call.getString("resourceName")!,
-                    parameters: call.getString("parameters")!
+                    parameters: call.getString("parameters") ?? "{}"
                 )
             )
             

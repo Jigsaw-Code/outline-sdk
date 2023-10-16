@@ -24,7 +24,7 @@ class MobileBackendPlugin: Plugin() {
             val rawInputMessage = Json.encodeToString(
                 FrontendRequest(
                     call.getString("resourceName")!!,
-                    call.getString("parameters")!!
+                    call.getString("parameters") ?: "{}"
                 )
             )
 
