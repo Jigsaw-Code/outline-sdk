@@ -55,6 +55,15 @@ func newShadowsocksPacketDialerFromURL(innerDialer transport.PacketDialer, confi
 	return dialer, nil
 }
 
+func newShadowsocksPacketListenerFromURL(configURL *url.URL) (transport.PacketListener, error) {
+	config, err := parseShadowsocksURL(configURL)
+	if err != nil {
+		return nil, err
+	}
+	ep := &transport.UDPEndpoint{Address: config.serverAddress}
+	return shadowsocks.NewPacketListener(ep, config.cryptoKey)
+}
+
 type shadowsocksConfig struct {
 	serverAddress string
 	cryptoKey     *shadowsocks.EncryptionKey

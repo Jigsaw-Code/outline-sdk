@@ -15,20 +15,18 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net"
-	"strconv"
+	"net/url"
+	"strings"
 	"sync"
 
-	"github.com/Jigsaw-Code/outline-internal-sdk/network"
-	"github.com/Jigsaw-Code/outline-internal-sdk/network/dnstruncate"
-	"github.com/Jigsaw-Code/outline-internal-sdk/network/lwip2transport"
-	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
-	"github.com/Jigsaw-Code/outline-internal-sdk/transport/shadowsocks"
-	"github.com/Jigsaw-Code/outline-internal-sdk/x/connectivity"
+	"github.com/Jigsaw-Code/outline-sdk/network"
+	"github.com/Jigsaw-Code/outline-sdk/network/lwip2transport"
+	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/x/config"
 )
 
 const (
@@ -36,64 +34,29 @@ const (
 	connectivityTestResolver = "1.1.1.1:53"
 )
 
-type OutlineConfig struct {
-	Hostname string
-	Port     uint16
-	Password string
-	Cipher   string
-}
-
 type OutlineDevice struct {
-	t2s              network.IPDevice
-	pktProxy         network.DelegatePacketProxy
-	fallbackPktProxy network.PacketProxy
-	ssStreamDialer   transport.StreamDialer
-	ssPktListener    transport.PacketListener
-	ssPktProxy       network.PacketProxy
+	t2s   network.IPDevice
+	sd    transport.StreamDialer
+	pp    *outlinePacketProxy
+	svrIP net.IP
 }
 
-func NewOutlineDevice(config *OutlineConfig) (od *OutlineDevice, err error) {
-	od = &OutlineDevice{}
-
-	cipher, err := shadowsocks.NewEncryptionKey(config.Cipher, config.Password)
+func NewOutlineDevice(transportConfig string) (od *OutlineDevice, err error) {
+	ip, err := resolveShadowsocksServerIPFromConfig(transportConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cipher `%v`: %w", config.Cipher, err)
+		return nil, err
+	}
+	od = &OutlineDevice{
+		svrIP: ip,
 	}
 
-	ssAddress := net.JoinHostPort(config.Hostname, strconv.Itoa(int(config.Port)))
-
-	// Create Shadowsocks TCP StreamDialer
-	od.ssStreamDialer, err = shadowsocks.NewStreamDialer(&transport.TCPEndpoint{Address: ssAddress}, cipher)
-	if err != nil {
+	if od.sd, err = config.NewStreamDialer(transportConfig); err != nil {
 		return nil, fmt.Errorf("failed to create TCP dialer: %w", err)
 	}
-
-	// Create DNS Truncated PacketProxy
-	od.fallbackPktProxy, err = dnstruncate.NewPacketProxy()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create DNS truncate proxy: %w", err)
-	}
-
-	// Create Shadowsocks UDP PacketProxy
-	od.ssPktListener, err = shadowsocks.NewPacketListener(&transport.UDPEndpoint{Address: ssAddress}, cipher)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create UDP listener: %w", err)
-	}
-
-	od.ssPktProxy, err = network.NewPacketProxyFromPacketListener(od.ssPktListener)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create UDP proxy: %w", err)
-	}
-
-	// Create DelegatePacketProxy
-	od.pktProxy, err = network.NewDelegatePacketProxy(od.fallbackPktProxy)
-	if err != nil {
+	if od.pp, err = newOutlinePacketProxy(transportConfig); err != nil {
 		return nil, fmt.Errorf("failed to create delegate UDP proxy: %w", err)
 	}
-
-	// Configure lwIP Device
-	od.t2s, err = lwip2transport.ConfigureDevice(od.ssStreamDialer, od.pktProxy)
-	if err != nil {
+	if od.t2s, err = lwip2transport.ConfigureDevice(od.sd, od.pp); err != nil {
 		return nil, fmt.Errorf("failed to configure lwIP: %w", err)
 	}
 
@@ -105,26 +68,11 @@ func (d *OutlineDevice) Close() error {
 }
 
 func (d *OutlineDevice) Refresh() error {
-	fmt.Println("debug: testing TCP connectivity...")
-	streamResolver := &transport.StreamDialerEndpoint{Dialer: d.ssStreamDialer, Address: connectivityTestResolver}
-	_, err := connectivity.TestResolverStreamConnectivity(context.Background(), streamResolver, connectivityTestDomain)
-	if err != nil {
-		return fmt.Errorf("failed to connect to the remote Shadowsocks server: %w", err)
-	}
+	return d.pp.testConnectivityAndRefresh(connectivityTestResolver, connectivityTestDomain)
+}
 
-	fmt.Println("debug: testing UDP connectivity...")
-	dialer := transport.PacketListenerDialer{Listener: d.ssPktListener}
-	packetResolver := &transport.PacketDialerEndpoint{Dialer: dialer, Address: connectivityTestResolver}
-	_, err = connectivity.TestResolverPacketConnectivity(context.Background(), packetResolver, connectivityTestDomain)
-	fmt.Printf("debug: UDP connectivity test result: %v\n", err)
-
-	if err != nil {
-		fmt.Println("info: remote Shadowsocks server doesn't support UDP, switching to local DNS truncation handler")
-		return d.pktProxy.SetProxy(d.fallbackPktProxy)
-	} else {
-		fmt.Println("info: remote Shadowsocks server supports UDP traffic")
-		return d.pktProxy.SetProxy(d.ssPktProxy)
-	}
+func (d *OutlineDevice) GetServerIP() net.IP {
+	return d.svrIP
 }
 
 func (d *OutlineDevice) RelayTraffic(netDev io.ReadWriter) error {
@@ -154,4 +102,32 @@ func (d *OutlineDevice) RelayTraffic(netDev io.ReadWriter) error {
 	wg.Wait()
 
 	return errors.Join(err1, err2)
+}
+
+func resolveShadowsocksServerIPFromConfig(transportConfig string) (net.IP, error) {
+	if strings.Contains(transportConfig, "|") {
+		return nil, errors.New("multi-part config is not supported")
+	}
+	if transportConfig = strings.TrimSpace(transportConfig); transportConfig == "" {
+		return nil, errors.New("config is required")
+	}
+	url, err := url.Parse(transportConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+	if url.Scheme != "ss" {
+		return nil, errors.New("config must start with 'ss://'")
+	}
+	ipList, err := net.LookupIP(url.Hostname())
+	if err != nil {
+		return nil, fmt.Errorf("invalid server hostname: %w", err)
+	}
+
+	// todo: we only tested IPv4 routing table, need to test IPv6 in the future
+	for _, ip := range ipList {
+		if ip = ip.To4(); ip != nil {
+			return ip, nil
+		}
+	}
+	return nil, errors.New("IPv6 only Shadowsocks server is not supported yet")
 }

@@ -17,11 +17,11 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"os"
 	"os/signal"
-	"strconv"
 	"sync"
 
 	"github.com/vishvananda/netlink"
@@ -31,32 +31,17 @@ import (
 const OUTLINE_TUN_NAME = "outline233"
 const OUTLINE_TUN_IP = "10.233.233.1"
 const OUTLINE_TUN_MTU = 1500 // todo: we can read this from netlink
-// const OUTLINE_TUN_SUBNET = "10.233.233.1/32"
 const OUTLINE_GW_SUBNET = "10.233.233.2/32"
 const OUTLINE_GW_IP = "10.233.233.2"
 const OUTLINE_ROUTING_PRIORITY = 23333
 const OUTLINE_ROUTING_TABLE = 233
 
-// ./app
-//
-//	<svr-ip>     : the outline server IP (e.g. 111.111.111.111)
-//	<svt-port>   : the outline server port (e.g. 21532)
-//	<svr-pass>   : the outline server password
+// ./app -transport "ss://..."
 func main() {
-	fmt.Println("OutlineVPN CLI (experimental-08031526)")
+	fmt.Println("OutlineVPN CLI (experimental-10161603)")
 
-	svrIp := os.Args[1]
-	svrIpCidr := svrIp + "/32"
-	svrPass := os.Args[3]
-	svrPort, err := strconv.Atoi(os.Args[2])
-	if err != nil {
-		fmt.Printf("fatal error: %v\n", err)
-		return
-	}
-	if svrPort < 1000 || svrPort > 65535 {
-		fmt.Printf("fatal error: server port out of range\n")
-		return
-	}
+	transportFlag := flag.String("transport", "", "Transport config")
+	flag.Parse()
 
 	bgWait := &sync.WaitGroup{}
 	defer bgWait.Wait()
@@ -68,12 +53,7 @@ func main() {
 	}
 	defer tun.Close()
 
-	ss, err := NewOutlineDevice(&OutlineConfig{
-		Hostname: svrIp,
-		Port:     uint16(svrPort),
-		Password: svrPass,
-		Cipher:   "chacha20-ietf-poly1305",
-	})
+	ss, err := NewOutlineDevice(*transportFlag)
 	if err != nil {
 		fmt.Printf("fatal error: %v", err)
 		return
@@ -96,38 +76,17 @@ func main() {
 	}
 	defer cleanUpRouting()
 
-	if err := showRouting(); err != nil {
-		return
-	}
-
+	svrIpCidr := ss.GetServerIP().String() + "/32"
 	r, err := setupIpRule(svrIpCidr)
 	if err != nil {
 		return
 	}
 	defer cleanUpRule(r)
 
-	if err := showAllRules(); err != nil {
-		return
-	}
-
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, unix.SIGTERM, unix.SIGHUP)
 	s := <-sigc
 	fmt.Printf("\nReceived %v, cleaning up resources...\n", s)
-}
-
-func showRouting() error {
-	filter := netlink.Route{Table: OUTLINE_ROUTING_TABLE}
-	routes, err := netlink.RouteListFiltered(netlink.FAMILY_V4, &filter, netlink.RT_FILTER_TABLE)
-	if err != nil {
-		fmt.Printf("fatal error: %v\n", err)
-		return err
-	}
-	fmt.Printf("\tRoutes (@%v): %v\n", OUTLINE_ROUTING_TABLE, len(routes))
-	for _, route := range routes {
-		fmt.Printf("\t\t%v\n", route)
-	}
-	return nil
 }
 
 func setupRouting() error {
@@ -192,18 +151,6 @@ func cleanUpRouting() error {
 		fmt.Println("routing table has been reset")
 	}
 	return lastErr
-}
-
-func showAllRules() error {
-	rules, err := netlink.RuleList(netlink.FAMILY_ALL)
-	if err != nil {
-		fmt.Printf("fatal error: %v\n", err)
-		return err
-	}
-	for _, r := range rules {
-		fmt.Printf("\t%v\n", r)
-	}
-	return nil
 }
 
 func setupIpRule(svrIp string) (*netlink.Rule, error) {

@@ -15,7 +15,7 @@
 package main
 
 import (
-	"github.com/Jigsaw-Code/outline-internal-sdk/network"
+	"github.com/Jigsaw-Code/outline-sdk/network"
 )
 
 type TunDevice interface {
