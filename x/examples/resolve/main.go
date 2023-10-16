@@ -139,7 +139,7 @@ func main() {
 		lines, err := resolver.LookupTXT(ctx, domain)
 		err = cleanDNSError(err, resolverAddr)
 		if err != nil {
-			log.Fatalf("Failed to lookup NS: %v", err)
+			log.Fatalf("Failed to lookup TXT: %v", err)
 		}
 		for _, line := range lines {
 			fmt.Println(line)
