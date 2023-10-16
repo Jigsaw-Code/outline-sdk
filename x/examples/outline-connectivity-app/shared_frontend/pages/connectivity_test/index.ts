@@ -13,10 +13,10 @@
 // limitations under the License.
 
 import { configureLocalization, msg, localized } from "@lit/localize";
-import { css, html, LitElement } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { property } from "lit/decorators.js";
 import { sourceLocale, targetLocales } from "./generated/messages";
-import type { ConnectivityTestRequest, ConnectivityTestResponse, ConnectivityTestResult } from "./types";
+import { ConnectivityTestRequest, ConnectivityTestResponse, ConnectivityTestResult, OperatingSystem, PlatformMetadata } from "./types";
 
 export * from "./types";
 
@@ -32,13 +32,19 @@ const Localization = configureLocalization({
 @localized()
 export class ConnectivityTestPage extends LitElement {
   @property({ type: Function })
+  loadPlatform?: () => Promise<PlatformMetadata>;
+
+  @property({ attribute: false })
+  platform?: PlatformMetadata;
+
+  @property({ type: Function })
   onSubmit?: (request: ConnectivityTestRequest) => Promise<ConnectivityTestResponse>;
 
   @property({ attribute: false })
   isSubmitting = false;
 
   @property({ attribute: false })
-  testResponse: ConnectivityTestResponse = null;
+  response?: ConnectivityTestResponse;
 
   get locale() {
     return Localization.getLocale();
@@ -84,6 +90,14 @@ export class ConnectivityTestPage extends LitElement {
     };
   }
 
+  protected async performUpdate() {
+    if (!this.platform && this.loadPlatform) {
+      this.platform = await this.loadPlatform();
+    }
+
+    super.performUpdate();
+  }
+
   async testConnectivity(event: SubmitEvent) {
     event.preventDefault();
 
@@ -94,9 +108,9 @@ export class ConnectivityTestPage extends LitElement {
     this.isSubmitting = true;
 
     try {
-      this.testResponse = (await this.onSubmit?.(this.formData)) ?? null;
+      this.response = (await this.onSubmit?.(this.formData)) ?? null;
     } catch (error) {
-      this.testResponse = new Error(error as string);
+      this.response = new Error(error as string);
     } finally {
       this.isSubmitting = false;
     }
@@ -177,7 +191,8 @@ export class ConnectivityTestPage extends LitElement {
       width: 100vw;
     }
 
-    .header {
+    .header,
+    .header--ios {
       background: var(--color-background-brand);
       display: flex;
       justify-content: center;
@@ -185,6 +200,10 @@ export class ConnectivityTestPage extends LitElement {
       position: sticky;
       top: 0;
       width: 100%;
+    }
+
+    .header--ios {
+      padding-top: 3.7rem;
     }
 
     .header-text {
@@ -572,18 +591,13 @@ export class ConnectivityTestPage extends LitElement {
       .field-header-info {
         display: none;
       }
-
-      /* if ios */
-      .header {
-        padding-top: 3.7rem;
-      }
     }
   `;
 
   render() {
     // TODO: move language definitions to a centralized place
     return html`<main dir="${this.locale === "fa-IR" ? "rtl" : "ltr"}">
-      <header class="header">
+      <header class=${this.platform?.operatingSystem === OperatingSystem.IOS ? "header--ios" : "header"}>
         <h1 class="header-text">${msg("Outline Connectivity Test")}</h1>
       </header>
       ${this.renderResults()}
@@ -743,8 +757,8 @@ export class ConnectivityTestPage extends LitElement {
   }
 
   renderResults() {
-    if (!this.testResponse) {
-      return;
+    if (!this.response) {
+      return nothing;
     }
 
     return html`<dialog open class="results">
@@ -752,12 +766,12 @@ export class ConnectivityTestPage extends LitElement {
         <h2 class="results-header-text">${msg("Test Results")}</h2>
         <button
           class="results-header-close"
-          @click=${() => (this.testResponse = null)}
+          @click=${() => (this.response = null)}
         >
           ✕
         </button>
       </header>
-      ${this.renderResultsList(this.testResponse)}
+      ${this.renderResultsList(this.response)}
     </dialog>`;
   }
 

@@ -35,3 +35,15 @@ export interface ConnectivityTestResult {
 }
 
 export type ConnectivityTestResponse =  ConnectivityTestResult[] | Error | null;
+
+export enum OperatingSystem {
+  ANDROID = "android",
+  IOS = "ios",
+  LINUX = "linux",
+  MACOS = "darwin",
+  WINDOWS = "windows"
+}
+
+export interface PlatformMetadata {
+  operatingSystem: OperatingSystem;
+}

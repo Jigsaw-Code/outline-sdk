@@ -18,18 +18,18 @@ import { registerPlugin } from "@capacitor/core";
 // Capacitor requires passing in a root object to each native call,
 // that is then accessed via APIs like `call.getString("objectKey")`.
 const MobileBackend = registerPlugin<{
-  Request(request: { resourceName: string; parameters: string}): Promise<{ error: string; body: string}>;
+  Request(request: { resourceName: string; parameters: string }): Promise<{ error: string; body: string }>;
 }>("MobileBackend");
 
 async function requestBackend<T, K>(resourceName: string, parameters: T): Promise<K> {
-  const response = await MobileBackend.Request({ 
-    resourceName, parameters: JSON.stringify(parameters) 
+  const response = await MobileBackend.Request({
+    resourceName, parameters: JSON.stringify(parameters)
   });
 
   if (response.error) {
     throw new Error(response.error);
   }
-  
+
   return JSON.parse(response.body);
 }
 
@@ -46,11 +46,12 @@ SharedFrontend.registerAllElements();
 @customElement("app-main")
 export class AppMain extends LitElement {
   render() {
-    return html`<connectivity-test-page .onSubmit=${
-      (parameters: ConnectivityTestRequest) =>
+    return html`<connectivity-test-page 
+    .loadPlatform=${() => requestBackend<void, SharedFrontend.PlatformMetadata>("Platform", void 0)}
+    .onSubmit=${(parameters: ConnectivityTestRequest) =>
         requestBackend<ConnectivityTestRequest, ConnectivityTestResponse>(
-          "ConnectivityTest", parameters 
+          "ConnectivityTest", parameters
         )
-     } />`;
+      } />`;
   }
 }
