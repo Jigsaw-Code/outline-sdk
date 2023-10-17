@@ -21,7 +21,7 @@ import (
 	"strconv"
 )
 
-// ReplyCode is byte unsigned number that represents a SOCKS error as indicated in the REP field of the server response.
+// ReplyCode is a byte-unsigned number that represents a SOCKS error as indicated in the REP field of the server response.
 type ReplyCode byte
 
 // SOCKS reply codes, as enumerated in https://datatracker.ietf.org/doc/html/rfc1928#section-6.

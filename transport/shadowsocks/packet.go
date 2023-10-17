@@ -19,7 +19,7 @@ import (
 	"io"
 )
 
-// ErrShortPacket indicates the destination packet given to Unpack is too short.
+// ErrShortPacket indicates that the destination packet given to Unpack is too short.
 var ErrShortPacket = errors.New("short packet")
 
 // Assumes all ciphers have NonceSize() <= 12.

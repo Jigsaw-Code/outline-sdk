@@ -153,7 +153,7 @@ type PlatformMetadata struct {
 }
 
 func Platform() PlatformMetadata {
-	return []PlatformMetadata{ OS: runtime.GOOS }
+	return PlatformMetadata{OS: runtime.GOOS}
 }
 
 func makeErrorRecord(err error) *ConnectivityTestError {

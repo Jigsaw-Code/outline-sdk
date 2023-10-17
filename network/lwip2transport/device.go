@@ -53,7 +53,7 @@ var inst *lwIPDevice = nil
 // [lwIP library] to perform the translation.
 //
 // LwIP device must be a singleton object due to limitations in [lwIP library]. If you try to call ConfigureDevice more
-// than once, we will Close the previous device and reconfigures it.
+// than once, we will Close the previous device and reconfigure it.
 //
 // To use a LwIP device:
 //  1. Call [ConfigureDevice] with two handlers for TCP and UDP traffic.
@@ -62,7 +62,7 @@ var inst *lwIPDevice = nil
 //  3. Read IP packets from the device to get the TCP/UDP responses.
 //
 // A LwIP device is NOT thread-safe. However it is safe to use Write, Read/WriteTo and Close in different goroutines.
-// But keep in mind that only one goroutine can call Write at a time; and only one goroutine can use either Read or
+// Keep in mind that only one goroutine can call Write at a time, and only one goroutine can use either Read or
 // WriteTo at a time.
 //
 // [lwIP library]: https://savannah.nongnu.org/projects/lwip/
