@@ -24,7 +24,9 @@
     "setup:vscode": "yarn sdks vscode",
     "shared_backend": "yarn workspace shared_backend",
     "shared_frontend": "yarn workspace shared_frontend",
-    "watch": "yarn workspaces foreach -piv run watch"
+    "watch": "yarn workspaces foreach -piv run watch",
+    "watch:android": "yarn workspaces foreach -piv run watch:android",
+    "watch:ios": "yarn workspaces foreach -piv run watch:ios"
   },
   "version": "0.0.0",
   "workspaces": [
