@@ -12,7 +12,7 @@
     "node": ">=18.0.0"
   },
   "name": "outline_sdk_connectivity_test",
-  "packageManager": "yarn@3.6.1",
+  "packageManager": "yarn@3.6.4",
   "private": true,
   "scripts": {
     "app_desktop": "yarn workspace app_desktop",
