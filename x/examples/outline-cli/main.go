@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/signal"
 	"sync"
@@ -49,7 +50,7 @@ func main() {
 
 	tun, err := NewTunDevice(OUTLINE_TUN_NAME, OUTLINE_TUN_IP)
 	if err != nil {
-		fmt.Printf("[error] failed to create tun device: %v\n", err)
+		log.Printf("[error] failed to create tun device: %v\n", err)
 		return
 	}
 	defer tun.Close()
@@ -57,14 +58,14 @@ func main() {
 	// disable IPv6 before resolving Shadowsocks server IP
 	prevIPv6, err := enableIPv6(false)
 	if err != nil {
-		fmt.Printf("[error] failed to disable IPv6: %v\n", err)
+		log.Printf("[error] failed to disable IPv6: %v\n", err)
 		return
 	}
 	defer enableIPv6(prevIPv6)
 
 	ss, err := NewOutlineDevice(*transportFlag)
 	if err != nil {
-		fmt.Printf("[error] failed to create Outline device: %v", err)
+		log.Printf("[error] failed to create Outline device: %v", err)
 		return
 	}
 	defer ss.Close()
@@ -76,16 +77,16 @@ func main() {
 	go func() {
 		defer trafficCopyWg.Done()
 		written, err := io.Copy(ss, tun)
-		fmt.Printf("[info] tun -> OutlineDevice stopped: %v %v\n", written, err)
+		log.Printf("[info] tun -> OutlineDevice stopped: %v %v\n", written, err)
 	}()
 	go func() {
 		defer trafficCopyWg.Done()
 		written, err := io.Copy(tun, ss)
-		fmt.Printf("[info] OutlineDevice -> tun stopped: %v %v\n", written, err)
+		log.Printf("[info] OutlineDevice -> tun stopped: %v %v\n", written, err)
 	}()
 
 	if err := setSystemDNSServer(OUTLINE_DNS_SERVER); err != nil {
-		fmt.Printf("[error] failed to configure system DNS: %v", err)
+		log.Printf("[error] failed to configure system DNS: %v", err)
 		return
 	}
 	defer restoreSystemDNSServer()
@@ -97,7 +98,7 @@ func main() {
 		OUTLINE_GW_IP,
 		OUTLINE_ROUTING_TABLE,
 		OUTLINE_ROUTING_PRIORITY); err != nil {
-		fmt.Printf("[error] failed to configure routing: %v", err)
+		log.Printf("[error] failed to configure routing: %v", err)
 		return
 	}
 	defer stopRouting(OUTLINE_ROUTING_TABLE)
@@ -105,5 +106,5 @@ func main() {
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, unix.SIGTERM, unix.SIGHUP)
 	s := <-sigc
-	fmt.Printf("\nReceived %v, cleaning up resources...\n", s)
+	log.Printf("\nreceived %v, terminating...\n", s)
 }

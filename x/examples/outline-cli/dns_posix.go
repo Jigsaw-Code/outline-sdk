@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 )
 
@@ -56,12 +57,12 @@ func backupAndWriteFile(original, backup string, data []byte) error {
 
 func restoreFileIfExists(backup, original string) {
 	if _, err := os.Stat(backup); err != nil {
-		fmt.Printf("[warn] failed to read DNS config backup '%s': %v\n", backup, err)
+		log.Printf("[warn] no DNS config backup file '%s' presents: %v\n", backup, err)
 		return
 	}
 	if err := os.Rename(backup, original); err != nil {
-		fmt.Printf("[error] failed to restore DNS config from backup '%s' to '%s': %v\n", backup, original, err)
+		log.Printf("[error] failed to restore DNS config from backup '%s' to '%s': %v\n", backup, original, err)
 		return
 	}
-	fmt.Printf("[info] DNS config restored from '%s' to '%s'\n", backup, original)
+	log.Printf("[info] DNS config restored from '%s' to '%s'\n", backup, original)
 }
