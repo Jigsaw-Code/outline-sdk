@@ -209,9 +209,7 @@ On Android, you can have the following Kotlin code:
 ```kotlin
 // Use port zero to let the system pick an open port for you.
 val proxy = mobileproxy.runProxy("localhost:0", "split:3")
-// Find the address the local proxy is bound to.
-val proxyAddress = proxy.address()
-// Configure your networking library with proxyAddress.
+// Configure your networking library using proxy.host() and proxy.port() or proxy.address().
 // ...
 // Stop running the proxy.
 proxy.stop()
@@ -231,7 +229,7 @@ Dart example:
 ```dart
   HttpClient client = HttpClient();
   client.findProxy = (Uri uri) {
-    return "PROXY localhost:1234";
+    return "PROXY " + proxy.address();
   };
 ```
 
@@ -243,18 +241,18 @@ Set the proxy with [`OkHttpClient.Builder.proxy`](https://square.github.io/okhtt
 Kotlin example:
 
 ```kotlin
-val proxy = Proxy(Proxy.Type.HTTP, InetSocketAddress("localhost", 1234))
-val client = OkHttpClient.Builder().proxy(proxy).build()
+val proxyConfig = Proxy(Proxy.Type.HTTP, InetSocketAddress(proxy.host(), proxy.port()))
+val client = OkHttpClient.Builder().proxy(proxyConfig).build()
 ```
 
 ### JVM (Java, Kotlin)
 
 In the JVM, you can configure the proxy to use with [system properties](https://docs.oracle.com/javase/8/docs/technotes/guides/net/proxies.html):
 ```kotlin
-System.setProperty("http.proxyHost", "localhost")
-System.setProperty("http.proxyPort", "1234")
-System.setProperty("https.proxyHost", "localhost")
-System.setProperty("https.proxyPort", "1234")
+System.setProperty("http.proxyHost", proxy.host())
+System.setProperty("http.proxyPort", String.valueOf(proxy.port()))
+System.setProperty("https.proxyHost", proxy.host())
+System.setProperty("https.proxyPort", String.valueOf(proxy.port()))
 ```
 
 Note that this may not fully work on Android, since it will only affect the JVM, not native code. You should also make sure you set this early in your code.
