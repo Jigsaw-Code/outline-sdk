@@ -6,9 +6,9 @@
   "module": "index.ts",
   "name": "shared_backend",
   "scripts": {
-    "build": "concurrently 'yarn:build:*' --kill-others-on-fail",
-    "build:android": "gomobile bind -target android -androidapi 21 -o output/SharedBackend.aar github.com/Jigsaw-Code/outline-sdk/x/examples/outline-connectivity-app/shared_backend",
-    "build:ios": "gomobile bind -target ios,iossimulator -o output/SharedBackend.xcframework github.com/Jigsaw-Code/outline-sdk/x/examples/outline-connectivity-app/shared_backend",
+    "build": "concurrently 'yarn:build:*'",
+    "build:android": "[ ! -d output ] && mkdir output; gomobile bind -target android -androidapi 21 -o output/SharedBackend.aar github.com/Jigsaw-Code/outline-sdk/x/examples/outline-connectivity-app/shared_backend",
+    "build:ios": "[ ! -d output ] && mkdir output; gomobile bind -target ios,iossimulator -o output/SharedBackend.xcframework github.com/Jigsaw-Code/outline-sdk/x/examples/outline-connectivity-app/shared_backend",
     "clean": "rm -rf output",
     "go": "go",
     "setup": "yarn build",
