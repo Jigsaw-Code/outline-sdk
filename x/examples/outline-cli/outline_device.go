@@ -17,11 +17,9 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/url"
 	"strings"
-	"sync"
 
 	"github.com/Jigsaw-Code/outline-sdk/network"
 	"github.com/Jigsaw-Code/outline-sdk/network/lwip2transport"
@@ -35,7 +33,7 @@ const (
 )
 
 type OutlineDevice struct {
-	t2s   network.IPDevice
+	network.IPDevice
 	sd    transport.StreamDialer
 	pp    *outlinePacketProxy
 	svrIP net.IP
@@ -56,7 +54,7 @@ func NewOutlineDevice(transportConfig string) (od *OutlineDevice, err error) {
 	if od.pp, err = newOutlinePacketProxy(transportConfig); err != nil {
 		return nil, fmt.Errorf("failed to create delegate UDP proxy: %w", err)
 	}
-	if od.t2s, err = lwip2transport.ConfigureDevice(od.sd, od.pp); err != nil {
+	if od.IPDevice, err = lwip2transport.ConfigureDevice(od.sd, od.pp); err != nil {
 		return nil, fmt.Errorf("failed to configure lwIP: %w", err)
 	}
 
@@ -64,7 +62,7 @@ func NewOutlineDevice(transportConfig string) (od *OutlineDevice, err error) {
 }
 
 func (d *OutlineDevice) Close() error {
-	return d.t2s.Close()
+	return d.IPDevice.Close()
 }
 
 func (d *OutlineDevice) Refresh() error {
@@ -73,35 +71,6 @@ func (d *OutlineDevice) Refresh() error {
 
 func (d *OutlineDevice) GetServerIP() net.IP {
 	return d.svrIP
-}
-
-func (d *OutlineDevice) RelayTraffic(netDev io.ReadWriter) error {
-	var err1, err2 error
-
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-
-		fmt.Println("debug: OutlineDevice start receiving data from tun")
-		if _, err2 = io.Copy(d.t2s, netDev); err2 != nil {
-			fmt.Printf("warning: failed to write data to OutlineDevice: %v\n", err2)
-		} else {
-			fmt.Println("debug: tun -> OutlineDevice eof")
-		}
-	}()
-
-	fmt.Println("debug: start forwarding OutlineDevice data to tun")
-	if _, err1 = io.Copy(netDev, d.t2s); err1 != nil {
-		fmt.Printf("warning: failed to forward OutlineDevice data to tun: %v\n", err1)
-	} else {
-		fmt.Println("debug: OutlineDevice -> tun eof")
-	}
-
-	wg.Wait()
-
-	return errors.Join(err1, err2)
 }
 
 func resolveShadowsocksServerIPFromConfig(transportConfig string) (net.IP, error) {

@@ -19,12 +19,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"net"
+	"io"
 	"os"
 	"os/signal"
 	"sync"
 
-	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
 
@@ -35,154 +34,76 @@ const OUTLINE_GW_SUBNET = "10.233.233.2/32"
 const OUTLINE_GW_IP = "10.233.233.2"
 const OUTLINE_ROUTING_PRIORITY = 23333
 const OUTLINE_ROUTING_TABLE = 233
+const OUTLINE_DNS_SERVER = "9.9.9.9"
 
 // ./app -transport "ss://..."
 func main() {
-	fmt.Println("OutlineVPN CLI (experimental-10161603)")
+	fmt.Println("OutlineVPN CLI (experimental)")
 
 	transportFlag := flag.String("transport", "", "Transport config")
 	flag.Parse()
 
-	bgWait := &sync.WaitGroup{}
-	defer bgWait.Wait()
+	// this WaitGroup must Wait() after tun is closed
+	trafficCopyWg := &sync.WaitGroup{}
+	defer trafficCopyWg.Wait()
 
 	tun, err := NewTunDevice(OUTLINE_TUN_NAME, OUTLINE_TUN_IP)
 	if err != nil {
-		fmt.Printf("fatal error: %v\n", err)
+		fmt.Printf("[error] failed to create tun device: %v\n", err)
 		return
 	}
 	defer tun.Close()
 
+	// disable IPv6 before resolving Shadowsocks server IP
+	prevIPv6, err := enableIPv6(false)
+	if err != nil {
+		fmt.Printf("[error] failed to disable IPv6: %v\n", err)
+		return
+	}
+	defer enableIPv6(prevIPv6)
+
 	ss, err := NewOutlineDevice(*transportFlag)
 	if err != nil {
-		fmt.Printf("fatal error: %v", err)
+		fmt.Printf("[error] failed to create Outline device: %v", err)
 		return
 	}
 	defer ss.Close()
 
 	ss.Refresh()
 
-	bgWait.Add(1)
+	// Copy the traffic from tun device to OutlineDevice bidirectionally
+	trafficCopyWg.Add(2)
 	go func() {
-		defer bgWait.Done()
-		if err := ss.RelayTraffic(tun); err != nil {
-			fmt.Printf("Traffic bridge destroyed: %v\n", err)
-		}
+		defer trafficCopyWg.Done()
+		written, err := io.Copy(ss, tun)
+		fmt.Printf("[info] tun -> OutlineDevice stopped: %v %v\n", written, err)
+	}()
+	go func() {
+		defer trafficCopyWg.Done()
+		written, err := io.Copy(tun, ss)
+		fmt.Printf("[info] OutlineDevice -> tun stopped: %v %v\n", written, err)
 	}()
 
-	err = setupRouting()
-	if err != nil {
+	if err := setSystemDNSServer(OUTLINE_DNS_SERVER); err != nil {
+		fmt.Printf("[error] failed to configure system DNS: %v", err)
 		return
 	}
-	defer cleanUpRouting()
+	defer restoreSystemDNSServer()
 
-	svrIpCidr := ss.GetServerIP().String() + "/32"
-	r, err := setupIpRule(svrIpCidr)
-	if err != nil {
+	if err := startRouting(ss.GetServerIP().String(),
+		OUTLINE_TUN_NAME,
+		OUTLINE_GW_SUBNET,
+		OUTLINE_TUN_IP,
+		OUTLINE_GW_IP,
+		OUTLINE_ROUTING_TABLE,
+		OUTLINE_ROUTING_PRIORITY); err != nil {
+		fmt.Printf("[error] failed to configure routing: %v", err)
 		return
 	}
-	defer cleanUpRule(r)
+	defer stopRouting(OUTLINE_ROUTING_TABLE)
 
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, unix.SIGTERM, unix.SIGHUP)
 	s := <-sigc
 	fmt.Printf("\nReceived %v, cleaning up resources...\n", s)
-}
-
-func setupRouting() error {
-	fmt.Println("configuring outline routing table...")
-	tun, err := netlink.LinkByName(OUTLINE_TUN_NAME)
-	if err != nil {
-		fmt.Printf("fatal error: %v\n", err)
-		return err
-	}
-
-	dst, err := netlink.ParseIPNet(OUTLINE_GW_SUBNET)
-	if err != nil {
-		fmt.Printf("fatal error: %v\n", err)
-		return err
-	}
-	r := netlink.Route{
-		LinkIndex: tun.Attrs().Index,
-		Table:     OUTLINE_ROUTING_TABLE,
-		Dst:       dst,
-		Src:       net.ParseIP(OUTLINE_TUN_IP),
-		Scope:     netlink.SCOPE_LINK,
-	}
-	fmt.Printf("\trouting only from %v to %v through nic %v...\n", r.Src, r.Dst, r.LinkIndex)
-	err = netlink.RouteAdd(&r)
-	if err != nil {
-		fmt.Printf("fatal error: %v\n", err)
-		return err
-	}
-
-	r = netlink.Route{
-		LinkIndex: tun.Attrs().Index,
-		Table:     OUTLINE_ROUTING_TABLE,
-		Gw:        net.ParseIP(OUTLINE_GW_IP),
-	}
-	fmt.Printf("\tdefault routing entry via gw %v through nic %v...\n", r.Gw, r.LinkIndex)
-	err = netlink.RouteAdd(&r)
-	if err != nil {
-		fmt.Printf("fatal error: %v\n", err)
-		return err
-	}
-
-	fmt.Println("routing table has been successfully configured")
-	return nil
-}
-
-func cleanUpRouting() error {
-	fmt.Println("cleaning up outline routing table...")
-	filter := netlink.Route{Table: OUTLINE_ROUTING_TABLE}
-	routes, err := netlink.RouteListFiltered(netlink.FAMILY_V4, &filter, netlink.RT_FILTER_TABLE)
-	if err != nil {
-		fmt.Printf("fatal error: %v\n", err)
-		return err
-	}
-	var lastErr error = nil
-	for _, route := range routes {
-		if err := netlink.RouteDel(&route); err != nil {
-			fmt.Printf("fatal error: %v\n", err)
-			lastErr = err
-		}
-	}
-	if lastErr == nil {
-		fmt.Println("routing table has been reset")
-	}
-	return lastErr
-}
-
-func setupIpRule(svrIp string) (*netlink.Rule, error) {
-	fmt.Println("adding ip rule for outline routing table...")
-	dst, err := netlink.ParseIPNet(svrIp)
-	if err != nil {
-		fmt.Printf("fatal error: %v\n", err)
-		return nil, err
-	}
-	rule := netlink.NewRule()
-	rule.Priority = OUTLINE_ROUTING_PRIORITY
-	rule.Family = netlink.FAMILY_V4
-	rule.Table = OUTLINE_ROUTING_TABLE
-	rule.Dst = dst
-	rule.Invert = true
-	fmt.Printf("+from all not to %v via table %v...\n", rule.Dst, rule.Table)
-	err = netlink.RuleAdd(rule)
-	if err != nil {
-		fmt.Printf("fatal error: %v\n", err)
-		return nil, err
-	}
-	fmt.Println("ip rule for outline routing table created")
-	return rule, nil
-}
-
-func cleanUpRule(rule *netlink.Rule) error {
-	fmt.Println("cleaning up ip rule of routing table...")
-	err := netlink.RuleDel(rule)
-	if err != nil {
-		fmt.Printf("fatal error: %v\n", err)
-		return err
-	}
-	fmt.Println("ip rule of routing table deleted")
-	return nil
 }

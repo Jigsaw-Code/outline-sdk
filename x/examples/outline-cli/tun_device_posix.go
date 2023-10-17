@@ -63,9 +63,7 @@ func NewTunDevice(name, ip string) (d TunDevice, err error) {
 }
 
 func (d *tunDevice) MTU() int {
-	// d.Interface.
-	// netlink.NewLinkAttrs().MTU
-	return 0
+	return 1500
 }
 
 func (d *tunDevice) configureSubnetAndBringUp(ip string) error {
@@ -80,7 +78,7 @@ func (d *tunDevice) configureSubnetAndBringUp(ip string) error {
 		return fmt.Errorf("subnet address '%s' is not valid: %w", subnet, err)
 	}
 	if err := netlink.AddrAdd(tunLink, addr); err != nil {
-		return fmt.Errorf("failed to add subnet to TUN/TAP device '': %w", tunName, err)
+		return fmt.Errorf("failed to add subnet to TUN/TAP device '%s': %w", tunName, err)
 	}
 	if err := netlink.LinkSetUp(tunLink); err != nil {
 		return fmt.Errorf("failed to bring TUN/TAP device '%s' up: %w", tunName, err)
