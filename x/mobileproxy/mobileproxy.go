@@ -24,6 +24,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
@@ -32,13 +33,24 @@ import (
 
 // Proxy enables you to get the actual address bound by the server and stop the service when no longer needed.
 type Proxy struct {
-	address string
-	server  *http.Server
+	host   string
+	port   int
+	server *http.Server
 }
 
-// Address returns the actual IP and port the server is bound to.
+// Address returns the IP and port the server is bound to.
 func (p *Proxy) Address() string {
-	return p.address
+	return net.JoinHostPort(p.host, strconv.Itoa(p.port))
+}
+
+// Host returns the IP the server is bound to.
+func (p *Proxy) Host() string {
+	return p.host
+}
+
+// Port returns the port the server is bound to.
+func (p *Proxy) Port() int {
+	return p.port
 }
 
 // Stop gracefully stops the proxy service, waiting for at most timeout seconds before forcefully closing it.
@@ -68,5 +80,13 @@ func RunProxy(localAddress string, transportConfig string) (*Proxy, error) {
 	server := &http.Server{Handler: httpproxy.NewConnectHandler(dialer)}
 	go server.Serve(listener)
 
-	return &Proxy{address: listener.Addr().String(), server: server}, nil
+	host, portStr, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		return nil, fmt.Errorf("could not parse proxy address '%v': %v", listener.Addr().String(), err)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse proxy port '%v': %v", portStr, err)
+	}
+	return &Proxy{host: host, port: port, server: server}, nil
 }
