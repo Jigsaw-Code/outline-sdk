@@ -120,21 +120,23 @@ func newPacketDialerFromPart(innerDialer transport.PacketDialer, oneDialerConfig
 	}
 }
 
-// NewShadowsocksPacketListenerFromPart creates a new [transport.PacketListener] according to the given config,
+// NewpacketListener creates a new [transport.PacketListener] according to the given config,
 // the config must contain only one "ss://" segment.
-func NewShadowsocksPacketListenerFromPart(ssConfig string) (transport.PacketListener, error) {
-	ssConfig = strings.TrimSpace(ssConfig)
-	if ssConfig == "" {
-		return nil, errors.New("empty config part")
+func NewpacketListener(transportConfig string) (transport.PacketListener, error) {
+	if transportConfig = strings.TrimSpace(transportConfig); transportConfig == "" {
+		return nil, errors.New("config is required")
+	}
+	if strings.Contains(transportConfig, "|") {
+		return nil, errors.New("multi-part config is not supported")
 	}
 
-	url, err := url.Parse(ssConfig)
+	url, err := url.Parse(transportConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse config part: %w", err)
+		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
-
 	if url.Scheme != "ss" {
 		return nil, errors.New("config scheme must be 'ss' for a PacketListener")
 	}
+
 	return newShadowsocksPacketListenerFromURL(url)
 }
