@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux
-
 package main
 
 import (
 	"errors"
 	"fmt"
 
+	"github.com/Jigsaw-Code/outline-sdk/network"
 	"github.com/songgao/water"
 	"github.com/vishvananda/netlink"
 )
@@ -28,20 +27,20 @@ type tunDevice struct {
 	*water.Interface
 }
 
-var _ TunDevice = (*tunDevice)(nil)
+var _ network.IPDevice = (*tunDevice)(nil)
 
-func NewTunDevice(name, ip string) (d TunDevice, err error) {
-	if len(name) == 0 {
+func newTunDevice(config *RoutingConfig) (d network.IPDevice, err error) {
+	if len(config.TunDeviceName) == 0 {
 		return nil, errors.New("name is required for TUN/TAP device")
 	}
-	if len(ip) == 0 {
+	if len(config.TunDeviceIP) == 0 {
 		return nil, errors.New("ip is required for TUN/TAP device")
 	}
 
 	tun, err := water.New(water.Config{
 		DeviceType: water.TUN,
 		PlatformSpecificParams: water.PlatformSpecificParams{
-			Name:    name,
+			Name:    config.TunDeviceName,
 			Persist: false,
 		},
 	})
@@ -56,7 +55,7 @@ func NewTunDevice(name, ip string) (d TunDevice, err error) {
 	}()
 
 	tunDev := &tunDevice{tun}
-	if err := tunDev.configureSubnetAndBringUp(ip); err != nil {
+	if err := tunDev.configureSubnetAndBringUp(config.TunDeviceIP); err != nil {
 		return nil, fmt.Errorf("failed to configure TUN/TAP device: %w", err)
 	}
 	return tunDev, nil

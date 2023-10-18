@@ -12,99 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux
-
 package main
 
 import (
 	"flag"
 	"fmt"
-	"io"
 	"log"
-	"os"
-	"os/signal"
-	"sync"
-
-	"golang.org/x/sys/unix"
 )
-
-const OUTLINE_TUN_NAME = "outline233"
-const OUTLINE_TUN_IP = "10.233.233.1"
-const OUTLINE_TUN_MTU = 1500 // todo: we can read this from netlink
-const OUTLINE_GW_SUBNET = "10.233.233.2/32"
-const OUTLINE_GW_IP = "10.233.233.2"
-const OUTLINE_ROUTING_PRIORITY = 23333
-const OUTLINE_ROUTING_TABLE = 233
-const OUTLINE_DNS_SERVER = "9.9.9.9"
 
 // ./app -transport "ss://..."
 func main() {
 	fmt.Println("OutlineVPN CLI (experimental)")
 
-	transportFlag := flag.String("transport", "", "Transport config")
+	app := App{
+		TransportConfig: flag.String("transport", "", "Transport config"),
+		RoutingConfig: &RoutingConfig{
+			TunDeviceName:        "outline233",
+			TunDeviceIP:          "10.233.233.1",
+			TunDeviceMTU:         1500, // todo: read this from netlink
+			TunGatewayCIDR:       "10.233.233.2/32",
+			RoutingTableID:       233,
+			RoutingTablePriority: 23333,
+			DNSServerIP:          "9.9.9.9",
+		},
+	}
 	flag.Parse()
 
-	// this WaitGroup must Wait() after tun is closed
-	trafficCopyWg := &sync.WaitGroup{}
-	defer trafficCopyWg.Wait()
-
-	tun, err := NewTunDevice(OUTLINE_TUN_NAME, OUTLINE_TUN_IP)
-	if err != nil {
-		log.Printf("[error] failed to create tun device: %v\n", err)
-		return
+	if err := app.Run(); err != nil {
+		log.Printf("[error] %v\n", err)
 	}
-	defer tun.Close()
-
-	// disable IPv6 before resolving Shadowsocks server IP
-	prevIPv6, err := enableIPv6(false)
-	if err != nil {
-		log.Printf("[error] failed to disable IPv6: %v\n", err)
-		return
-	}
-	defer enableIPv6(prevIPv6)
-
-	ss, err := NewOutlineDevice(*transportFlag)
-	if err != nil {
-		log.Printf("[error] failed to create Outline device: %v", err)
-		return
-	}
-	defer ss.Close()
-
-	ss.Refresh()
-
-	// Copy the traffic from tun device to OutlineDevice bidirectionally
-	trafficCopyWg.Add(2)
-	go func() {
-		defer trafficCopyWg.Done()
-		written, err := io.Copy(ss, tun)
-		log.Printf("[info] tun -> OutlineDevice stopped: %v %v\n", written, err)
-	}()
-	go func() {
-		defer trafficCopyWg.Done()
-		written, err := io.Copy(tun, ss)
-		log.Printf("[info] OutlineDevice -> tun stopped: %v %v\n", written, err)
-	}()
-
-	if err := setSystemDNSServer(OUTLINE_DNS_SERVER); err != nil {
-		log.Printf("[error] failed to configure system DNS: %v", err)
-		return
-	}
-	defer restoreSystemDNSServer()
-
-	if err := startRouting(ss.GetServerIP().String(),
-		OUTLINE_TUN_NAME,
-		OUTLINE_GW_SUBNET,
-		OUTLINE_TUN_IP,
-		OUTLINE_GW_IP,
-		OUTLINE_ROUTING_TABLE,
-		OUTLINE_ROUTING_PRIORITY); err != nil {
-		log.Printf("[error] failed to configure routing: %v", err)
-		return
-	}
-	defer stopRouting(OUTLINE_ROUTING_TABLE)
-
-	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc, os.Interrupt, unix.SIGTERM, unix.SIGHUP)
-	s := <-sigc
-	log.Printf("\nreceived %v, terminating...\n", s)
 }

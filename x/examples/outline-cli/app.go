@@ -14,10 +14,17 @@
 
 package main
 
-import (
-	"github.com/Jigsaw-Code/outline-sdk/network"
-)
+type App struct {
+	TransportConfig *string
+	RoutingConfig   *RoutingConfig
+}
 
-type TunDevice interface {
-	network.IPDevice
+type RoutingConfig struct {
+	TunDeviceName        string
+	TunDeviceIP          string
+	TunDeviceMTU         int
+	TunGatewayCIDR       string
+	RoutingTableID       int
+	RoutingTablePriority int
+	DNSServerIP          string
 }

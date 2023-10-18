@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux
-
 package main
 
 import (
@@ -27,11 +25,11 @@ import (
 
 var ipRule *netlink.Rule = nil
 
-func startRouting(svrIP string, tunName, gwSubnet string, tunIP, gwIP string, routingTable, routingPriority int) error {
-	if err := setupRoutingTable(routingTable, tunName, gwSubnet, tunIP, gwIP); err != nil {
+func startRouting(proxyIP string, config *RoutingConfig) error {
+	if err := setupRoutingTable(config.RoutingTableID, config.TunDeviceName, config.TunGatewayCIDR, config.TunDeviceIP); err != nil {
 		return err
 	}
-	return setupIpRule(svrIP+"/32", routingTable, routingPriority)
+	return setupIpRule(proxyIP+"/32", config.RoutingTableID, config.RoutingTablePriority)
 }
 
 func stopRouting(routingTable int) {
@@ -43,7 +41,7 @@ func stopRouting(routingTable int) {
 	}
 }
 
-func setupRoutingTable(routingTable int, tunName, gwSubnet string, tunIP, gwIP string) error {
+func setupRoutingTable(routingTable int, tunName, gwSubnet string, tunIP string) error {
 	tun, err := netlink.LinkByName(tunName)
 	if err != nil {
 		return fmt.Errorf("failed to find tun device '%s': %w", tunName, err)
@@ -70,7 +68,7 @@ func setupRoutingTable(routingTable int, tunName, gwSubnet string, tunIP, gwIP s
 	r = netlink.Route{
 		LinkIndex: tun.Attrs().Index,
 		Table:     routingTable,
-		Gw:        net.ParseIP(gwIP),
+		Gw:        dst.IP,
 	}
 
 	if err := netlink.RouteAdd(&r); err != nil {

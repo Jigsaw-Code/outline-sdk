@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux
-
 package main
 
 import (
@@ -47,6 +45,6 @@ func enableIPv6(enabled bool) (bool, error) {
 		return prevEnabled, fmt.Errorf("failed to write IPv6 config: %w", err)
 	}
 
-	log.Printf("[info] global IPv6 enabled: %v\n", enabled)
+	log.Printf("[info] updated global IPv6 support: %v\n", enabled)
 	return prevEnabled, nil
 }
