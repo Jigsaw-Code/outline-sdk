@@ -4,10 +4,12 @@
 .DS_Store
 .idea
 
+# Not using Zero-Installs
 .yarn/*
-!.yarn/cache
-!.yarn/patches
-!.yarn/plugins
 !.yarn/releases
-!.yarn/sdks
-!.yarn/versions
+!.yarn/plugins
+.pnp.*
+
+#  using Zero Installs
+#.yarn/unplugged
+#.yarn/build-state.yml
