@@ -77,6 +77,6 @@ func (app App) Run() error {
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, unix.SIGTERM, unix.SIGHUP)
 	s := <-sigc
-	log.Printf("\nreceived %v, terminating...\n", s)
+	log.Printf("received %v, terminating...\n", s)
 	return nil
 }
