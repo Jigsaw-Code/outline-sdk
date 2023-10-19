@@ -125,7 +125,7 @@ Beta features:
   - For Mobile apps
     - [x] Library to run a local SOCKS5 or HTTP-Connect proxy ([source](./x/mobileproxy/mobileproxy.go), [example Go usage](./x/examples/fetch-proxy/main.go), [example mobile usage](./x/examples/mobileproxy)).
     - [x] Documentation on how to integrate the SDK into mobile apps
-    - [x] Connectivity Test iOS mobile app (iOS and Android) using [Capacitor](https://capacitorjs.com/)
+    - [x] Connectivity Test mobile app (iOS and Android) using [Capacitor](https://capacitorjs.com/)
   - For Go apps
     - [x] Connectivity Test example [Wails](https://wails.io/) graphical app
     - [x] Connectivity Test example command-line app ([source](./x/examples/outline-connectivity/))
