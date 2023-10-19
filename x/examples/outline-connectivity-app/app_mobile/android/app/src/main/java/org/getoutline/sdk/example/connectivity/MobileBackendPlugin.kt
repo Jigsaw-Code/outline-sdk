@@ -31,7 +31,7 @@ class MobileBackendPlugin: Plugin() {
             response = Json.decodeFromString(
                 Shared_backend.handleRequest(
                     rawInputMessage.toByteArray(Charsets.UTF_8)
-                ).toString(Charsets.UTF_8)
+                ).toString(Charsets.UTF_8)C
             )
         } catch (error: Exception) {
             output.put("error", error.message)
