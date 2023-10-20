@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -131,9 +132,26 @@ func main() {
 	domainFlag := flag.String("domain", "example.com.", "Domain name to resolve in the test")
 	resolverFlag := flag.String("resolver", "8.8.8.8,2001:4860:4860::8888", "Comma-separated list of addresses of DNS resolver to use for the test")
 	protoFlag := flag.String("proto", "tcp,udp", "Comma-separated list of the protocols to test. Must be \"tcp\", \"udp\", or a combination of them")
-	reportToFlag := flag.String("reportTo", "", "URL to send JSON error reports to")
+	reportToFlag := flag.String("report-to", "", "URL to send JSON error reports to")
+	portFlag := flag.String("port", "53", "Resolver port to use for the test")
+	reportSuccessFlag := flag.Float64("report-success-rate", 0.1, "Report success to collector with this probability - must be between 0 and 1")
+	reportFailureFlag := flag.Float64("report-failure-rate", 1, "Report failure to collector with this probability - must be between 0 and 1")
 
 	flag.Parse()
+
+	// Perform custom range validation for sampling rate
+	if *reportSuccessFlag < 0.0 || *reportSuccessFlag > 1.0 {
+		fmt.Println("Error: report-success-rate must be between 0 and 1.")
+		flag.Usage()
+		return
+	}
+
+	if *reportFailureFlag < 0.0 || *reportFailureFlag > 1.0 {
+		fmt.Println("Error: report-failure-rate must be between 0 and 1.")
+		flag.Usage()
+		return
+	}
+
 	if *verboseFlag {
 		debugLog = *log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 	}
@@ -150,7 +168,7 @@ func main() {
 	jsonEncoder.SetEscapeHTML(false)
 	for _, resolverHost := range strings.Split(*resolverFlag, ",") {
 		resolverHost := strings.TrimSpace(resolverHost)
-		resolverAddress := net.JoinHostPort(resolverHost, "53")
+		resolverAddress := net.JoinHostPort(resolverHost, *portFlag)
 		for _, proto := range strings.Split(*protoFlag, ",") {
 			proto = strings.TrimSpace(proto)
 
@@ -194,10 +212,25 @@ func main() {
 				log.Fatalf("Failed to output JSON: %v", err)
 			}
 			// Send error report to collector if specified
-			if !success && *reportToFlag != "" {
-				err = sendReport(record, *reportToFlag)
-				if err != nil {
-					log.Fatalf("HTTP request failed: %v", err)
+			if *reportToFlag != "" {
+				var samplingRate float64
+				if !success {
+					samplingRate = *reportFailureFlag
+				} else {
+					samplingRate = *reportSuccessFlag
+				}
+				// Generate a random number between 0 and 1
+				random := rand.Float64()
+				if random < samplingRate {
+					// Run your function here
+					err = sendReport(record, *reportToFlag)
+					if err != nil {
+						log.Fatalf("HTTP request failed: %v", err)
+					} else {
+						fmt.Println("Report sent")
+					}
+				} else {
+					fmt.Println("Report was not sent this time")
 				}
 			}
 		}
