@@ -15,6 +15,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -23,6 +24,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"path"
 	"strings"
@@ -85,6 +87,37 @@ func unwrapAll(err error) error {
 	}
 }
 
+func sendReport(record jsonRecord, collectorURL string) error {
+	jsonData, err := json.Marshal(record)
+	if err != nil {
+		log.Fatalf("Error encoding JSON: %s\n", err)
+		return err
+	}
+
+	req, err := http.NewRequest("POST", collectorURL, bytes.NewReader(jsonData))
+	if err != nil {
+		debugLog.Printf("Error creating the HTTP request: %s\n", err)
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatalf("Error sending the HTTP request: %s\n", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		debugLog.Printf("Error reading the HTTP response body: %s\n", err)
+		return err
+	}
+	debugLog.Printf("Response: %s\n", respBody)
+	return nil
+}
+
 func init() {
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags...]\n", path.Base(os.Args[0]))
@@ -98,6 +131,7 @@ func main() {
 	domainFlag := flag.String("domain", "example.com.", "Domain name to resolve in the test")
 	resolverFlag := flag.String("resolver", "8.8.8.8,2001:4860:4860::8888", "Comma-separated list of addresses of DNS resolver to use for the test")
 	protoFlag := flag.String("proto", "tcp,udp", "Comma-separated list of the protocols to test. Must be \"tcp\", \"udp\", or a combination of them")
+	reportToFlag := flag.String("reportTo", "", "URL to send JSON error reports to")
 
 	flag.Parse()
 	if *verboseFlag {
@@ -158,6 +192,13 @@ func main() {
 			err := jsonEncoder.Encode(record)
 			if err != nil {
 				log.Fatalf("Failed to output JSON: %v", err)
+			}
+			// Send error report to collector if specified
+			if !success && *reportToFlag != "" {
+				err = sendReport(record, *reportToFlag)
+				if err != nil {
+					log.Fatalf("HTTP request failed: %v", err)
+				}
 			}
 		}
 	}
