@@ -16,9 +16,8 @@
 
 package main
 
-import "fmt"
+import "errors"
 
 func (App) Run() error {
-	fmt.Println("OutlineVPN does not support this platform")
-	return nil
+	return errors.New("platform not supported")
 }

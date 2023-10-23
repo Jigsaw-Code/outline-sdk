@@ -60,6 +60,7 @@ func newShadowsocksPacketListenerFromURL(configURL *url.URL) (transport.PacketLi
 	if err != nil {
 		return nil, err
 	}
+	// todo: accept an inner dialer from the caller and pass it to UDPEndpoint
 	ep := &transport.UDPEndpoint{Address: config.serverAddress}
 	return shadowsocks.NewPacketListener(ep, config.cryptoKey)
 }

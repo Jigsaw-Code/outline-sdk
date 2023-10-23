@@ -17,7 +17,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/Jigsaw-Code/outline-sdk/network"
 	"github.com/Jigsaw-Code/outline-sdk/network/dnstruncate"
@@ -58,10 +57,10 @@ func (proxy *outlinePacketProxy) testConnectivityAndRefresh(resolver, domain str
 	_, err := connectivity.TestResolverPacketConnectivity(context.Background(), dnsResolver, domain)
 
 	if err != nil {
-		log.Println("[info] remote server cannot handle UDP traffic, switch to DNS truncate mode")
+		logging.Info.Println("remote server cannot handle UDP traffic, switch to DNS truncate mode")
 		return proxy.SetProxy(proxy.fallback)
 	} else {
-		log.Println("[info] remote server supports UDP, we will delegate all UDP packets to it")
+		logging.Info.Println("remote server supports UDP, we will delegate all UDP packets to it")
 		return proxy.SetProxy(proxy.remote)
 	}
 }

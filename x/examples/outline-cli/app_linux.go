@@ -17,7 +17,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/signal"
 	"sync"
@@ -30,7 +29,7 @@ func (app App) Run() error {
 	trafficCopyWg := &sync.WaitGroup{}
 	defer trafficCopyWg.Wait()
 
-	tun, err := newTunDevice(app.RoutingConfig)
+	tun, err := newTunDevice(app.RoutingConfig.TunDeviceName, app.RoutingConfig.TunDeviceIP)
 	if err != nil {
 		return fmt.Errorf("failed to create tun device: %w", err)
 	}
@@ -56,12 +55,12 @@ func (app App) Run() error {
 	go func() {
 		defer trafficCopyWg.Done()
 		written, err := io.Copy(ss, tun)
-		log.Printf("[info] tun -> OutlineDevice stopped: %v %v\n", written, err)
+		logging.Info.Printf("tun -> OutlineDevice stopped: %v %v\n", written, err)
 	}()
 	go func() {
 		defer trafficCopyWg.Done()
 		written, err := io.Copy(tun, ss)
-		log.Printf("[info] OutlineDevice -> tun stopped: %v %v\n", written, err)
+		logging.Info.Printf("OutlineDevice -> tun stopped: %v %v\n", written, err)
 	}()
 
 	if err := setSystemDNSServer(app.RoutingConfig.DNSServerIP); err != nil {
@@ -77,6 +76,6 @@ func (app App) Run() error {
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, unix.SIGTERM, unix.SIGHUP)
 	s := <-sigc
-	log.Printf("received %v, terminating...\n", s)
+	logging.Info.Printf("received %v, terminating...\n", s)
 	return nil
 }

@@ -1,6 +1,6 @@
 # OutlineVPN CLI
 
-The CLI interface of OutlineVPN client for Linux.
+A CLI interface of Outline VPN client for Linux.
 
 ### Usage
 

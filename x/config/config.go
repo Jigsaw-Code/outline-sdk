@@ -138,5 +138,6 @@ func NewpacketListener(transportConfig string) (transport.PacketListener, error)
 		return nil, errors.New("config scheme must be 'ss' for a PacketListener")
 	}
 
+	// todo: support nested dialer, the last part must be "ss://"
 	return newShadowsocksPacketListenerFromURL(url)
 }

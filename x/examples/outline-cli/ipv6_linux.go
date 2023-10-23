@@ -16,7 +16,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 )
 
@@ -45,6 +44,6 @@ func enableIPv6(enabled bool) (bool, error) {
 		return prevEnabled, fmt.Errorf("failed to write IPv6 config: %w", err)
 	}
 
-	log.Printf("[info] updated global IPv6 support: %v\n", enabled)
+	logging.Info.Printf("updated global IPv6 support: %v\n", enabled)
 	return prevEnabled, nil
 }

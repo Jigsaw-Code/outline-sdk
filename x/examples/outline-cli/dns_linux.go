@@ -16,10 +16,10 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 )
 
+// todo: find a more portable way of configuring DNS (e.g. resolved)
 const (
 	resolvConfFile           = "/etc/resolv.conf"
 	resolvConfHeadFile       = "/etc/resolv.conf.head"
@@ -55,12 +55,12 @@ func backupAndWriteFile(original, backup string, data []byte) error {
 
 func restoreFileIfExists(backup, original string) {
 	if _, err := os.Stat(backup); err != nil {
-		log.Printf("[warn] no DNS config backup file '%s' presents: %v\n", backup, err)
+		logging.Warn.Printf("no DNS config backup file '%s' presents: %v\n", backup, err)
 		return
 	}
 	if err := os.Rename(backup, original); err != nil {
-		log.Printf("[error] failed to restore DNS config from backup '%s' to '%s': %v\n", backup, original, err)
+		logging.Err.Printf("failed to restore DNS config from backup '%s' to '%s': %v\n", backup, original, err)
 		return
 	}
-	log.Printf("[info] DNS config restored from '%s' to '%s'\n", backup, original)
+	logging.Info.Printf("DNS config restored from '%s' to '%s'\n", backup, original)
 }
