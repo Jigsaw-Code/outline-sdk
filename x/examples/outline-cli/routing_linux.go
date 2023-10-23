@@ -103,6 +103,8 @@ func setupIpRule(svrIp string, routingTable, routingPriority int) error {
 		return fmt.Errorf("failed to parse server IP CIDR '%s': %w", svrIp, err)
 	}
 
+	// todo: exclude server IP will cause issues when accessing services on the same server,
+	//       use fwmask to protect the shadowsocks socket instead
 	ipRule = netlink.NewRule()
 	ipRule.Priority = routingPriority
 	ipRule.Family = netlink.FAMILY_V4
