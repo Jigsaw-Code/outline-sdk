@@ -17,6 +17,7 @@ package reporter
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -25,11 +26,12 @@ import (
 )
 
 var debugLog log.Logger = *log.New(io.Discard, "", 0)
+var httpClient = &http.Client{}
 
 func sendReport(record map[string]interface{}, collectorURL string) error {
 	jsonData, err := json.Marshal(record)
 	if err != nil {
-		log.Fatalf("Error encoding JSON: %s\n", err)
+		log.Printf("Error encoding JSON: %s\n", err)
 		return err
 	}
 
@@ -40,10 +42,9 @@ func sendReport(record map[string]interface{}, collectorURL string) error {
 	}
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
-		log.Fatalf("Error sending the HTTP request: %s\n", err)
+		log.Printf("Error sending the HTTP request: %s\n", err)
 		return err
 	}
 	defer resp.Body.Close()
@@ -58,6 +59,16 @@ func sendReport(record map[string]interface{}, collectorURL string) error {
 }
 
 func sendReportRandomly(record map[string]interface{}, collectorURL string, success bool, successSampleRate float64, failureSampleRate float64) error {
+
+	// Perform custom range validation for sampling rate
+	if successSampleRate < 0.0 || successSampleRate > 1.0 {
+		return errors.New("Error: successSampleRate must be between 0 and 1.")
+	}
+
+	if failureSampleRate < 0.0 || failureSampleRate > 1.0 {
+		return errors.New("Error: failureSampleRate must be between 0 and 1.")
+	}
+
 	var samplingRate float64
 	if success {
 		samplingRate = successSampleRate
@@ -70,7 +81,7 @@ func sendReportRandomly(record map[string]interface{}, collectorURL string, succ
 		// Run your function here
 		err := sendReport(record, collectorURL)
 		if err != nil {
-			log.Fatalf("HTTP request failed: %v", err)
+			log.Printf("HTTP request failed: %v", err)
 			return err
 		} else {
 			fmt.Println("Report sent")
