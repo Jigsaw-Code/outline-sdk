@@ -6,6 +6,7 @@
   "description": "A cross-platform connectivity test app using the Outline SDK",
   "devDependencies": {
     "@yarnpkg/sdks": "^3.0.0-rc.48",
+    "concurrently": "^8.2.2",
     "typescript": "^5.1.6"
   },
   "engines": {
@@ -24,7 +25,9 @@
     "setup:vscode": "yarn sdks vscode",
     "shared_backend": "yarn workspace shared_backend",
     "shared_frontend": "yarn workspace shared_frontend",
-    "watch": "yarn workspaces foreach -piv run watch"
+    "watch": "yarn workspaces foreach -piv run watch",
+    "watch:android": "concurrently -n frontend,android 'yarn app_mobile watch:frontend' 'yarn workspaces foreach -piv run watch:android'",
+    "watch:ios": "concurrently -n frontend,ios 'yarn app_mobile watch:frontend' 'yarn workspaces foreach -piv run watch:ios'"
   },
   "version": "0.0.0",
   "workspaces": [

@@ -975,6 +975,26 @@ __metadata:
   languageName: node
   linkType: hard
 
+"concurrently@npm:^8.2.2":
+  version: 8.2.2
+  resolution: "concurrently@npm:8.2.2"
+  dependencies:
+    chalk: ^4.1.2
+    date-fns: ^2.30.0
+    lodash: ^4.17.21
+    rxjs: ^7.8.1
+    shell-quote: ^1.8.1
+    spawn-command: 0.0.2
+    supports-color: ^8.1.1
+    tree-kill: ^1.2.2
+    yargs: ^17.7.2
+  bin:
+    conc: dist/bin/concurrently.js
+    concurrently: dist/bin/concurrently.js
+  checksum: 8ac774df06869773438f1bf91025180c52d5b53139bc86cf47659136c0d97461d0579c515d848d1e945d4e3e0cafe646b2ea18af8d74259b46abddcfe39b2c6c
+  languageName: node
+  linkType: hard
+
 "console-control-strings@npm:^1.1.0":
   version: 1.1.0
   resolution: "console-control-strings@npm:1.1.0"
@@ -2608,6 +2628,7 @@ __metadata:
   resolution: "outline_sdk_connectivity_test@workspace:."
   dependencies:
     "@yarnpkg/sdks": ^3.0.0-rc.48
+    concurrently: ^8.2.2
     lit: ^2.7.6
     typescript: ^5.1.6
   languageName: unknown

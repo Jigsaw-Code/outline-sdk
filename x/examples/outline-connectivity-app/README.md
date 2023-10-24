@@ -113,6 +113,8 @@ If at any point you run into issues during development, try `yarn reset`.
 
 `yarn watch`
 
+If you just want to develop ios or android, you can run `yarn watch:ios` or `yarn watch:android` respectively.
+
 ### Build
 
 > TODO: how to generate credentials

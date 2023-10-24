@@ -12,6 +12,8 @@
     "clean": "rm -rf output",
     "go": "go",
     "setup": "yarn build",
-    "watch": "nodemon --exec 'yarn build' --ext go"
+    "watch": "nodemon --exec 'yarn build' --ext go",
+    "watch:android": "nodemon --exec 'yarn build:android' --ext go",
+    "watch:ios": "nodemon --exec 'yarn build:ios' --ext go"
   }
 }
