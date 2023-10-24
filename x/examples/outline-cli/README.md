@@ -1,4 +1,4 @@
-# OutlineVPN CLI
+# Outline VPN Command-Line Client
 
 A CLI interface of Outline VPN client for Linux.
 
