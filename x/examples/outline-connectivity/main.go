@@ -133,7 +133,6 @@ func main() {
 	resolverFlag := flag.String("resolver", "8.8.8.8,2001:4860:4860::8888", "Comma-separated list of addresses of DNS resolver to use for the test")
 	protoFlag := flag.String("proto", "tcp,udp", "Comma-separated list of the protocols to test. Must be \"tcp\", \"udp\", or a combination of them")
 	reportToFlag := flag.String("report-to", "", "URL to send JSON error reports to")
-	portFlag := flag.String("port", "53", "Resolver port to use for the test")
 	reportSuccessFlag := flag.Float64("report-success-rate", 0.1, "Report success to collector with this probability - must be between 0 and 1")
 	reportFailureFlag := flag.Float64("report-failure-rate", 1, "Report failure to collector with this probability - must be between 0 and 1")
 
@@ -168,7 +167,7 @@ func main() {
 	jsonEncoder.SetEscapeHTML(false)
 	for _, resolverHost := range strings.Split(*resolverFlag, ",") {
 		resolverHost := strings.TrimSpace(resolverHost)
-		resolverAddress := net.JoinHostPort(resolverHost, *portFlag)
+		resolverAddress := net.JoinHostPort(resolverHost, "53")
 		for _, proto := range strings.Split(*protoFlag, ",") {
 			proto = strings.TrimSpace(proto)
 
