@@ -15,6 +15,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -22,7 +23,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net"
+	"net/http"
 	"os"
 	"path"
 	"strings"
@@ -85,6 +88,37 @@ func unwrapAll(err error) error {
 	}
 }
 
+func sendReport(record jsonRecord, collectorURL string) error {
+	jsonData, err := json.Marshal(record)
+	if err != nil {
+		log.Fatalf("Error encoding JSON: %s\n", err)
+		return err
+	}
+
+	req, err := http.NewRequest("POST", collectorURL, bytes.NewReader(jsonData))
+	if err != nil {
+		debugLog.Printf("Error creating the HTTP request: %s\n", err)
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatalf("Error sending the HTTP request: %s\n", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		debugLog.Printf("Error reading the HTTP response body: %s\n", err)
+		return err
+	}
+	debugLog.Printf("Response: %s\n", respBody)
+	return nil
+}
+
 func init() {
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags...]\n", path.Base(os.Args[0]))
@@ -98,8 +132,25 @@ func main() {
 	domainFlag := flag.String("domain", "example.com.", "Domain name to resolve in the test")
 	resolverFlag := flag.String("resolver", "8.8.8.8,2001:4860:4860::8888", "Comma-separated list of addresses of DNS resolver to use for the test")
 	protoFlag := flag.String("proto", "tcp,udp", "Comma-separated list of the protocols to test. Must be \"tcp\", \"udp\", or a combination of them")
+	reportToFlag := flag.String("report-to", "", "URL to send JSON error reports to")
+	reportSuccessFlag := flag.Float64("report-success-rate", 0.1, "Report success to collector with this probability - must be between 0 and 1")
+	reportFailureFlag := flag.Float64("report-failure-rate", 1, "Report failure to collector with this probability - must be between 0 and 1")
 
 	flag.Parse()
+
+	// Perform custom range validation for sampling rate
+	if *reportSuccessFlag < 0.0 || *reportSuccessFlag > 1.0 {
+		fmt.Println("Error: report-success-rate must be between 0 and 1.")
+		flag.Usage()
+		return
+	}
+
+	if *reportFailureFlag < 0.0 || *reportFailureFlag > 1.0 {
+		fmt.Println("Error: report-failure-rate must be between 0 and 1.")
+		flag.Usage()
+		return
+	}
+
 	if *verboseFlag {
 		debugLog = *log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 	}
@@ -158,6 +209,27 @@ func main() {
 			err := jsonEncoder.Encode(record)
 			if err != nil {
 				log.Fatalf("Failed to output JSON: %v", err)
+			}
+			// Send error report to collector if specified
+			if *reportToFlag != "" {
+				var samplingRate float64
+				if success {
+					samplingRate = *reportSuccessFlag
+				} else {
+					samplingRate = *reportFailureFlag
+				}
+				// Generate a random number between 0 and 1
+				random := rand.Float64()
+				if random < samplingRate {
+					err = sendReport(record, *reportToFlag)
+					if err != nil {
+						log.Fatalf("Report failed: %v", err)
+					} else {
+						fmt.Println("Report sent")
+					}
+				} else {
+					fmt.Println("Report was not sent this time")
+				}
 			}
 		}
 	}
