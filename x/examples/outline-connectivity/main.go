@@ -213,18 +213,17 @@ func main() {
 			// Send error report to collector if specified
 			if *reportToFlag != "" {
 				var samplingRate float64
-				if !success {
-					samplingRate = *reportFailureFlag
-				} else {
+				if success {
 					samplingRate = *reportSuccessFlag
+				} else {
+					samplingRate = *reportFailureFlag
 				}
 				// Generate a random number between 0 and 1
 				random := rand.Float64()
 				if random < samplingRate {
-					// Run your function here
 					err = sendReport(record, *reportToFlag)
 					if err != nil {
-						log.Fatalf("HTTP request failed: %v", err)
+						log.Fatalf("Report failed: %v", err)
 					} else {
 						fmt.Println("Report sent")
 					}
