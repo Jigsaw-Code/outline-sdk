@@ -24,7 +24,9 @@ type tlsRecordFragWriter struct {
 	prefixBytes int32
 }
 
-const maxRecordLength = 16384 //For the fragments, not for the reassembled record
+// Record Layer: https://datatracker.ietf.org/doc/html/rfc8446#section-5.1
+const maxRecordLength = 1 << 14 //For the fragments, not for the reassembled record
+const typeHandshake = 22
 
 func NewWriter(writer io.Writer, prefixBytes int32) *tlsRecordFragWriter {
 	return &tlsRecordFragWriter{writer, prefixBytes}
@@ -50,7 +52,7 @@ func (w *tlsRecordFragWriter) ReadFrom(source io.Reader) (written int64, err err
 			return 0, err
 		}
 		recordLength := int32(binary.BigEndian.Uint16(recordHeader[3:]))
-		if w.prefixBytes >= recordLength {
+		if recordHeader[0] != typeHandshake || w.prefixBytes >= recordLength {
 			return w.dontFrag(recordHeader[:], source)
 		}
 		if recordLength > maxRecordLength {
@@ -78,6 +80,9 @@ func (w *tlsRecordFragWriter) ReadFrom(source io.Reader) (written int64, err err
 
 		tmp, err := w.writer.Write(buf)
 		w.prefixBytes = 0
+		if tmp >= 5 { //subtract bytes of added header
+			tmp -= 5
+		}
 		written = int64(tmp)
 		if err != nil {
 			return written, err
@@ -103,7 +108,7 @@ func (w *tlsRecordFragWriter) Write(data []byte) (written int, err error) {
 		hasMultipleRecords := recordLength < remainderLength
 		isRecordOverflow := recordLength > maxRecordLength
 
-		if hasPartialRecord || w.prefixBytes == recordLength || isRecordOverflow {
+		if data[0] != typeHandshake || hasPartialRecord || w.prefixBytes == recordLength || isRecordOverflow {
 			w.prefixBytes = 0
 			return w.writer.Write(data)
 		}
@@ -126,7 +131,11 @@ func (w *tlsRecordFragWriter) Write(data []byte) (written int, err error) {
 		}
 
 		w.prefixBytes = 0
-		return w.writer.Write(buf)
+		written, err = w.writer.Write(buf)
+		if written >= 5 {
+			written -= 5
+		}
+		return written, err
 	}
 	return w.writer.Write(data)
 }

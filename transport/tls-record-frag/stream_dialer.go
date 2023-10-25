@@ -22,8 +22,8 @@ import (
 )
 
 type tlsRecordFragDialer struct {
-	dialer     transport.StreamDialer
-	splitPoint int32
+	dialer      transport.StreamDialer
+	prefixBytes int32
 }
 
 var _ transport.StreamDialer = (*tlsRecordFragDialer)(nil)
@@ -33,7 +33,7 @@ func NewStreamDialer(dialer transport.StreamDialer, prefixBytes int32) (transpor
 	if dialer == nil {
 		return nil, errors.New("argument dialer must not be nil")
 	}
-	return &tlsRecordFragDialer{dialer: dialer, splitPoint: prefixBytes}, nil
+	return &tlsRecordFragDialer{dialer: dialer, prefixBytes: prefixBytes}, nil
 }
 
 // Dial implements [transport.StreamDialer].Dial.
@@ -42,5 +42,5 @@ func (d *tlsRecordFragDialer) Dial(ctx context.Context, remoteAddr string) (tran
 	if err != nil {
 		return nil, err
 	}
-	return transport.WrapConn(innerConn, innerConn, NewWriter(innerConn, d.splitPoint)), nil
+	return transport.WrapConn(innerConn, innerConn, NewWriter(innerConn, d.prefixBytes)), nil
 }
