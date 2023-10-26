@@ -70,8 +70,8 @@ func (d *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 	return conn, nil
 }
 
-// clientConfig encodes the parameters for a TLS client connection.
-type clientConfig struct {
+// ClientConfig encodes the parameters for a TLS client connection.
+type ClientConfig struct {
 	ServerName      string
 	CertificateName string
 	NextProtos      []string
@@ -79,7 +79,7 @@ type clientConfig struct {
 }
 
 // ToStdConfig creates a [tls.Config] based on the configured parameters.
-func (cfg *clientConfig) ToStdConfig() *tls.Config {
+func (cfg *ClientConfig) ToStdConfig() *tls.Config {
 	return &tls.Config{
 		ServerName:         cfg.ServerName,
 		NextProtos:         cfg.NextProtos,
@@ -106,7 +106,7 @@ func (cfg *clientConfig) ToStdConfig() *tls.Config {
 }
 
 // ClientOption allows configuring the parameters to be used for a client TLS connection.
-type ClientOption func(host string, port int, config *clientConfig)
+type ClientOption func(host string, port int, config *ClientConfig)
 
 // WrapConn wraps a [transport.StreamConn] in a TLS connection.
 func WrapConn(ctx context.Context, conn transport.StreamConn, remoteAdr string, options ...ClientOption) (transport.StreamConn, error) {
@@ -118,7 +118,7 @@ func WrapConn(ctx context.Context, conn transport.StreamConn, remoteAdr string, 
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve port: %w", err)
 	}
-	cfg := clientConfig{ServerName: host, CertificateName: host}
+	cfg := ClientConfig{ServerName: host, CertificateName: host}
 	for _, option := range options {
 		option(host, port, &cfg)
 	}
@@ -134,7 +134,7 @@ func WrapConn(ctx context.Context, conn transport.StreamConn, remoteAdr string, 
 // If absent, defaults to the dialed hostname.
 // Note that this only changes what is sent in the SNI, not what host is used for certificate verification.
 func WithSNI(hostName string) ClientOption {
-	return func(_ string, _ int, config *clientConfig) {
+	return func(_ string, _ int, config *ClientConfig) {
 		config.ServerName = hostName
 	}
 }
@@ -142,14 +142,14 @@ func WithSNI(hostName string) ClientOption {
 // WithALPN sets the protocol name list for [Application-Layer Protocol Negotiation](https://datatracker.ietf.org/doc/html/rfc7301) (ALPN).
 // The list of protocol IDs can be found in [IANA's registry](https://www.iana.org/assignments/tls-extensiontype-values/tls-extensiontype-values.xhtml#alpn-protocol-ids).
 func WithALPN(protocolNameList []string) ClientOption {
-	return func(_ string, _ int, config *clientConfig) {
+	return func(_ string, _ int, config *ClientConfig) {
 		config.NextProtos = protocolNameList
 	}
 }
 
 // WithSessionCache sets the [tls.ClientSessionCache] to enable session resumption of TLS connections.
 func WithSessionCache(sessionCache tls.ClientSessionCache) ClientOption {
-	return func(_ string, _ int, config *clientConfig) {
+	return func(_ string, _ int, config *ClientConfig) {
 		config.SessionCache = sessionCache
 	}
 }
@@ -157,7 +157,7 @@ func WithSessionCache(sessionCache tls.ClientSessionCache) ClientOption {
 // WithCertificateName sets the hostname to be used for the certificate cerification.
 // If absent, defaults to the dialed hostname.
 func WithCertificateName(hostname string) ClientOption {
-	return func(_ string, _ int, config *clientConfig) {
+	return func(_ string, _ int, config *ClientConfig) {
 		config.CertificateName = hostname
 	}
 }

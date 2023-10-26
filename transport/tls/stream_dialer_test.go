@@ -71,13 +71,13 @@ func TestAllCustom(t *testing.T) {
 }
 
 func TestWithSNI(t *testing.T) {
-	var cfg clientConfig
+	var cfg ClientConfig
 	WithSNI("example.com")("", 0, &cfg)
 	require.Equal(t, "example.com", cfg.ServerName)
 }
 
 func TestWithALPN(t *testing.T) {
-	var cfg clientConfig
+	var cfg ClientConfig
 	WithALPN([]string{"h2", "http/1.1"})("", 0, &cfg)
 	require.Equal(t, []string{"h2", "http/1.1"}, cfg.NextProtos)
 }
