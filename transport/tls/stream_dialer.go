@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
@@ -70,6 +71,10 @@ func (d *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 	return conn, nil
 }
 
+func normalizeHost(host string) string {
+	return strings.ToLower(host)
+}
+
 // ClientConfig encodes the parameters for a TLS client connection.
 type ClientConfig struct {
 	ServerName      string
@@ -114,6 +119,7 @@ func WrapConn(ctx context.Context, conn transport.StreamConn, remoteAdr string, 
 	if err != nil {
 		return nil, fmt.Errorf("could not parse remote address: %w", err)
 	}
+	host = normalizeHost(host)
 	port, err := net.DefaultResolver.LookupPort(ctx, "tcp", portStr)
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve port: %w", err)
@@ -136,6 +142,20 @@ func WrapConn(ctx context.Context, conn transport.StreamConn, remoteAdr string, 
 func WithSNI(hostName string) ClientOption {
 	return func(_ string, _ int, config *ClientConfig) {
 		config.ServerName = hostName
+	}
+}
+
+// IfHostPort applies the given option if the host and port matches the dialed one.
+func IfHostPort(matchHost string, matchPort int, option ClientOption) ClientOption {
+	matchHost = normalizeHost(matchHost)
+	return func(host string, port int, config *ClientConfig) {
+		if matchHost != "" && matchHost != host {
+			return
+		}
+		if matchPort != 0 && matchPort != port {
+			return
+		}
+		option(host, port, config)
 	}
 }
 

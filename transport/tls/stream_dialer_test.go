@@ -16,6 +16,7 @@ package tls
 
 import (
 	"context"
+	"crypto/x509"
 	"testing"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -27,7 +28,27 @@ func TestDomain(t *testing.T) {
 	require.NoError(t, err)
 	conn, err := sd.Dial(context.Background(), "dns.google:443")
 	require.NoError(t, err)
+	tlsConn, ok := conn.(streamConn)
+	require.True(t, ok)
+	require.True(t, tlsConn.ConnectionState().HandshakeComplete)
 	conn.Close()
+}
+
+func TestUntrustedRoot(t *testing.T) {
+	sd, err := NewStreamDialer(&transport.TCPStreamDialer{})
+	require.NoError(t, err)
+	_, err = sd.Dial(context.Background(), "untrusted-root.badssl.com:443")
+	var certErr x509.UnknownAuthorityError
+	require.ErrorAs(t, err, &certErr)
+}
+
+func TestRevoked(t *testing.T) {
+	sd, err := NewStreamDialer(&transport.TCPStreamDialer{})
+	require.NoError(t, err)
+	_, err = sd.Dial(context.Background(), "revoked.badssl.com:443")
+	var certErr x509.CertificateInvalidError
+	require.ErrorAs(t, err, &certErr)
+	require.Equal(t, x509.Expired, certErr.Reason)
 }
 
 func TestIP(t *testing.T) {
@@ -67,6 +88,47 @@ func TestAllCustom(t *testing.T) {
 	require.NoError(t, err)
 	conn, err := sd.Dial(context.Background(), "www.google.com:443")
 	require.NoError(t, err)
+	conn.Close()
+}
+
+func TestHostSelector(t *testing.T) {
+	sd, err := NewStreamDialer(&transport.TCPStreamDialer{},
+		IfHostPort("dns.google", 0, WithSNI("decoy.example.com")),
+		IfHostPort("www.youtube.com", 0, WithSNI("notyoutube.com")),
+	)
+	require.NoError(t, err)
+
+	conn, err := sd.Dial(context.Background(), "dns.google:443")
+	require.NoError(t, err)
+	tlsConn := conn.(streamConn)
+	require.Equal(t, "decoy.example.com", tlsConn.ConnectionState().ServerName)
+	conn.Close()
+
+	conn, err = sd.Dial(context.Background(), "www.youtube.com:443")
+	require.NoError(t, err)
+	tlsConn = conn.(streamConn)
+	require.Equal(t, "notyoutube.com", tlsConn.ConnectionState().ServerName)
+	conn.Close()
+}
+
+func TestPortSelector(t *testing.T) {
+	sd, err := NewStreamDialer(&transport.TCPStreamDialer{},
+		IfHostPort("", 443, WithALPN([]string{"http/1.1"})),
+		IfHostPort("www.google.com", 443, WithALPN([]string{"h2"})),
+		IfHostPort("", 853, WithALPN([]string{"dot"})),
+	)
+	require.NoError(t, err)
+
+	conn, err := sd.Dial(context.Background(), "dns.google:443")
+	require.NoError(t, err)
+	tlsConn := conn.(streamConn)
+	require.Equal(t, "http/1.1", tlsConn.ConnectionState().NegotiatedProtocol)
+	conn.Close()
+
+	conn, err = sd.Dial(context.Background(), "www.google.com:443")
+	require.NoError(t, err)
+	tlsConn = conn.(streamConn)
+	require.Equal(t, "h2", tlsConn.ConnectionState().NegotiatedProtocol)
 	conn.Close()
 }
 
