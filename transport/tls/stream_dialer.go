@@ -28,7 +28,7 @@ type StreamDialer struct {
 	// Dialer provides the underlying connection to be wrapped.
 	Dialer transport.StreamDialer
 	// Options to configure the tls.Config.
-	Options []Option
+	Options []ClientOption
 }
 
 var _ transport.StreamDialer = (*StreamDialer)(nil)
@@ -45,10 +45,6 @@ func (c streamConn) CloseRead() error {
 	return c.innerConn.CloseRead()
 }
 
-func (c streamConn) CloseWrite() error {
-	return c.innerConn.CloseWrite()
-}
-
 // Dial implements [transport.StreamDialer].Dial.
 func (d *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
 	innerConn, err := d.Dialer.Dial(ctx, remoteAddr)
@@ -58,11 +54,27 @@ func (d *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 	return WrapConn(innerConn, remoteAddr, d.Options...)
 }
 
-// Option allows tweaking the [tls.Config] to be used for a connection.
-type Option func(host string, port int, config *tls.Config)
+// clientConfig encodes the parameters for a TLS client connection.
+type clientConfig struct {
+	ServerName   string
+	NextProtos   []string
+	SessionCache tls.ClientSessionCache
+}
+
+// ToStdConfig creates a [tls.Config] based on the configured parameters.
+func (cfg *clientConfig) ToStdConfig() *tls.Config {
+	return &tls.Config{
+		ServerName:         cfg.ServerName,
+		NextProtos:         cfg.NextProtos,
+		ClientSessionCache: cfg.SessionCache,
+	}
+}
+
+// ClientOption allows configuring the parameters to be used for a client TLS connection.
+type ClientOption func(host string, port int, config *clientConfig)
 
 // WrapConn wraps a [transport.StreamConn] in a TLS connection.
-func WrapConn(conn transport.StreamConn, remoteAdr string, options ...Option) (transport.StreamConn, error) {
+func WrapConn(conn transport.StreamConn, remoteAdr string, options ...ClientOption) (transport.StreamConn, error) {
 	host, portStr, err := net.SplitHostPort(remoteAdr)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse remote address: %w", err)
@@ -71,24 +83,31 @@ func WrapConn(conn transport.StreamConn, remoteAdr string, options ...Option) (t
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve port: %w", err)
 	}
-	cfg := tls.Config{ServerName: host}
+	cfg := clientConfig{ServerName: host}
 	for _, option := range options {
 		option(host, port, &cfg)
 	}
-	return streamConn{tls.Client(conn, &cfg), conn}, nil
+	return streamConn{tls.Client(conn, cfg.ToStdConfig()), conn}, nil
 }
 
 // WithSNI sets the host name for [Server Name Indication](https://datatracker.ietf.org/doc/html/rfc6066#section-3) (SNI)
-func WithSNI(hostName string) Option {
-	return func(_ string, _ int, config *tls.Config) {
+func WithSNI(hostName string) ClientOption {
+	return func(_ string, _ int, config *clientConfig) {
 		config.ServerName = hostName
 	}
 }
 
 // WithALPN sets the protocol name list for [Application-Layer Protocol Negotiation](https://datatracker.ietf.org/doc/html/rfc7301) (ALPN).
 // The list of protocol IDs can be found in [IANA's registry](https://www.iana.org/assignments/tls-extensiontype-values/tls-extensiontype-values.xhtml#alpn-protocol-ids).
-func WithALPN(procolNameList []string) Option {
-	return func(_ string, _ int, config *tls.Config) {
-		config.NextProtos = procolNameList
+func WithALPN(protocolNameList []string) ClientOption {
+	return func(_ string, _ int, config *clientConfig) {
+		config.NextProtos = protocolNameList
+	}
+}
+
+// WithSessionCache sets the [tls.ClientSessionCache] to enable session resumption of TLS connections.
+func WithSessionCache(sessionCache tls.ClientSessionCache) ClientOption {
+	return func(_ string, _ int, config *clientConfig) {
+		config.SessionCache = sessionCache
 	}
 }
