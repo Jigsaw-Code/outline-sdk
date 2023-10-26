@@ -51,7 +51,12 @@ func (d *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 	if err != nil {
 		return nil, err
 	}
-	return WrapConn(innerConn, remoteAddr, d.Options...)
+	conn, err := WrapConn(ctx, innerConn, remoteAddr, d.Options...)
+	if err != nil {
+		innerConn.Close()
+		return nil, err
+	}
+	return conn, nil
 }
 
 // clientConfig encodes the parameters for a TLS client connection.
@@ -74,12 +79,12 @@ func (cfg *clientConfig) ToStdConfig() *tls.Config {
 type ClientOption func(host string, port int, config *clientConfig)
 
 // WrapConn wraps a [transport.StreamConn] in a TLS connection.
-func WrapConn(conn transport.StreamConn, remoteAdr string, options ...ClientOption) (transport.StreamConn, error) {
+func WrapConn(ctx context.Context, conn transport.StreamConn, remoteAdr string, options ...ClientOption) (transport.StreamConn, error) {
 	host, portStr, err := net.SplitHostPort(remoteAdr)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse remote address: %w", err)
 	}
-	port, err := net.DefaultResolver.LookupPort(context.Background(), "tcp", portStr)
+	port, err := net.DefaultResolver.LookupPort(ctx, "tcp", portStr)
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve port: %w", err)
 	}
@@ -87,7 +92,12 @@ func WrapConn(conn transport.StreamConn, remoteAdr string, options ...ClientOpti
 	for _, option := range options {
 		option(host, port, &cfg)
 	}
-	return streamConn{tls.Client(conn, cfg.ToStdConfig()), conn}, nil
+	tlsConn := tls.Client(conn, cfg.ToStdConfig())
+	err = tlsConn.HandshakeContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return streamConn{tlsConn, conn}, nil
 }
 
 // WithSNI sets the host name for [Server Name Indication](https://datatracker.ietf.org/doc/html/rfc6066#section-3) (SNI)
