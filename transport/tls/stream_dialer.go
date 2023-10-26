@@ -80,10 +80,6 @@ type clientConfig struct {
 
 // ToStdConfig creates a [tls.Config] based on the configured parameters.
 func (cfg *clientConfig) ToStdConfig() *tls.Config {
-	certificateName := cfg.CertificateName
-	if certificateName == "" {
-		certificateName = cfg.ServerName
-	}
 	return &tls.Config{
 		ServerName:         cfg.ServerName,
 		NextProtos:         cfg.NextProtos,
@@ -97,7 +93,7 @@ func (cfg *clientConfig) ToStdConfig() *tls.Config {
 			// And the documentation example:
 			// https://pkg.go.dev/crypto/tls#example-Config-VerifyConnection
 			opts := x509.VerifyOptions{
-				DNSName:       certificateName,
+				DNSName:       cfg.CertificateName,
 				Intermediates: x509.NewCertPool(),
 			}
 			for _, cert := range cs.PeerCertificates[1:] {
@@ -122,7 +118,7 @@ func WrapConn(ctx context.Context, conn transport.StreamConn, remoteAdr string, 
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve port: %w", err)
 	}
-	cfg := clientConfig{ServerName: host}
+	cfg := clientConfig{ServerName: host, CertificateName: host}
 	for _, option := range options {
 		option(host, port, &cfg)
 	}
@@ -135,6 +131,8 @@ func WrapConn(ctx context.Context, conn transport.StreamConn, remoteAdr string, 
 }
 
 // WithSNI sets the host name for [Server Name Indication](https://datatracker.ietf.org/doc/html/rfc6066#section-3) (SNI)
+// If absent, defaults to the dialed hostname.
+// Note that this only changes what is sent in the SNI, not what host is used for certificate verification.
 func WithSNI(hostName string) ClientOption {
 	return func(_ string, _ int, config *clientConfig) {
 		config.ServerName = hostName
@@ -156,8 +154,8 @@ func WithSessionCache(sessionCache tls.ClientSessionCache) ClientOption {
 	}
 }
 
-// WithCertificateName sets the hostname to be used for the certificate validation.
-// If absent, defaults to SNI.
+// WithCertificateName sets the hostname to be used for the certificate cerification.
+// If absent, defaults to the dialed hostname.
 func WithCertificateName(hostname string) ClientOption {
 	return func(_ string, _ int, config *clientConfig) {
 		config.CertificateName = hostname

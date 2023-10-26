@@ -22,7 +22,47 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDomainFronting(t *testing.T) {
+func TestDomain(t *testing.T) {
+	sd, err := NewStreamDialer(&transport.TCPStreamDialer{})
+	require.NoError(t, err)
+	conn, err := sd.Dial(context.Background(), "dns.google:443")
+	require.NoError(t, err)
+	conn.Close()
+}
+
+func TestIP(t *testing.T) {
+	sd, err := NewStreamDialer(&transport.TCPStreamDialer{})
+	require.NoError(t, err)
+	conn, err := sd.Dial(context.Background(), "8.8.8.8:443")
+	require.NoError(t, err)
+	conn.Close()
+}
+
+func TestIPOverride(t *testing.T) {
+	sd, err := NewStreamDialer(&transport.TCPStreamDialer{}, WithCertificateName("8.8.8.8"))
+	require.NoError(t, err)
+	conn, err := sd.Dial(context.Background(), "dns.google:443")
+	require.NoError(t, err)
+	conn.Close()
+}
+
+func TestFakeSNI(t *testing.T) {
+	sd, err := NewStreamDialer(&transport.TCPStreamDialer{}, WithSNI("decoy.example.com"))
+	require.NoError(t, err)
+	conn, err := sd.Dial(context.Background(), "dns.google:443")
+	require.NoError(t, err)
+	conn.Close()
+}
+
+func TestNoSNI(t *testing.T) {
+	sd, err := NewStreamDialer(&transport.TCPStreamDialer{}, WithSNI(""))
+	require.NoError(t, err)
+	conn, err := sd.Dial(context.Background(), "dns.google:443")
+	require.NoError(t, err)
+	conn.Close()
+}
+
+func TestAllCustom(t *testing.T) {
 	sd, err := NewStreamDialer(&transport.TCPStreamDialer{}, WithSNI("decoy.android.com"), WithCertificateName("www.youtube.com"))
 	require.NoError(t, err)
 	conn, err := sd.Dial(context.Background(), "www.google.com:443")
