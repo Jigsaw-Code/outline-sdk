@@ -45,7 +45,7 @@ func main() {
 	defer listener.Close()
 	log.Printf("Proxy listening on %v", listener.Addr().String())
 
-	server := http.Server{Handler: httpproxy.NewConnectHandler(dialer)}
+	server := http.Server{Handler: httpproxy.NewProxyHandler(dialer)}
 	go func() {
 		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Error running web server: %v", err)
