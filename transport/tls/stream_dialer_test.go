@@ -15,10 +15,19 @@
 package tls
 
 import (
+	"context"
 	"testing"
 
+	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/stretchr/testify/require"
 )
+
+func TestDomainFronting(t *testing.T) {
+	sd := StreamDialer{Dialer: &transport.TCPStreamDialer{}, Options: []ClientOption{WithSNI("www.youtube.com")}}
+	conn, err := sd.Dial(context.Background(), "www.google.com:443")
+	require.NoError(t, err)
+	conn.Close()
+}
 
 func TestWithSNI(t *testing.T) {
 	var cfg clientConfig
