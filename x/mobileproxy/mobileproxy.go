@@ -77,7 +77,7 @@ func RunProxy(localAddress string, transportConfig string) (*Proxy, error) {
 		return nil, fmt.Errorf("could not listen on address %v: %v", localAddress, err)
 	}
 
-	server := &http.Server{Handler: httpproxy.NewConnectHandler(dialer)}
+	server := &http.Server{Handler: httpproxy.NewProxyHandler(dialer)}
 	go server.Serve(listener)
 
 	host, portStr, err := net.SplitHostPort(listener.Addr().String())
