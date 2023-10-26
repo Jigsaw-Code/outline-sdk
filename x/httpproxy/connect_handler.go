@@ -15,68 +15,26 @@
 package httpproxy
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
-	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
-type handler struct {
+type connectHandler struct {
 	dialer transport.StreamDialer
-	client http.Client
 }
 
-var _ http.Handler = (*handler)(nil)
+var _ http.Handler = (*connectHandler)(nil)
 
-// ServeHTTP implements [http.Handler].ServeHTTP for CONNECT requests, using the internal [transport.StreamDialer].
-func (h *handler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Request) {
-	// TODO(fortuna): For public services (not local), we need authentication and drain on failures to avoid fingerprinting.
-	if proxyReq.Method == http.MethodConnect {
-		h.handleConnect(proxyResp, proxyReq)
+func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Request) {
+	if proxyReq.Method != http.MethodConnect {
+		proxyResp.Header().Add("Allow", "CONNECT")
+		http.Error(proxyResp, fmt.Sprintf("Method %v is not supported", proxyReq.Method), http.StatusMethodNotAllowed)
 		return
 	}
-	if proxyReq.URL.Host != "" {
-		h.handleHTTPProxyRequest(proxyResp, proxyReq)
-		return
-	}
-	http.Error(proxyResp, "Not Found", http.StatusNotFound)
-}
-
-func (h *handler) handleHTTPProxyRequest(proxyResp http.ResponseWriter, proxyReq *http.Request) {
-	// We create a new request that uses a relative path + Host header, instead of the absolute URL in the proxy request.
-	targetReq, err := http.NewRequestWithContext(proxyReq.Context(), proxyReq.Method, proxyReq.URL.String(), proxyReq.Body)
-	if err != nil {
-		http.Error(proxyResp, "Error creating target request", http.StatusInternalServerError)
-		return
-	}
-	for key, values := range proxyReq.Header {
-		for _, value := range values {
-			targetReq.Header.Add(key, value)
-		}
-	}
-	targetResp, err := h.client.Do(targetReq)
-	if err != nil {
-		http.Error(proxyResp, "Failed to fetch destination", http.StatusServiceUnavailable)
-		return
-	}
-	defer targetResp.Body.Close()
-	for key, values := range targetResp.Header {
-		for _, value := range values {
-			proxyResp.Header().Add(key, value)
-		}
-	}
-	_, err = io.Copy(proxyResp, targetResp.Body)
-	if err != nil {
-		http.Error(proxyResp, "Failed write response", http.StatusServiceUnavailable)
-		return
-	}
-}
-
-func (h *handler) handleConnect(proxyResp http.ResponseWriter, proxyReq *http.Request) {
 	// Validate the target address.
 	_, portStr, err := net.SplitHostPort(proxyReq.Host)
 	if err != nil {
@@ -128,11 +86,5 @@ func (h *handler) handleConnect(proxyResp http.ResponseWriter, proxyReq *http.Re
 // The resulting handler is currently vulnerable to probing attacks. It's ok as a localhost proxy
 // but it may be vulnerable if used as a public proxy.
 func NewConnectHandler(dialer transport.StreamDialer) http.Handler {
-	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		if !strings.HasPrefix(network, "tcp") {
-			return nil, fmt.Errorf("protocol not supported: %v", network)
-		}
-		return dialer.Dial(ctx, addr)
-	}
-	return &handler{dialer, http.Client{Transport: &http.Transport{DialContext: dialContext}}}
+	return &connectHandler{dialer}
 }
