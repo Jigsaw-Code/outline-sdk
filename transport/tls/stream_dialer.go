@@ -17,21 +17,31 @@ package tls
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
-// StreamDialer is a [transport.StreamDialer] that uses TLS to wrap the inner Dialer.
+// StreamDialer is a [transport.StreamDialer] that uses TLS to wrap the inner StreamDialer.
 type StreamDialer struct {
-	// Dialer provides the underlying connection to be wrapped.
-	Dialer transport.StreamDialer
-	// Options to configure the tls.Config.
-	Options []ClientOption
+	// dialer provides the underlying connection to be wrapped.
+	dialer transport.StreamDialer
+	// options to configure the tls.Config.
+	options []ClientOption
 }
 
 var _ transport.StreamDialer = (*StreamDialer)(nil)
+
+// NewStreamDialer creates a [StreamDialer] that wraps the connections from the baseDialer with TLS
+// configured with the given options.
+func NewStreamDialer(baseDialer transport.StreamDialer, options ...ClientOption) (*StreamDialer, error) {
+	if baseDialer == nil {
+		return nil, errors.New("base dialer must not be nil")
+	}
+	return &StreamDialer{baseDialer, options}, nil
+}
 
 // streamConn wraps a [tls.Conn] to provide a [transport.StreamConn] interface.
 type streamConn struct {
@@ -47,11 +57,11 @@ func (c streamConn) CloseRead() error {
 
 // Dial implements [transport.StreamDialer].Dial.
 func (d *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
-	innerConn, err := d.Dialer.Dial(ctx, remoteAddr)
+	innerConn, err := d.dialer.Dial(ctx, remoteAddr)
 	if err != nil {
 		return nil, err
 	}
-	conn, err := WrapConn(ctx, innerConn, remoteAddr, d.Options...)
+	conn, err := WrapConn(ctx, innerConn, remoteAddr, d.options...)
 	if err != nil {
 		innerConn.Close()
 		return nil, err

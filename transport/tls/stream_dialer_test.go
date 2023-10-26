@@ -23,7 +23,8 @@ import (
 )
 
 func TestDomainFronting(t *testing.T) {
-	sd := StreamDialer{Dialer: &transport.TCPStreamDialer{}, Options: []ClientOption{WithSNI("www.youtube.com")}}
+	sd, err := NewStreamDialer(&transport.TCPStreamDialer{}, WithSNI("www.youtube.com"))
+	require.NoError(t, err)
 	conn, err := sd.Dial(context.Background(), "www.google.com:443")
 	require.NoError(t, err)
 	conn.Close()
