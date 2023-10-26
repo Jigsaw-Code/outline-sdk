@@ -70,7 +70,7 @@ func Report(r Record) error {
 	}
 }
 
-func sendReport(record interface{}, collectorURL string) error {
+func sendReport(record any, collectorURL string) error {
 	jsonData, err := json.Marshal(record)
 	if err != nil {
 		log.Printf("Error encoding JSON: %s\n", err)
