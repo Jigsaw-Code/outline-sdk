@@ -123,13 +123,12 @@ Beta features:
 
 - Integration resources
   - For Mobile apps
-    - [x] Library to run a local SOCKS5 or HTTP-Connect proxy ([source](./x/mobileproxy/mobileproxy.go), [example Go usage](./x/examples/fetch-proxy/main.go), [example mobile usage](./x/examples/mobileproxy)). (v0.0.6)
-    - [x] Documentation on how to integrate the SDK into mobile apps (v0.0.6)
-    - [x] Connectivity Test iOS mobile app using [Capacitor](https://capacitorjs.com/)
-    - [ ] Connectivity Test Android app using [Capacitor](https://capacitorjs.com/) (coming soon)
+    - [x] Library to run a local SOCKS5 or HTTP-Connect proxy ([source](./x/mobileproxy/mobileproxy.go), [example Go usage](./x/examples/fetch-proxy/main.go), [example mobile usage](./x/examples/mobileproxy)).
+    - [x] Documentation on how to integrate the SDK into mobile apps
+    - [x] Connectivity Test mobile app (iOS and Android) using [Capacitor](https://capacitorjs.com/)
   - For Go apps
     - [x] Connectivity Test example [Wails](https://wails.io/) graphical app
-    - [x] Connectivity Test example command-line app ([source](./x/examples/outline-connectivity/)) (v0.0.6)
-    - [ ] Outline Client example command-line app (coming soon)
-    - [x] Page fetch example command-line app ([source](./x/examples/outline-fetch/)) (v0.0.6)
-    - [x] Local proxy example command-line app ([source](./x/examples/http2transport/)) (v0.0.6)
+    - [x] Connectivity Test example command-line app ([source](./x/examples/outline-connectivity/))
+    - [x] Outline Client example command-line app ([source](./x/examples/outline-cli/))
+    - [x] Page fetch example command-line app ([source](./x/examples/outline-fetch/))
+    - [x] Local proxy example command-line app ([source](./x/examples/http2transport/))
