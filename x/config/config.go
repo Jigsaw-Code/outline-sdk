@@ -26,7 +26,21 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/transport/socks5"
 	"github.com/Jigsaw-Code/outline-sdk/transport/split"
+	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
+	"github.com/Jigsaw-Code/outline-sdk/x/tls"
 )
+
+func parseConfigPart(oneDialerConfig string) (*url.URL, error) {
+	// Make it "<scheme>:" it it's only "<scheme>" to parse as a URL.
+	if !strings.Contains(oneDialerConfig, ":") {
+		oneDialerConfig += ":"
+	}
+	url, err := url.Parse(oneDialerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse config part: %w", err)
+	}
+	return url, nil
+}
 
 // NewStreamDialer creates a new [transport.StreamDialer] according to the given config.
 func NewStreamDialer(transportConfig string) (dialer transport.StreamDialer, err error) {
@@ -51,18 +65,16 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 		return nil, errors.New("empty config part")
 	}
 
-	url, err := url.Parse(oneDialerConfig)
+	url, err := parseConfigPart(oneDialerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config part: %w", err)
 	}
 
+	// Please keep scheme list sorted.
 	switch url.Scheme {
 	case "socks5":
 		endpoint := transport.StreamDialerEndpoint{Dialer: innerDialer, Address: url.Host}
 		return socks5.NewStreamDialer(&endpoint)
-
-	case "ss":
-		return newShadowsocksStreamDialerFromURL(innerDialer, url)
 
 	case "split":
 		prefixBytesStr := url.Opaque
@@ -71,6 +83,12 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 			return nil, fmt.Errorf("prefixBytes is not a number: %v. Split config should be in split:<number> format", prefixBytesStr)
 		}
 		return split.NewStreamDialer(innerDialer, int64(prefixBytes))
+
+	case "ss":
+		return newShadowsocksStreamDialerFromURL(innerDialer, url)
+
+	case "tls":
+		return tls.NewStreamDialer(innerDialer), nil
 
 	default:
 		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
@@ -100,20 +118,24 @@ func newPacketDialerFromPart(innerDialer transport.PacketDialer, oneDialerConfig
 		return nil, errors.New("empty config part")
 	}
 
-	url, err := url.Parse(oneDialerConfig)
+	url, err := parseConfigPart(oneDialerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config part: %w", err)
 	}
 
+	// Please keep scheme list sorted.
 	switch url.Scheme {
 	case "socks5":
 		return nil, errors.New("socks5 is not supported for PacketDialers")
 
+	case "split":
+		return nil, errors.New("split is not supported for PacketDialers")
+
 	case "ss":
 		return newShadowsocksPacketDialerFromURL(innerDialer, url)
 
-	case "split":
-		return nil, errors.New("split is not supported for PacketDialers")
+	case "tls":
+		return nil, errors.New("tls is not yet supported for PacketDialers")
 
 	default:
 		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
