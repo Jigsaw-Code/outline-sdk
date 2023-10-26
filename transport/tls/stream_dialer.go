@@ -77,10 +77,14 @@ func normalizeHost(host string) string {
 
 // ClientConfig encodes the parameters for a TLS client connection.
 type ClientConfig struct {
-	ServerName      string
+	// The host name for the Server Name Indication (SNI).
+	ServerName string
+	// The hostname to use for certificate validation.
 	CertificateName string
-	NextProtos      []string
-	SessionCache    tls.ClientSessionCache
+	// The protocol id list for protocol negotiation (ALPN).
+	NextProtos []string
+	// The cache for sessin resumption.
+	SessionCache tls.ClientSessionCache
 }
 
 // ToStdConfig creates a [tls.Config] based on the configured parameters.
@@ -136,9 +140,11 @@ func WrapConn(ctx context.Context, conn transport.StreamConn, remoteAdr string, 
 	return streamConn{tlsConn, conn}, nil
 }
 
-// WithSNI sets the host name for [Server Name Indication](https://datatracker.ietf.org/doc/html/rfc6066#section-3) (SNI)
+// WithSNI sets the host name for [Server Name Indication] (SNI).
 // If absent, defaults to the dialed hostname.
 // Note that this only changes what is sent in the SNI, not what host is used for certificate verification.
+//
+// [Server Name Indication]: https://datatracker.ietf.org/doc/html/rfc6066#section-3
 func WithSNI(hostName string) ClientOption {
 	return func(_ string, _ int, config *ClientConfig) {
 		config.ServerName = hostName
@@ -159,8 +165,11 @@ func IfHostPort(matchHost string, matchPort int, option ClientOption) ClientOpti
 	}
 }
 
-// WithALPN sets the protocol name list for [Application-Layer Protocol Negotiation](https://datatracker.ietf.org/doc/html/rfc7301) (ALPN).
-// The list of protocol IDs can be found in [IANA's registry](https://www.iana.org/assignments/tls-extensiontype-values/tls-extensiontype-values.xhtml#alpn-protocol-ids).
+// WithALPN sets the protocol name list for [Application-Layer Protocol Negotiation] (ALPN).
+// The list of protocol IDs can be found in [IANA's registry].
+//
+// [Application-Layer Protocol Negotiation]: https://datatracker.ietf.org/doc/html/rfc7301
+// [IANA's registry]: https://www.iana.org/assignments/tls-extensiontype-values/tls-extensiontype-values.xhtml#alpn-protocol-ids
 func WithALPN(protocolNameList []string) ClientOption {
 	return func(_ string, _ int, config *ClientConfig) {
 		config.NextProtos = protocolNameList
