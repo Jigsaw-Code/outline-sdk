@@ -28,7 +28,49 @@ import (
 var debugLog log.Logger = *log.New(io.Discard, "", 0)
 var httpClient = &http.Client{}
 
-func sendReport(record map[string]interface{}, collectorURL string) error {
+type Record struct {
+	collectorURL      string
+	successSampleRate float64
+	failureSampleRate float64
+	success           bool
+	record            interface{}
+}
+
+func Report(r Record) error {
+
+	// Perform custom range validation for sampling rate
+	if r.successSampleRate < 0.0 || r.successSampleRate > 1.0 {
+		return errors.New("Error: successSampleRate must be between 0 and 1.")
+	}
+
+	if r.failureSampleRate < 0.0 || r.failureSampleRate > 1.0 {
+		return errors.New("Error: failureSampleRate must be between 0 and 1.")
+	}
+
+	var samplingRate float64
+	if r.success {
+		samplingRate = r.successSampleRate
+	} else {
+		samplingRate = r.failureSampleRate
+	}
+	// Generate a random number between 0 and 1
+	random := rand.Float64()
+	if random < samplingRate {
+		err := sendReport(r.record, r.collectorURL)
+		if err != nil {
+			log.Printf("HTTP request failed: %v", err)
+			return err
+		} else {
+			fmt.Println("Report sent")
+			return nil
+		}
+	} else {
+		fmt.Println("Report was not sent this time")
+		return nil
+	}
+}
+
+func sendReport(record interface{}, collectorURL string) error {
 	jsonData, err := json.Marshal(record)
 	if err != nil {
 		log.Printf("Error encoding JSON: %s\n", err)
@@ -56,39 +98,4 @@ func sendReport(record map[string]interface{}, collectorURL string) error {
 	}
 	debugLog.Printf("Response: %s\n", respBody)
 	return nil
-}
-
-func sendReportRandomly(record map[string]interface{}, collectorURL string, success bool, successSampleRate float64, failureSampleRate float64) error {
-
-	// Perform custom range validation for sampling rate
-	if successSampleRate < 0.0 || successSampleRate > 1.0 {
-		return errors.New("Error: successSampleRate must be between 0 and 1.")
-	}
-
-	if failureSampleRate < 0.0 || failureSampleRate > 1.0 {
-		return errors.New("Error: failureSampleRate must be between 0 and 1.")
-	}
-
-	var samplingRate float64
-	if success {
-		samplingRate = successSampleRate
-	} else {
-		samplingRate = failureSampleRate
-	}
-	// Generate a random number between 0 and 1
-	random := rand.Float64()
-	if random < samplingRate {
-		// Run your function here
-		err := sendReport(record, collectorURL)
-		if err != nil {
-			log.Printf("HTTP request failed: %v", err)
-			return err
-		} else {
-			fmt.Println("Report sent")
-			return nil
-		}
-	} else {
-		fmt.Println("Report was not sent this time")
-		return nil
-	}
 }

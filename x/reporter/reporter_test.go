@@ -36,18 +36,18 @@ func TestSendReportSuccessfully(t *testing.T) {
 			"msg": "i/o timeout"
 		}
 	}`
-	var record map[string]interface{}
-	err := json.Unmarshal([]byte(jsonData), &record)
+	var testRecord Record
+	err := json.Unmarshal([]byte(jsonData), &testRecord.record)
 	if err != nil {
 		fmt.Println(err)
 		t.Errorf("Expected no error, but got: %v", err)
 	}
-	collectorURL := "example.com"
-	success := true
-	successSampleRate := 1.0
-	failureSampleRate := 0.0
+	testRecord.collectorURL = "https://example.com"
+	testRecord.success = true
+	testRecord.successSampleRate = 1.0
+	testRecord.failureSampleRate = 0.0
 
-	err = sendReportRandomly(record, collectorURL, success, successSampleRate, failureSampleRate)
+	err = Report(testRecord)
 
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
