@@ -15,20 +15,19 @@
 package tls
 
 import (
-	"crypto/tls"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestWithSNI(t *testing.T) {
-	var cfg tls.Config
+	var cfg clientConfig
 	WithSNI("example.com")("", 0, &cfg)
 	require.Equal(t, "example.com", cfg.ServerName)
 }
 
 func TestWithALPN(t *testing.T) {
-	var cfg tls.Config
+	var cfg clientConfig
 	WithALPN([]string{"h2", "http/1.1"})("", 0, &cfg)
 	require.Equal(t, []string{"h2", "http/1.1"}, cfg.NextProtos)
 }
