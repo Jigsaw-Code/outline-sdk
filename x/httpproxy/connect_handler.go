@@ -15,6 +15,8 @@
 package httpproxy
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -57,6 +59,10 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 	}
 	targetConn, err := dialer.Dial(proxyReq.Context(), proxyReq.Host)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			http.Error(proxyResp, "Request cancelled", 499)
+			return
+		}
 		http.Error(proxyResp, fmt.Sprintf("Failed to connect to %v", proxyReq.Host), http.StatusServiceUnavailable)
 		return
 	}
