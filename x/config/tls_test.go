@@ -43,6 +43,19 @@ func TestTLS_SNI(t *testing.T) {
 	require.Equal(t, "host", cfg.CertificateName)
 }
 
+func TestTLS_CertName(t *testing.T) {
+	tlsURL, err := url.Parse("tls:certname=www.google.com")
+	require.NoError(t, err)
+	options, err := parseOptions(tlsURL)
+	require.NoError(t, err)
+	cfg := tls.ClientConfig{ServerName: "host", CertificateName: "host"}
+	for _, option := range options {
+		option("host", 443, &cfg)
+	}
+	require.Equal(t, "host", cfg.ServerName)
+	require.Equal(t, "www.google.com", cfg.CertificateName)
+}
+
 func TestTLS_NoSNI(t *testing.T) {
 	tlsURL, err := url.Parse("tls:sni=")
 	require.NoError(t, err)
