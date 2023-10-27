@@ -26,7 +26,6 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/transport/socks5"
 	"github.com/Jigsaw-Code/outline-sdk/transport/split"
-	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
 	"github.com/Jigsaw-Code/outline-sdk/x/tls"
 )
 
@@ -43,14 +42,23 @@ func parseConfigPart(oneDialerConfig string) (*url.URL, error) {
 }
 
 // NewStreamDialer creates a new [transport.StreamDialer] according to the given config.
-func NewStreamDialer(transportConfig string) (dialer transport.StreamDialer, err error) {
-	dialer = &transport.TCPStreamDialer{}
+func NewStreamDialer(transportConfig string) (transport.StreamDialer, error) {
+	return WrapStreamDialer(transportConfig, &transport.TCPStreamDialer{})
+}
+
+// WrapStreamDialer created a [transport.StreamDialer] according to transportConfig, using dialer as the
+// base [transport.StreamDialer]. The given dialer must not be nil.
+func WrapStreamDialer(transportConfig string, dialer transport.StreamDialer) (transport.StreamDialer, error) {
+	if dialer == nil {
+		return nil, errors.New("base dialer must not be nil")
+	}
 	transportConfig = strings.TrimSpace(transportConfig)
 	if transportConfig == "" {
 		return dialer, nil
 	}
+	var err error
 	for _, part := range strings.Split(transportConfig, "|") {
-		dialer, err = newStreamDialerFromPart(dialer, part)
+		dialer, err = newStreamDialerFromPart(part, dialer)
 		if err != nil {
 			return nil, err
 		}
@@ -58,7 +66,7 @@ func NewStreamDialer(transportConfig string) (dialer transport.StreamDialer, err
 	return dialer, nil
 }
 
-func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig string) (transport.StreamDialer, error) {
+func newStreamDialerFromPart(oneDialerConfig string, innerDialer transport.StreamDialer) (transport.StreamDialer, error) {
 	oneDialerConfig = strings.TrimSpace(oneDialerConfig)
 
 	if oneDialerConfig == "" {
@@ -88,7 +96,7 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 		return newShadowsocksStreamDialerFromURL(innerDialer, url)
 
 	case "tls":
-		return tls.NewStreamDialer(innerDialer), nil
+		return tls.NewStreamDialer(innerDialer)
 
 	default:
 		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
@@ -103,7 +111,7 @@ func NewPacketDialer(transportConfig string) (dialer transport.PacketDialer, err
 		return dialer, nil
 	}
 	for _, part := range strings.Split(transportConfig, "|") {
-		dialer, err = newPacketDialerFromPart(dialer, part)
+		dialer, err = newPacketDialerFromPart(part, dialer)
 		if err != nil {
 			return nil, err
 		}
@@ -111,7 +119,7 @@ func NewPacketDialer(transportConfig string) (dialer transport.PacketDialer, err
 	return dialer, nil
 }
 
-func newPacketDialerFromPart(innerDialer transport.PacketDialer, oneDialerConfig string) (transport.PacketDialer, error) {
+func newPacketDialerFromPart(oneDialerConfig string, innerDialer transport.PacketDialer) (transport.PacketDialer, error) {
 	oneDialerConfig = strings.TrimSpace(oneDialerConfig)
 
 	if oneDialerConfig == "" {

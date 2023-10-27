@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/x/config"
 )
 
 type connectHandler struct {
@@ -48,7 +49,12 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 	}
 
 	// Dial the target.
-	targetConn, err := h.dialer.Dial(proxyReq.Context(), proxyReq.Host)
+	transportConfig := proxyReq.Header.Get("Transport")
+	dialer, err := config.WrapStreamDialer(transportConfig, h.dialer)
+	if err != nil {
+		http.Error(proxyResp, "Invalid config in Transport header", http.StatusBadRequest)
+	}
+	targetConn, err := dialer.Dial(proxyReq.Context(), proxyReq.Host)
 	if err != nil {
 		http.Error(proxyResp, "Failed to connect to target", http.StatusServiceUnavailable)
 		return
