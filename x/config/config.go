@@ -12,8 +12,71 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package config provides convenience functions to create [transport.StreamDialer] and [transport.PacketDialer]
-// objects based on a text config. This is experimental and mostly for illustrative purposes at this point.
+/*
+Package config provides convenience functions to create dialer objects based on a text config.
+This is experimental and mostly for illustrative purposes at this point.
+
+Configurable transports simplifies the way you create and manage transports.
+With the [config] package, you can use [NewPacketDialer] and [NewStreamDialer] to create dialers using a simple text string.
+
+Key Benefits:
+
+  - Ease of Use: Create transports effortlessly by providing a textual configuration, reducing boilerplate code.
+  - Serialization: Easily share configurations with users or between different parts of your application, including your Go backend.
+  - Dynamic Configuration: Set your app's transport settings at runtime.
+  - DPI Evasion: Advanced nesting and configuration options help you evade Deep Packet Inspection (DPI).
+
+# Config Format
+
+The configuration string is composed of parts separated by the `|` symbol, which define nested dialers.
+For example, `A|B` means dialer `B` takes dialer `A` as its input.
+An empty string represents the direct TCP/UDP dialer, and is used as the input to the first cofigured dialer.
+
+Each dialer configuration follows a URL format, where the scheme defines the type of Dialer. Supported formats include:
+
+Shadowsocks proxy (compatible with Outline's access keys, package [shadowsocks])
+
+	ss://[USERINFO]@[HOST]:[PORT]?prefix=[PREFIX]
+
+SOCKS5 proxy (currently streams only, package [socks5])
+
+	socks5://[HOST]:[PORT]
+
+Stream split transport (streams only, package [split])
+
+It takes the length of the prefix. The stream will be split when PREFIX_LENGTH bytes are first written.
+
+	split:[PREFIX_LENGTH]
+
+TLS transport (currently streams only, package [tls])
+
+The sni parameter defines the name to be sent in the TLS SNI. It can be empty.
+The certname parameter defines what name to validate against the server certificate.
+
+	tls:sni=[SNI]&certname=[CERT_NAME]
+
+# Examples
+
+Packet splitting - To split outgoing streams on bytes 2 and 123, you can use:
+
+	split:2|split:123
+
+SOCKS5-over-TLS, with domain-fronting - To tunnel SOCKS5 over TLS, and set the SNI to decoy.example.com, while still validating against your host name, use:
+
+	tls:sni=decoy.example.com&certname=[HOST]|socks5:[HOST]:[PORT]
+
+Onion Routing with Shadowsocks - To route your traffic through three Shadowsocks servers, similar to [Onion Routing], use:
+
+	ss://[USERINFO1]@[HOST1]:[PORT1]|ss://[USERINFO2]@[HOST2]:[PORT2]|ss://[USERINFO3]@[HOST3]:[PORT3]
+
+In that case, HOST1 will be your entry node, and HOST3 will be your exit node.
+
+DPI Evasion - To add packet splitting to a Shadowsocks server for enhanced DPI evasion, use:
+
+	split:2|ss://[USERINFO]@[HOST]:[PORT]
+
+[Onion Routing]: https://en.wikipedia.org/wiki/Onion_routing
+*/
 package config
 
 import (
@@ -143,7 +206,7 @@ func newPacketDialerFromPart(innerDialer transport.PacketDialer, oneDialerConfig
 
 // NewpacketListener creates a new [transport.PacketListener] according to the given config,
 // the config must contain only one "ss://" segment.
-func NewpacketListener(transportConfig string) (transport.PacketListener, error) {
+func NewPacketListener(transportConfig string) (transport.PacketListener, error) {
 	if transportConfig = strings.TrimSpace(transportConfig); transportConfig == "" {
 		return nil, errors.New("config is required")
 	}
