@@ -70,7 +70,7 @@ func TestIPOverride(t *testing.T) {
 func TestFakeSNI(t *testing.T) {
 	sd, err := NewStreamDialer(&transport.TCPStreamDialer{}, WithSNI("decoy.example.com"))
 	require.NoError(t, err)
-	conn, err := sd.Dial(context.Background(), "dns.google:443")
+	conn, err := sd.Dial(context.Background(), "www.youtube.com:443")
 	require.NoError(t, err)
 	conn.Close()
 }
