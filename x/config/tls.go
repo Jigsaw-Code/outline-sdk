@@ -17,6 +17,7 @@ package config
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/tls"
@@ -30,13 +31,13 @@ func parseOptions(configURL *url.URL) ([]tls.ClientOption, error) {
 	}
 	options := []tls.ClientOption{}
 	for key, values := range values {
-		switch key {
+		switch strings.ToLower(key) {
 		case "sni":
 			if len(values) != 1 {
 				return nil, fmt.Errorf("sni option must has one value, found %v", len(values))
 			}
 			options = append(options, tls.WithSNI(values[0]))
-		case "certName":
+		case "certname":
 			if len(values) != 1 {
 				return nil, fmt.Errorf("certName option must has one value, found %v", len(values))
 			}

@@ -29,6 +29,10 @@ import (
 )
 
 func parseConfigPart(oneDialerConfig string) (*url.URL, error) {
+	oneDialerConfig = strings.TrimSpace(oneDialerConfig)
+	if oneDialerConfig == "" {
+		return nil, errors.New("empty config part")
+	}
 	// Make it "<scheme>:" it it's only "<scheme>" to parse as a URL.
 	if !strings.Contains(oneDialerConfig, ":") {
 		oneDialerConfig += ":"
@@ -66,19 +70,13 @@ func WrapStreamDialer(dialer transport.StreamDialer, transportConfig string) (tr
 }
 
 func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig string) (transport.StreamDialer, error) {
-	oneDialerConfig = strings.TrimSpace(oneDialerConfig)
-
-	if oneDialerConfig == "" {
-		return nil, errors.New("empty config part")
-	}
-
 	url, err := parseConfigPart(oneDialerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config part: %w", err)
 	}
 
 	// Please keep scheme list sorted.
-	switch url.Scheme {
+	switch strings.ToLower(url.Scheme) {
 	case "socks5":
 		endpoint := transport.StreamDialerEndpoint{Dialer: innerDialer, Address: url.Host}
 		return socks5.NewStreamDialer(&endpoint)
@@ -119,19 +117,13 @@ func NewPacketDialer(transportConfig string) (dialer transport.PacketDialer, err
 }
 
 func newPacketDialerFromPart(innerDialer transport.PacketDialer, oneDialerConfig string) (transport.PacketDialer, error) {
-	oneDialerConfig = strings.TrimSpace(oneDialerConfig)
-
-	if oneDialerConfig == "" {
-		return nil, errors.New("empty config part")
-	}
-
 	url, err := parseConfigPart(oneDialerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config part: %w", err)
 	}
 
 	// Please keep scheme list sorted.
-	switch url.Scheme {
+	switch strings.ToLower(url.Scheme) {
 	case "socks5":
 		return nil, errors.New("socks5 is not supported for PacketDialers")
 
@@ -159,14 +151,16 @@ func NewpacketListener(transportConfig string) (transport.PacketListener, error)
 		return nil, errors.New("multi-part config is not supported")
 	}
 
-	url, err := url.Parse(transportConfig)
+	url, err := parseConfigPart(transportConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
-	if url.Scheme != "ss" {
-		return nil, errors.New("config scheme must be 'ss' for a PacketListener")
+	// Please keep scheme list sorted.
+	switch strings.ToLower(url.Scheme) {
+	case "ss":
+		// TODO: support nested dialer, the last part must be "ss://"
+		return newShadowsocksPacketListenerFromURL(url)
+	default:
+		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
 	}
-
-	// TODO: support nested dialer, the last part must be "ss://"
-	return newShadowsocksPacketListenerFromURL(url)
 }
