@@ -21,13 +21,37 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 )
 
+type sanitizeErrorDialer struct {
+	transport.StreamDialer
+}
+
+func isCancelledError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Works around the fact that DNS doesn't return typed errors.
+	return errors.Is(err, context.Canceled) || strings.HasSuffix(err.Error(), "operation was canceled")
+}
+
+func (d *sanitizeErrorDialer) Dial(ctx context.Context, addr string) (transport.StreamConn, error) {
+	conn, err := d.StreamDialer.Dial(ctx, addr)
+	if isCancelledError(err) {
+		return nil, context.Canceled
+	}
+	if err != nil {
+		return nil, errors.New("base dial failed")
+	}
+	return conn, nil
+}
+
 type connectHandler struct {
-	dialer transport.StreamDialer
+	dialer *sanitizeErrorDialer
 }
 
 var _ http.Handler = (*connectHandler)(nil)
@@ -54,16 +78,13 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 	transportConfig := proxyReq.Header.Get("Transport")
 	dialer, err := config.WrapStreamDialer(h.dialer, transportConfig)
 	if err != nil {
+		// Because we sanitize the base dialer error, it's safe to return error details here.
 		http.Error(proxyResp, fmt.Sprintf("Invalid config in Transport header: %v", err), http.StatusBadRequest)
 		return
 	}
 	targetConn, err := dialer.Dial(proxyReq.Context(), proxyReq.Host)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			http.Error(proxyResp, "Request cancelled", 499)
-			return
-		}
-		http.Error(proxyResp, fmt.Sprintf("Failed to connect to %v", proxyReq.Host), http.StatusServiceUnavailable)
+		http.Error(proxyResp, fmt.Sprintf("Failed to connect to %v: %v", proxyReq.Host, err), http.StatusServiceUnavailable)
 		return
 	}
 	defer targetConn.Close()
@@ -102,5 +123,7 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 // The resulting handler is currently vulnerable to probing attacks. It's ok as a localhost proxy
 // but it may be vulnerable if used as a public proxy.
 func NewConnectHandler(dialer transport.StreamDialer) http.Handler {
-	return &connectHandler{dialer}
+	// We sanitize the errors from the input Dialer because we don't want to leak sensitive details
+	// of the base dialer (e.g. access key credentials) to the user.
+	return &connectHandler{&sanitizeErrorDialer{dialer}}
 }
