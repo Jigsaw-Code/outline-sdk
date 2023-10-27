@@ -39,7 +39,7 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 	// Validate the target address.
 	_, portStr, err := net.SplitHostPort(proxyReq.Host)
 	if err != nil {
-		http.Error(proxyResp, "Authority is not a valid host:port", http.StatusBadRequest)
+		http.Error(proxyResp, fmt.Sprintf("Authority \"%v\" is not a valid host:port", proxyReq.Host), http.StatusBadRequest)
 		return
 	}
 	if portStr == "" {
@@ -52,11 +52,12 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 	transportConfig := proxyReq.Header.Get("Transport")
 	dialer, err := config.WrapStreamDialer(h.dialer, transportConfig)
 	if err != nil {
-		http.Error(proxyResp, "Invalid config in Transport header", http.StatusBadRequest)
+		http.Error(proxyResp, fmt.Sprintf("Invalid config in Transport header: %v", err), http.StatusBadRequest)
+		return
 	}
 	targetConn, err := dialer.Dial(proxyReq.Context(), proxyReq.Host)
 	if err != nil {
-		http.Error(proxyResp, "Failed to connect to target", http.StatusServiceUnavailable)
+		http.Error(proxyResp, fmt.Sprintf("Failed to connect to %v", proxyReq.Host), http.StatusServiceUnavailable)
 		return
 	}
 	defer targetConn.Close()
