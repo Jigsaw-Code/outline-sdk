@@ -89,6 +89,9 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 // NewConnectHandler creates a [http.Handler] that handles CONNECT requests and forwards
 // the requests using the given [transport.StreamDialer].
 //
+// Clients can specify a Transport header with a value of a transport config as specified in
+// the [config] package to specify the transport for a given request.
+//
 // The resulting handler is currently vulnerable to probing attacks. It's ok as a localhost proxy
 // but it may be vulnerable if used as a public proxy.
 func NewConnectHandler(dialer transport.StreamDialer) http.Handler {
