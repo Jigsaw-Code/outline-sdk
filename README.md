@@ -89,37 +89,28 @@ Steps:
 
 This launch is currently in Beta. Most of the code is not new. It's the same code that is currently being used by the production Outline Client and Server. The SDK repackages code from [outline-ss-server](https://github.com/Jigsaw-Code/outline-ss-server) and [outline-go-tun2socks](https://github.com/Jigsaw-Code/outline-go-tun2socks) in a way that is easier to reuse and extend.
 
-### Beta
-
-The goal of the Beta release is to make the SDK available for broad consumption, with no major expected changes to the APIs and all supporting resources in place (website, documentation, examples, and so on).
-
-Beta features:
+### Features
 
 - Network-level libraries
-  - [x] Add IP Device abstraction (v0.0.2)
-  - [x] Add IP Device implementation based on go-tun2socks (LWIP) (v0.0.2)
-  - [x] Add UDP handler to fallback to DNS-over-TCP (v0.0.2)
-  - [x] Add DelegatePacketProxy for runtime PacketProxy replacement (v0.0.2)
+  - [x] IP Device abstraction (v0.0.2)
+  - [x] IP Device implementation based on go-tun2socks (LWIP) (v0.0.2)
+  - [x] UDP handler to fallback to DNS-over-TCP (v0.0.2)
+  - [x] DelegatePacketProxy for runtime PacketProxy replacement (v0.0.2)
 
-- Network library implementations
-  - [ ] Use network libraries in the Outline Client (coming soon)
-  - [ ] Add extensive testing (coming soon)
+- Proxy protocols
+  - [x] TCP and UDP Dialers (v0.0.2)
+  - [x] Shadowsocks wrappers and Dialers ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks)) (v0.0.2)
+  - [x] SOCKS5 StreamDialer ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/socks5)) (v0.0.6)
+  - [ ] SOCKS5 PacketDialer (coming soon)
+  - [ ] HTTP Connect (coming soon)
 
-- Transport-level libraries
-  - [x] Add generic transport client primitives (`StreamDialer`, `PacketListener` and Endpoints) (v0.0.2)
-  - [x] Add TCP and UDP client implementations (v0.0.2)
-  - [x] Add Shadowsocks client implementations (v0.0.2)
-  - [x] Use transport libraries in the Outline Client (v0.0.2)
-  - [x] Use transport libraries in the Outline Server (v0.0.2)
+- Transport protocols
+  - [x] Stream (TCP) split ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/split)) (v0.0.6)
+  - [x] TLS connection wrapper and StreamDialer ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/tls))
 
-- Transport client strategies
-  - Proxyless strategies
-    - [ ] Encrypted DNS (coming soon)
-    - [x] Packet splitting ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/split)) (v0.0.6)
-  - Proxy-based strategies
-    - [ ] HTTP Connect (coming soon)
-    - [x] SOCKS5 StreamDialer ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/socks5)) (v0.0.6)
-    - [ ] SOCKS5 PacketDialer (coming soon)
+- Name resolution
+  - [ ] Resilient DNS (coming soon)
+  - [ ] Encrypted DNS (coming soon)
 
 - Integration resources
   - For Mobile apps

@@ -15,16 +15,43 @@
 package httpproxy
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/x/config"
 )
 
+type sanitizeErrorDialer struct {
+	transport.StreamDialer
+}
+
+func isCancelledError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Works around the fact that DNS doesn't return typed errors.
+	return errors.Is(err, context.Canceled) || strings.HasSuffix(err.Error(), "operation was canceled")
+}
+
+func (d *sanitizeErrorDialer) Dial(ctx context.Context, addr string) (transport.StreamConn, error) {
+	conn, err := d.StreamDialer.Dial(ctx, addr)
+	if isCancelledError(err) {
+		return nil, context.Canceled
+	}
+	if err != nil {
+		return nil, errors.New("base dial failed")
+	}
+	return conn, nil
+}
+
 type connectHandler struct {
-	dialer transport.StreamDialer
+	dialer *sanitizeErrorDialer
 }
 
 var _ http.Handler = (*connectHandler)(nil)
@@ -38,7 +65,7 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 	// Validate the target address.
 	_, portStr, err := net.SplitHostPort(proxyReq.Host)
 	if err != nil {
-		http.Error(proxyResp, "Authority is not a valid host:port", http.StatusBadRequest)
+		http.Error(proxyResp, fmt.Sprintf("Authority \"%v\" is not a valid host:port", proxyReq.Host), http.StatusBadRequest)
 		return
 	}
 	if portStr == "" {
@@ -48,9 +75,16 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 	}
 
 	// Dial the target.
-	targetConn, err := h.dialer.Dial(proxyReq.Context(), proxyReq.Host)
+	transportConfig := proxyReq.Header.Get("Transport")
+	dialer, err := config.WrapStreamDialer(h.dialer, transportConfig)
 	if err != nil {
-		http.Error(proxyResp, "Failed to connect to target", http.StatusServiceUnavailable)
+		// Because we sanitize the base dialer error, it's safe to return error details here.
+		http.Error(proxyResp, fmt.Sprintf("Invalid config in Transport header: %v", err), http.StatusBadRequest)
+		return
+	}
+	targetConn, err := dialer.Dial(proxyReq.Context(), proxyReq.Host)
+	if err != nil {
+		http.Error(proxyResp, fmt.Sprintf("Failed to connect to %v: %v", proxyReq.Host, err), http.StatusServiceUnavailable)
 		return
 	}
 	defer targetConn.Close()
@@ -83,8 +117,13 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 // NewConnectHandler creates a [http.Handler] that handles CONNECT requests and forwards
 // the requests using the given [transport.StreamDialer].
 //
+// Clients can specify a Transport header with a value of a transport config as specified in
+// the [config] package to specify the transport for a given request.
+//
 // The resulting handler is currently vulnerable to probing attacks. It's ok as a localhost proxy
 // but it may be vulnerable if used as a public proxy.
 func NewConnectHandler(dialer transport.StreamDialer) http.Handler {
-	return &connectHandler{dialer}
+	// We sanitize the errors from the input Dialer because we don't want to leak sensitive details
+	// of the base dialer (e.g. access key credentials) to the user.
+	return &connectHandler{&sanitizeErrorDialer{dialer}}
 }

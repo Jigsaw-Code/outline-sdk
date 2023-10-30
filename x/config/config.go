@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package config provides convenience functions to create [transport.StreamDialer] and [transport.PacketDialer]
-// objects based on a text config. This is experimental and mostly for illustrative purposes at this point.
 package config
 
 import (
@@ -28,13 +26,38 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/split"
 )
 
+func parseConfigPart(oneDialerConfig string) (*url.URL, error) {
+	oneDialerConfig = strings.TrimSpace(oneDialerConfig)
+	if oneDialerConfig == "" {
+		return nil, errors.New("empty config part")
+	}
+	// Make it "<scheme>:" it it's only "<scheme>" to parse as a URL.
+	if !strings.Contains(oneDialerConfig, ":") {
+		oneDialerConfig += ":"
+	}
+	url, err := url.Parse(oneDialerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("part is not a valid URL: %w", err)
+	}
+	return url, nil
+}
+
 // NewStreamDialer creates a new [transport.StreamDialer] according to the given config.
-func NewStreamDialer(transportConfig string) (dialer transport.StreamDialer, err error) {
-	dialer = &transport.TCPStreamDialer{}
+func NewStreamDialer(transportConfig string) (transport.StreamDialer, error) {
+	return WrapStreamDialer(&transport.TCPStreamDialer{}, transportConfig)
+}
+
+// WrapStreamDialer created a [transport.StreamDialer] according to transportConfig, using dialer as the
+// base [transport.StreamDialer]. The given dialer must not be nil.
+func WrapStreamDialer(dialer transport.StreamDialer, transportConfig string) (transport.StreamDialer, error) {
+	if dialer == nil {
+		return nil, errors.New("base dialer must not be nil")
+	}
 	transportConfig = strings.TrimSpace(transportConfig)
 	if transportConfig == "" {
 		return dialer, nil
 	}
+	var err error
 	for _, part := range strings.Split(transportConfig, "|") {
 		dialer, err = newStreamDialerFromPart(dialer, part)
 		if err != nil {
@@ -45,24 +68,16 @@ func NewStreamDialer(transportConfig string) (dialer transport.StreamDialer, err
 }
 
 func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig string) (transport.StreamDialer, error) {
-	oneDialerConfig = strings.TrimSpace(oneDialerConfig)
-
-	if oneDialerConfig == "" {
-		return nil, errors.New("empty config part")
-	}
-
-	url, err := url.Parse(oneDialerConfig)
+	url, err := parseConfigPart(oneDialerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config part: %w", err)
 	}
 
-	switch url.Scheme {
+	// Please keep scheme list sorted.
+	switch strings.ToLower(url.Scheme) {
 	case "socks5":
 		endpoint := transport.StreamDialerEndpoint{Dialer: innerDialer, Address: url.Host}
 		return socks5.NewStreamDialer(&endpoint)
-
-	case "ss":
-		return newShadowsocksStreamDialerFromURL(innerDialer, url)
 
 	case "split":
 		prefixBytesStr := url.Opaque
@@ -71,6 +86,12 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 			return nil, fmt.Errorf("prefixBytes is not a number: %v. Split config should be in split:<number> format", prefixBytesStr)
 		}
 		return split.NewStreamDialer(innerDialer, int64(prefixBytes))
+
+	case "ss":
+		return newShadowsocksStreamDialerFromURL(innerDialer, url)
+
+	case "tls":
+		return newTlsStreamDialerFromURL(innerDialer, url)
 
 	default:
 		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
@@ -94,26 +115,24 @@ func NewPacketDialer(transportConfig string) (dialer transport.PacketDialer, err
 }
 
 func newPacketDialerFromPart(innerDialer transport.PacketDialer, oneDialerConfig string) (transport.PacketDialer, error) {
-	oneDialerConfig = strings.TrimSpace(oneDialerConfig)
-
-	if oneDialerConfig == "" {
-		return nil, errors.New("empty config part")
-	}
-
-	url, err := url.Parse(oneDialerConfig)
+	url, err := parseConfigPart(oneDialerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config part: %w", err)
 	}
 
-	switch url.Scheme {
+	// Please keep scheme list sorted.
+	switch strings.ToLower(url.Scheme) {
 	case "socks5":
 		return nil, errors.New("socks5 is not supported for PacketDialers")
+
+	case "split":
+		return nil, errors.New("split is not supported for PacketDialers")
 
 	case "ss":
 		return newShadowsocksPacketDialerFromURL(innerDialer, url)
 
-	case "split":
-		return nil, errors.New("split is not supported for PacketDialers")
+	case "tls":
+		return nil, errors.New("tls is not yet supported for PacketDialers")
 
 	default:
 		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
@@ -122,7 +141,7 @@ func newPacketDialerFromPart(innerDialer transport.PacketDialer, oneDialerConfig
 
 // NewpacketListener creates a new [transport.PacketListener] according to the given config,
 // the config must contain only one "ss://" segment.
-func NewpacketListener(transportConfig string) (transport.PacketListener, error) {
+func NewPacketListener(transportConfig string) (transport.PacketListener, error) {
 	if transportConfig = strings.TrimSpace(transportConfig); transportConfig == "" {
 		return nil, errors.New("config is required")
 	}
@@ -130,14 +149,16 @@ func NewpacketListener(transportConfig string) (transport.PacketListener, error)
 		return nil, errors.New("multi-part config is not supported")
 	}
 
-	url, err := url.Parse(transportConfig)
+	url, err := parseConfigPart(transportConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
-	if url.Scheme != "ss" {
-		return nil, errors.New("config scheme must be 'ss' for a PacketListener")
+	// Please keep scheme list sorted.
+	switch strings.ToLower(url.Scheme) {
+	case "ss":
+		// TODO: support nested dialer, the last part must be "ss://"
+		return newShadowsocksPacketListenerFromURL(url)
+	default:
+		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
 	}
-
-	// TODO: support nested dialer, the last part must be "ss://"
-	return newShadowsocksPacketListenerFromURL(url)
 }
