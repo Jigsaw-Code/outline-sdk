@@ -53,6 +53,11 @@ type streamConn struct {
 
 var _ transport.StreamConn = (*streamConn)(nil)
 
+func (c streamConn) CloseWrite() error {
+	tlsErr := c.Conn.CloseWrite()
+	return errors.Join(tlsErr, c.innerConn.CloseWrite())
+}
+
 func (c streamConn) CloseRead() error {
 	return c.innerConn.CloseRead()
 }

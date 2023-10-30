@@ -31,6 +31,8 @@ func TestDomain(t *testing.T) {
 	tlsConn, ok := conn.(streamConn)
 	require.True(t, ok)
 	require.True(t, tlsConn.ConnectionState().HandshakeComplete)
+	require.NoError(t, conn.CloseWrite())
+	require.NoError(t, conn.CloseRead())
 	conn.Close()
 }
 
