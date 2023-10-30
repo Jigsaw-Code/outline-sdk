@@ -17,6 +17,7 @@ package socks5
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -70,15 +71,21 @@ func TestSOCKS5Dialer_DialError(t *testing.T) {
 	require.NoError(t, err, "Failed to create TCP listener: %v", err)
 	defer listener.Close()
 
-	testExchange(t, listener, "example.com:443", nil, nil, ErrGeneralServerFailure)
-	testExchange(t, listener, "example.com:443", nil, nil, ErrConnectionNotAllowedByRuleset)
-	testExchange(t, listener, "example.com:443", nil, nil, ErrNetworkUnreachable)
-	testExchange(t, listener, "example.com:443", nil, nil, ErrHostUnreachable)
-	testExchange(t, listener, "example.com:443", nil, nil, ErrConnectionRefused)
-	testExchange(t, listener, "example.com:443", nil, nil, ErrTTLExpired)
-	testExchange(t, listener, "example.com:443", nil, nil, ErrCommandNotSupported)
-	testExchange(t, listener, "example.com:443", nil, nil, ErrAddressTypeNotSupported)
-	testExchange(t, listener, "example.com:443", nil, nil, ReplyCode(0xff))
+	for _, replyCode := range []ReplyCode{
+		ErrGeneralServerFailure,
+		ErrConnectionNotAllowedByRuleset,
+		ErrNetworkUnreachable,
+		ErrHostUnreachable,
+		ErrConnectionRefused,
+		ErrTTLExpired,
+		ErrCommandNotSupported,
+		ErrAddressTypeNotSupported,
+		ReplyCode(0xff),
+	} {
+		t.Run(fmt.Sprintf("ReplyCode=%v", replyCode), func(t *testing.T) {
+			testExchange(t, listener, "example.com:443", nil, nil, ErrGeneralServerFailure)
+		})
+	}
 }
 
 func testExchange(tb testing.TB, listener *net.TCPListener, destAddr string, request []byte, response []byte, replyCode ReplyCode) {
@@ -145,8 +152,14 @@ func testExchange(tb testing.TB, listener *net.TCPListener, destAddr string, req
 			require.Equal(tb, len(response), n)
 		}
 
+		// There's a race condition here. If the replyCode is an error, the client may close
+		// the connection before we have a chance to close the write, resulting in the error
+		// "shutdown: transport endpoint is not connected". For that reason we don't treat the
+		// error as fatal.
 		err = clientConn.CloseWrite()
-		assert.NoError(tb, err, "CloseWrite failed: %v", err)
+		if err != nil {
+			tb.Logf("CloseWrite failed: %v", err)
+		}
 	}()
 
 	running.Wait()
