@@ -106,7 +106,7 @@ This launch is currently in Beta. Most of the code is not new. It's the same cod
 
 - Transport protocols
   - [x] Packet splitting ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/split)) (v0.0.6)
-  - [x] TLS wrapper and StreamDialer ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/tls))
+  - [x] TLS connection wrapper and StreamDialer ([reference](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/tls))
 
 - Name resolution
   - [ ] Resilient DNS (coming soon)
