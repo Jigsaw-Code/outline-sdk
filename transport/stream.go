@@ -45,17 +45,11 @@ func (dc *duplexConnAdaptor) Read(b []byte) (int, error) {
 func (dc *duplexConnAdaptor) WriteTo(w io.Writer) (int64, error) {
 	return io.Copy(w, dc.r)
 }
-func (dc *duplexConnAdaptor) CloseRead() error {
-	return dc.StreamConn.CloseRead()
-}
 func (dc *duplexConnAdaptor) Write(b []byte) (int, error) {
 	return dc.w.Write(b)
 }
 func (dc *duplexConnAdaptor) ReadFrom(r io.Reader) (int64, error) {
 	return io.Copy(dc.w, r)
-}
-func (dc *duplexConnAdaptor) CloseWrite() error {
-	return dc.StreamConn.CloseWrite()
 }
 
 // WrapConn wraps an existing [StreamConn] with a new [io.Reader] and [io.Writer], but preserves the original

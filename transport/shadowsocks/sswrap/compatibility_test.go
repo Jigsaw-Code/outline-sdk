@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package shadowsocks
+package sswrap
 
 import (
 	"io"
@@ -36,7 +36,9 @@ func TestCompatibility(t *testing.T) {
 	wait.Add(1)
 	key, err := NewEncryptionKey(cipherName, secret)
 	require.NoError(t, err, "NewCipher failed: %v", err)
-	ssWriter := NewWriter(left, key)
+	ssWriter, err := NewWriter(left, key, nil)
+	require.NoError(t, err)
+
 	go func() {
 		defer wait.Done()
 		var err error

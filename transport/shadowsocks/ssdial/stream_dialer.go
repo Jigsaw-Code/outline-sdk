@@ -12,39 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package shadowsocks
+package ssdial
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks/sswrap"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 )
 
 // NewStreamDialer creates a client that routes connections to a Shadowsocks proxy listening at
-// the given StreamEndpoint, with `key` as the Shadowsocks encyption key.
-func NewStreamDialer(endpoint transport.StreamEndpoint, key *sswrap.EncryptionKey) (*StreamDialer, error) {
+// the given StreamEndpoint.
+func NewStreamDialer(endpoint transport.StreamEndpoint) (*StreamDialer, error) {
 	if endpoint == nil {
 		return nil, errors.New("argument endpoint must not be nil")
 	}
-	if key == nil {
-		return nil, errors.New("argument key must not be nil")
-	}
-	d := StreamDialer{endpoint: endpoint, key: key, ClientDataWait: 10 * time.Millisecond}
+	d := StreamDialer{endpoint: endpoint, ClientDataWait: 10 * time.Millisecond}
 	return &d, nil
 }
 
 type StreamDialer struct {
 	endpoint transport.StreamEndpoint
-	key      *sswrap.EncryptionKey
-
-	// SaltGenerator is used by Shadowsocks to generate the connection salts.
-	// `SaltGenerator` can be `nil`, which defaults to [shadowsocks.RandomSaltGenerator].
-	SaltGenerator sswrap.SaltGenerator
 
 	// ClientDataWait specifies the amount of time to wait for client data before sending
 	// the Shadowsocks connection request to the proxy server. This value is 10 milliseconds
@@ -89,19 +82,36 @@ func (c *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 	if err != nil {
 		return nil, err
 	}
-	ssw, err := sswrap.NewWriter(proxyConn, c.key, c.SaltGenerator)
+	err = DialWithConn(ctx, proxyConn, remoteAddr)
 	if err != nil {
 		proxyConn.Close()
-		return nil, fmt.Errorf("failed to wrap connection: %w", err)
+		return nil, err
 	}
-	_, err = ssw.LazyWrite(socksTargetAddr)
+	return proxyConn, nil
+}
+
+func DialWithConn(ctx context.Context, proxyConn transport.StreamConn, remoteAddr string) error {
+	return DialWithDataWithConn(ctx, proxyConn, remoteAddr, nil)
+}
+
+func DialWithDataWithConn(ctx context.Context, proxyConn transport.StreamConn, remoteAddr string, initialData []byte) error {
+	socksTargetAddr := socks.ParseAddr(remoteAddr)
+	if socksTargetAddr == nil {
+		return errors.New("failed to parse target address")
+	}
+	var err error
+	if len(initialData) == 0 {
+		_, err = proxyConn.Write(socksTargetAddr)
+	} else if rf, ok := proxyConn.(io.ReaderFrom); ok {
+		buffers := net.Buffers([][]byte{socksTargetAddr, initialData})
+		_, err = rf.ReadFrom(&buffers)
+	} else {
+		firstWrite := append(socksTargetAddr, initialData...)
+		_, err = proxyConn.Write(firstWrite)
+	}
 	if err != nil {
 		proxyConn.Close()
-		return nil, errors.New("failed to write target address")
+		return fmt.Errorf("failed to write: %w", err)
 	}
-	time.AfterFunc(c.ClientDataWait, func() {
-		ssw.Flush()
-	})
-	ssr := sswrap.NewReader(proxyConn, c.key)
-	return transport.WrapConn(proxyConn, ssr, ssw), nil
+	return nil
 }

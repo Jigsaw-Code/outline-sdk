@@ -18,6 +18,8 @@ import (
 	"bytes"
 	"io"
 	"testing"
+
+	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks/sswrap"
 )
 
 const (
@@ -40,8 +42,8 @@ func expectEchoPayload(conn io.ReadWriter, payload, buf []byte, t testing.TB) {
 	}
 }
 
-func makeTestKey(tb testing.TB) *EncryptionKey {
-	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "testPassword")
+func makeTestKey(tb testing.TB) *sswrap.EncryptionKey {
+	key, err := sswrap.NewEncryptionKey(sswrap.CHACHA20IETFPOLY1305, "testPassword")
 	if err != nil {
 		tb.Fatalf("Failed to create key: %v", err)
 	}

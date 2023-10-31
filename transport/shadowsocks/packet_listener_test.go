@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks/sswrap"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 	"github.com/stretchr/testify/require"
 )
@@ -82,7 +83,7 @@ func BenchmarkShadowsocksPacketListener_ListenPacket(b *testing.B) {
 	running.Wait()
 }
 
-func startShadowsocksUDPEchoServer(key *EncryptionKey, expectedTgtAddr string, t testing.TB) (net.Conn, *sync.WaitGroup) {
+func startShadowsocksUDPEchoServer(key *sswrap.EncryptionKey, expectedTgtAddr string, t testing.TB) (net.Conn, *sync.WaitGroup) {
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
 	if err != nil {
 		t.Fatalf("Proxy ListenUDP failed: %v", err)
@@ -101,7 +102,7 @@ func startShadowsocksUDPEchoServer(key *EncryptionKey, expectedTgtAddr string, t
 				t.Logf("Failed to read from UDP conn: %v", err)
 				return
 			}
-			buf, err := Unpack(clientBuf, cipherBuf[:n], key)
+			buf, err := sswrap.Unpack(clientBuf, cipherBuf[:n], key)
 			if err != nil {
 				t.Fatalf("Failed to decrypt: %v", err)
 			}
@@ -113,7 +114,7 @@ func startShadowsocksUDPEchoServer(key *EncryptionKey, expectedTgtAddr string, t
 				t.Fatalf("Expected target address '%v'. Got '%v'", expectedTgtAddr, tgtAddr)
 			}
 			// Echo both the payload and SOCKS address.
-			buf, err = Pack(cipherBuf, buf, key)
+			buf, err = sswrap.Pack(cipherBuf, buf, key)
 			if err != nil {
 				t.Fatalf("Failed to encrypt: %v", err)
 			}

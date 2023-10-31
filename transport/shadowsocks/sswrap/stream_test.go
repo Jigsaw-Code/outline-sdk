@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package shadowsocks
+package sswrap
 
 import (
 	"bytes"
@@ -166,7 +166,8 @@ func TestEndToEnd(t *testing.T) {
 	require.NoError(t, err)
 
 	connReader, connWriter := io.Pipe()
-	writer := NewWriter(connWriter, key)
+	writer, err := NewWriter(connWriter, key, nil)
+	require.NoError(t, err)
 	reader := NewReader(connReader, key)
 	expected := "Test"
 	wg := sync.WaitGroup{}
@@ -195,7 +196,8 @@ func TestLazyWriteFlush(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
 	require.NoError(t, err)
 	buf := new(bytes.Buffer)
-	writer := NewWriter(buf, key)
+	writer, err := NewWriter(buf, key, nil)
+	require.NoError(t, err)
 	header := []byte{1, 2, 3, 4}
 	n, err := writer.LazyWrite(header)
 	require.NoError(t, err, "LazyWrite failed: %v", err)
@@ -233,7 +235,8 @@ func TestLazyWriteConcat(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
 	require.NoError(t, err)
 	buf := new(bytes.Buffer)
-	writer := NewWriter(buf, key)
+	writer, err := NewWriter(buf, key, nil)
+	require.NoError(t, err)
 	header := []byte{1, 2, 3, 4}
 	n, err := writer.LazyWrite(header)
 	if n != len(header) {
@@ -288,7 +291,8 @@ func TestLazyWriteOversize(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
 	require.NoError(t, err)
 	buf := new(bytes.Buffer)
-	writer := NewWriter(buf, key)
+	writer, err := NewWriter(buf, key, nil)
+	require.NoError(t, err)
 	N := 25000 // More than one block, less than two.
 	data := make([]byte, N)
 	for i := range data {
@@ -329,7 +333,8 @@ func TestLazyWriteConcurrentFlush(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
 	require.NoError(t, err)
 	buf := new(bytes.Buffer)
-	writer := NewWriter(buf, key)
+	writer, err := NewWriter(buf, key, nil)
+	require.NoError(t, err)
 	header := []byte{1, 2, 3, 4}
 	n, err := writer.LazyWrite(header)
 	require.NoError(t, err, "LazyWrite failed: %v", err)
@@ -397,7 +402,8 @@ func BenchmarkWriter(b *testing.B) {
 
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
 	require.NoError(b, err)
-	writer := NewWriter(new(nullIO), key)
+	writer, err := NewWriter(new(nullIO), key, nil)
+	require.NoError(b, err)
 
 	start := time.Now()
 	b.StartTimer()

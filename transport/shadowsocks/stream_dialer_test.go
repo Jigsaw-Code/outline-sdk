@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks/sswrap"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 	"github.com/stretchr/testify/require"
 )
@@ -150,7 +151,7 @@ func TestStreamDialer_TCPPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
-	d.SaltGenerator = NewPrefixSaltGenerator(prefix)
+	d.SaltGenerator = sswrap.NewPrefixSaltGenerator(prefix)
 	conn, err := d.Dial(context.Background(), testTargetAddr)
 	if err != nil {
 		t.Fatalf("StreamDialer.Dial failed: %v", err)
@@ -188,7 +189,7 @@ func BenchmarkStreamDialer_Dial(b *testing.B) {
 	running.Wait()
 }
 
-func startShadowsocksTCPEchoProxy(key *EncryptionKey, expectedTgtAddr string, t testing.TB) (net.Listener, *sync.WaitGroup) {
+func startShadowsocksTCPEchoProxy(key *sswrap.EncryptionKey, expectedTgtAddr string, t testing.TB) (net.Listener, *sync.WaitGroup) {
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
 	if err != nil {
 		t.Fatalf("ListenTCP failed: %v", err)
@@ -211,8 +212,9 @@ func startShadowsocksTCPEchoProxy(key *EncryptionKey, expectedTgtAddr string, t 
 			go func() {
 				defer running.Done()
 				defer clientConn.Close()
-				ssr := NewReader(clientConn, key)
-				ssw := NewWriter(clientConn, key)
+				ssr := sswrap.NewReader(clientConn, key)
+				ssw, err := sswrap.NewWriter(clientConn, key, nil)
+				require.NoError(t, err)
 				ssClientConn := transport.WrapConn(clientConn, ssr, ssw)
 
 				tgtAddr, err := socks.ReadAddr(ssClientConn)
