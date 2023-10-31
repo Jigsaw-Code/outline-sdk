@@ -20,16 +20,16 @@ import "io"
 // For example, if you have a read of [0123456789] and prefixBytes = 3, you will get reads [012] and [3456789].
 type splitReader struct {
 	reader      io.Reader
-	prefixBytes int
+	prefixBytes int64
 }
 
 var _ io.Reader = (*splitReader)(nil)
 
 func (r *splitReader) Read(data []byte) (int, error) {
-	if r.prefixBytes > 0 && len(data) > int(r.prefixBytes) {
+	if 0 < r.prefixBytes && r.prefixBytes < int64(len(data)) {
 		data = data[:r.prefixBytes]
 	}
 	n, err := r.reader.Read(data)
-	r.prefixBytes -= n
+	r.prefixBytes -= int64(n)
 	return n, err
 }

@@ -45,7 +45,7 @@ func NewWriter(writer io.Writer, prefixBytes int64) io.Writer {
 }
 
 func (w *splitWriterReaderFrom) ReadFrom(source io.Reader) (written int64, err error) {
-	written, err = w.ReaderFrom.ReadFrom(&splitReader{source, int(w.prefixBytes)})
+	written, err = w.ReaderFrom.ReadFrom(&splitReader{source, w.prefixBytes})
 	w.prefixBytes -= written
 	return written, err
 }
