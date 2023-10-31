@@ -3,3 +3,13 @@
 # MacOS files
 .DS_Store
 .idea
+
+# Not using Zero-Installs
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
+.pnp.*
+
+#  using Zero Installs
+#.yarn/unplugged
+#.yarn/build-state.yml
