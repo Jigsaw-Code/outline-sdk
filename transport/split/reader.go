@@ -16,6 +16,8 @@ package split
 
 import "io"
 
+// splitReader is a [io.Reader] that splits a read that spans the byte at prefixBytes position.
+// For example, if you have a read of [0123456789] and prefixBytes = 3, you will get reads [012] and [3456789].
 type splitReader struct {
 	reader      io.Reader
 	prefixBytes int
