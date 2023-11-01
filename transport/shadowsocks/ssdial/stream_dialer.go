@@ -26,6 +26,12 @@ import (
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 )
 
+// TODO: DialWithConnOnWrite or DialOnWrite?
+// Should be doable by the user.
+// Implement general DialOnWrite given DialWithData.
+// Perhaps StreamConn should have Writev([][]bytes). Writev can be implemented using ReadFrom(Buffers).
+// Can have AsWriter[RF io.ReaderFrom](rf RF) Writer[RF]
+
 // NewStreamDialer creates a client that routes connections to a Shadowsocks proxy listening at
 // the given StreamEndpoint.
 func NewStreamDialer(endpoint transport.StreamEndpoint) (*StreamDialer, error) {
