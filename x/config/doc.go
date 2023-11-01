@@ -34,21 +34,21 @@ An empty string represents the direct TCP/UDP dialer, and is used as the input t
 
 Each dialer configuration follows a URL format, where the scheme defines the type of Dialer. Supported formats include:
 
-Shadowsocks proxy (compatible with Outline's access keys, package [transport/shadowsocks])
+Shadowsocks proxy (compatible with Outline's access keys, package [github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks])
 
 	ss://[USERINFO]@[HOST]:[PORT]?prefix=[PREFIX]
 
-SOCKS5 proxy (currently streams only, package [transport/socks5])
+SOCKS5 proxy (currently streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/socks5])
 
 	socks5://[HOST]:[PORT]
 
-Stream split transport (streams only, package [transport/split])
+Stream split transport (streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/split])
 
 It takes the length of the prefix. The stream will be split when PREFIX_LENGTH bytes are first written.
 
 	split:[PREFIX_LENGTH]
 
-TLS transport (currently streams only, package [x/tls])
+TLS transport (currently streams only, package [github.com/Jigsaw-Code/outline-sdk/x/tls])
 
 The sni parameter defines the name to be sent in the TLS SNI. It can be empty.
 The certname parameter defines what name to validate against the server certificate.
