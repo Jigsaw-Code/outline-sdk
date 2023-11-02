@@ -26,11 +26,11 @@ func TestSplitReader(t *testing.T) {
 	buf := make([]byte, 10)
 	n, err := splitReader.Read(buf)
 	require.NoError(t, err)
-	require.Equal(t, int(3), n)
+	require.Equal(t, 3, n)
 	require.Equal(t, []byte("Req"), buf[:n])
 
 	n, err = splitReader.Read(buf)
 	require.NoError(t, err)
-	require.Equal(t, int(4), n)
+	require.Equal(t, 4, n)
 	require.Equal(t, []byte("uest"), buf[:n])
 }
