@@ -104,20 +104,44 @@ func TestReadFrom(t *testing.T) {
 	splitWriter := NewWriter(&bytes.Buffer{}, 3)
 	rf, ok := splitWriter.(io.ReaderFrom)
 	require.True(t, ok)
-	cr := &collectReader{Reader: bytes.NewReader([]byte("Request"))}
+
+	cr := &collectReader{Reader: bytes.NewReader([]byte("Request1"))}
 	n, err := rf.ReadFrom(cr)
 	require.NoError(t, err)
-	require.Equal(t, int64(7), n)
-	require.Equal(t, [][]byte{[]byte("Req"), []byte("uest")}, cr.reads)
+	require.Equal(t, int64(8), n)
+	require.Equal(t, [][]byte{[]byte("Req"), []byte("uest1")}, cr.reads)
+
+	cr = &collectReader{Reader: bytes.NewReader([]byte("Request2"))}
+	n, err = rf.ReadFrom(cr)
+	require.NoError(t, err)
+	require.Equal(t, int64(8), n)
+	require.Equal(t, [][]byte{[]byte("Request2")}, cr.reads)
 }
 
 func TestReadFrom_ShortRead(t *testing.T) {
 	splitWriter := NewWriter(&bytes.Buffer{}, 10)
 	rf, ok := splitWriter.(io.ReaderFrom)
 	require.True(t, ok)
-	cr := &collectReader{Reader: bytes.NewReader([]byte("Request"))}
+	cr := &collectReader{Reader: bytes.NewReader([]byte("Request1"))}
 	n, err := rf.ReadFrom(cr)
 	require.NoError(t, err)
-	require.Equal(t, int64(7), n)
-	require.Equal(t, [][]byte{[]byte("Request")}, cr.reads)
+	require.Equal(t, int64(8), n)
+	require.Equal(t, [][]byte{[]byte("Request1")}, cr.reads)
+
+	cr = &collectReader{Reader: bytes.NewReader([]byte("Request2"))}
+	n, err = rf.ReadFrom(cr)
+	require.NoError(t, err)
+	require.Equal(t, int64(8), n)
+	require.Equal(t, [][]byte{[]byte("Re"), []byte("quest2")}, cr.reads)
+}
+
+func BenchmarkReadFrom(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		reader := bytes.NewReader(make([]byte, n))
+		writer := NewWriter(io.Discard, 10)
+		rf, ok := writer.(io.ReaderFrom)
+		require.True(b, ok)
+		_, err := rf.ReadFrom(reader)
+		require.NoError(b, err)
+	}
 }

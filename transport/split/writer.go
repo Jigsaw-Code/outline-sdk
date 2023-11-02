@@ -27,7 +27,7 @@ var _ io.Writer = (*splitWriter)(nil)
 
 type splitWriterReaderFrom struct {
 	*splitWriter
-	io.ReaderFrom
+	rf io.ReaderFrom
 }
 
 var _ io.ReaderFrom = (*splitWriterReaderFrom)(nil)
@@ -45,7 +45,8 @@ func NewWriter(writer io.Writer, prefixBytes int64) io.Writer {
 }
 
 func (w *splitWriterReaderFrom) ReadFrom(source io.Reader) (int64, error) {
-	written, err := w.ReaderFrom.ReadFrom(&splitReader{source, w.prefixBytes})
+	reader := io.MultiReader(io.LimitReader(source, w.prefixBytes), source)
+	written, err := w.rf.ReadFrom(reader)
 	w.prefixBytes -= written
 	return written, err
 }
