@@ -23,7 +23,6 @@ import (
 )
 
 type collectReads struct {
-	tb    testing.TB
 	reads [][]byte
 }
 
@@ -32,7 +31,6 @@ var _ io.ReaderFrom = (*collectReads)(nil)
 func (c *collectReads) ReadFrom(reader io.Reader) (int64, error) {
 	var b bytes.Buffer
 	n, err := b.ReadFrom(reader)
-	c.tb.Logf("ReadFrom: n=%v, err=%v", n, err)
 	if err != nil {
 		return n, err
 	}
@@ -43,7 +41,7 @@ func (c *collectReads) ReadFrom(reader io.Reader) (int64, error) {
 }
 
 func TestWrite_Split(t *testing.T) {
-	innerReaderFrom := collectReads{tb: t}
+	var innerReaderFrom collectReads
 	splitReaderFrom := NewReaderFrom(&innerReaderFrom, 3)
 	n, err := splitReaderFrom.ReadFrom(bytes.NewReader([]byte("Request")))
 	require.NoError(t, err)
@@ -52,7 +50,7 @@ func TestWrite_Split(t *testing.T) {
 }
 
 func TestWrite_OnEOF(t *testing.T) {
-	innerReaderFrom := collectReads{tb: t}
+	var innerReaderFrom collectReads
 	splitReaderFrom := NewReaderFrom(&innerReaderFrom, 7)
 	n, err := splitReaderFrom.ReadFrom(bytes.NewReader([]byte("Request")))
 	require.NoError(t, err)
