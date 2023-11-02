@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// collectWrites is a [io.Writer] that appends each write to the writes slice.
 type collectWrites struct {
 	writes [][]byte
 }
@@ -83,20 +84,64 @@ func TestWrite_Compound(t *testing.T) {
 	require.Equal(t, [][]byte{[]byte("R"), []byte("equ"), []byte("est")}, innerWriter.writes)
 }
 
+// collectReader is a [io.Reader] that appends each Read from the Reader to the reads slice.
+type collectReader struct {
+	io.Reader
+	reads [][]byte
+}
+
+func (r *collectReader) Read(buf []byte) (int, error) {
+	n, err := r.Reader.Read(buf)
+	if n > 0 {
+		read := make([]byte, n)
+		copy(read, buf[:n])
+		r.reads = append(r.reads, read)
+	}
+	return n, err
+}
+
 func TestReadFrom(t *testing.T) {
-	var innerWriter collectWrites
-	splitWriter := NewWriter(&innerWriter, 3)
-	n, err := splitWriter.ReadFrom(bytes.NewReader([]byte("Request")))
+	splitWriter := NewWriter(&bytes.Buffer{}, 3)
+	rf, ok := splitWriter.(io.ReaderFrom)
+	require.True(t, ok)
+
+	cr := &collectReader{Reader: bytes.NewReader([]byte("Request1"))}
+	n, err := rf.ReadFrom(cr)
 	require.NoError(t, err)
-	require.Equal(t, int64(7), n)
-	require.Equal(t, [][]byte{[]byte("Req"), []byte("uest")}, innerWriter.writes)
+	require.Equal(t, int64(8), n)
+	require.Equal(t, [][]byte{[]byte("Req"), []byte("uest1")}, cr.reads)
+
+	cr = &collectReader{Reader: bytes.NewReader([]byte("Request2"))}
+	n, err = rf.ReadFrom(cr)
+	require.NoError(t, err)
+	require.Equal(t, int64(8), n)
+	require.Equal(t, [][]byte{[]byte("Request2")}, cr.reads)
 }
 
 func TestReadFrom_ShortRead(t *testing.T) {
-	var innerWriter collectWrites
-	splitWriter := NewWriter(&innerWriter, 10)
-	n, err := splitWriter.ReadFrom(bytes.NewReader([]byte("Request")))
+	splitWriter := NewWriter(&bytes.Buffer{}, 10)
+	rf, ok := splitWriter.(io.ReaderFrom)
+	require.True(t, ok)
+	cr := &collectReader{Reader: bytes.NewReader([]byte("Request1"))}
+	n, err := rf.ReadFrom(cr)
 	require.NoError(t, err)
-	require.Equal(t, int64(7), n)
-	require.Equal(t, [][]byte{[]byte("Request")}, innerWriter.writes)
+	require.Equal(t, int64(8), n)
+	require.Equal(t, [][]byte{[]byte("Request1")}, cr.reads)
+
+	cr = &collectReader{Reader: bytes.NewReader([]byte("Request2"))}
+	n, err = rf.ReadFrom(cr)
+	require.NoError(t, err)
+	require.Equal(t, int64(8), n)
+	require.Equal(t, [][]byte{[]byte("Re"), []byte("quest2")}, cr.reads)
+}
+
+func BenchmarkReadFrom(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		reader := bytes.NewReader(make([]byte, n))
+		writer := NewWriter(io.Discard, 10)
+		rf, ok := writer.(io.ReaderFrom)
+		require.True(b, ok)
+		_, err := rf.ReadFrom(reader)
+		require.NoError(b, err)
+	}
 }
