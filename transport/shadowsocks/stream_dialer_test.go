@@ -155,7 +155,7 @@ func TestStreamDialer_TCPPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StreamDialer.Dial failed: %v", err)
 	}
-	conn.Write(nil)
+	conn.ReadFrom(nil)
 	conn.Close()
 	running.Wait()
 }
@@ -212,8 +212,8 @@ func startShadowsocksTCPEchoProxy(key *EncryptionKey, expectedTgtAddr string, t 
 				defer running.Done()
 				defer clientConn.Close()
 				ssr := NewReader(clientConn, key)
-				ssw := NewWriter(clientConn, key)
-				ssClientConn := transport.WrapConn(clientConn, ssr, ssw)
+				ssrf := NewReaderFrom(clientConn, key)
+				ssClientConn := transport.WrapConn(clientConn, ssr, ssrf)
 
 				tgtAddr, err := socks.ReadAddr(ssClientConn)
 				if err != nil {
@@ -222,7 +222,7 @@ func startShadowsocksTCPEchoProxy(key *EncryptionKey, expectedTgtAddr string, t 
 				if tgtAddr.String() != expectedTgtAddr {
 					t.Fatalf("Expected target address '%v'. Got '%v'", expectedTgtAddr, tgtAddr)
 				}
-				io.Copy(ssw, ssr)
+				ssrf.ReadFrom(ssr)
 			}()
 		}
 	}()

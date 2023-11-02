@@ -166,7 +166,8 @@ func TestEndToEnd(t *testing.T) {
 	require.NoError(t, err)
 
 	connReader, connWriter := io.Pipe()
-	writer := NewWriter(connWriter, key)
+	// TODO: ReaderFrom to Writer adapter
+	readerFrom := NewReaderFrom(connWriter, key)
 	reader := NewReader(connReader, key)
 	expected := "Test"
 	wg := sync.WaitGroup{}
@@ -175,7 +176,7 @@ func TestEndToEnd(t *testing.T) {
 		defer connWriter.Close()
 		wg.Add(1)
 		defer wg.Done()
-		_, writeErr = writer.Write([]byte(expected))
+		_, writeErr = readerFrom.ReadFrom(bytes.NewReader([]byte(expected)))
 	}()
 	var output bytes.Buffer
 	_, readErr := reader.WriteTo(&output)
@@ -195,14 +196,14 @@ func TestLazyWriteFlush(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
 	require.NoError(t, err)
 	buf := new(bytes.Buffer)
-	writer := NewWriter(buf, key)
+	readerFrom := NewReaderFrom(buf, key)
 	header := []byte{1, 2, 3, 4}
-	n, err := writer.LazyWrite(header)
+	n, err := readerFrom.LazyWrite(header)
 	require.NoError(t, err, "LazyWrite failed: %v", err)
 	require.Equal(t, len(header), n, "Wrong write size")
 	require.Equal(t, 0, buf.Len(), "LazyWrite isn't lazy")
 
-	err = writer.Flush()
+	err = readerFrom.Flush()
 	require.NoError(t, err, "Flush failed: %v", err)
 
 	len1 := buf.Len()
@@ -210,9 +211,9 @@ func TestLazyWriteFlush(t *testing.T) {
 
 	// Check that normal writes now work
 	body := []byte{5, 6, 7}
-	n, err = writer.Write(body)
+	n64, err := readerFrom.ReadFrom(bytes.NewReader(body))
 	require.NoError(t, err, "Write failed: %v", err)
-	require.Equal(t, len(body), n, "Wrong write size")
+	require.Equal(t, int64(len(body)), n64, "Wrong write size")
 	require.Greater(t, buf.Len(), len1, "No write observed")
 
 	// Verify content arrives in two blocks
@@ -233,9 +234,9 @@ func TestLazyWriteConcat(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
 	require.NoError(t, err)
 	buf := new(bytes.Buffer)
-	writer := NewWriter(buf, key)
+	readerFrom := NewReaderFrom(buf, key)
 	header := []byte{1, 2, 3, 4}
-	n, err := writer.LazyWrite(header)
+	n, err := readerFrom.LazyWrite(header)
 	if n != len(header) {
 		t.Errorf("Wrong write size: %d", n)
 	}
@@ -248,8 +249,8 @@ func TestLazyWriteConcat(t *testing.T) {
 
 	// Write additional data and flush the header.
 	body := []byte{5, 6, 7}
-	n, err = writer.Write(body)
-	if n != len(body) {
+	n64, err := readerFrom.ReadFrom(bytes.NewReader(body))
+	if int(n64) != len(body) {
 		t.Errorf("Wrong write size: %d", n)
 	}
 	if err != nil {
@@ -261,7 +262,7 @@ func TestLazyWriteConcat(t *testing.T) {
 	}
 
 	// Flush after write should have no effect
-	if err = writer.Flush(); err != nil {
+	if err = readerFrom.Flush(); err != nil {
 		t.Errorf("Flush failed: %v", err)
 	}
 	if buf.Len() != len1 {
@@ -288,7 +289,7 @@ func TestLazyWriteOversize(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
 	require.NoError(t, err)
 	buf := new(bytes.Buffer)
-	writer := NewWriter(buf, key)
+	writer := NewReaderFrom(buf, key)
 	N := 25000 // More than one block, less than two.
 	data := make([]byte, N)
 	for i := range data {
@@ -329,7 +330,7 @@ func TestLazyWriteConcurrentFlush(t *testing.T) {
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
 	require.NoError(t, err)
 	buf := new(bytes.Buffer)
-	writer := NewWriter(buf, key)
+	writer := NewReaderFrom(buf, key)
 	header := []byte{1, 2, 3, 4}
 	n, err := writer.LazyWrite(header)
 	require.NoError(t, err, "LazyWrite failed: %v", err)
@@ -382,8 +383,8 @@ func TestLazyWriteConcurrentFlush(t *testing.T) {
 
 type nullIO struct{}
 
-func (n *nullIO) Write(b []byte) (int, error) {
-	return len(b), nil
+func (n *nullIO) ReadFrom(r io.Reader) (int64, error) {
+	return io.Copy(io.Discard, r)
 }
 
 func (r *nullIO) Read(b []byte) (int, error) {
@@ -397,11 +398,11 @@ func BenchmarkWriter(b *testing.B) {
 
 	key, err := NewEncryptionKey(CHACHA20IETFPOLY1305, "test secret")
 	require.NoError(b, err)
-	writer := NewWriter(new(nullIO), key)
+	readerFrom := NewReaderFrom(new(nullIO), key)
 
 	start := time.Now()
 	b.StartTimer()
-	io.CopyN(writer, new(nullIO), int64(b.N))
+	readerFrom.ReadFrom(&io.LimitedReader{R: new(nullIO), N: int64(b.N)})
 	b.StopTimer()
 	elapsed := time.Since(start)
 

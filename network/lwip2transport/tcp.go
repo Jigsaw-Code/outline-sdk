@@ -16,7 +16,6 @@ package lwip2transport
 
 import (
 	"context"
-	"io"
 	"net"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -52,7 +51,7 @@ func (h *tcpHandler) Handle(conn net.Conn, target *net.TCPAddr) error {
 //
 // rightConn's read end and leftConn's write end will be closed after copyOneWay returns.
 func copyOneWay(leftConn, rightConn transport.StreamConn) (int64, error) {
-	n, err := io.Copy(leftConn, rightConn)
+	n, err := leftConn.ReadFrom(rightConn)
 	// Send FIN to indicate EOF
 	leftConn.CloseWrite()
 	// Release reader resources

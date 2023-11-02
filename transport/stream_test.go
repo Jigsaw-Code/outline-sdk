@@ -15,6 +15,7 @@
 package transport
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net"
@@ -76,9 +77,9 @@ func TestNewTCPStreamDialerIPv4(t *testing.T) {
 		require.Equal(t, listener.Addr().String(), serverConn.RemoteAddr().String())
 		defer serverConn.Close()
 
-		n, err := serverConn.Write(requestText)
+		n, err := serverConn.ReadFrom(bytes.NewReader(requestText))
 		require.NoError(t, err)
-		require.Equal(t, 7, n)
+		require.Equal(t, 7, int(n))
 		assert.Nil(t, serverConn.CloseWrite())
 
 		err = iotest.TestReader(serverConn, responseText)

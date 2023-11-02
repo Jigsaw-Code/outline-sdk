@@ -87,7 +87,7 @@ func (c *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 	if err != nil {
 		return nil, err
 	}
-	ssw := NewWriter(proxyConn, c.key)
+	ssw := NewReaderFrom(proxyConn, c.key)
 	if c.SaltGenerator != nil {
 		ssw.SetSaltGenerator(c.SaltGenerator)
 	}
