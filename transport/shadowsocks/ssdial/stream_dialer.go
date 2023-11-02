@@ -88,7 +88,7 @@ func (c *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 	if err != nil {
 		return nil, err
 	}
-	err = DialWithConn(ctx, proxyConn, remoteAddr)
+	err = DialStreamConn(ctx, proxyConn, remoteAddr, nil)
 	if err != nil {
 		proxyConn.Close()
 		return nil, err
@@ -96,11 +96,8 @@ func (c *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 	return proxyConn, nil
 }
 
-func DialWithConn(ctx context.Context, proxyConn transport.StreamConn, remoteAddr string) error {
-	return DialWithDataWithConn(ctx, proxyConn, remoteAddr, nil)
-}
-
-func DialWithDataWithConn(ctx context.Context, proxyConn transport.StreamConn, remoteAddr string, initialData []byte) error {
+// TODO: Introduce a generic wrapConn that inserts a prefix in the first Write. Need to account for ReadFrom.
+func DialStreamConn(ctx context.Context, proxyConn transport.StreamConn, remoteAddr string, initialData []byte) error {
 	socksTargetAddr := socks.ParseAddr(remoteAddr)
 	if socksTargetAddr == nil {
 		return errors.New("failed to parse target address")

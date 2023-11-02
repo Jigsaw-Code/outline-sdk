@@ -23,6 +23,7 @@ import (
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
+	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks/sswrap"
 )
 
 func newShadowsocksStreamDialerFromURL(innerDialer transport.StreamDialer, configURL *url.URL) (transport.StreamDialer, error) {
@@ -36,7 +37,7 @@ func newShadowsocksStreamDialerFromURL(innerDialer transport.StreamDialer, confi
 		return nil, err
 	}
 	if len(config.prefix) > 0 {
-		dialer.SaltGenerator = shadowsocks.NewPrefixSaltGenerator(config.prefix)
+		dialer.SaltGenerator = sswrap.NewPrefixSaltGenerator(config.prefix)
 	}
 	return dialer, nil
 }
@@ -67,7 +68,7 @@ func newShadowsocksPacketListenerFromURL(configURL *url.URL) (transport.PacketLi
 
 type shadowsocksConfig struct {
 	serverAddress string
-	cryptoKey     *shadowsocks.EncryptionKey
+	cryptoKey     *sswrap.EncryptionKey
 	prefix        []byte
 }
 
@@ -85,7 +86,7 @@ func parseShadowsocksURL(url *url.URL) (*shadowsocksConfig, error) {
 	if !found {
 		return nil, errors.New("invalid cipher info: no ':' separator")
 	}
-	config.cryptoKey, err = shadowsocks.NewEncryptionKey(cipherName, secret)
+	config.cryptoKey, err = sswrap.NewEncryptionKey(cipherName, secret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher: %w", err)
 	}
