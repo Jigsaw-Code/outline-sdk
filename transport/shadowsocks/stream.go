@@ -15,7 +15,6 @@
 package shadowsocks
 
 import (
-	"bytes"
 	"crypto/cipher"
 	"encoding/binary"
 	"fmt"
@@ -44,11 +43,9 @@ type Writer struct {
 	mu sync.Mutex
 	// Indicates that a concurrent flush is currently allowed.
 	needFlush     bool
-	writer        io.Writer
+	rf            io.ReaderFrom
 	key           *EncryptionKey
 	saltGenerator SaltGenerator
-	// Wrapper for input that arrives as a slice.
-	byteWrapper bytes.Reader
 	// Number of plaintext bytes that are currently buffered.
 	pending int
 	// These are populated by init():
@@ -59,14 +56,13 @@ type Writer struct {
 }
 
 var (
-	_ io.Writer     = (*Writer)(nil)
 	_ io.ReaderFrom = (*Writer)(nil)
 )
 
-// NewWriter creates a [Writer] that encrypts the given [io.Writer] using
+// NewReaderFrom creates a [Writer] that encrypts the given [io.Writer] using
 // the shadowsocks protocol with the given encryption key.
-func NewWriter(writer io.Writer, key *EncryptionKey) *Writer {
-	return &Writer{writer: writer, key: key, saltGenerator: RandomSaltGenerator}
+func NewReaderFrom(rf io.ReaderFrom, key *EncryptionKey) *Writer {
+	return &Writer{rf: rf, key: key, saltGenerator: RandomSaltGenerator}
 }
 
 // SetSaltGenerator sets the salt generator to be used. Must be called before the first write.
@@ -105,12 +101,6 @@ func (sw *Writer) encryptBlock(plaintext []byte) int {
 	out := sw.aead.Seal(plaintext[:0], sw.counter, plaintext, nil)
 	increment(sw.counter)
 	return len(out)
-}
-
-func (sw *Writer) Write(p []byte) (int, error) {
-	sw.byteWrapper.Reset(p)
-	n, err := sw.ReadFrom(&sw.byteWrapper)
-	return int(n), err
 }
 
 // LazyWrite queues p to be written, but doesn't send it until Flush() is
@@ -252,7 +242,7 @@ func (sw *Writer) flush() error {
 	binary.BigEndian.PutUint16(sizeBuf, uint16(sw.pending))
 	sizeBlockSize := sw.encryptBlock(sizeBuf)
 	payloadSize := sw.encryptBlock(payloadBuf[:sw.pending])
-	_, err := sw.writer.Write(sw.buf[start : saltSize+sizeBlockSize+payloadSize])
+	_, err := sw.rf.Write(sw.buf[start : saltSize+sizeBlockSize+payloadSize])
 	sw.pending = 0
 	return err
 }

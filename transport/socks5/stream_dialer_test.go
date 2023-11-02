@@ -15,6 +15,7 @@
 package socks5
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -109,9 +110,9 @@ func testExchange(tb testing.TB, listener *net.TCPListener, destAddr string, req
 		require.Equal(tb, listener.Addr().String(), serverConn.RemoteAddr().String())
 		defer serverConn.Close()
 
-		n, err := serverConn.Write(request)
+		n, err := serverConn.ReadFrom(bytes.NewReader(request))
 		require.NoError(tb, err)
-		require.Equal(tb, len(request), n)
+		require.Equal(tb, len(request), int(n))
 		assert.NoError(tb, serverConn.CloseWrite())
 
 		err = iotest.TestReader(serverConn, response)
@@ -129,10 +130,10 @@ func testExchange(tb testing.TB, listener *net.TCPListener, destAddr string, req
 		// This reads method and connect requests at once, demonstrating they are both sent before a server response.
 		// Method request: VER = 5, NMETHODS = 1, METHODS = 0 (no auth)
 		// Connect request: VER = 5, CMD = 1, RSV = 0, ATYP, DST.ADDR, DST.PORT
-		expected := []byte{5, 1, 0, 5, 1, 0}
-		expected, err = appendSOCKS5Address(expected, destAddr)
+		expected := bytes.NewBuffer([]byte{5, 1, 0, 5, 1, 0})
+		err = writeSOCKS5Address(expected, destAddr)
 		require.NoError(tb, err)
-		err = iotest.TestReader(io.LimitReader(clientConn, int64(len(expected))), expected)
+		err = iotest.TestReader(io.LimitReader(clientConn, int64(expected.Len())), expected.Bytes())
 		assert.NoError(tb, err, "Request read failed: %v", err)
 
 		// Write the method and connect responses

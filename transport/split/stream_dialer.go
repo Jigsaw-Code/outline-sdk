@@ -43,5 +43,5 @@ func (d *splitDialer) Dial(ctx context.Context, remoteAddr string) (transport.St
 	if err != nil {
 		return nil, err
 	}
-	return transport.WrapConn(innerConn, innerConn, NewWriter(innerConn, d.splitPoint)), nil
+	return transport.WrapConn(innerConn, innerConn, NewReaderFrom(innerConn, d.splitPoint)), nil
 }

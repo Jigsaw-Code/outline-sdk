@@ -15,6 +15,7 @@
 package socks5
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
@@ -22,38 +23,38 @@ import (
 )
 
 func TestAppendSOCKS5Address_IPv4(t *testing.T) {
-	b := []byte{}
-	b, err := appendSOCKS5Address(b, "8.8.8.8:853")
+	var b bytes.Buffer
+	err := writeSOCKS5Address(&b, "8.8.8.8:853")
 	require.NoError(t, err)
 	// 853 = 0x355
-	require.EqualValues(t, []byte{1, 8, 8, 8, 8, 0x3, 0x55}, b)
+	require.EqualValues(t, []byte{1, 8, 8, 8, 8, 0x3, 0x55}, b.Bytes())
 }
 
 func TestAppendSOCKS5Address_IPv6(t *testing.T) {
-	b := []byte{}
-	b, err := appendSOCKS5Address(b, "[2001:4860:4860::8888]:853")
+	var b bytes.Buffer
+	err := writeSOCKS5Address(&b, "[2001:4860:4860::8888]:853")
 	require.NoError(t, err)
-	require.EqualValues(t, []byte{0x04, 0x20, 0x01, 0x48, 0x60, 0x48, 0x60, 0, 0, 0, 0, 0, 0, 0, 0, 0x88, 0x88, 0x3, 0x55}, b)
+	require.EqualValues(t, []byte{0x04, 0x20, 0x01, 0x48, 0x60, 0x48, 0x60, 0, 0, 0, 0, 0, 0, 0, 0, 0x88, 0x88, 0x3, 0x55}, b.Bytes())
 }
 
 func TestAppendSOCKS5Address_DomainName(t *testing.T) {
-	b := []byte{}
-	b, err := appendSOCKS5Address(b, "dns.google:853")
+	var b bytes.Buffer
+	err := writeSOCKS5Address(&b, "dns.google:853")
 	require.NoError(t, err)
-	require.EqualValues(t, []byte{0x03, byte(len("dns.google")), 'd', 'n', 's', '.', 'g', 'o', 'o', 'g', 'l', 'e', 0x3, 0x55}, b)
+	require.EqualValues(t, []byte{0x03, byte(len("dns.google")), 'd', 'n', 's', '.', 'g', 'o', 'o', 'g', 'l', 'e', 0x3, 0x55}, b.Bytes())
 }
 
 func TestAppendSOCKS5Address_NotHostPort(t *testing.T) {
-	_, err := appendSOCKS5Address([]byte{}, "fsdfksajdhfjk")
+	err := writeSOCKS5Address(&bytes.Buffer{}, "fsdfksajdhfjk")
 	require.Error(t, err)
 }
 
 func TestAppendSOCKS5Address_BadPort(t *testing.T) {
-	_, err := appendSOCKS5Address([]byte{}, "dns.google:dns")
+	err := writeSOCKS5Address(&bytes.Buffer{}, "dns.google:dns")
 	require.Error(t, err)
 }
 
 func TestAppendSOCKS5Address_DomainNameTooLong(t *testing.T) {
-	_, err := appendSOCKS5Address([]byte{}, strings.Repeat("1234567890", 26)+":53")
+	err := writeSOCKS5Address(&bytes.Buffer{}, strings.Repeat("1234567890", 26)+":53")
 	require.Error(t, err)
 }

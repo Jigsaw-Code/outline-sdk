@@ -15,6 +15,7 @@
 package shadowsocks
 
 import (
+	"bytes"
 	"io"
 	"net"
 	"sync"
@@ -36,11 +37,12 @@ func TestCompatibility(t *testing.T) {
 	wait.Add(1)
 	key, err := NewEncryptionKey(cipherName, secret)
 	require.NoError(t, err, "NewCipher failed: %v", err)
-	ssWriter := NewWriter(left, key)
+	// TODO: wrap left in a ReaderFrom adaptor.
+	ssWriter := NewReaderFrom(bytes.NewReader(left), key)
 	go func() {
 		defer wait.Done()
 		var err error
-		ssWriter.Write([]byte(fromLeft))
+		ssWriter.ReadFrom(bytes.NewReader([]byte(fromLeft)))
 
 		ssReader := NewReader(left, key)
 		receivedByLeft := make([]byte, len(fromRight))
