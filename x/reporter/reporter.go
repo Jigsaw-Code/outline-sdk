@@ -28,35 +28,48 @@ import (
 var debugLog log.Logger = *log.New(io.Discard, "", 0)
 var httpClient = &http.Client{}
 
-type Record struct {
-	collectorURL      string
-	successSampleRate float64
-	failureSampleRate float64
-	success           bool
-	record            interface{}
+type reporterConfig struct {
+	reportTo        string
+	successFraction float64
+	failureFraction float64
+	// Other possible config fields
+	// max_age      int
+	// max_retry	int
 }
 
-func Report(r Record) error {
-
-	// Perform custom range validation for sampling rate
-	if r.successSampleRate < 0.0 || r.successSampleRate > 1.0 {
-		return errors.New("Error: successSampleRate must be between 0 and 1.")
+func (r *reporterConfig) SetFractions(success, failure float64) error {
+	if success < 0 || success > 1 {
+		return errors.New("success fraction must be between 0 and 1")
 	}
-
-	if r.failureSampleRate < 0.0 || r.failureSampleRate > 1.0 {
-		return errors.New("Error: failureSampleRate must be between 0 and 1.")
+	if failure < 0 || failure > 1 {
+		return errors.New("failure fraction must be between 0 and 1")
 	}
+	r.successFraction = success
+	r.failureFraction = failure
+	return nil
+}
 
+type Report struct {
+	logRecord any
+	success   bool
+	config    reporterConfig
+}
+
+type Reporter interface {
+	Collect() error
+}
+
+func (r Report) Collect() error {
 	var samplingRate float64
 	if r.success {
-		samplingRate = r.successSampleRate
+		samplingRate = r.config.successFraction
 	} else {
-		samplingRate = r.failureSampleRate
+		samplingRate = r.config.failureFraction
 	}
 	// Generate a random number between 0 and 1
 	random := rand.Float64()
 	if random < samplingRate {
-		err := sendReport(r.record, r.collectorURL)
+		err := sendReport(r.logRecord, r.config.reportTo)
 		if err != nil {
 			log.Printf("HTTP request failed: %v", err)
 			return err
@@ -70,8 +83,8 @@ func Report(r Record) error {
 	}
 }
 
-func sendReport(record any, collectorURL string) error {
-	jsonData, err := json.Marshal(record)
+func sendReport(logRecord any, collectorURL string) error {
+	jsonData, err := json.Marshal(logRecord)
 	if err != nil {
 		log.Printf("Error encoding JSON: %s\n", err)
 		return err

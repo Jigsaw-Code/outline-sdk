@@ -25,6 +25,7 @@ func TestSendReportSuccessfully(t *testing.T) {
 	// Example JSON data
 	jsonData := `{
 		"proxy": "192.168.1.1:65000",
+		"transport": "shadowsocks",
 		"resolver": "8.8.8.8:53",
 		"proto": "tcp",
 		"prefix": "HTTP1/1",
@@ -36,19 +37,18 @@ func TestSendReportSuccessfully(t *testing.T) {
 			"msg": "i/o timeout"
 		}
 	}`
-	var testRecord Record
-	err := json.Unmarshal([]byte(jsonData), &testRecord.record)
+	var testReport Report
+	err := json.Unmarshal([]byte(jsonData), &testReport.logRecord)
 	if err != nil {
 		fmt.Println(err)
 		t.Errorf("Expected no error, but got: %v", err)
 	}
-	testRecord.collectorURL = "https://example.com"
-	testRecord.success = true
-	testRecord.successSampleRate = 1.0
-	testRecord.failureSampleRate = 0.0
+	testReport.config.reportTo = "https://script.google.com/macros/s/AKfycbzoMBmftQaR9Aw4jzTB-w4TwkDjLHtSfBCFhh4_2NhTEZAUdj85Qt8uYCKCNOEAwCg4/exec"
+	testReport.success = true
+	testReport.config.successFraction = 1.0
+	testReport.config.failureFraction = 0.0
 
-	err = Report(testRecord)
-
+	err = testReport.Collect()
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
