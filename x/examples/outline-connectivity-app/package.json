@@ -13,21 +13,21 @@
     "node": ">=18.0.0"
   },
   "name": "outline_sdk_connectivity_test",
-  "packageManager": "yarn@3.6.4",
+  "packageManager": "yarn@4.0.1",
   "private": true,
   "scripts": {
     "app_desktop": "yarn workspace app_desktop",
     "app_mobile": "yarn workspace app_mobile",
-    "build": "yarn workspaces foreach -ptiv run build",
-    "clean": "yarn workspaces foreach -piv run clean && rm -rf node_modules .yarn/cache .yarn/sdks .yarn/unplugged .yarn/install-state.",
+    "build": "yarn workspaces foreach -ptivW run build",
+    "clean": "yarn workspaces foreach -pivW run clean && rm -rf node_modules .yarn/cache .yarn/sdks .yarn/unplugged .yarn/install-state.",
     "reset": "yarn clean && yarn && yarn sdks vscode",
-    "setup": "yarn && yarn workspaces foreach -piv run setup",
+    "setup": "yarn && yarn workspaces foreach -pivW run setup",
     "setup:vscode": "yarn sdks vscode",
     "shared_backend": "yarn workspace shared_backend",
     "shared_frontend": "yarn workspace shared_frontend",
-    "watch": "yarn workspaces foreach -piv run watch",
-    "watch:android": "concurrently -n frontend,android 'yarn app_mobile watch:frontend' 'yarn workspaces foreach -piv run watch:android'",
-    "watch:ios": "concurrently -n frontend,ios 'yarn app_mobile watch:frontend' 'yarn workspaces foreach -piv run watch:ios'"
+    "watch": "yarn workspaces foreach -pivW run watch",
+    "watch:android": "concurrently -n frontend,android 'yarn app_mobile watch:frontend' 'yarn workspaces foreach -pivW run watch:android'",
+    "watch:ios": "concurrently -n frontend,ios 'yarn app_mobile watch:frontend' 'yarn workspaces foreach -pivW run watch:ios'"
   },
   "version": "0.0.0",
   "workspaces": [
