@@ -66,7 +66,7 @@ func main() {
 		}
 		return dialer.Dial(ctx, addr)
 	}
-	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: 5 * time.Second}
+	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: 30 * time.Second}
 
 	resp, err := httpClient.Get(url)
 	if err != nil {

@@ -62,7 +62,20 @@ func (c *streamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 	// Method request:
 	// VER = 5, NMETHODS = 1, METHODS = 0 (no auth)
 	b := append(header[:0], 5, 1, 0)
+	_, err = proxyConn.Write(b)
 
+	// Read method response (VER, METHOD).
+	if _, err = io.ReadFull(proxyConn, header[:2]); err != nil {
+		return nil, fmt.Errorf("failed to read method server response")
+	}
+	if header[0] != 5 {
+		return nil, fmt.Errorf("invalid protocol version %v. Expected 5", header[0])
+	}
+	if header[1] != 0 {
+		return nil, fmt.Errorf("unsupported SOCKS authentication method %v. Expected 0 (no auth)", header[1])
+	}
+
+	b = b[:0]
 	// Connect request:
 	// VER = 5, CMD = 1 (connect), RSV = 0
 	b = append(b, 5, 1, 0)
@@ -77,17 +90,6 @@ func (c *streamDialer) Dial(ctx context.Context, remoteAddr string) (transport.S
 	_, err = proxyConn.Write(b)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write SOCKS5 request: %w", err)
-	}
-
-	// Read method response (VER, METHOD).
-	if _, err = io.ReadFull(proxyConn, header[:2]); err != nil {
-		return nil, fmt.Errorf("failed to read method server response")
-	}
-	if header[0] != 5 {
-		return nil, fmt.Errorf("invalid protocol version %v. Expected 5", header[0])
-	}
-	if header[1] != 0 {
-		return nil, fmt.Errorf("unsupported SOCKS authentication method %v. Expected 0 (no auth)", header[1])
 	}
 
 	// Read connect response (VER, REP, RSV, ATYP, BND.ADDR, BND.PORT).
