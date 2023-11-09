@@ -82,7 +82,7 @@ func putTLSClientHelloHeader(hdr []byte, recordLen uint16) {
 	_ = hdr[4] // bounds check to guarantee safety of writes below
 	hdr[0] = tlsTypeHandshake
 	hdr[1] = 0x03
-	hdr[2] = 0x03
+	hdr[2] = 0x01
 	binary.BigEndian.PutUint16(hdr[3:], recordLen)
 }
 
