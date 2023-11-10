@@ -22,12 +22,14 @@
 // - Can't change target address and select a proxy at the same time. Either one or the other.
 // - We may be able to do more with dart:http BaseClient.send.
 
+// ignore_for_file: unnecessary_this
 
-import 'dart:js_interop';
+import 'dart:convert';
 
 import 'package:args/args.dart';
 import 'dart:io';
-import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 
 HttpClient makeClientWithFindProxy(String? proxy) {
   var client = HttpClient();
@@ -43,12 +45,14 @@ HttpClient makeClientWithFindProxy(String? proxy) {
   return client;
 }
 
-Future<ConnectionTask<Socket>> connectHttp(String proxyHost, int proxyPort, String targetHost, int targetPort) async {
+Future<ConnectionTask<Socket>> connectHttp(
+    String proxyHost, int proxyPort, String targetHost, int targetPort) async {
   var socketTask = Socket.startConnect(proxyHost, proxyPort);
   var client = HttpClient()
-    ..connectionFactory =(url, proxyHost, proxyPort) => socketTask;
-  
-  var request = await client.openUrl("CONNECT", Uri(host: proxyHost, port: proxyPort));
+    ..connectionFactory = (url, proxyHost, proxyPort) => socketTask;
+
+  var request =
+      await client.openUrl("CONNECT", Uri(host: proxyHost, port: proxyPort));
   // if (uri.scheme == "https") {
   //   request.headers.add("Transport", "split:2");
   // }
@@ -128,7 +132,7 @@ HttpClient makeClientWithConnectionFactory(String proxyHost, int proxyPort) {
 
     var connectHost = uri.host;
     if (uri.host == "www.rferl.org") {
-       connectHost = "e4887.dscb.akamaiedge.net";
+      connectHost = "e4887.dscb.akamaiedge.net";
     }
     if (uri.scheme == "https") {
       return SecureSocket.startConnect(connectHost, uri.port);
@@ -157,7 +161,61 @@ HttpClient makeClientWithConnectionFactory(String proxyHost, int proxyPort) {
   return client;
 }
 
-Future<bool> testClient(HttpClient client, Uri url) async {
+http.Client makeRemapClient(String proxy) {
+  var ioClient = HttpClient()
+    ..findProxy = (uri) {
+      if (uri.port == 443) {
+        print("Proxy for $uri: $proxy");
+        return "PROXY $proxy";
+      }
+      print("Proxy for $uri: DIRECT");
+      return "DIRECT";
+    };
+  return RemapClient(IOClient(ioClient));
+}
+
+class RemapClient extends http.BaseClient {
+  final http.Client _client;
+
+  RemapClient(http.Client client) : _client = client;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    print("Called send with $request");
+
+    // Create a new request with the modified URL
+    var url = request.url;
+    if (url.scheme == "https") {
+      var port = url.hasPort ? url.port : 443;
+      url = url.replace(scheme: "http", port: port);
+    }
+    if (url.host == 'www.rferl.org') {
+      url = url.replace(host: "e4887.dscb.akamaiedge.net");
+    }
+    print("New url is $url");
+    var newRequest = http.Request(request.method, url)
+      ..headers.addAll(request.headers)
+      ..followRedirects = false // request.followRedirects
+      ..maxRedirects = request.maxRedirects
+      ..persistentConnection = request.persistentConnection;
+
+    if (request is http.Request) {
+      newRequest.body = request.body;
+      newRequest.encoding = request.encoding;
+    }
+    print("New request is $newRequest");
+
+    // Call the base class's send method
+    return this._client.send(newRequest);
+  }
+
+  @override
+  void close() {
+    this._client.close();
+  }
+}
+
+Future<bool> testIoClient(HttpClient client, Uri url) async {
   try {
     var request = await client.headUrl(url);
     await request.close();
@@ -168,9 +226,21 @@ Future<bool> testClient(HttpClient client, Uri url) async {
   }
 }
 
+Future<bool> testHttpClient(http.Client client, Uri url) async {
+  try {
+    var response = await client.get(url);
+    print("Status: ${response.statusCode}");
+    print("Headers: ${response.headers}");
+    print("Response: ${utf8.decode(response.bodyBytes)}");
+    return true;
+  } catch (e) {
+    print(e);
+    return false;
+  }
+}
+
 void main(List<String> arguments) async {
-  final parser = ArgParser()
-    ..addOption('proxy', abbr: 'p', mandatory: false);
+  final parser = ArgParser()..addOption('proxy', abbr: 'p', mandatory: false);
 
   ArgResults argResults;
 
@@ -196,46 +266,60 @@ void main(List<String> arguments) async {
     exit(1);
   }
 
-  HttpClient client = HttpClient();
-  bool isClientOk = await testClient(client, url);
-  print("Direct access: ${isClientOk ? "OK" : "FAILED"}");
-  client.close(force: true);
-
   // Extract proxy argument
   final String? proxyAddress = argResults['proxy'];
   if (proxyAddress == null) {
     return;
   }
 
-  client = makeClientWithFindProxy(proxyAddress);
-  isClientOk = await testClient(client, url);
-  print("Proxy access (findProxy): ${isClientOk ? "OK" : "FAILED"}");
-  client.close(force: true);
-
-  final proxyUri = Uri.parse("http://$proxyAddress");
-  client = makeClientWithConnectionFactory(proxyUri.host, proxyUri.port);
-  isClientOk = await testClient(client, url);
-  print("Proxy access (HTTP CONNECT): ${isClientOk ? "OK" : "FAILED"}");
-
-  if (isClientOk) {
-    try {
-      var request = await client.getUrl(url);
-      var response = await request.close();
-      
-      if (response.statusCode == 200) {
-        print('Page fetched successfully:');
-        // Read the response body
-        await for (var contents in response.transform(utf8.decoder)) {
-          print(contents);
-        }
-      } else {
-        print('Failed to fetch page: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error fetching page: $e');
-    } finally {
-      client.close();
-    }
+  // HttpClient client = HttpClient();
+  // bool isClientOk = await testIoClient(client, url);
+  // print("Direct access: ${isClientOk ? "OK" : "FAILED"}");
+  // client.close(force: true);
+  {
+    final client = makeRemapClient(proxyAddress);
+    var isClientOk = await testHttpClient(client, url);
+    print("Direct access (RemapClient): ${isClientOk ? "OK" : "FAILED"}");
+    client.close();
   }
-  client.close();
+
+  // try {
+  //   var client = http.Client();
+  //   isClientOk = await testHttpClient(client, url);
+  //   print("Direct access (http.Client): ${isClientOk ? "OK" : "FAILED"}");
+  // } finally {
+  //   client.close();
+  // }
+
+  // client = makeClientWithFindProxy(proxyAddress);
+  // isClientOk = await testIoClient(client, url);
+  // print("Proxy access (findProxy): ${isClientOk ? "OK" : "FAILED"}");
+  // client.close(force: true);
+
+  // final proxyUri = Uri.parse("http://$proxyAddress");
+  // client = makeClientWithConnectionFactory(proxyUri.host, proxyUri.port);
+  // isClientOk = await testIoClient(client, url);
+  // print("Proxy access (HTTP CONNECT): ${isClientOk ? "OK" : "FAILED"}");
+
+  // if (isClientOk) {
+  //   try {
+  //     var request = await client.getUrl(url);
+  //     var response = await request.close();
+
+  //     if (response.statusCode == 200) {
+  //       print('Page fetched successfully:');
+  //       // Read the response body
+  //       await for (var contents in response.transform(utf8.decoder)) {
+  //         print(contents);
+  //       }
+  //     } else {
+  //       print('Failed to fetch page: ${response.statusCode}');
+  //     }
+  //   } catch (e) {
+  //     print('Error fetching page: $e');
+  //   } finally {
+  //     client.close();
+  //   }
+  // }
+  // client.close();
 }
