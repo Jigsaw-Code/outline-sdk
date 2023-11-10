@@ -107,7 +107,7 @@ Future<ConnectionTask<Socket>> connectHttp(String proxyHost, int proxyPort, Stri
 //   return completer.future;
 // }
 
-HttpClient makeClientWithSocketFactory(String proxyHost, int proxyPort) {
+HttpClient makeClientWithConnectionFactory(String proxyHost, int proxyPort) {
   var client = HttpClient();
   // Configure proxy
   client.connectionFactory = (uri, nullHost, nullPort) async {
@@ -126,13 +126,15 @@ HttpClient makeClientWithSocketFactory(String proxyHost, int proxyPort) {
     //   SecureSocket.s
     // }
 
-    if (uri.host == "direct.example.com") {
-       return Socket.startConnect(uri.host, uri.port);
-    }
+    var connectHost = uri.host;
     if (uri.host == "www.rferl.org") {
-       return Socket.startConnect("e4887.dscb.akamaiedge.net", uri.port);
+       connectHost = "e4887.dscb.akamaiedge.net";
     }
-    return Socket.startConnect(uri.host, uri.port);
+    if (uri.scheme == "https") {
+      return SecureSocket.startConnect(connectHost, uri.port);
+    }
+    return Socket.startConnect(connectHost, uri.port);
+    // This results in Bad state: Stream has already been listened to.
     // return connectHttp(proxyHost, proxyPort, uri.host, uri.port);
     // var request = await proxyClient.openUrl("CONNECT", Uri(host: proxyUri.host, port: proxyUri.port));
     // if (uri.scheme == "https") {
@@ -211,7 +213,7 @@ void main(List<String> arguments) async {
   client.close(force: true);
 
   final proxyUri = Uri.parse("http://$proxyAddress");
-  client = makeClientWithSocketFactory(proxyUri.host, proxyUri.port);
+  client = makeClientWithConnectionFactory(proxyUri.host, proxyUri.port);
   isClientOk = await testClient(client, url);
   print("Proxy access (HTTP CONNECT): ${isClientOk ? "OK" : "FAILED"}");
 
