@@ -15,40 +15,106 @@
 package reporter
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 )
 
 // When success is true and random number is less than successSampleRate, report is sent successfully
 func TestSendReportSuccessfully(t *testing.T) {
-	// Example JSON data
-	jsonData := `{
-		"proxy": "192.168.1.1:65000",
-		"transport": "shadowsocks",
-		"resolver": "8.8.8.8:53",
-		"proto": "tcp",
-		"prefix": "HTTP1/1",
-		"time": "2021-01-01T00:00:00Z",
-		"durationMs": 100,
+	// Example test data
+	type ConnectivitySetup struct {
+		Proxy    string `json:"proxy"`
+		Resolver string `json:"resolver"`
+		Proto    string `json:"proto"`
+		Prefix   string `json:"prefix"`
+	}
+	var testSetup = ConnectivitySetup{
+		Proxy:    "testProxy",
+		Resolver: "8.8.8.8",
+		Proto:    "udp",
+		Prefix:   "HTTP1/1",
+	}
+	type ConnectivityError struct {
+		Op         string `json:"operation"`
+		PosixError string `json:"posixError"`
+		Msg        string `json:"msg"`
+	}
+	var testErr = ConnectivityError{
+		Op:         "read",
+		PosixError: "ETIMEDOUT",
+		Msg:        "i/o timeout",
+	}
+	var report = ConnectivityReport{
+		Connection: testSetup,
+		Time:       time.Now().UTC().Truncate(time.Second),
+		DurationMs: 1,
+		Error:      &testErr,
+	}
+
+	var c = Config{}
+	err := c.SetFractions(1.0, 1.0)
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+	err = c.SetURL("https://example.com")
+
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+	err = report.Transmit(c)
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+}
+
+func TestFromJSON(t *testing.T) {
+	var testJSON = []byte(`{
+		"connection": {
+			"proxy": "testProxy",
+			"resolver": "8.8.8.8",
+			"proto": "udp",
+			"prefix": "HTTP1/1"
+		},
+		"time": "2021-07-01T00:00:00Z",
+		"durationMs": 1,
 		"error": {
 			"operation": "read",
 			"posixError": "ETIMEDOUT",
 			"msg": "i/o timeout"
 		}
-	}`
-	var testReport Report
-	err := json.Unmarshal([]byte(jsonData), &testReport.logRecord)
+	}`)
+	var report = ConnectivityReport{}
+	type ConnectivityError struct {
+		Op         string `json:"operation"`
+		PosixError string `json:"posixError"`
+		Msg        string `json:"msg"`
+	}
+	type ConnectivitySetup struct {
+		Proxy    string `json:"proxy"`
+		Resolver string `json:"resolver"`
+		Proto    string `json:"proto"`
+		Prefix   string `json:"prefix"`
+	}
+	report.Connection = &ConnectivitySetup{}
+	report.Error = &ConnectivityError{}
+	err := report.FromJSON(testJSON)
+	fmt.Println(report.Error)
+	fmt.Println(report)
 	if err != nil {
-		fmt.Println(err)
 		t.Errorf("Expected no error, but got: %v", err)
 	}
-	testReport.config.reportTo = "https://script.google.com/macros/s/AKfycbzoMBmftQaR9Aw4jzTB-w4TwkDjLHtSfBCFhh4_2NhTEZAUdj85Qt8uYCKCNOEAwCg4/exec"
-	testReport.success = true
-	testReport.config.successFraction = 1.0
-	testReport.config.failureFraction = 0.0
+	var c = Config{}
+	err = c.SetFractions(1.0, 1.0)
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+	err = c.SetURL("https://example.com")
 
-	err = testReport.Collect()
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+	err = report.Transmit(c)
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
