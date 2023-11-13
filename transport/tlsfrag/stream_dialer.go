@@ -130,14 +130,21 @@ func (d *tlsFragDialer) Dial(ctx context.Context, raddr string) (conn transport.
 	}
 	for _, addr := range d.config.addrs {
 		if addr.matches(raddr) {
-			w, err := newClientHelloFragWriter(conn, d.frag)
-			if err != nil {
-				return nil, err
-			}
-			return transport.WrapConn(conn, conn, w), nil
+			return WrapConnFunc(conn, d.frag)
 		}
 	}
 	return
+}
+
+// WrapConnFunc wraps the base [transport.StreamConn] and splits the first TLS Client Hello packet into two records
+// according to the frag function. Subsequent data is forwarded without modification. If the first packet isn't a valid
+// Client Hello, WrapConnFunc simply forwards all data through transparently.
+func WrapConnFunc(base transport.StreamConn, frag FragFunc) (transport.StreamConn, error) {
+	w, err := newClientHelloFragWriter(base, frag)
+	if err != nil {
+		return nil, err
+	}
+	return transport.WrapConn(base, base, w), nil
 }
 
 // tlsAddrEntry reprsents an entry of the TLS traffic list. See [WithTLSHostPortList].
