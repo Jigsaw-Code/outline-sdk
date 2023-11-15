@@ -25,9 +25,11 @@ import (
 // are not modified and are directly transmitted through the base [io.Writer].
 type clientHelloFragWriter struct {
 	base io.Writer
-	done bool
+	done bool // indicates all splitted rcds have been already written to base
 	frag FragFunc
-	buf  *clientHelloBuffer
+
+	buf  *clientHelloBuffer // the buffer containing and parsing a TLS Client Hello record
+	rcds *bytes.Buffer      // the buffer containing splitted records what will be written to base
 }
 
 // clientHelloFragReaderFrom serves as an optimized version of clientHelloFragWriter when the base [io.Writer] also
@@ -68,57 +70,31 @@ func newClientHelloFragWriter(base io.Writer, frag FragFunc) (io.Writer, error) 
 
 // Write implements io.Writer.Write. It attempts to split the data received in the first one or more Write call(s)
 // into two TLS records if the data corresponds to a TLS Client Hello record.
-//
-// Internally, this function maintains a state machine with the following states:
-//   - S: reading the first client hello record and appending the data to w.buf
-//   - F: the first client hello record has been read, fragmenting and writing to w.base
-//   - T: forwarding all remaining packets without modification
-//
-// Here is the transition graph:
-//
-//	S ----(full handshake read)----> F -----> T
-//	|                                         ^
-//	|                                         |
-//	+-----(invalid TLS handshake)-------------+
-func (w *clientHelloFragWriter) Write(p []byte) (written int, err error) {
-	// T: optimize to have fewer comparisons for the most common case.
+func (w *clientHelloFragWriter) Write(p []byte) (n int, err error) {
 	if w.done {
 		return w.base.Write(p)
 	}
-
-	// S
-	nr, e := w.buf.ReadFrom(bytes.NewBuffer(p))
-
-	// S -> T
-	if errors.Is(e, errInvalidTLSClientHello) {
-		goto FlushBufAndDone
+	if w.rcds != nil {
+		if _, err = w.flushRecords(); err != nil {
+			return
+		}
+		return w.base.Write(p)
 	}
 
-	// S < x < F, wait for the next write
-	if e != nil || !w.buf.HasFullyReceived() {
-		return int(nr), e
+	if n, err = w.buf.Write(p); err != nil {
+		if errors.Is(err, errTLSClientHelloFullyReceived) {
+			w.splitBufToRecords()
+		} else {
+			w.copyBufToRecords()
+		}
+		// recursively flush w.rcds and write the remaining content
+		m, e := w.Write(p[n:])
+		return n + m, e
 	}
 
-	// F
-	if err = w.buf.Split(w.frag(w.buf.Content())); err != nil {
-		return int(nr), err
+	if n < len(p) {
+		return n, io.ErrShortWrite
 	}
-
-	// * -> T (err must be nil)
-FlushBufAndDone:
-	w.done = true
-	nw, e := w.buf.WriteTo(w.base)
-	written += w.buf.BytesOverlapped(nr, nw)
-	w.buf = nil // allows the GC to recycle the memory
-
-	// If WriteTo failed, no need to write more data
-	if err = e; err != nil {
-		return
-	}
-
-	m, e := w.base.Write(p[nr:])
-	written += m
-	err = e
 	return
 }
 
@@ -129,36 +105,65 @@ FlushBufAndDone:
 // If the first packet is not a valid TLS Client Hello, everything from r gets copied to the base io.Writer as is.
 //
 // It returns the number of bytes read. Any error except EOF encountered during the read is also returned.
-//
-// Internally, it uses a similar state machine to the one mentioned in w.Write. But the transition is simplier because
-// we expect r containing all the data (while the first packet might be consisted of multiple Writes in Write).
 func (w *clientHelloFragReaderFrom) ReadFrom(r io.Reader) (n int64, err error) {
-	// T
 	if w.done {
 		return w.baseRF.ReadFrom(r)
 	}
-
-	// S & F
-	nr, e := w.buf.ReadFrom(r)
-	if err = e; err == nil && w.buf.HasFullyReceived() {
-		err = w.buf.Split(w.frag(w.buf.Content()))
-	} else if errors.Is(err, errInvalidTLSClientHello) {
-		err = nil
+	if w.rcds != nil {
+		if _, err = w.flushRecords(); err != nil {
+			return
+		}
+		return w.baseRF.ReadFrom(r)
 	}
 
-	// * -> T (err might be non-nil, but we still need to flush data to w.base)
-	w.done = true
-	nw, e := w.buf.WriteTo(w.base)
-	n += int64(w.buf.BytesOverlapped(nr, nw))
-	w.buf = nil // allows the GC to recycle the memory
+	if n, err = w.buf.ReadFrom(r); err != nil {
+		if errors.Is(err, errTLSClientHelloFullyReceived) {
+			w.splitBufToRecords()
+		} else {
+			w.copyBufToRecords()
+		}
+		// recursively flush w.rcds and read the remaining content from r
+		m, e := w.ReadFrom(r)
+		return n + m, e
+	}
+	return
+}
 
-	// If WriteTo failed, no need to write more data
-	if err = errors.Join(err, e); e != nil {
+// copyBuf copies w.buf into w.rcds.
+func (w *clientHelloFragWriter) copyBufToRecords() {
+	w.rcds = bytes.NewBuffer(w.buf.Bytes())
+	w.buf = nil // allows the GC to recycle the memory
+}
+
+// splitBuf splits w.buf into two records and put them into w.rcds.
+func (w *clientHelloFragWriter) splitBufToRecords() {
+	content := w.buf.Bytes()[recordHeaderLen:]
+	split := w.frag(content)
+	if split <= 0 || split >= len(content) {
+		w.copyBufToRecords()
 		return
 	}
 
-	m, e := w.baseRF.ReadFrom(r)
-	n += m
-	err = e
-	return
+	header := make([]byte, recordHeaderLen)
+	w.rcds = bytes.NewBuffer(make([]byte, 0, w.buf.Len()+recordHeaderLen))
+
+	putTLSClientHelloHeader(header, uint16(split))
+	w.rcds.Write(header)
+	w.rcds.Write(content[:split])
+
+	putTLSClientHelloHeader(header, uint16(len(content)-split))
+	w.rcds.Write(header)
+	w.rcds.Write(content[split:])
+
+	w.buf = nil // allows the GC to recycle the memory
+}
+
+// flushRecords writes all bytes from w.rcds to base.
+func (w *clientHelloFragWriter) flushRecords() (int, error) {
+	n, err := io.Copy(w.base, w.rcds)
+	if w.rcds.Len() == 0 {
+		w.rcds = nil // allows the GC to recycle the memory
+		w.done = true
+	}
+	return int(n), err
 }
