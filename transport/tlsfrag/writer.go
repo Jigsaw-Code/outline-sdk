@@ -87,9 +87,17 @@ func (w *clientHelloFragWriter) Write(p []byte) (n int, err error) {
 		} else {
 			w.copyBufToRecords()
 		}
-		// recursively flush w.rcds and write the remaining content
-		m, e := w.Write(p[n:])
-		return n + m, e
+		// We did not call w.Write(p[n:]) here because p[n:] might be empty, and we don't want to
+		// Write an empty buffer to w.base if it's not initiated by the upstream caller.
+		if _, err = w.flushRecords(); err != nil {
+			return
+		}
+		if p = p[n:]; len(p) > 0 {
+			m, e := w.base.Write(p)
+			n += m
+			err = e
+		}
+		return
 	}
 
 	if n < len(p) {
