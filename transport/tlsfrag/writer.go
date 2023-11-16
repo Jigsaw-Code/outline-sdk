@@ -145,13 +145,15 @@ func (w *clientHelloFragWriter) splitBufToRecords() {
 	}
 
 	header := make([]byte, recordHeaderLen)
+	copy(header, w.buf.Bytes())
+
 	w.rcds = bytes.NewBuffer(make([]byte, 0, w.buf.Len()+recordHeaderLen))
 
-	putTLSClientHelloHeader(header, uint16(split))
+	putMsgLen(header, uint16(split))
 	w.rcds.Write(header)
 	w.rcds.Write(content[:split])
 
-	putTLSClientHelloHeader(header, uint16(len(content)-split))
+	putMsgLen(header, uint16(len(content)-split))
 	w.rcds.Write(header)
 	w.rcds.Write(content[split:])
 

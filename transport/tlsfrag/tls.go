@@ -20,7 +20,7 @@ import (
 
 // This file contains helper functions and constants for TLS Client Hello message.
 
-type recordType uint8
+type recordType byte
 type tlsVersion uint16
 
 // TLS record layout from [RFC 8446]:
@@ -46,9 +46,6 @@ type tlsVersion uint16
 //
 // [RFC 8446]: https://datatracker.ietf.org/doc/html/rfc8446#section-5.1
 const (
-	tlsRecordWithTypeSize          = 1 // the minimum size that contains record type
-	tlsRecordWithVersionHeaderSize = 3 // the minimum size that contains protocol version
-
 	recordHeaderLen = 5
 	maxMsgLen       = 1 << 14
 
@@ -65,19 +62,9 @@ func getRecordType(hdr []byte) recordType {
 	return recordType(hdr[0])
 }
 
-// putRecordType puts the TLS record type to the TLS header hdr[0]. This function will panic if len(hdr) < 1.
-func putRecordType(hdr []byte, typ recordType) {
-	hdr[0] = byte(typ)
-}
-
 // getTLSVersion gets the TLS version from the TLS header hdr[1:3]. This function will panic if len(hdr) < 3.
 func getTLSVersion(hdr []byte) tlsVersion {
 	return tlsVersion(binary.BigEndian.Uint16(hdr[1:]))
-}
-
-// putTLSVersion puts the TLS version to the TLS header hdr[1:3]. This function will panic if len(hdr) < 3.
-func putTLSVersion(hdr []byte, ver tlsVersion) {
-	binary.BigEndian.PutUint16(hdr[1:], uint16(ver))
 }
 
 // getMsgLen gets the TLS message length from the TLS header hdr[3:5]. This function will panic if len(hdr) < 5.
@@ -105,12 +92,4 @@ func isValidTLSVersion(ver tlsVersion) bool {
 // isValidRecordLenForHandshake checks whether 0 < len ≤ 2^14.
 func isValidMsgLenForHandshake(len uint16) bool {
 	return 0 < len && len <= maxMsgLen
-}
-
-// This function will panic if len(hdr) < 5.
-func putTLSClientHelloHeader(hdr []byte, recordLen uint16) {
-	_ = hdr[recordHeaderLen-1] // bounds check to guarantee safety of writes below
-	putRecordType(hdr, recordTypeHandshake)
-	putTLSVersion(hdr, versionTLS10)
-	putMsgLen(hdr, recordLen)
 }
