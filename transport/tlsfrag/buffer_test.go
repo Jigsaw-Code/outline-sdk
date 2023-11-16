@@ -16,10 +16,66 @@ package tlsfrag
 
 import (
 	"bytes"
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+// Test Write valid Client Hello to the buffer.
+func TestWriteValidClientHello(t *testing.T) {
+	for _, tc := range validClientHelloTestCases() {
+		buf := newClientHelloBuffer()
+
+		totalExpectedBytes := []byte{}
+		for k, pkt := range tc.pkts {
+			n, err := buf.Write(pkt)
+			if k < tc.expectLastPkt {
+				require.NoError(t, err, tc.msg+": pkt-%d", k)
+			} else {
+				require.ErrorIs(t, err, errTLSClientHelloFullyReceived, tc.msg+": pkt-%d", k)
+			}
+			require.Equal(t, len(pkt)-len(tc.expectRemaining[k]), n, tc.msg+": pkt-%d", k)
+			require.Equal(t, tc.expectRemaining[k], pkt[n:], tc.msg+": pkt-%d", k)
+
+			totalExpectedBytes = append(totalExpectedBytes, pkt[:n]...)
+			require.Equal(t, len(totalExpectedBytes), buf.Len(), tc.msg+": pkt-%d", k)
+			require.Equal(t, totalExpectedBytes, buf.Bytes(), tc.msg+": pkt-%d", k)
+		}
+		require.Equal(t, len(tc.expectTotalPkt), buf.Len(), tc.msg)
+		require.Equal(t, tc.expectTotalPkt, buf.Bytes(), tc.msg)
+	}
+}
+
+// Test ReadFrom Reader(s) containing valid Client Hello.
+func TestReadFromValidClientHello(t *testing.T) {
+	for _, tc := range validClientHelloTestCases() {
+		buf := newClientHelloBuffer()
+
+		totalExpectedBytes := []byte{}
+		for k, pkt := range tc.pkts {
+			r := bytes.NewBuffer(pkt)
+			require.Equal(t, len(pkt), r.Len(), tc.msg+": pkt-%d", k)
+
+			n, err := buf.ReadFrom(r)
+			if k < tc.expectLastPkt {
+				require.NoError(t, err, tc.msg+": pkt-%d", k)
+			} else {
+				require.ErrorIs(t, err, errTLSClientHelloFullyReceived, tc.msg+": pkt-%d", k)
+			}
+			require.Equal(t, len(pkt)-len(tc.expectRemaining[k]), int(n), tc.msg+": pkt-%d", k)
+			require.Equal(t, tc.expectRemaining[k], pkt[n:], tc.msg+": pkt-%d", k)
+
+			totalExpectedBytes = append(totalExpectedBytes, pkt[:n]...)
+			require.Equal(t, len(totalExpectedBytes), buf.Len(), tc.msg+": pkt-%d", k)
+			require.Equal(t, totalExpectedBytes, buf.Bytes(), tc.msg+": pkt-%d", k)
+			require.Equal(t, len(tc.expectRemaining[k]), r.Len(), tc.msg+": pkt-%d", k)
+			require.Equal(t, tc.expectRemaining[k], r.Bytes(), tc.msg+": pkt-%d", k)
+		}
+		require.Equal(t, len(tc.expectTotalPkt), buf.Len(), tc.msg)
+		require.Equal(t, tc.expectTotalPkt, buf.Bytes(), tc.msg)
+	}
+}
 
 // Example TLS Client Hello packet copied from https://tls13.xargs.org/#client-hello
 // Total Len = 253, ContentLen = 253 - 5 = 248
@@ -39,93 +95,48 @@ var exampleTLS13ClientHello = []byte{
 	0x21, 0xa2, 0x8e, 0x3b, 0x75, 0xe9, 0x65, 0xd0, 0xd2, 0xcd, 0x16, 0x62, 0x54,
 }
 
-// Test ReadFrom a Reader containing exactly one Client Hello record.
-func TestReadFromClientHelloSingleReader(t *testing.T) {
-	buf := newClientHelloBuffer()
-	r := bytes.NewBuffer(exampleTLS13ClientHello)
-	require.Equal(t, 253, r.Len())
-
-	n, err := buf.ReadFrom(r)
-	require.NoError(t, err)
-	require.Equal(t, 253, int(n))
-	require.Equal(t, 0, r.Len())
-
-	require.True(t, buf.HasFullyReceived())
-	require.Equal(t, exampleTLS13ClientHello[5:], buf.Content())
-	require.Equal(t, 248, len(buf.Content()))
+type validClientHelloCase struct {
+	msg             string
+	pkts            net.Buffers
+	expectTotalPkt  []byte
+	expectLastPkt   int // the index of the expected last packet
+	expectRemaining net.Buffers
 }
 
-// Test ReadFrom multiple Readers containing exactly one Client Hello record.
-func TestReadFromClientHelloMultipleReaders(t *testing.T) {
-	buf := newClientHelloBuffer()
-	r1 := bytes.NewBuffer(exampleTLS13ClientHello[:2])
-	r2 := bytes.NewBuffer(exampleTLS13ClientHello[2:123])
-	r3 := bytes.NewBuffer(exampleTLS13ClientHello[123:])
-
-	require.Equal(t, 2, r1.Len())
-	n, err := buf.ReadFrom(r1)
-	require.NoError(t, err)
-	require.Equal(t, 2, int(n))
-	require.Equal(t, 0, r1.Len())
-	require.False(t, buf.HasFullyReceived())
-
-	require.Equal(t, 123-2, r2.Len())
-	n, err = buf.ReadFrom(r2)
-	require.NoError(t, err)
-	require.Equal(t, 123-2, int(n))
-	require.Equal(t, 0, r2.Len())
-	require.False(t, buf.HasFullyReceived())
-
-	require.Equal(t, 253-123, r3.Len())
-	n, err = buf.ReadFrom(r3)
-	require.NoError(t, err)
-	require.Equal(t, 253-123, int(n))
-	require.Equal(t, 0, r3.Len())
-
-	require.True(t, buf.HasFullyReceived())
-	require.Equal(t, exampleTLS13ClientHello[5:], buf.Content())
-	require.Equal(t, 248, len(buf.Content()))
-}
-
-// Test ReadFrom a Reader containing Client Hello and 8 more extra bytes.
-func TestReadFromClientHelloExtraBytesSingleReader(t *testing.T) {
-	buf := newClientHelloBuffer()
-	r := bytes.NewBuffer(append(exampleTLS13ClientHello, 0x88, 0x87, 0x86, 0x85, 0x84, 0x83, 0x82, 0x81))
-	require.Equal(t, 261, r.Len())
-
-	n, err := buf.ReadFrom(r)
-	require.NoError(t, err)
-	require.Equal(t, 253, int(n))
-	require.Equal(t, 8, r.Len())
-
-	require.True(t, buf.HasFullyReceived())
-	require.Equal(t, exampleTLS13ClientHello[5:], buf.Content())
-	require.Equal(t, 248, len(buf.Content()))
-	require.Equal(t, []byte{0x88, 0x87, 0x86, 0x85, 0x84, 0x83, 0x82, 0x81}, r.Bytes())
-}
-
-// Test ReadFrom multiple Readers containing Client Hello and 8 more extra bytes.
-func TestReadFromClientHelloExtraBytesMultipleReaders(t *testing.T) {
-	buf := newClientHelloBuffer()
-	pkt := append(exampleTLS13ClientHello, 0x88, 0x87, 0x86, 0x85, 0x84, 0x83, 0x82, 0x81)
-	r1 := bytes.NewBuffer(pkt[:123])
-	r2 := bytes.NewBuffer(pkt[123:])
-
-	require.Equal(t, 123, r1.Len())
-	n, err := buf.ReadFrom(r1)
-	require.NoError(t, err)
-	require.Equal(t, 123, int(n))
-	require.Equal(t, 0, r1.Len())
-	require.False(t, buf.HasFullyReceived())
-
-	require.Equal(t, 261-123, r2.Len())
-	n, err = buf.ReadFrom(r2)
-	require.NoError(t, err)
-	require.Equal(t, 261-123-8, int(n))
-	require.Equal(t, 8, r2.Len())
-
-	require.True(t, buf.HasFullyReceived())
-	require.Equal(t, exampleTLS13ClientHello[5:], buf.Content())
-	require.Equal(t, 248, len(buf.Content()))
-	require.Equal(t, []byte{0x88, 0x87, 0x86, 0x85, 0x84, 0x83, 0x82, 0x81}, r2.Bytes())
+// generating test cases that contain one valid Client Hello
+func validClientHelloTestCases() []validClientHelloCase {
+	return []validClientHelloCase{
+		{
+			msg:             "full client hello in single buffer",
+			pkts:            [][]byte{exampleTLS13ClientHello},
+			expectTotalPkt:  exampleTLS13ClientHello,
+			expectLastPkt:   0,
+			expectRemaining: [][]byte{{}},
+		},
+		{
+			msg:             "full client hello with extra bytes",
+			pkts:            [][]byte{append(exampleTLS13ClientHello, 0x88, 0x87, 0x86, 0x85, 0x84, 0x83, 0x82, 0x81)},
+			expectTotalPkt:  exampleTLS13ClientHello,
+			expectLastPkt:   0,
+			expectRemaining: [][]byte{{0x88, 0x87, 0x86, 0x85, 0x84, 0x83, 0x82, 0x81}},
+		},
+		{
+			msg:             "client hello in three buffers",
+			pkts:            [][]byte{exampleTLS13ClientHello[:2], exampleTLS13ClientHello[2:123], exampleTLS13ClientHello[123:]},
+			expectTotalPkt:  exampleTLS13ClientHello,
+			expectLastPkt:   2,
+			expectRemaining: [][]byte{{}, {}, {}},
+		},
+		{
+			msg: "client hello in three buffers with extra bytes",
+			pkts: [][]byte{
+				exampleTLS13ClientHello[:2],
+				exampleTLS13ClientHello[2:123],
+				append(exampleTLS13ClientHello[123:], 0x88, 0x87, 0x86, 0x85, 0x84, 0x83, 0x82, 0x81),
+			},
+			expectTotalPkt:  exampleTLS13ClientHello,
+			expectLastPkt:   2,
+			expectRemaining: [][]byte{{}, {}, {0x88, 0x87, 0x86, 0x85, 0x84, 0x83, 0x82, 0x81}},
+		},
+	}
 }

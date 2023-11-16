@@ -32,10 +32,10 @@ var (
 
 // clientHelloBuffer is a byte buffer used to receive and buffer a TLS Client Hello packet.
 type clientHelloBuffer struct {
-	data   []byte // the buffer that hosts both header and content, cap: 5 -> 5+len(content)
-	len    int    // the number of bytes that have already been read into data
+	data   []byte // the buffer that hosts both header and content, len: 5 -> 5+len(content)
+	len    int    // the actual bytes that have been read into data
 	valid  bool   // indicate whether the content in data is a valid TLS Client Hello record
-	toRead int    // the number of bytes to read next, e.g. 1 -> 2 -> 2 -> len(content)
+	toRead int    // the number of bytes to read next, e.g. 5 -> len(content)
 }
 
 var _ io.Writer = (*clientHelloBuffer)(nil)
@@ -46,9 +46,8 @@ func newClientHelloBuffer() *clientHelloBuffer {
 	// Allocate the 5 bytes header first, and then reallocate it to contain the entire packet later
 	return &clientHelloBuffer{
 		data:   make([]byte, recordHeaderLen),
-		len:    0,
 		valid:  true,
-		toRead: tlsRecordWithTypeSize,
+		toRead: recordHeaderLen,
 	}
 }
 
@@ -62,12 +61,6 @@ func (b *clientHelloBuffer) Bytes() []byte {
 	return b.data[:b.len]
 }
 
-func (b *clientHelloBuffer) growBy(size int) {
-	buf := make([]byte, b.len+size)
-	copy(buf, b.data[:b.len])
-	b.data = buf
-}
-
 // Write appends p to the buffer and returns the number of bytes actually used.
 // If this data completes a valid TLS Client Hello, it returns errTLSClientHelloFullyReceived.
 // If an invalid TLS Client Hello message is detected, it returns the error errInvalidTLSClientHello.
@@ -78,46 +71,26 @@ func (b *clientHelloBuffer) Write(p []byte) (n int, err error) {
 		return 0, errInvalidTLSClientHello
 	}
 
-	defer func() { b.valid = !errors.Is(err, errInvalidTLSClientHello) }()
+	for b.len < len(b.data) && len(p) > 0 {
+		m := copy(b.data[b.len:], p)
+		n += m
+		b.len += m
+		p = p[m:]
 
-	for b.toRead > 0 {
-		if len(p) == 0 {
-			return
-		}
-
-		sz := b.toRead
-		if len(p) < sz {
-			sz = len(p)
-		}
-		copy(b.data[b.len:], p[:sz])
-		n += sz
-		b.len += sz
-		b.toRead -= sz
-		p = p[sz:]
-
-		// check whether message is valid according to the bytes just read
-		switch b.len {
-		case tlsRecordWithTypeSize: // 1
-			if typ := getRecordType(b.data); typ != recordTypeHandshake {
-				return n, fmt.Errorf("record type %d is not handshake: %w", typ, errInvalidTLSClientHello)
+		if b.len == recordHeaderLen {
+			if err = b.validateTLSClientHello(); err != nil {
+				return
 			}
-			b.toRead = tlsRecordWithVersionHeaderSize - tlsRecordWithTypeSize // +2
-
-		case tlsRecordWithVersionHeaderSize: // 3
-			if ver := getTLSVersion(b.data); !isValidTLSVersion(ver) {
-				return n, fmt.Errorf("%#04x is not a valid TLS version: %w", ver, errInvalidTLSClientHello)
-			}
-			b.toRead = recordHeaderLen - tlsRecordWithVersionHeaderSize // +2
-
-		case recordHeaderLen: // 5
-			if b.toRead = int(getMsgLen(b.data)); !isValidMsgLenForHandshake(uint16(b.toRead)) {
-				return n, fmt.Errorf("message length %v out of range: %w", b.toRead, errInvalidTLSClientHello)
-			}
-			b.growBy(b.toRead)
+			buf := make([]byte, recordHeaderLen+getMsgLen(b.data))
+			copy(buf, b.data)
+			b.data = buf
 		}
 	}
 
-	return n, errTLSClientHelloFullyReceived
+	if b.len == len(b.data) {
+		err = errTLSClientHelloFullyReceived
+	}
+	return
 }
 
 // ReadFrom reads all the data from r and appends it to this buffer until a complete Client Hello packet has been
@@ -130,5 +103,51 @@ func (b *clientHelloBuffer) Write(p []byte) (n int, err error) {
 //
 // You can call ReadFrom multiple times if r doesn't provide enough data to build a complete Client Hello packet.
 func (b *clientHelloBuffer) ReadFrom(r io.Reader) (n int64, err error) {
-	return 0, errors.New("to be implemented")
+	if !b.valid {
+		return 0, errInvalidTLSClientHello
+	}
+
+	for b.len < len(b.data) && err == nil {
+		m, e := r.Read(b.data[b.len:])
+		n += int64(m)
+		b.len += m
+		err = e
+
+		if b.len == recordHeaderLen {
+			if e := b.validateTLSClientHello(); e != nil {
+				if err == io.EOF {
+					err = nil
+				}
+				err = errors.Join(err, e)
+				return
+			}
+			buf := make([]byte, recordHeaderLen+getMsgLen(b.data))
+			copy(buf, b.data)
+			b.data = buf
+		}
+	}
+
+	if err == io.EOF {
+		err = nil
+	}
+	if b.len == len(b.data) {
+		err = errors.Join(err, errTLSClientHelloFullyReceived)
+	}
+	return
+}
+
+func (b *clientHelloBuffer) validateTLSClientHello() error {
+	if typ := getRecordType(b.data); typ != recordTypeHandshake {
+		b.valid = false
+		return fmt.Errorf("record type %d is not handshake: %w", typ, errInvalidTLSClientHello)
+	}
+	if ver := getTLSVersion(b.data); !isValidTLSVersion(ver) {
+		b.valid = false
+		return fmt.Errorf("%#04x is not a valid TLS version: %w", ver, errInvalidTLSClientHello)
+	}
+	if len := getMsgLen(b.data); !isValidMsgLenForHandshake(len) {
+		b.valid = false
+		return fmt.Errorf("message length %v out of range: %w", len, errInvalidTLSClientHello)
+	}
+	return nil
 }
