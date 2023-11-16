@@ -17,12 +17,13 @@ package reporter
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
+	"sort"
 	"time"
 )
 
@@ -38,68 +39,13 @@ type ConnectivityReport struct {
 	Error      interface{} `json:"error"`
 }
 
-type Configurer interface {
-	SetFractions() error
-	SetURL() error
-	// SetMode() error
+type Report interface {
+	IsSuccess() bool
+	CanMarshal() bool
 }
 
-type Config struct {
-	reportTo        string
-	successFraction float64
-	failureFraction float64
-	// Other possible config fields
-	// max_age      ints
-	// max_retry	int
-}
-
-func (c *Config) SetFractions(success, failure float64) error {
-	if success < 0 || success > 1 {
-		return errors.New("success fraction must be between 0 and 1")
-	}
-	if failure < 0 || failure > 1 {
-		return errors.New("failure fraction must be between 0 and 1")
-	}
-	c.successFraction = success
-	c.failureFraction = failure
-	return nil
-}
-
-func (c *Config) SetURL(url string) error {
-	if url == "" {
-		return errors.New("URL cannot be empty")
-	}
-	c.reportTo = url
-	return nil
-}
-
-type Reporter interface {
-	Transmit() error
-	ToJSON() error
-	// Configure() error
-	FromJSON() error
-	IsSuccessful() bool
-}
-
-func (r *ConnectivityReport) ToJSON() ([]byte, error) {
-	jsonData, err := json.Marshal(r)
-	if err != nil {
-		log.Printf("Error encoding JSON: %s\n", err)
-		return nil, err
-	}
-	return jsonData, nil
-}
-
-func (r *ConnectivityReport) FromJSON(jsonData []byte) error {
-	err := json.Unmarshal(jsonData, r)
-	if err != nil {
-		log.Printf("Error decoding JSON: %s\n", err)
-		return err
-	}
-	return nil
-}
-
-func (r *ConnectivityReport) IsSuccess() bool {
+// ConnectivityReport implements the Report interface
+func (r ConnectivityReport) IsSuccess() bool {
 	if r.Error == nil {
 		return true
 	} else {
@@ -107,48 +53,150 @@ func (r *ConnectivityReport) IsSuccess() bool {
 	}
 }
 
-func (r *ConnectivityReport) Transmit(c Config) error {
+// Makes sure the Report type can be marshalled into JSON
+func (r ConnectivityReport) CanMarshal() bool {
+	_, err := json.Marshal(r)
+	if err != nil {
+		log.Printf("Error encoding JSON: %s\n", err)
+		return false
+	} else {
+		return true
+	}
+}
+
+type Collector interface {
+	Collect(Report) error
+}
+
+type RemoteCollector struct {
+	collectorEndpoint *url.URL
+}
+
+type SamplingCollector struct {
+	collector       Collector
+	successFraction float64
+	failureFraction float64
+}
+
+type CollectorTarget struct {
+	collector Collector
+	priority  int
+	maxRetry  int
+}
+
+// TODO: implement a rotating collector
+type RotatingCollector struct {
+	collectors    []CollectorTarget
+	stopOnSuccess bool
+}
+
+// SortByPriority sorts the collectors based on their priority in ascending order
+func (rc *RotatingCollector) SortByPriority() {
+	sort.Slice(rc.collectors, func(i, j int) bool {
+		return rc.collectors[i].priority < rc.collectors[j].priority
+	})
+}
+
+func (c *RotatingCollector) Collect(report Report) error {
+	// sort collectors in RotatingCollector by priority
+	// into a new slice
+	c.SortByPriority()
+	for _, target := range c.collectors {
+		for i := 0; i < target.maxRetry; i++ {
+			err := target.collector.Collect(report)
+			if err != nil {
+				if err, ok := err.(StatusErr); ok {
+					switch {
+					case err.StatusCode == 500:
+						// skip retrying
+						break
+					case err.StatusCode == 408:
+						// wait for 1 second before retry
+						time.Sleep(time.Duration(1000 * time.Millisecond))
+					default:
+						break
+					}
+				} else {
+					return err
+				}
+			} else {
+				fmt.Println("Report sent")
+				if c.stopOnSuccess {
+					return nil
+				}
+				break
+			}
+		}
+	}
+	return nil
+}
+
+type StatusErr struct {
+	StatusCode int
+	Message    string
+}
+
+func (e StatusErr) Error() string {
+	return e.Message
+}
+
+func (c *RemoteCollector) Collect(report Report) error {
+	jsonData, err := json.Marshal(report)
+	var statusCode int
+	if err != nil {
+		log.Printf("Error encoding JSON: %s\n", err)
+		return err
+	}
+	statusCode, err = sendReport(jsonData, c.collectorEndpoint)
+	if err != nil {
+		log.Printf("Send report failed: %v", err)
+		return err
+	} else if statusCode > 400 {
+		return StatusErr{
+			StatusCode: statusCode,
+			Message:    fmt.Sprintf("HTTP request failed with status code %d", statusCode),
+		}
+	} else {
+		fmt.Println("Report sent")
+		return nil
+	}
+}
+
+func (c *SamplingCollector) Collect(report Report) error {
 	var samplingRate float64
-	if r.IsSuccess() {
+	if report.IsSuccess() {
 		samplingRate = c.successFraction
 	} else {
 		samplingRate = c.failureFraction
 	}
-	// Generate a random number between 0 and 1
+	// Generate a random float64 number between 0 and 1
 	random := rand.Float64()
 	if random < samplingRate {
-		jsonData, err := r.ToJSON()
+		err := c.collector.Collect(report)
 		if err != nil {
-			log.Printf("Error encoding JSON: %s\n", err)
+			log.Printf("Error collecting report: %v", err)
 			return err
 		}
-		err = sendReport(jsonData, c.reportTo)
-		if err != nil {
-			log.Printf("HTTP request failed: %v", err)
-			return err
-		} else {
-			fmt.Println("Report sent")
-			return nil
-		}
+		return nil
 	} else {
 		fmt.Println("Report was not sent this time")
 		return nil
 	}
 }
 
-func sendReport(jsonData []byte, collectorURL string) error {
-
-	req, err := http.NewRequest("POST", collectorURL, bytes.NewReader(jsonData))
+func sendReport(jsonData []byte, remote *url.URL) (int, error) {
+	// TODO: return status code of HTTP response
+	req, err := http.NewRequest("POST", remote.String(), bytes.NewReader(jsonData))
 	if err != nil {
 		debugLog.Printf("Error creating the HTTP request: %s\n", err)
-		return err
+		return 0, err
 	}
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf("Error sending the HTTP request: %s\n", err)
-		return err
+		return 0, err
 	}
 	defer resp.Body.Close()
 	// Access the HTTP response status code
@@ -156,8 +204,8 @@ func sendReport(jsonData []byte, collectorURL string) error {
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		debugLog.Printf("Error reading the HTTP response body: %s\n", err)
-		return err
+		return 0, err
 	}
 	debugLog.Printf("Response: %s\n", respBody)
-	return nil
+	return resp.StatusCode, nil
 }

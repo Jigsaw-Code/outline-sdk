@@ -16,105 +16,171 @@ package reporter
 
 import (
 	"fmt"
+	"net/url"
 	"testing"
 	"time"
 )
 
-// When success is true and random number is less than successSampleRate, report is sent successfully
-func TestSendReportSuccessfully(t *testing.T) {
-	// Example test data
-	type ConnectivitySetup struct {
-		Proxy    string `json:"proxy"`
-		Resolver string `json:"resolver"`
-		Proto    string `json:"proto"`
-		Prefix   string `json:"prefix"`
+type ConnectivitySetup struct {
+	Proxy    string `json:"proxy"`
+	Resolver string `json:"resolver"`
+	Proto    string `json:"proto"`
+	Prefix   string `json:"prefix"`
+}
+
+type ConnectivityError struct {
+	Op         string `json:"operation"`
+	PosixError string `json:"posixError"`
+	Msg        string `json:"msg"`
+}
+
+func TestIsSuccess(t *testing.T) {
+	var testReport = ConnectivityReport{
+		Connection: nil,
+		Time:       time.Now().UTC().Truncate(time.Second),
+		DurationMs: 1,
 	}
+
+	var r Report = testReport
+	if !r.IsSuccess() {
+		t.Errorf("Expected false, but got: %v", r.IsSuccess())
+	} else {
+		fmt.Println("IsSuccess Test Passed")
+	}
+}
+
+func TestSendReportSuccessfully(t *testing.T) {
 	var testSetup = ConnectivitySetup{
 		Proxy:    "testProxy",
 		Resolver: "8.8.8.8",
 		Proto:    "udp",
 		Prefix:   "HTTP1/1",
 	}
-	type ConnectivityError struct {
-		Op         string `json:"operation"`
-		PosixError string `json:"posixError"`
-		Msg        string `json:"msg"`
-	}
 	var testErr = ConnectivityError{
 		Op:         "read",
 		PosixError: "ETIMEDOUT",
 		Msg:        "i/o timeout",
 	}
-	var report = ConnectivityReport{
+	var testReport = ConnectivityReport{
 		Connection: testSetup,
 		Time:       time.Now().UTC().Truncate(time.Second),
 		DurationMs: 1,
-		Error:      &testErr,
+		Error:      testErr,
 	}
 
-	var c = Config{}
-	err := c.SetFractions(1.0, 1.0)
+	var r Report = testReport
+	fmt.Printf("The test report shows success: %v\n", r.IsSuccess())
+	u, err := url.Parse("https://script.google.com/macros/s/AKfycbzoMBmftQaR9Aw4jzTB-w4TwkDjLHtSfBCFhh4_2NhTEZAUdj85Qt8uYCKCNOEAwCg4/exec")
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
-	err = c.SetURL("https://example.com")
-
-	if err != nil {
-		t.Errorf("Expected no error, but got: %v", err)
+	c := RemoteCollector{
+		collectorEndpoint: u,
 	}
-	err = report.Transmit(c)
+	err = c.Collect(r)
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
 }
 
-func TestFromJSON(t *testing.T) {
-	var testJSON = []byte(`{
-		"connection": {
-			"proxy": "testProxy",
-			"resolver": "8.8.8.8",
-			"proto": "udp",
-			"prefix": "HTTP1/1"
-		},
-		"time": "2021-07-01T00:00:00Z",
-		"durationMs": 1,
-		"error": {
-			"operation": "read",
-			"posixError": "ETIMEDOUT",
-			"msg": "i/o timeout"
+func TestSendReportUnsuccessfully(t *testing.T) {
+	var testReport = ConnectivityReport{
+		Connection: nil,
+		Time:       time.Now().UTC().Truncate(time.Second),
+		DurationMs: 1,
+	}
+	var r Report = testReport
+	fmt.Printf("The test report shows success: %v\n", r.IsSuccess())
+	u, err := url.Parse("https://google.com")
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+	c := RemoteCollector{
+		collectorEndpoint: u,
+	}
+	err = c.Collect(r)
+	if err == nil {
+		t.Errorf("Expected 405 error no error occurred!")
+	} else {
+		if err, ok := err.(StatusErr); ok {
+			if err.StatusCode != 405 {
+				t.Errorf("Expected 405 error no error occurred!")
+			}
 		}
-	}`)
-	var report = ConnectivityReport{}
-	type ConnectivityError struct {
-		Op         string `json:"operation"`
-		PosixError string `json:"posixError"`
-		Msg        string `json:"msg"`
 	}
-	type ConnectivitySetup struct {
-		Proxy    string `json:"proxy"`
-		Resolver string `json:"resolver"`
-		Proto    string `json:"proto"`
-		Prefix   string `json:"prefix"`
-	}
-	report.Connection = &ConnectivitySetup{}
-	report.Error = &ConnectivityError{}
-	err := report.FromJSON(testJSON)
-	fmt.Println(report.Error)
-	fmt.Println(report)
-	if err != nil {
-		t.Errorf("Expected no error, but got: %v", err)
-	}
-	var c = Config{}
-	err = c.SetFractions(1.0, 1.0)
-	if err != nil {
-		t.Errorf("Expected no error, but got: %v", err)
-	}
-	err = c.SetURL("https://example.com")
+}
 
+func TestSamplingCollector(t *testing.T) {
+	var testReport = ConnectivityReport{
+		Connection: nil,
+		Time:       time.Now().UTC().Truncate(time.Second),
+		DurationMs: 1,
+	}
+	var r Report = testReport
+	fmt.Printf("The test report shows success: %v\n", r.IsSuccess())
+	u, err := url.Parse("https://example.com")
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
-	err = report.Transmit(c)
+	c := SamplingCollector{
+		collector: &RemoteCollector{
+			collectorEndpoint: u,
+		},
+		successFraction: 0.5,
+		failureFraction: 0.1,
+	}
+	err = c.Collect(r)
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+}
+
+func TestRotatingCollector(t *testing.T) {
+	var testReport = ConnectivityReport{
+		Connection: nil,
+		Time:       time.Now().UTC().Truncate(time.Second),
+		DurationMs: 1,
+	}
+	var r Report = testReport
+	fmt.Printf("The test report shows success: %v\n", r.IsSuccess())
+	u1, err := url.Parse("https://example.com")
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+	u2, err := url.Parse("https://google.com")
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+	u3, err := url.Parse("https://script.google.com/macros/s/AKfycbzoMBmftQaR9Aw4jzTB-w4TwkDjLHtSfBCFhh4_2NhTEZAUdj85Qt8uYCKCNOEAwCg4/exec")
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+	c := RotatingCollector{
+		collectors: []CollectorTarget{
+			{collector: &RemoteCollector{
+				collectorEndpoint: u1,
+			},
+				priority: 1,
+				maxRetry: 2,
+			},
+			{
+				collector: &RemoteCollector{
+					collectorEndpoint: u2,
+				},
+				priority: 2,
+				maxRetry: 3,
+			},
+			{
+				collector: &RemoteCollector{
+					collectorEndpoint: u3,
+				},
+				priority: 3,
+				maxRetry: 2,
+			},
+		},
+		stopOnSuccess: false,
+	}
+	err = c.Collect(r)
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
