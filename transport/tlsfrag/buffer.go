@@ -45,7 +45,7 @@ var _ io.ReaderFrom = (*clientHelloBuffer)(nil)
 func newClientHelloBuffer() *clientHelloBuffer {
 	// Allocate the 5 bytes header first, and then reallocate it to contain the entire packet later
 	return &clientHelloBuffer{
-		data:   make([]byte, recordHeaderLen),
+		data:   make([]byte, 0, recordHeaderLen),
 		valid:  true,
 		toRead: recordHeaderLen,
 	}
