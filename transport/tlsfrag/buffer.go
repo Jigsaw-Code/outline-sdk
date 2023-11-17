@@ -51,11 +51,6 @@ func newClientHelloBuffer() *clientHelloBuffer {
 	}
 }
 
-// Len returns the length of this buffer including both the 5 bytes header and the content.
-func (b *clientHelloBuffer) Len() int {
-	return b.len
-}
-
 // Bytes returns the full Client Hello packet including both the 5 bytes header and the content.
 func (b *clientHelloBuffer) Bytes() []byte {
 	return b.data[:b.len]
