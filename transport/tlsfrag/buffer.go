@@ -53,7 +53,7 @@ func newClientHelloBuffer() *clientHelloBuffer {
 
 // Bytes returns the full Client Hello packet including both the 5 bytes header and the content.
 func (b *clientHelloBuffer) Bytes() []byte {
-	return b.data[:b.len]
+	return b.data
 }
 
 // Write appends p to the buffer and returns the number of bytes actually used.
