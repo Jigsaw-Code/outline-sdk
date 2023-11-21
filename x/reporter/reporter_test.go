@@ -15,7 +15,12 @@
 package reporter
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
@@ -42,10 +47,15 @@ func TestIsSuccess(t *testing.T) {
 	}
 
 	var r Report = testReport
-	if !r.IsSuccess() {
-		t.Errorf("Expected false, but got: %v", r.IsSuccess())
+	v, ok := r.(HasSuccess)
+	if !ok {
+		t.Error("Report is expected to implement HasSuccess interface, but it does not")
+	}
+	// since report does not have Error field, it should be successful
+	if v.IsSuccess() {
+		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
 	} else {
-		fmt.Println("IsSuccess Test Passed")
+		t.Errorf("Expected true, but got: %v", v.IsSuccess())
 	}
 }
 
@@ -69,7 +79,10 @@ func TestSendReportSuccessfully(t *testing.T) {
 	}
 
 	var r Report = testReport
-	fmt.Printf("The test report shows success: %v\n", r.IsSuccess())
+	v, ok := r.(HasSuccess)
+	if ok {
+		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
+	}
 	u, err := url.Parse("https://script.google.com/macros/s/AKfycbzoMBmftQaR9Aw4jzTB-w4TwkDjLHtSfBCFhh4_2NhTEZAUdj85Qt8uYCKCNOEAwCg4/exec")
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
@@ -77,7 +90,7 @@ func TestSendReportSuccessfully(t *testing.T) {
 	c := RemoteCollector{
 		collectorEndpoint: u,
 	}
-	err = c.Collect(r)
+	err = c.Collect(context.Background(), r)
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
@@ -90,7 +103,10 @@ func TestSendReportUnsuccessfully(t *testing.T) {
 		DurationMs: 1,
 	}
 	var r Report = testReport
-	fmt.Printf("The test report shows success: %v\n", r.IsSuccess())
+	v, ok := r.(HasSuccess)
+	if ok {
+		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
+	}
 	u, err := url.Parse("https://google.com")
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
@@ -98,11 +114,11 @@ func TestSendReportUnsuccessfully(t *testing.T) {
 	c := RemoteCollector{
 		collectorEndpoint: u,
 	}
-	err = c.Collect(r)
+	err = c.Collect(context.Background(), r)
 	if err == nil {
 		t.Errorf("Expected 405 error no error occurred!")
 	} else {
-		if err, ok := err.(StatusErr); ok {
+		if err, ok := err.(BadRequestErr); ok {
 			if err.StatusCode != 405 {
 				t.Errorf("Expected 405 error no error occurred!")
 			}
@@ -117,7 +133,10 @@ func TestSamplingCollector(t *testing.T) {
 		DurationMs: 1,
 	}
 	var r Report = testReport
-	fmt.Printf("The test report shows success: %v\n", r.IsSuccess())
+	v, ok := r.(HasSuccess)
+	if ok {
+		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
+	}
 	u, err := url.Parse("https://example.com")
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
@@ -129,20 +148,62 @@ func TestSamplingCollector(t *testing.T) {
 		successFraction: 0.5,
 		failureFraction: 0.1,
 	}
-	err = c.Collect(r)
+	err = c.Collect(context.Background(), r)
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
 }
 
-func TestRotatingCollector(t *testing.T) {
+func TestSendJSONToServer(t *testing.T) {
+	var testReport = ConnectivityReport{
+		Connection: nil,
+		Time:       time.Now().UTC().Truncate(time.Second),
+		DurationMs: 1,
+	}
+
+	// Start a local HTTP server for testing
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		defer r.Body.Close()
+
+		var receivedReport ConnectivityReport
+		err := json.Unmarshal(body, &receivedReport)
+		if err != nil {
+			t.Errorf("Expected no error, but got: %v", err)
+		}
+
+		// Asserting that the received JSON matches the expected JSON
+		if testReport != receivedReport {
+			t.Errorf("Expected %v, got %v", testReport, receivedReport)
+		}
+	}))
+	defer server.Close()
+
+	u, err := url.Parse(server.URL)
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+	var r Report = testReport
+	c := RemoteCollector{
+		collectorEndpoint: u,
+	}
+	err = c.Collect(context.Background(), r)
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+}
+
+func TestFallbackCollector(t *testing.T) {
 	var testReport = ConnectivityReport{
 		Connection: nil,
 		Time:       time.Now().UTC().Truncate(time.Second),
 		DurationMs: 1,
 	}
 	var r Report = testReport
-	fmt.Printf("The test report shows success: %v\n", r.IsSuccess())
+	v, ok := r.(HasSuccess)
+	if ok {
+		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
+	}
 	u1, err := url.Parse("https://example.com")
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
@@ -151,36 +212,17 @@ func TestRotatingCollector(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
-	u3, err := url.Parse("https://script.google.com/macros/s/AKfycbzoMBmftQaR9Aw4jzTB-w4TwkDjLHtSfBCFhh4_2NhTEZAUdj85Qt8uYCKCNOEAwCg4/exec")
-	if err != nil {
-		t.Errorf("Expected no error, but got: %v", err)
-	}
-	c := RotatingCollector{
-		collectors: []CollectorTarget{
-			{collector: &RemoteCollector{
+	c := FallbackCollector{
+		collectors: []Collector{
+			&RemoteCollector{
 				collectorEndpoint: u1,
 			},
-				priority: 1,
-				maxRetry: 2,
-			},
-			{
-				collector: &RemoteCollector{
-					collectorEndpoint: u2,
-				},
-				priority: 2,
-				maxRetry: 3,
-			},
-			{
-				collector: &RemoteCollector{
-					collectorEndpoint: u3,
-				},
-				priority: 3,
-				maxRetry: 2,
+			&RemoteCollector{
+				collectorEndpoint: u2,
 			},
 		},
-		stopOnSuccess: false,
 	}
-	err = c.Collect(r)
+	err = c.Collect(context.Background(), r)
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
