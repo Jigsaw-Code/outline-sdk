@@ -39,11 +39,10 @@ func TestWriteValidClientHello(t *testing.T) {
 			require.Equal(t, tc.expectRemaining[k], pkt[n:], tc.msg+": pkt-%d", k)
 
 			totalExpectedBytes = append(totalExpectedBytes, pkt[:n]...)
-			require.Equal(t, len(totalExpectedBytes), buf.Len(), tc.msg+": pkt-%d", k)
 			require.Equal(t, totalExpectedBytes, buf.Bytes(), tc.msg+": pkt-%d", k)
 		}
-		require.Equal(t, len(tc.expectTotalPkt), buf.Len(), tc.msg)
 		require.Equal(t, tc.expectTotalPkt, buf.Bytes(), tc.msg)
+		require.Equal(t, len(tc.expectTotalPkt)+5, cap(buf.Bytes()), tc.msg)
 	}
 }
 
@@ -67,13 +66,12 @@ func TestReadFromValidClientHello(t *testing.T) {
 			require.Equal(t, tc.expectRemaining[k], pkt[n:], tc.msg+": pkt-%d", k)
 
 			totalExpectedBytes = append(totalExpectedBytes, pkt[:n]...)
-			require.Equal(t, len(totalExpectedBytes), buf.Len(), tc.msg+": pkt-%d", k)
 			require.Equal(t, totalExpectedBytes, buf.Bytes(), tc.msg+": pkt-%d", k)
 			require.Equal(t, len(tc.expectRemaining[k]), r.Len(), tc.msg+": pkt-%d", k)
 			require.Equal(t, tc.expectRemaining[k], r.Bytes(), tc.msg+": pkt-%d", k)
 		}
-		require.Equal(t, len(tc.expectTotalPkt), buf.Len(), tc.msg)
 		require.Equal(t, tc.expectTotalPkt, buf.Bytes(), tc.msg)
+		require.Equal(t, len(tc.expectTotalPkt)+5, cap(buf.Bytes()), tc.msg)
 	}
 }
 

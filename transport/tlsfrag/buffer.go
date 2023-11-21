@@ -15,6 +15,7 @@
 package tlsfrag
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -32,10 +33,10 @@ var (
 
 // clientHelloBuffer is a byte buffer used to receive and buffer a TLS Client Hello packet.
 type clientHelloBuffer struct {
-	data   []byte // the buffer that hosts both header and content, len: 5 -> 5+len(content)
-	len    int    // the actual bytes that have been read into data
-	valid  bool   // indicate whether the content in data is a valid TLS Client Hello record
-	toRead int    // the number of bytes to read next, e.g. 5 -> len(content)
+	data    []byte        // The buffer that hosts both header and content, cap: 5 -> 5+len(content)+padding
+	padding int           // The unused additional padding allocated at the end of data, 0 -> 5
+	valid   bool          // Indicates whether the content in data is a valid TLS Client Hello record
+	bufrd   *bytes.Reader // A reader used to read from the slice passed to Write
 }
 
 var _ io.Writer = (*clientHelloBuffer)(nil)
@@ -45,9 +46,10 @@ var _ io.ReaderFrom = (*clientHelloBuffer)(nil)
 func newClientHelloBuffer() *clientHelloBuffer {
 	// Allocate the 5 bytes header first, and then reallocate it to contain the entire packet later
 	return &clientHelloBuffer{
-		data:   make([]byte, 0, recordHeaderLen),
-		valid:  true,
-		toRead: recordHeaderLen,
+		data:    make([]byte, 0, recordHeaderLen),
+		padding: 0,
+		valid:   true,
+		bufrd:   bytes.NewReader(nil), // It will be Reset in Write
 	}
 }
 
@@ -61,31 +63,13 @@ func (b *clientHelloBuffer) Bytes() []byte {
 // If an invalid TLS Client Hello message is detected, it returns the error errInvalidTLSClientHello.
 // If all bytes in p have been used and the buffer still requires more data to build a complete TLS Client Hello
 // message, it returns (len(p), nil).
-func (b *clientHelloBuffer) Write(p []byte) (n int, err error) {
-	if !b.valid {
-		return 0, errInvalidTLSClientHello
+func (b *clientHelloBuffer) Write(p []byte) (int, error) {
+	b.bufrd.Reset(p)
+	n, err := b.ReadFrom(b.bufrd)
+	if err == nil && int(n) != len(p) {
+		err = io.ErrShortWrite
 	}
-
-	for b.len < len(b.data) && len(p) > 0 {
-		m := copy(b.data[b.len:], p)
-		n += m
-		b.len += m
-		p = p[m:]
-
-		if b.len == recordHeaderLen {
-			if err = b.validateTLSClientHello(); err != nil {
-				return
-			}
-			buf := make([]byte, recordHeaderLen+getMsgLen(b.data))
-			copy(buf, b.data)
-			b.data = buf
-		}
-	}
-
-	if b.len == len(b.data) {
-		err = errTLSClientHelloFullyReceived
-	}
-	return
+	return int(n), err
 }
 
 // ReadFrom reads all the data from r and appends it to this buffer until a complete Client Hello packet has been
@@ -102,13 +86,13 @@ func (b *clientHelloBuffer) ReadFrom(r io.Reader) (n int64, err error) {
 		return 0, errInvalidTLSClientHello
 	}
 
-	for b.len < len(b.data) && err == nil {
-		m, e := r.Read(b.data[b.len:])
+	for len(b.data) < cap(b.data)-b.padding && err == nil {
+		m, e := r.Read(b.data[len(b.data) : cap(b.data)-b.padding])
+		b.data = b.data[:len(b.data)+m]
 		n += int64(m)
-		b.len += m
 		err = e
 
-		if b.len == recordHeaderLen {
+		if len(b.data) == recordHeaderLen {
 			if e := b.validateTLSClientHello(); e != nil {
 				if err == io.EOF {
 					err = nil
@@ -116,16 +100,16 @@ func (b *clientHelloBuffer) ReadFrom(r io.Reader) (n int64, err error) {
 				err = errors.Join(err, e)
 				return
 			}
-			buf := make([]byte, recordHeaderLen+getMsgLen(b.data))
-			copy(buf, b.data)
-			b.data = buf
+			buf := make([]byte, 0, recordHeaderLen*2+getMsgLen(b.data))
+			b.data = append(buf, b.data...)
+			b.padding = recordHeaderLen
 		}
 	}
 
 	if err == io.EOF {
 		err = nil
 	}
-	if b.len == len(b.data) {
+	if len(b.data) == cap(b.data)-b.padding {
 		err = errors.Join(err, errTLSClientHelloFullyReceived)
 	}
 	return

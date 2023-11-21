@@ -25,11 +25,11 @@ import (
 // are not modified and are directly transmitted through the base [io.Writer].
 type clientHelloFragWriter struct {
 	base io.Writer
-	done bool // indicates all splitted rcds have been already written to base
+	done bool // Indicates all splitted rcds have been already written to base
 	frag FragFunc
 
-	buf  *clientHelloBuffer // the buffer containing and parsing a TLS Client Hello record
-	rcds *bytes.Buffer      // the buffer containing splitted records what will be written to base
+	helloBuf *clientHelloBuffer // The buffer containing and parsing a TLS Client Hello record
+	record   *bytes.Buffer      // The buffer containing splitted records what will be written to base
 }
 
 // clientHelloFragReaderFrom serves as an optimized version of clientHelloFragWriter when the base [io.Writer] also
@@ -58,9 +58,9 @@ func newClientHelloFragWriter(base io.Writer, frag FragFunc) (io.Writer, error) 
 		return nil, errors.New("frag callback function must not be nil")
 	}
 	fw := &clientHelloFragWriter{
-		base: base,
-		frag: frag,
-		buf:  newClientHelloBuffer(),
+		base:     base,
+		frag:     frag,
+		helloBuf: newClientHelloBuffer(),
 	}
 	if rf, ok := base.(io.ReaderFrom); ok {
 		return &clientHelloFragReaderFrom{fw, rf}, nil
@@ -71,37 +71,30 @@ func newClientHelloFragWriter(base io.Writer, frag FragFunc) (io.Writer, error) 
 // Write implements io.Writer.Write. It attempts to split the data received in the first one or more Write call(s)
 // into two TLS records if the data corresponds to a TLS Client Hello record.
 func (w *clientHelloFragWriter) Write(p []byte) (n int, err error) {
-	if w.done {
-		return w.base.Write(p)
-	}
-	if w.rcds != nil {
-		if _, err = w.flushRecords(); err != nil {
+	if !w.done {
+		// not yet splitted, append to the buffer
+		if w.record == nil {
+			if n, err = w.helloBuf.Write(p); err == nil {
+				// all written, but Client Hello is not fully received yet
+				return
+			}
+			p = p[n:]
+			if errors.Is(err, errTLSClientHelloFullyReceived) {
+				w.splitHelloBufToRecord()
+			} else {
+				w.copyHelloBufToRecord()
+			}
+		}
+		// already splitted (but previous Writes might fail), try to flush all remaining w.record to w.base
+		if _, err = w.flushRecord(); err != nil {
 			return
 		}
-		return w.base.Write(p)
 	}
 
-	if n, err = w.buf.Write(p); err != nil {
-		if errors.Is(err, errTLSClientHelloFullyReceived) {
-			w.splitBufToRecords()
-		} else {
-			w.copyBufToRecords()
-		}
-		// We did not call w.Write(p[n:]) here because p[n:] might be empty, and we don't want to
-		// Write an empty buffer to w.base if it's not initiated by the upstream caller.
-		if _, err = w.flushRecords(); err != nil {
-			return
-		}
-		if p = p[n:]; len(p) > 0 {
-			m, e := w.base.Write(p)
-			n += m
-			err = e
-		}
-		return
-	}
-
-	if n < len(p) {
-		return n, io.ErrShortWrite
+	if len(p) > 0 {
+		m, e := w.base.Write(p)
+		n += m
+		err = e
 	}
 	return
 }
@@ -114,65 +107,70 @@ func (w *clientHelloFragWriter) Write(p []byte) (n int, err error) {
 //
 // It returns the number of bytes read. Any error except EOF encountered during the read is also returned.
 func (w *clientHelloFragReaderFrom) ReadFrom(r io.Reader) (n int64, err error) {
-	if w.done {
-		return w.baseRF.ReadFrom(r)
-	}
-	if w.rcds != nil {
-		if _, err = w.flushRecords(); err != nil {
+	if !w.done {
+		// not yet splitted, append to the buffer
+		if w.record == nil {
+			if n, err = w.helloBuf.ReadFrom(r); err == nil {
+				// EOF, but Client Hello is not fully received yet
+				return
+			}
+			if errors.Is(err, errTLSClientHelloFullyReceived) {
+				w.splitHelloBufToRecord()
+			} else {
+				w.copyHelloBufToRecord()
+			}
+		}
+		// already splitted (but previous Writes might fail), try to flush all remaining w.record to w.base
+		if _, err = w.flushRecord(); err != nil {
 			return
 		}
-		return w.baseRF.ReadFrom(r)
 	}
 
-	if n, err = w.buf.ReadFrom(r); err != nil {
-		if errors.Is(err, errTLSClientHelloFullyReceived) {
-			w.splitBufToRecords()
-		} else {
-			w.copyBufToRecords()
-		}
-		// recursively flush w.rcds and read the remaining content from r
-		m, e := w.ReadFrom(r)
-		return n + m, e
-	}
+	m, e := w.baseRF.ReadFrom(r)
+	n += m
+	err = e
 	return
 }
 
-// copyBuf copies w.buf into w.rcds.
-func (w *clientHelloFragWriter) copyBufToRecords() {
-	w.rcds = bytes.NewBuffer(w.buf.Bytes())
-	w.buf = nil // allows the GC to recycle the memory
+// copyHelloBufToRecord copies w.helloBuf into w.record without allocations.
+func (w *clientHelloFragWriter) copyHelloBufToRecord() {
+	w.record = bytes.NewBuffer(w.helloBuf.Bytes())
+	w.helloBuf = nil // allows the GC to recycle the memory
 }
 
-// splitBuf splits w.buf into two records and put them into w.rcds.
-func (w *clientHelloFragWriter) splitBufToRecords() {
-	content := w.buf.Bytes()[recordHeaderLen:]
+// splitHelloBufToRecord splits w.helloBuf into two records and put them into w.record without allocations.
+func (w *clientHelloFragWriter) splitHelloBufToRecord() {
+	received := w.helloBuf.Bytes()
+	content := received[recordHeaderLen:]
 	split := w.frag(content)
 	if split <= 0 || split >= len(content) {
-		w.copyBufToRecords()
+		w.copyHelloBufToRecord()
 		return
 	}
 
-	header := make([]byte, recordHeaderLen)
-	copy(header, w.buf.Bytes())
-
-	w.rcds = bytes.NewBuffer(make([]byte, 0, w.buf.Len()+recordHeaderLen))
-
-	putMsgLen(header, uint16(split))
-	w.rcds.Write(header)
-	w.rcds.Write(content[:split])
-
-	putMsgLen(header, uint16(len(content)-split))
-	w.rcds.Write(header)
-	w.rcds.Write(content[split:])
-
-	w.buf = nil // allows the GC to recycle the memory
+	// received: | <== header (5) ==> | <== split ==> | <== len(content)-split ==> |  ... cap with padding (5) ... |
+	//                                                 \                            \
+	//                                                  +-----------------+          +-----------------+
+	//                                                                     \                            \
+	// splitted: | <== header (5) ==> | <== split ==> | <== header2 (5) ==> | <== len(content)-split ==> |
+	splitted := received[:len(received)+recordHeaderLen]
+	hdr1 := splitted[:recordHeaderLen]
+	hdr2 := splitted[recordHeaderLen+split : recordHeaderLen*2+split]
+	recvContent2 := splitted[recordHeaderLen+split : len(received)]
+	content2 := splitted[recordHeaderLen*2+split:]
+	copy(content2, recvContent2)
+	copy(hdr2, hdr1)
+	putMsgLen(hdr1, uint16(split))
+	putMsgLen(hdr2, uint16(len(content)-split))
+	w.record = bytes.NewBuffer(splitted)
+	w.helloBuf = nil // allows the GC to recycle the memory
 }
 
-// flushRecords writes all bytes from w.rcds to base.
-func (w *clientHelloFragWriter) flushRecords() (int, error) {
-	n, err := io.Copy(w.base, w.rcds)
-	if w.rcds.Len() == 0 {
-		w.rcds = nil // allows the GC to recycle the memory
+// flushRecord writes all bytes from w.record to base.
+func (w *clientHelloFragWriter) flushRecord() (int, error) {
+	n, err := io.Copy(w.base, w.record)
+	if w.record.Len() == 0 {
+		w.record = nil // allows the GC to recycle the memory
 		w.done = true
 	}
 	return int(n), err
