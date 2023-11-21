@@ -1,4 +1,7 @@
+# vscode
+.trunk
 .vscode
+
 
 # MacOS files
 .DS_Store
@@ -20,3 +23,4 @@ output-metadata.json
 #  using Zero Installs
 #.yarn/unplugged
 #.yarn/build-state.yml
+
