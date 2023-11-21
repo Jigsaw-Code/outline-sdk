@@ -16,19 +16,29 @@ package reporter
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"math/rand"
 	"net/http"
 	"net/url"
-	"sort"
 	"time"
 )
 
 var debugLog log.Logger = *log.New(io.Discard, "", 0)
 var httpClient = &http.Client{}
+
+type BadRequestErr struct {
+	StatusCode int
+	Message    string
+}
+
+func (e BadRequestErr) Error() string {
+	return e.Message
+}
 
 type ConnectivityReport struct {
 	// Connection setup
@@ -39,12 +49,13 @@ type ConnectivityReport struct {
 	Error      interface{} `json:"error"`
 }
 
-type Report interface {
+type Report any
+
+type HasSuccess interface {
 	IsSuccess() bool
-	CanMarshal() bool
 }
 
-// ConnectivityReport implements the Report interface
+// ConnectivityReport implements the HasSuccess interface
 func (r ConnectivityReport) IsSuccess() bool {
 	if r.Error == nil {
 		return true
@@ -53,23 +64,27 @@ func (r ConnectivityReport) IsSuccess() bool {
 	}
 }
 
-// Makes sure the Report type can be marshalled into JSON
-func (r ConnectivityReport) CanMarshal() bool {
-	_, err := json.Marshal(r)
-	if err != nil {
-		log.Printf("Error encoding JSON: %s\n", err)
-		return false
-	} else {
-		return true
-	}
-}
-
 type Collector interface {
-	Collect(Report) error
+	Collect(context.Context, Report) error
 }
 
 type RemoteCollector struct {
 	collectorEndpoint *url.URL
+}
+
+func (c *RemoteCollector) Collect(ctx context.Context, report Report) error {
+	jsonData, err := json.Marshal(report)
+	if err != nil {
+		log.Printf("Error encoding JSON: %s\n", err)
+		return err
+	}
+	err = sendReport(ctx, jsonData, c.collectorEndpoint)
+	if err != nil {
+		log.Printf("Send report failed: %v", err)
+		return err
+	}
+	fmt.Println("Report sent")
+	return nil
 }
 
 type SamplingCollector struct {
@@ -78,93 +93,14 @@ type SamplingCollector struct {
 	failureFraction float64
 }
 
-type CollectorTarget struct {
-	collector Collector
-	priority  int
-	maxRetry  int
-}
-
-// TODO: implement a rotating collector
-type RotatingCollector struct {
-	collectors    []CollectorTarget
-	stopOnSuccess bool
-}
-
-// SortByPriority sorts the collectors based on their priority in ascending order
-func (rc *RotatingCollector) SortByPriority() {
-	sort.Slice(rc.collectors, func(i, j int) bool {
-		return rc.collectors[i].priority < rc.collectors[j].priority
-	})
-}
-
-func (c *RotatingCollector) Collect(report Report) error {
-	// sort collectors in RotatingCollector by priority
-	// into a new slice
-	c.SortByPriority()
-	for _, target := range c.collectors {
-		for i := 0; i < target.maxRetry; i++ {
-			err := target.collector.Collect(report)
-			if err != nil {
-				if err, ok := err.(StatusErr); ok {
-					switch {
-					case err.StatusCode == 500:
-						// skip retrying
-						break
-					case err.StatusCode == 408:
-						// wait for 1 second before retry
-						time.Sleep(time.Duration(1000 * time.Millisecond))
-					default:
-						break
-					}
-				} else {
-					return err
-				}
-			} else {
-				fmt.Println("Report sent")
-				if c.stopOnSuccess {
-					return nil
-				}
-				break
-			}
-		}
-	}
-	return nil
-}
-
-type StatusErr struct {
-	StatusCode int
-	Message    string
-}
-
-func (e StatusErr) Error() string {
-	return e.Message
-}
-
-func (c *RemoteCollector) Collect(report Report) error {
-	jsonData, err := json.Marshal(report)
-	var statusCode int
-	if err != nil {
-		log.Printf("Error encoding JSON: %s\n", err)
-		return err
-	}
-	statusCode, err = sendReport(jsonData, c.collectorEndpoint)
-	if err != nil {
-		log.Printf("Send report failed: %v", err)
-		return err
-	} else if statusCode > 400 {
-		return StatusErr{
-			StatusCode: statusCode,
-			Message:    fmt.Sprintf("HTTP request failed with status code %d", statusCode),
-		}
-	} else {
-		fmt.Println("Report sent")
+func (c *SamplingCollector) Collect(ctx context.Context, report Report) error {
+	var samplingRate float64
+	hs, ok := report.(HasSuccess)
+	if !ok {
+		log.Printf("Report does not implement HasSuccess interface")
 		return nil
 	}
-}
-
-func (c *SamplingCollector) Collect(report Report) error {
-	var samplingRate float64
-	if report.IsSuccess() {
+	if hs.IsSuccess() {
 		samplingRate = c.successFraction
 	} else {
 		samplingRate = c.failureFraction
@@ -172,7 +108,7 @@ func (c *SamplingCollector) Collect(report Report) error {
 	// Generate a random float64 number between 0 and 1
 	random := rand.Float64()
 	if random < samplingRate {
-		err := c.collector.Collect(report)
+		err := c.collector.Collect(ctx, report)
 		if err != nil {
 			log.Printf("Error collecting report: %v", err)
 			return err
@@ -184,19 +120,81 @@ func (c *SamplingCollector) Collect(report Report) error {
 	}
 }
 
-func sendReport(jsonData []byte, remote *url.URL) (int, error) {
+type RetryCollector struct {
+	collector        Collector
+	maxRetry         int
+	waitBetweenRetry time.Duration
+}
+
+func (c *RetryCollector) Collect(ctx context.Context, report Report) error {
+	for i := 0; i < c.maxRetry; i++ {
+		err := c.collector.Collect(ctx, report)
+		if err != nil {
+			if _, ok := err.(BadRequestErr); ok {
+				break
+			} else {
+				time.Sleep(c.waitBetweenRetry)
+			}
+		} else {
+			fmt.Println("Report sent")
+			return nil
+		}
+	}
+	return errors.New("max retry exceeded")
+}
+
+type MutltiCollector struct {
+	collectors []Collector
+}
+
+// Collects reports through multiple collectors
+func (c *MutltiCollector) Collect(ctx context.Context, report Report) error {
+	success := false
+	for i := range c.collectors {
+		err := c.collectors[i].Collect(ctx, report)
+		if err != nil {
+			log.Printf("Error collecting report: %v", err)
+			success = success || false
+		} else {
+			success = success || true
+		}
+	}
+	if success {
+		// At least one collector succeeded
+		return nil
+	}
+	return errors.New("all collectors failed")
+}
+
+type FallbackCollector struct {
+	collectors []Collector
+}
+
+// Collects reports through multiple collectors
+func (c *FallbackCollector) Collect(ctx context.Context, report Report) error {
+	for i := range c.collectors {
+		err := c.collectors[i].Collect(ctx, report)
+		if err == nil {
+			debugLog.Println("Report sent!")
+			return nil
+		}
+	}
+	return errors.New("all collectors failed")
+}
+
+func sendReport(ctx context.Context, jsonData []byte, remote *url.URL) error {
 	// TODO: return status code of HTTP response
 	req, err := http.NewRequest("POST", remote.String(), bytes.NewReader(jsonData))
 	if err != nil {
 		debugLog.Printf("Error creating the HTTP request: %s\n", err)
-		return 0, err
+		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	resp, err := httpClient.Do(req)
+	resp, err := httpClient.Do(req.WithContext(ctx))
 	if err != nil {
 		log.Printf("Error sending the HTTP request: %s\n", err)
-		return 0, err
+		return err
 	}
 	defer resp.Body.Close()
 	// Access the HTTP response status code
@@ -204,8 +202,15 @@ func sendReport(jsonData []byte, remote *url.URL) (int, error) {
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		debugLog.Printf("Error reading the HTTP response body: %s\n", err)
-		return 0, err
+		return err
+	}
+	if resp.StatusCode >= 400 {
+		debugLog.Printf("Error sending the report: %s\n", respBody)
+		return BadRequestErr{
+			StatusCode: resp.StatusCode,
+			Message:    fmt.Sprintf("HTTP request failed with status code %d", resp.StatusCode),
+		}
 	}
 	debugLog.Printf("Response: %s\n", respBody)
-	return resp.StatusCode, nil
+	return nil
 }
