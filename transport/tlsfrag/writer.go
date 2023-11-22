@@ -140,7 +140,7 @@ func (w *clientHelloFragWriter) copyHelloBufToRecord() {
 
 // splitHelloBufToRecord splits w.helloBuf into two records and put them into w.record without allocations.
 func (w *clientHelloFragWriter) splitHelloBufToRecord() {
-	received := w.helloBuf.Bytes()
+	originalRecord := w.helloBuf.Bytes()
 	content := received[recordHeaderLen:]
 	split := w.frag(content)
 	if split <= 0 || split >= len(content) {
