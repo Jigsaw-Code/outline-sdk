@@ -156,6 +156,7 @@ func (w *clientHelloFragWriter) splitHelloBufToRecord() {
 	splitted := received[:len(received)+recordHeaderLen]
 	hdr1 := tlsRecordHeaderFromRawBytes(splitted[:recordHeaderLen])
 	hdr2 := tlsRecordHeaderFromRawBytes(splitted[recordHeaderLen+split : recordHeaderLen*2+split])
+        // Shift tail fragment to make space for record header.
 	recvContent2 := splitted[recordHeaderLen+split : len(received)]
 	content2 := splitted[recordHeaderLen*2+split:]
 	copy(content2, recvContent2)
