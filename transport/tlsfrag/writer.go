@@ -160,8 +160,8 @@ func (w *clientHelloFragWriter) splitHelloBufToRecord() {
 	recvContent2 := splitted[recordHeaderLen+split : len(received)]
 	content2 := splitted[recordHeaderLen*2+split:]
 	copy(content2, recvContent2)
+        // Insert header for second fragment.
 	copy(hdr2, hdr1)
-	hdr1.SetPayloadLen(uint16(split))
 	hdr2.SetPayloadLen(uint16(len(content) - split))
 	w.record = bytes.NewBuffer(splitted)
 	w.helloBuf = nil // allows the GC to recycle the memory
