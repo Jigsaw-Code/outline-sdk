@@ -164,7 +164,7 @@ func (w *clientHelloFragWriter) splitHelloBufToRecord() {
 	hdr1.SetPayloadLen(uint16(headLen))
 
 	// Shift tail fragment to make space for record header.
-	tail := splitted[recordHeaderLen+headLen : len(original)]
+	tail := original[recordHeaderLen+headLen:]
 	payload2 := splitted[recordHeaderLen*2+headLen:]
 	copy(payload2, tail)
 
