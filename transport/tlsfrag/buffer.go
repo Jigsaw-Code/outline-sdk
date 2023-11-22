@@ -93,14 +93,15 @@ func (b *clientHelloBuffer) ReadFrom(r io.Reader) (n int64, err error) {
 		err = e
 
 		if len(b.data) == recordHeaderLen {
-			if e := b.validateTLSClientHello(); e != nil {
+			hdr, e := b.validateTLSClientHello()
+			if e != nil {
 				if err == io.EOF {
 					err = nil
 				}
 				err = errors.Join(err, e)
 				return
 			}
-			buf := make([]byte, 0, recordHeaderLen*2+getMsgLen(b.data))
+			buf := make([]byte, 0, recordHeaderLen*2+hdr.PayloadLen())
 			b.data = append(buf, b.data...)
 			b.padding = recordHeaderLen
 		}
@@ -115,18 +116,19 @@ func (b *clientHelloBuffer) ReadFrom(r io.Reader) (n int64, err error) {
 	return
 }
 
-func (b *clientHelloBuffer) validateTLSClientHello() error {
-	if typ := getRecordType(b.data); typ != recordTypeHandshake {
+func (b *clientHelloBuffer) validateTLSClientHello() (tlsRecordHeader, error) {
+	hdr := tlsRecordHeaderFromRawBytes(b.data)
+	if typ := hdr.Type(); typ != recordTypeHandshake {
 		b.valid = false
-		return fmt.Errorf("record type %d is not handshake: %w", typ, errInvalidTLSClientHello)
+		return hdr, fmt.Errorf("record type %d is not handshake: %w", typ, errInvalidTLSClientHello)
 	}
-	if ver := getTLSVersion(b.data); !isValidTLSVersion(ver) {
+	if ver := hdr.LegacyVersion(); !isValidTLSVersion(ver) {
 		b.valid = false
-		return fmt.Errorf("%#04x is not a valid TLS version: %w", ver, errInvalidTLSClientHello)
+		return hdr, fmt.Errorf("%#04x is not a valid TLS version: %w", ver, errInvalidTLSClientHello)
 	}
-	if len := getMsgLen(b.data); !isValidMsgLenForHandshake(len) {
+	if len := hdr.PayloadLen(); !isValidPayloadLenForHandshake(len) {
 		b.valid = false
-		return fmt.Errorf("message length %v out of range: %w", len, errInvalidTLSClientHello)
+		return hdr, fmt.Errorf("message length %v out of range: %w", len, errInvalidTLSClientHello)
 	}
-	return nil
+	return hdr, nil
 }

@@ -68,8 +68,9 @@ func (d *tlsFragDialer) Dial(ctx context.Context, raddr string) (conn transport.
 }
 
 // WrapConnFunc wraps the base [transport.StreamConn] and splits the first TLS Client Hello packet into two records
-// according to the frag function. Subsequent data is forwarded without modification. If the first packet isn't a valid
-// Client Hello, WrapConnFunc simply forwards all data through transparently.
+// according to the frag function. Subsequent data is forwarded without modification. The Write to the base
+// [transport.StreamConn] will be buffered until we have the full initial Client Hello record. If the first packet
+// isn't a valid Client Hello, WrapConnFunc simply forwards all data through transparently.
 func WrapConnFunc(base transport.StreamConn, frag FragFunc) (transport.StreamConn, error) {
 	w, err := newClientHelloFragWriter(base, frag)
 	if err != nil {

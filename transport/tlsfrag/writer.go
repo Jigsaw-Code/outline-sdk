@@ -154,14 +154,14 @@ func (w *clientHelloFragWriter) splitHelloBufToRecord() {
 	//                                                                     \                            \
 	// splitted: | <== header (5) ==> | <== split ==> | <== header2 (5) ==> | <== len(content)-split ==> |
 	splitted := received[:len(received)+recordHeaderLen]
-	hdr1 := splitted[:recordHeaderLen]
-	hdr2 := splitted[recordHeaderLen+split : recordHeaderLen*2+split]
+	hdr1 := tlsRecordHeaderFromRawBytes(splitted[:recordHeaderLen])
+	hdr2 := tlsRecordHeaderFromRawBytes(splitted[recordHeaderLen+split : recordHeaderLen*2+split])
 	recvContent2 := splitted[recordHeaderLen+split : len(received)]
 	content2 := splitted[recordHeaderLen*2+split:]
 	copy(content2, recvContent2)
 	copy(hdr2, hdr1)
-	putMsgLen(hdr1, uint16(split))
-	putMsgLen(hdr2, uint16(len(content)-split))
+	hdr1.SetPayloadLen(uint16(split))
+	hdr2.SetPayloadLen(uint16(len(content) - split))
 	w.record = bytes.NewBuffer(splitted)
 	w.helloBuf = nil // allows the GC to recycle the memory
 }

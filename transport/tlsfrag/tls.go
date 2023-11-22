@@ -22,6 +22,7 @@ import (
 
 type recordType byte
 type tlsVersion uint16
+type tlsRecordHeader []byte
 
 // TLS record layout from [RFC 8446]:
 //
@@ -40,14 +41,14 @@ type tlsVersion uint16
 //	+-------------+ Message Length + 5
 //
 //	RecordType := invalid(0) | handshake(22) | application_data(23) | ...
-//	Protocol Version (deprecated) := 0x0301 ("TLS 1.0") | 0x0303 ("TLS 1.2" & "TLS 1.3") | 0x0302 ("TLS 1.1")
+//	LegacyRecordVersion := 0x0301 ("TLS 1.0") | 0x0302 ("TLS 1.1") | 0x0303 ("TLS 1.2")
 //	0 < Message Length (of handshake)        ≤ 2^14
 //	0 ≤ Message Length (of application_data) ≤ 2^14
 //
 // [RFC 8446]: https://datatracker.ietf.org/doc/html/rfc8446#section-5.1
 const (
-	recordHeaderLen = 5
-	maxMsgLen       = 1 << 14
+	recordHeaderLen     = 5
+	maxRecordPayloadLen = 1 << 14
 
 	recordTypeHandshake recordType = 22
 
@@ -57,27 +58,33 @@ const (
 	versionTLS13 tlsVersion = 0x0304
 )
 
-// getRecordType gets the TLS record type from the TLS header hdr[0]. This function will panic if len(hdr) < 1.
-func getRecordType(hdr []byte) recordType {
-	return recordType(hdr[0])
+// tlsRecordHeaderFromRawBytes creates a new tlsRecordHeader from raw. This function will panic if len(raw) < 5.
+func tlsRecordHeaderFromRawBytes(raw []byte) tlsRecordHeader {
+	_ = raw[recordHeaderLen-1] // early panic on invalid data
+	return tlsRecordHeader(raw[:recordHeaderLen])
 }
 
-// getTLSVersion gets the TLS version from the TLS header hdr[1:3]. This function will panic if len(hdr) < 3.
-func getTLSVersion(hdr []byte) tlsVersion {
-	return tlsVersion(binary.BigEndian.Uint16(hdr[1:]))
+// Type gets the TLS record type from the TLS header h[0]. This function will panic if len(h) < 1.
+func (h tlsRecordHeader) Type() recordType {
+	return recordType(h[0])
 }
 
-// getMsgLen gets the TLS message length from the TLS header hdr[3:5]. This function will panic if len(hdr) < 5.
-func getMsgLen(hdr []byte) uint16 {
-	return binary.BigEndian.Uint16(hdr[3:])
+// LegacyVersion gets the TLS version from the TLS header h[1:3]. This function will panic if len(h) < 3.
+func (h tlsRecordHeader) LegacyVersion() tlsVersion {
+	return tlsVersion(binary.BigEndian.Uint16(h[1:3]))
 }
 
-// putMsgLen puts the TLS message length to the TLS header hdr[3:5]. This function will panic if len(hdr) < 5.
-func putMsgLen(hdr []byte, len uint16) {
-	binary.BigEndian.PutUint16(hdr[3:], len)
+// PayloadLen gets the TLS record payload length from the TLS header h[3:5]. This function will panic if len(h) < 5.
+func (h tlsRecordHeader) PayloadLen() uint16 {
+	return binary.BigEndian.Uint16(h[3:5])
 }
 
-// isValidTLSProtocolVersion determines whether ver is a valid TLS version according to RFC:
+// SetPayloadLen puts the TLS record payload len to the TLS header h[3:5]. This function will panic if len(h) < 5.
+func (h tlsRecordHeader) SetPayloadLen(len uint16) {
+	binary.BigEndian.PutUint16(h[3:5], len)
+}
+
+// isValidTLSVersion determines whether ver is a valid TLS version according to RFC:
 //
 //	"""
 //	legacy_record_version:
@@ -89,7 +96,7 @@ func isValidTLSVersion(ver tlsVersion) bool {
 	return ver == versionTLS10 || ver == versionTLS11 || ver == versionTLS12 || ver == versionTLS13
 }
 
-// isValidRecordLenForHandshake checks whether 0 < len ≤ 2^14.
-func isValidMsgLenForHandshake(len uint16) bool {
-	return 0 < len && len <= maxMsgLen
+// isValidPayloadLenForHandshake checks whether 0 < len ≤ 2^14.
+func isValidPayloadLenForHandshake(len uint16) bool {
+	return 0 < len && len <= maxRecordPayloadLen
 }
