@@ -105,7 +105,7 @@ func (b *clientHelloBuffer) ReadFrom(r io.Reader) (n int64, err error) {
 		}
 	}
 
-	// If the buffer is already invalid, or has already fully received the record
+	// If the buffer is already invalid
 	if b.validationErr != nil {
 		err = b.validationErr
 		return
