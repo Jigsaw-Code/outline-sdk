@@ -25,11 +25,14 @@ import (
 // are not modified and are directly transmitted through the base [io.Writer].
 type clientHelloFragWriter struct {
 	base io.Writer
-	done bool // Indicates all splitted rcds have been already written to base
+	// Indicates all splitted rcds have been already written to base
+	done bool
 	frag FragFunc
 
-	helloBuf *clientHelloBuffer // The buffer containing and parsing a TLS Client Hello record
-	record   *bytes.Buffer      // The buffer containing splitted records what will be written to base
+	// The buffer containing and parsing a TLS Client Hello record
+	helloBuf *clientHelloBuffer
+	// The buffer containing splitted records what will be written to base
+	record *bytes.Buffer
 }
 
 // clientHelloFragReaderFrom serves as an optimized version of clientHelloFragWriter when the base [io.Writer] also
@@ -140,29 +143,36 @@ func (w *clientHelloFragWriter) copyHelloBufToRecord() {
 
 // splitHelloBufToRecord splits w.helloBuf into two records and put them into w.record without allocations.
 func (w *clientHelloFragWriter) splitHelloBufToRecord() {
-	originalRecord := w.helloBuf.Bytes()
-	content := received[recordHeaderLen:]
+	original := w.helloBuf.Bytes()
+	content := original[recordHeaderLen:]
 	headLen := w.frag(content)
-	if split <= 0 || split >= len(content) {
+	if headLen <= 0 || headLen >= len(content) {
 		w.copyHelloBufToRecord()
 		return
 	}
+	tailLen := len(content) - headLen
 
-	// received: | <== header (5) ==> | <== split ==> | <== len(content)-split ==> |  ... cap with padding (5) ... |
-	//                                                 \                            \
-	//                                                  +-----------------+          +-----------------+
-	//                                                                     \                            \
-	// splitted: | <== header (5) ==> | <== split ==> | <== header2 (5) ==> | <== len(content)-split ==> |
-	splitted := received[:len(received)+recordHeaderLen]
+	//           |  header   |         payload         |  cap==len+5
+	// original: | <= (5) => | <= head => | <= tail => | <= (5) => |
+	//                       |            |\            \
+	//                       |            | \-------\    \-------\
+	//                       |            |          \            \
+	// splitted: | <= (5) => | <= head => | <= (5) => | <= tail => |
+	//           |  header1  |  payload1  |  header2  |  payload2  |
+	splitted := original[:len(original)+recordHeaderLen]
 	hdr1 := tlsRecordHeaderFromRawBytes(splitted[:recordHeaderLen])
-	hdr2 := tlsRecordHeaderFromRawBytes(splitted[recordHeaderLen+split : recordHeaderLen*2+split])
-        // Shift tail fragment to make space for record header.
-	recvContent2 := splitted[recordHeaderLen+split : len(received)]
-	content2 := splitted[recordHeaderLen*2+split:]
-	copy(content2, recvContent2)
-        // Insert header for second fragment.
+	hdr1.SetPayloadLen(uint16(headLen))
+
+	// Shift tail fragment to make space for record header.
+	tail := splitted[recordHeaderLen+headLen : len(original)]
+	payload2 := splitted[recordHeaderLen*2+headLen:]
+	copy(payload2, tail)
+
+	// Insert header for second fragment.
+	hdr2 := tlsRecordHeaderFromRawBytes(splitted[recordHeaderLen+headLen : recordHeaderLen*2+headLen])
 	copy(hdr2, hdr1)
-	hdr2.SetPayloadLen(uint16(len(content) - split))
+	hdr2.SetPayloadLen(uint16(tailLen))
+
 	w.record = bytes.NewBuffer(splitted)
 	w.helloBuf = nil // allows the GC to recycle the memory
 }
