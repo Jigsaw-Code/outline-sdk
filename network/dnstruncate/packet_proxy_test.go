@@ -164,15 +164,15 @@ func constructDNSQuestionsFromDomainNames(questions []string) []layers.DNSQuesti
 
 // constructDNSRequestOrResponse creates the following DNS request/response:
 //
-//		[ `id` ]:                                2 bytes
-//		[ Standard-Query/Response + Recursive ]: 0x01/0x81
-//		[ Reserved/Response-No-Err ]:            0x00
-//		[ Questions-Count ]:                     2 bytes    (= len(questions))
-//		[ Answers Count ]:                       2 bytes    (= 0x00 0x00 / len(questions))
-//		[ Authorities Count ]:                   0x00 0x00
-//		[ Resources Count ]:                     0x00 0x01
-//		[ `questions` ]:                         ? bytes
-//	 	[ Additional Resources ]:                ? bytes   (= OPT(payload_size=4096))
+//	[ `id` ]:                                2 bytes
+//	[ Standard-Query/Response + Recursive ]: 0x01/0x81
+//	[ Reserved/Response-No-Err ]:            0x00
+//	[ Questions-Count ]:                     2 bytes    (= len(questions))
+//	[ Answers Count ]:                       2 bytes    (= 0x00 0x00 / len(questions))
+//	[ Authorities Count ]:                   0x00 0x00
+//	[ Resources Count ]:                     0x00 0x01
+//	[ `questions` ]:                         ? bytes
+//	[ Additional Resources ]:                ? bytes   (= OPT(payload_size=4096))
 //
 // https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.1
 //

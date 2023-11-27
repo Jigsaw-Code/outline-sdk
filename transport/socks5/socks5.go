@@ -15,6 +15,7 @@
 package socks5
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
@@ -79,7 +80,7 @@ func appendSOCKS5Address(b []byte, address string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	portNum, err := strconv.Atoi(portStr)
+	portNum, err := strconv.ParseUint(portStr, 10, 16)
 	if err != nil {
 		return nil, err
 	}
@@ -109,6 +110,6 @@ func appendSOCKS5Address(b []byte, address string) ([]byte, error) {
 		b = append(b, byte(len(host)))
 		b = append(b, host...)
 	}
-	b = append(b, byte(portNum>>8), byte(portNum))
+	b = binary.BigEndian.AppendUint16(b, uint16(portNum))
 	return b, nil
 }
