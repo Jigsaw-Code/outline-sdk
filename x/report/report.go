@@ -25,12 +25,12 @@ type BadRequestError struct {
 	Err error
 }
 
-// Error returns the error message associated with the BadRequestError.
+// Error returns the error message associated with the [BadRequestError].
 func (e BadRequestError) Error() string {
 	return e.Err.Error()
 }
 
-// Unwrap returns the underlying error wrapped by the BadRequestError.
+// Unwrap returns the underlying error wrapped by the [BadRequestError].
 func (e BadRequestError) Unwrap() error {
 	return e.Err
 }
@@ -76,7 +76,7 @@ type RemoteCollector struct {
 }
 
 // Collect sends the given report to the remote collector.
-// It marshals the report into JSON format and sends it using the sendReport method.
+// It marshals the report into JSON format and sends it using the [sendReport] method.
 // If there is an error encoding the JSON or sending the report, it returns the error.
 // Otherwise, it returns nil.
 func (c *RemoteCollector) Collect(ctx context.Context, report Report) error {
@@ -163,7 +163,7 @@ type MutltiCollector struct {
 }
 
 // Collect implements Collector interface on [MutltiCollector] type.
-// It collects the report using all the provided collectors in the MultiCollector.
+// It collects the report using all the provided collectors in the [MultiCollector].
 // It returns an error if all collectors fail to collect the report.
 func (c *MutltiCollector) Collect(ctx context.Context, report Report) error {
 	success := false
@@ -187,7 +187,7 @@ type FallbackCollector struct {
 	collectors []Collector
 }
 
-// Collect implements Collector interface on [FallbackCollector] type that collects a report using the provided context and report data.
+// Collect implements [Collector] interface on [FallbackCollector] type that collects a report using the provided context and report data.
 // It iterates over a list of collectors and attempts to collect the report using each collector.
 // If any of the collectors succeeds in collecting the report, operation aborts, and it returns nil.
 // If all collectors fail to collect the report, it returns an error indicating the failure.
