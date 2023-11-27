@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package reporter
+package report
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 	"time"
 )
@@ -89,6 +91,7 @@ func TestSendReportSuccessfully(t *testing.T) {
 	}
 	c := RemoteCollector{
 		collectorEndpoint: u,
+		httpClient:        &http.Client{Timeout: 10 * time.Second},
 	}
 	err = c.Collect(context.Background(), r)
 	if err != nil {
@@ -102,6 +105,7 @@ func TestSendReportUnsuccessfully(t *testing.T) {
 		Time:       time.Now().UTC().Truncate(time.Second),
 		DurationMs: 1,
 	}
+	var e *BadRequestError
 	var r Report = testReport
 	v, ok := r.(HasSuccess)
 	if ok {
@@ -113,15 +117,16 @@ func TestSendReportUnsuccessfully(t *testing.T) {
 	}
 	c := RemoteCollector{
 		collectorEndpoint: u,
+		httpClient:        &http.Client{Timeout: 10 * time.Second},
 	}
 	err = c.Collect(context.Background(), r)
 	if err == nil {
 		t.Errorf("Expected 405 error no error occurred!")
 	} else {
-		if err, ok := err.(BadRequestErr); ok {
-			if err.StatusCode != 405 {
-				t.Errorf("Expected 405 error no error occurred!")
-			}
+		if errors.As(err, &e) {
+			fmt.Printf("Error was expected: %v\n", err)
+		} else {
+			t.Errorf("Expected 405 error, but got: %v", err)
 		}
 	}
 }
@@ -144,6 +149,7 @@ func TestSamplingCollector(t *testing.T) {
 	c := SamplingCollector{
 		collector: &RemoteCollector{
 			collectorEndpoint: u,
+			httpClient:        &http.Client{Timeout: 10 * time.Second},
 		},
 		successFraction: 0.5,
 		failureFraction: 0.1,
@@ -186,6 +192,7 @@ func TestSendJSONToServer(t *testing.T) {
 	var r Report = testReport
 	c := RemoteCollector{
 		collectorEndpoint: u,
+		httpClient:        &http.Client{Timeout: 10 * time.Second},
 	}
 	err = c.Collect(context.Background(), r)
 	if err != nil {
@@ -216,11 +223,90 @@ func TestFallbackCollector(t *testing.T) {
 		collectors: []Collector{
 			&RemoteCollector{
 				collectorEndpoint: u1,
+				httpClient:        &http.Client{Timeout: 10 * time.Second},
 			},
 			&RemoteCollector{
 				collectorEndpoint: u2,
+				httpClient:        &http.Client{Timeout: 10 * time.Second},
 			},
 		},
+	}
+	err = c.Collect(context.Background(), r)
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+}
+
+func TestRetryCollector(t *testing.T) {
+	var testReport = ConnectivityReport{
+		Connection: nil,
+		Time:       time.Now().UTC().Truncate(time.Second),
+		DurationMs: 1,
+	}
+	var r Report = testReport
+	v, ok := r.(HasSuccess)
+	if ok {
+		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
+	}
+	u, err := url.Parse("https://google.com")
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+	c := RetryCollector{
+		collector: &RemoteCollector{
+			collectorEndpoint: u,
+			httpClient:        &http.Client{Timeout: 10 * time.Second},
+		},
+		maxRetry:         3,
+		waitBetweenRetry: 1 * time.Second,
+	}
+	err = c.Collect(context.Background(), r)
+	if err == nil {
+		t.Errorf("max retry error expcted not got none!")
+	} else {
+		fmt.Printf("Error was expected: %v\n", err)
+	}
+}
+
+func TestWriteCollector(t *testing.T) {
+	var testReport = ConnectivityReport{
+		Connection: nil,
+		Time:       time.Now().UTC().Truncate(time.Second),
+		DurationMs: 1,
+	}
+	var r Report = testReport
+	v, ok := r.(HasSuccess)
+	if ok {
+		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
+	}
+	c := WriteCollector{
+		writer: io.Discard,
+	}
+	err := c.Collect(context.Background(), r)
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+}
+
+// TestWriteCollectorToFile that opens a file and collects to a temp file
+func TestWriteCollectorToFile(t *testing.T) {
+	var testReport = ConnectivityReport{
+		Connection: nil,
+		Time:       time.Now().UTC().Truncate(time.Second),
+		DurationMs: 1,
+	}
+	var r Report = testReport
+	v, ok := r.(HasSuccess)
+	if ok {
+		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
+	}
+	f, err := os.CreateTemp("", "test")
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+	defer os.Remove(f.Name()) // clean up
+	c := WriteCollector{
+		writer: f,
 	}
 	err = c.Collect(context.Background(), r)
 	if err != nil {
