@@ -277,8 +277,8 @@ func TestRetryCollector(t *testing.T) {
 			collectorEndpoint: u,
 			httpClient:        &http.Client{Timeout: 10 * time.Second},
 		},
-		maxRetry:         3,
-		waitBetweenRetry: 1 * time.Second,
+		maxRetry:     3,
+		initialDelay: 1 * time.Second,
 	}
 	err = c.Collect(context.Background(), r)
 	if err == nil {

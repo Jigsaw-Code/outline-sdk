@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -110,9 +111,9 @@ func (c *SamplingCollector) Collect(ctx context.Context, report Report) error {
 
 // RetryCollector represents a collector that supports retrying failed operations.
 type RetryCollector struct {
-	collector        Collector
-	maxRetry         int
-	waitBetweenRetry time.Duration
+	collector    Collector
+	maxRetry     int
+	initialDelay time.Duration
 }
 
 // Collect collects the report by making multiple attempts with retries.
@@ -128,7 +129,7 @@ func (c *RetryCollector) Collect(ctx context.Context, report Report) error {
 			if errors.As(err, &e) {
 				break
 			} else {
-				time.Sleep(c.waitBetweenRetry)
+				time.Sleep(time.Duration(math.Pow(2, float64(i))) * c.initialDelay)
 			}
 		} else {
 			return nil
