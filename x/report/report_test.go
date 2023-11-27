@@ -41,6 +41,26 @@ type ConnectivityError struct {
 	Msg        string `json:"msg"`
 }
 
+// ConnectivityReport implements the [HasSuccess] interface.
+func (r ConnectivityReport) IsSuccess() bool {
+	if r.Error == nil {
+		return true
+	} else {
+		return false
+	}
+}
+
+// ConnectivityReport represents a report containing connectivity information.
+type ConnectivityReport struct {
+	// Connection setup
+	Connection interface{} `json:"connection"`
+	// Observations
+	Time       time.Time `json:"time"`
+	DurationMs int64     `json:"durationMs"`
+	// Connectivity error, if any
+	Error interface{} `json:"error"`
+}
+
 func TestIsSuccess(t *testing.T) {
 	var testReport = ConnectivityReport{
 		Connection: nil,

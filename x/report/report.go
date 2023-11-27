@@ -35,32 +35,12 @@ func (e BadRequestError) Unwrap() error {
 	return e.Err
 }
 
-// ConnectivityReport represents a report containing connectivity information.
-type ConnectivityReport struct {
-	// Connection setup
-	Connection interface{} `json:"connection"`
-	// Observations
-	Time       time.Time `json:"time"`
-	DurationMs int64     `json:"durationMs"`
-	// Connectivity error, if any
-	Error interface{} `json:"error"`
-}
-
 // Report is an alias for any type of report.
 type Report any
 
 // HasSuccess is an interface that represents an object that has a success status.
 type HasSuccess interface {
 	IsSuccess() bool
-}
-
-// ConnectivityReport implements the [HasSuccess] interface.
-func (r ConnectivityReport) IsSuccess() bool {
-	if r.Error == nil {
-		return true
-	} else {
-		return false
-	}
 }
 
 // Collector is an interface that defines the behavior of a report collector.
