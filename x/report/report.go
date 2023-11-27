@@ -1,10 +1,10 @@
 // Package report provides functionality for collecting and sending reports.
 //
-// It defines the behavior of a report collector and provides implementations of the Collector interface.
-// It also defines a report type and a HasSuccess interface that is implemented by the report type.
+// It defines the behavior of a report collector and provides implementations of the [Collector] interface.
+// It also defines a report type and a [HasSuccess] interface that is implemented by the report type.
 // The report type is used to represent a connectivity test report.
-// The HasSuccess interface is used to determine the success status of a report. This will be used to control SamplingCollector behavior.
-// The report package also defines a BadRequestError type that is used to represent an error that occurs when a sending the report to remote collector fails.
+// The [HasSuccess] interface is used to determine the success status of a report. This will be used to control [SamplingCollector] behavior.
+// The report package also defines a [BadRequestError] type that is used to represent an error that occurs when a sending the report to remote collector fails.
 package report
 
 import (
