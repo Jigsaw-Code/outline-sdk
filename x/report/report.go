@@ -157,15 +157,15 @@ func (c *RetryCollector) Collect(ctx context.Context, report Report) error {
 	return errors.New("max retry exceeded")
 }
 
-// MutltiCollector represents a collector that combines multiple collectors.
-type MutltiCollector struct {
+// MultiCollector represents a collector that combines multiple collectors.
+type MultiCollector struct {
 	collectors []Collector
 }
 
-// Collect implements Collector interface on [MutltiCollector] type.
+// Collect implements [Collector] interface on [MultiCollector] type.
 // It collects the report using all the provided collectors in the [MultiCollector].
 // It returns an error if all collectors fail to collect the report.
-func (c *MutltiCollector) Collect(ctx context.Context, report Report) error {
+func (c *MultiCollector) Collect(ctx context.Context, report Report) error {
 	success := false
 	for i := range c.collectors {
 		err := c.collectors[i].Collect(ctx, report)
