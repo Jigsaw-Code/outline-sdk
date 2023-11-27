@@ -82,7 +82,7 @@ type RemoteCollector struct {
 func (c *RemoteCollector) Collect(ctx context.Context, report Report) error {
 	jsonData, err := json.Marshal(report)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 	err = c.sendReport(ctx, jsonData)
 	if err != nil {
@@ -240,7 +240,7 @@ type WriteCollector struct {
 func (c *WriteCollector) Collect(ctx context.Context, report Report) error {
 	jsonData, err := json.Marshal(report)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 	_, err = c.writer.Write(jsonData)
 	if err != nil {
