@@ -78,3 +78,25 @@ func WrapConnFunc(base transport.StreamConn, frag FragFunc) (transport.StreamCon
 	}
 	return transport.WrapConn(base, base, w), nil
 }
+
+// NewFixedBytesStreamDialer is a [transport.StreamDialer] that modifies the [TLS Client Hello] message. It splits the
+// Client Hello message into two parts based on the given splitBytes. If splitBytes is positive, the first piece will
+// contain the specified number of leading bytes from the original message. If it is negative, the second piece will
+// contain the specified number of trailing bytes.
+//
+// [TLS Client Hello]: https://datatracker.ietf.org/doc/html/rfc8446#section-4.1.2
+func NewFixedBytesStreamDialer(base transport.StreamDialer, splitBytes int) (transport.StreamDialer, error) {
+	if base == nil {
+		return nil, errors.New("base dialer must not be nil")
+	}
+	if splitBytes == 0 {
+		return base, nil
+	}
+	return NewStreamDialerFunc(base, func(record []byte) int {
+		if splitBytes > 0 {
+			// TODO: optimize for the leading bytes split
+			return splitBytes
+		}
+		return len(record) + splitBytes
+	})
+}
