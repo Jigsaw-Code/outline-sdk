@@ -35,13 +35,13 @@ func TestStreamDialerFuncSplitsClientHello(t *testing.T) {
 	req1 := constructTLSRecord(t, layers.TLSApplicationData, 0x0303, []byte{0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88})
 
 	inner := &collectStreamDialer{}
-	conn := assertCanDialFragFunc(t, inner, "ipinfo.io:443", func(_ []byte) int { return 2 })
+	conn := assertCanDialFragFunc(t, inner, "ipinfo.io:443", func(payload []byte) int { return len(payload) / 2 })
 	defer conn.Close()
 
 	assertCanWriteAll(t, conn, net.Buffers{hello, cipher, req1, hello, cipher, req1})
 
-	frag1 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00})
-	frag2 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x00, 0x03, 0xaa, 0xbb, 0xcc})
+	frag1 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00})
+	frag2 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x03, 0xaa, 0xbb, 0xcc})
 	expected := net.Buffers{
 		append(frag1, frag2...),           // fragment 1 and fragment 2 will be merged in one single Write
 		cipher, req1, hello, cipher, req1, // unchanged
@@ -78,7 +78,7 @@ func TestStreamDialerFuncDontSplitNonClientHello(t *testing.T) {
 
 	for _, tc := range cases {
 		inner := &collectStreamDialer{}
-		conn := assertCanDialFragFunc(t, inner, "ipinfo.io:443", func(_ []byte) int { return 2 })
+		conn := assertCanDialFragFunc(t, inner, "ipinfo.io:443", func(payload []byte) int { return len(payload) / 2 })
 		defer conn.Close()
 
 		assertCanWriteAll(t, conn, net.Buffers{tc.pkt, cipher, req})
@@ -91,10 +91,73 @@ func TestStreamDialerFuncDontSplitNonClientHello(t *testing.T) {
 	}
 }
 
+// Make sure only the first Client Hello is splitted.
+func TestFixedBytesStreamDialerSplitsClientHello(t *testing.T) {
+	hello := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00, 0x03, 0xaa, 0xbb, 0xcc})
+	cipher := constructTLSRecord(t, layers.TLSChangeCipherSpec, 0x0303, []byte{0x01})
+	req1 := constructTLSRecord(t, layers.TLSApplicationData, 0x0303, []byte{0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88})
+
+	cases := []struct {
+		msg                string
+		original, splitted net.Buffers
+		splitBytes         int
+	}{
+		{
+			msg:        "split leading bytes",
+			original:   net.Buffers{hello, cipher, req1, hello, cipher, req1},
+			splitBytes: 2,
+			splitted: net.Buffers{
+				// fragment 1 and fragment 2 will be merged in one single Write
+				append(
+					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00}),
+					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x00, 0x03, 0xaa, 0xbb, 0xcc})...),
+				cipher, req1, hello, cipher, req1,
+			},
+		},
+		{
+			msg:        "split trailing bytes",
+			original:   net.Buffers{hello, cipher, req1, hello, cipher, req1},
+			splitBytes: -2,
+			splitted: net.Buffers{
+				// fragment 1 and fragment 2 will be merged in one single Write
+				append(
+					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00, 0x03, 0xaa}),
+					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0xbb, 0xcc})...),
+				cipher, req1, hello, cipher, req1,
+			},
+		},
+		{
+			msg:        "no split",
+			original:   net.Buffers{hello, cipher, req1, hello, cipher, req1},
+			splitBytes: 0,
+			splitted:   net.Buffers{hello, cipher, req1, hello, cipher, req1},
+		},
+	}
+
+	for _, tc := range cases {
+		inner := &collectStreamDialer{}
+		conn := assertCanDialFixedBytesFrag(t, inner, "ipinfo.io:443", tc.splitBytes)
+		defer conn.Close()
+
+		assertCanWriteAll(t, conn, tc.original)
+		require.Equal(t, tc.splitted, inner.bufs, tc.msg)
+	}
+}
+
 // test assertions
 
 func assertCanDialFragFunc(t *testing.T, inner transport.StreamDialer, raddr string, frag FragFunc) transport.StreamConn {
 	d, err := NewStreamDialerFunc(inner, frag)
+	require.NoError(t, err)
+	require.NotNil(t, d)
+	conn, err := d.Dial(context.Background(), raddr)
+	require.NoError(t, err)
+	require.NotNil(t, conn)
+	return conn
+}
+
+func assertCanDialFixedBytesFrag(t *testing.T, inner transport.StreamDialer, raddr string, splitBytes int) transport.StreamConn {
+	d, err := NewFixedBytesStreamDialer(inner, splitBytes)
 	require.NoError(t, err)
 	require.NotNil(t, d)
 	conn, err := d.Dial(context.Background(), raddr)
