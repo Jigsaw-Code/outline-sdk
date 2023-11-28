@@ -110,8 +110,8 @@ func TestSendReportSuccessfully(t *testing.T) {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
 	c := RemoteCollector{
-		collectorEndpoint: u,
-		httpClient:        &http.Client{Timeout: 10 * time.Second},
+		CollectorEndpoint: u,
+		HttpClient:        &http.Client{Timeout: 10 * time.Second},
 	}
 	err = c.Collect(context.Background(), r)
 	if err != nil {
@@ -136,8 +136,8 @@ func TestSendReportUnsuccessfully(t *testing.T) {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
 	c := RemoteCollector{
-		collectorEndpoint: u,
-		httpClient:        &http.Client{Timeout: 10 * time.Second},
+		CollectorEndpoint: u,
+		HttpClient:        &http.Client{Timeout: 10 * time.Second},
 	}
 	err = c.Collect(context.Background(), r)
 	if err == nil {
@@ -167,12 +167,12 @@ func TestSamplingCollector(t *testing.T) {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
 	c := SamplingCollector{
-		collector: &RemoteCollector{
-			collectorEndpoint: u,
-			httpClient:        &http.Client{Timeout: 10 * time.Second},
+		Collector: &RemoteCollector{
+			CollectorEndpoint: u,
+			HttpClient:        &http.Client{Timeout: 10 * time.Second},
 		},
-		successFraction: 0.5,
-		failureFraction: 0.1,
+		SuccessFraction: 0.5,
+		FailureFraction: 0.1,
 	}
 	err = c.Collect(context.Background(), r)
 	if err != nil {
@@ -211,8 +211,8 @@ func TestSendJSONToServer(t *testing.T) {
 	}
 	var r Report = testReport
 	c := RemoteCollector{
-		collectorEndpoint: u,
-		httpClient:        &http.Client{Timeout: 10 * time.Second},
+		CollectorEndpoint: u,
+		HttpClient:        &http.Client{Timeout: 10 * time.Second},
 	}
 	err = c.Collect(context.Background(), r)
 	if err != nil {
@@ -240,14 +240,14 @@ func TestFallbackCollector(t *testing.T) {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
 	c := FallbackCollector{
-		collectors: []Collector{
+		Collectors: []Collector{
 			&RemoteCollector{
-				collectorEndpoint: u1,
-				httpClient:        &http.Client{Timeout: 10 * time.Second},
+				CollectorEndpoint: u1,
+				HttpClient:        &http.Client{Timeout: 10 * time.Second},
 			},
 			&RemoteCollector{
-				collectorEndpoint: u2,
-				httpClient:        &http.Client{Timeout: 10 * time.Second},
+				CollectorEndpoint: u2,
+				HttpClient:        &http.Client{Timeout: 10 * time.Second},
 			},
 		},
 	}
@@ -273,12 +273,12 @@ func TestRetryCollector(t *testing.T) {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
 	c := RetryCollector{
-		collector: &RemoteCollector{
-			collectorEndpoint: u,
-			httpClient:        &http.Client{Timeout: 10 * time.Second},
+		Collector: &RemoteCollector{
+			CollectorEndpoint: u,
+			HttpClient:        &http.Client{Timeout: 10 * time.Second},
 		},
-		maxRetry:     3,
-		initialDelay: 1 * time.Second,
+		MaxRetry:     3,
+		InitialDelay: 1 * time.Second,
 	}
 	err = c.Collect(context.Background(), r)
 	if err == nil {
@@ -300,7 +300,7 @@ func TestWriteCollector(t *testing.T) {
 		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
 	}
 	c := WriteCollector{
-		writer: io.Discard,
+		Writer: io.Discard,
 	}
 	err := c.Collect(context.Background(), r)
 	if err != nil {
@@ -326,7 +326,7 @@ func TestWriteCollectorToFile(t *testing.T) {
 	}
 	defer os.Remove(f.Name()) // clean up
 	c := WriteCollector{
-		writer: f,
+		Writer: f,
 	}
 	err = c.Collect(context.Background(), r)
 	if err != nil {
