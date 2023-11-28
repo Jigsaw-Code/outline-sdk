@@ -79,7 +79,7 @@ func WrapConnFunc(base transport.StreamConn, frag FragFunc) (transport.StreamCon
 	return transport.WrapConn(base, base, w), nil
 }
 
-// NewFixedBytesStreamDialer is a [transport.StreamDialer] that modifies the [TLS Client Hello] message. It splits the
+// NewFixedBytesStreamDialer is a [transport.StreamDialer] that fragments the handshake TLS record. It splits the
 // Client Hello message into two parts based on the given splitBytes. If splitBytes is positive, the first piece will
 // contain the specified number of leading bytes from the original message. If it is negative, the second piece will
 // contain the specified number of trailing bytes.
