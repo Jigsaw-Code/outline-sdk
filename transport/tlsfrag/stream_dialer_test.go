@@ -162,7 +162,7 @@ func TestNestedFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 	require.NoError(t, err)
 	d, err = NewFixedLenStreamDialer(d, 8) // Further split msg[:16] mentioned below into msg[:8] + msg[8:16]
 	require.NoError(t, err)
-	conn := assertCanDialFixedLenFrag(t, d, "ipinfo.io:443", 16) // Split into msg[:16] + msg[16:]
+	conn := assertCanDialFixedLenFrag(t, d, "ipinfo.io:443", -3) // Split msg[:19] into msg[:16] + msg[16:19]
 	defer conn.Close()
 
 	assertCanWriteAll(t, conn, net.Buffers{hello, cipher, req1, hello, cipher, req1})
