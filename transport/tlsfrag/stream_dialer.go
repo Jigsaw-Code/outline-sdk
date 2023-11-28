@@ -79,24 +79,24 @@ func WrapConnFunc(base transport.StreamConn, frag FragFunc) (transport.StreamCon
 	return transport.WrapConn(base, base, w), nil
 }
 
-// NewFixedBytesStreamDialer is a [transport.StreamDialer] that fragments the handshake TLS record. It splits the
-// Client Hello message into two parts based on the given splitBytes. If splitBytes is positive, the first piece will
-// contain the specified number of leading bytes from the original message. If it is negative, the second piece will
-// contain the specified number of trailing bytes.
+// NewFixedLenStreamDialer is a [transport.StreamDialer] that fragments the [TLS handshake record]. It splits the
+// record into two records based on the given splitLen. If splitLen is positive, the first piece will contain the
+// specified number of leading bytes from the original message. If it is negative, the second piece will contain
+// the specified number of trailing bytes.
 //
-// [TLS Client Hello]: https://datatracker.ietf.org/doc/html/rfc8446#section-4.1.2
-func NewFixedBytesStreamDialer(base transport.StreamDialer, splitBytes int) (transport.StreamDialer, error) {
+// [TLS handshake record]: https://datatracker.ietf.org/doc/html/rfc8446#section-5.1
+func NewFixedLenStreamDialer(base transport.StreamDialer, splitLen int) (transport.StreamDialer, error) {
 	if base == nil {
 		return nil, errors.New("base dialer must not be nil")
 	}
-	if splitBytes == 0 {
+	if splitLen == 0 {
 		return base, nil
 	}
 	return NewStreamDialerFunc(base, func(record []byte) int {
-		if splitBytes > 0 {
+		if splitLen > 0 {
 			// TODO: optimize for the leading bytes split
-			return splitBytes
+			return splitLen
 		}
-		return len(record) + splitBytes
+		return len(record) + splitLen
 	})
 }

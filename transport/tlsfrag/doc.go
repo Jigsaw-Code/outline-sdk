@@ -13,25 +13,26 @@
 // limitations under the License.
 
 /*
-Package tlsfrag provides tools to split a single [TLS Client Hello message]
-into multiple [TLS records]. This technique, known as TLS record fragmentation,
-forces censors to maintain state and allocate memory for potential reassembly,
-making censorship more difficult and resource-intensive. For detailed
-explanation on how this technique works, refer to [Circumventing the GFW with
-TLS Record Fragmentation].
+Package tlsfrag provides tools to split the [TLS handshake record] containing
+the [Client Hello message] into multiple [TLS records]. This technique,
+known as TLS record fragmentation, forces censors to maintain state and
+allocate memory for potential reassembly, making censorship more difficult and
+resource-intensive. For detailed explanation on how this technique works, refer
+to [Circumventing the GFW with TLS Record Fragmentation].
 
 This package offers convenient helper functions to create a TLS
-[transport.StreamDialer] that fragments the [TLS Client Hello message]:
-  - [NewFixedBytesStreamDialer] creates a [transport.StreamDialer] that splits
-    the Client Hello message into two records. One record will have the
-    specified splitBytes length.
-  - [NewStreamDialerFunc] offers a more flexible way to fragment Client Hello
-    message. It accepts a callback function that determines the split point,
+[transport.StreamDialer] that fragments the [TLS handshake record]:
+  - [NewFixedLenStreamDialer] creates a [transport.StreamDialer] that splits
+    the [Client Hello message] into two records. One of the records will have
+    the specified length of splitLen bytes.
+  - [NewStreamDialerFunc] offers a more flexible way to fragment [Client Hello
+    message]. It accepts a callback function that determines the split point,
     enabling advanced splitting logic such as splitting based on the SNI
     extension.
 
 [Circumventing the GFW with TLS Record Fragmentation]: https://upb-syssec.github.io/blog/2023/record-fragmentation/#tls-record-fragmentation
-[TLS Client Hello message]: https://datatracker.ietf.org/doc/html/rfc8446#section-4.1.2
 [TLS records]: https://datatracker.ietf.org/doc/html/rfc8446#section-5.1
+[TLS handshake record]: https://datatracker.ietf.org/doc/html/rfc8446#appendix-B.3
+[Client Hello message]: https://datatracker.ietf.org/doc/html/rfc8446#section-4.1.2
 */
 package tlsfrag
