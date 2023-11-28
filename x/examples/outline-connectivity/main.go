@@ -172,8 +172,7 @@ func main() {
 			if testErr == nil {
 				success = true
 			}
-			//var r report.Report = testReport
-			record := jsonRecord{
+			var r report.Report = jsonRecord{
 				Resolver: resolverAddress,
 				Proto:    proto,
 				Time:     testTime.UTC().Truncate(time.Second),
@@ -183,12 +182,6 @@ func main() {
 				DurationMs: testDuration.Milliseconds(),
 				Error:      makeErrorRecord(testErr),
 			}
-			var r report.Report = record
-			// err := jsonEncoder.Encode(record)
-			// if err != nil {
-			// 	log.Fatalf("Failed to output JSON: %v", err)
-			// }
-			// Send error report to collector if specified
 			u, err := url.Parse(*reportToFlag)
 			if err != nil {
 				debugLog.Printf("Expected no error, but got: %v", err)
@@ -197,8 +190,13 @@ func main() {
 				CollectorEndpoint: u,
 				HttpClient:        &http.Client{Timeout: 10 * time.Second},
 			}
+			retryCollector := &report.RetryCollector{
+				Collector:    remoteCollector,
+				MaxRetry:     3,
+				InitialDelay: 1 * time.Second,
+			}
 			c := report.SamplingCollector{
-				Collector:       remoteCollector,
+				Collector:       retryCollector,
 				SuccessFraction: *reportSuccessFlag,
 				FailureFraction: *reportFailureFlag,
 			}
