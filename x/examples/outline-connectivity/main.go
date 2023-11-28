@@ -15,7 +15,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -23,9 +22,9 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -34,6 +33,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
+	"github.com/Jigsaw-Code/outline-sdk/x/report"
 )
 
 var debugLog log.Logger = *log.New(io.Discard, "", 0)
@@ -88,35 +88,12 @@ func unwrapAll(err error) error {
 	}
 }
 
-func sendReport(record jsonRecord, collectorURL string) error {
-	jsonData, err := json.Marshal(record)
-	if err != nil {
-		log.Fatalf("Error encoding JSON: %s\n", err)
-		return err
+func (r jsonRecord) IsSuccess() bool {
+	if r.Error == nil {
+		return true
+	} else {
+		return false
 	}
-
-	req, err := http.NewRequest("POST", collectorURL, bytes.NewReader(jsonData))
-	if err != nil {
-		debugLog.Printf("Error creating the HTTP request: %s\n", err)
-		return err
-	}
-
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatalf("Error sending the HTTP request: %s\n", err)
-		return err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		debugLog.Printf("Error reading the HTTP response body: %s\n", err)
-		return err
-	}
-	debugLog.Printf("Response: %s\n", respBody)
-	return nil
 }
 
 func init() {
@@ -170,7 +147,6 @@ func main() {
 		resolverAddress := net.JoinHostPort(resolverHost, "53")
 		for _, proto := range strings.Split(*protoFlag, ",") {
 			proto = strings.TrimSpace(proto)
-
 			testTime := time.Now()
 			var testErr error
 			var testDuration time.Duration
@@ -196,6 +172,7 @@ func main() {
 			if testErr == nil {
 				success = true
 			}
+			//var r report.Report = testReport
 			record := jsonRecord{
 				Resolver: resolverAddress,
 				Proto:    proto,
@@ -206,34 +183,32 @@ func main() {
 				DurationMs: testDuration.Milliseconds(),
 				Error:      makeErrorRecord(testErr),
 			}
-			err := jsonEncoder.Encode(record)
-			if err != nil {
-				log.Fatalf("Failed to output JSON: %v", err)
-			}
+			var r report.Report = record
+			// err := jsonEncoder.Encode(record)
+			// if err != nil {
+			// 	log.Fatalf("Failed to output JSON: %v", err)
+			// }
 			// Send error report to collector if specified
-			if *reportToFlag != "" {
-				var samplingRate float64
-				if success {
-					samplingRate = *reportSuccessFlag
-				} else {
-					samplingRate = *reportFailureFlag
-				}
-				// Generate a random number between 0 and 1
-				random := rand.Float64()
-				if random < samplingRate {
-					err = sendReport(record, *reportToFlag)
-					if err != nil {
-						log.Fatalf("Report failed: %v", err)
-					} else {
-						fmt.Println("Report sent")
-					}
-				} else {
-					fmt.Println("Report was not sent this time")
-				}
+			u, err := url.Parse(*reportToFlag)
+			if err != nil {
+				debugLog.Printf("Expected no error, but got: %v", err)
+			}
+			remoteCollector := &report.RemoteCollector{
+				CollectorEndpoint: u,
+				HttpClient:        &http.Client{Timeout: 10 * time.Second},
+			}
+			c := report.SamplingCollector{
+				Collector:       remoteCollector,
+				SuccessFraction: *reportSuccessFlag,
+				FailureFraction: *reportFailureFlag,
+			}
+			err = c.Collect(context.Background(), r)
+			if err != nil {
+				debugLog.Printf("Failed to collect report: %v\n", err)
 			}
 		}
-	}
-	if !success {
-		os.Exit(1)
+		if !success {
+			os.Exit(1)
+		}
 	}
 }
