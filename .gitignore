@@ -1,14 +1,24 @@
+# vscode
+.trunk
 .vscode
+
 
 # MacOS files
 .DS_Store
 .idea
+
+# Xcode
+App.xcscheme
+
+# Android Studio
+output-metadata.json
 
 # Not using Zero-Installs
 .yarn/*
 !.yarn/releases
 !.yarn/plugins
 .pnp.*
+.yarn-integrity
 
 #  using Zero Installs
 #.yarn/unplugged
