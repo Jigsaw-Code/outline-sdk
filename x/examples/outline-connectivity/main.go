@@ -40,7 +40,7 @@ var debugLog log.Logger = *log.New(io.Discard, "", 0)
 
 // var errorLog log.Logger = *log.New(os.Stderr, "[ERROR] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
-type jsonRecord struct {
+type connectivityReport struct {
 	// Inputs
 	Resolver string `json:"resolver"`
 	Proto    string `json:"proto"`
@@ -88,7 +88,7 @@ func unwrapAll(err error) error {
 	}
 }
 
-func (r jsonRecord) IsSuccess() bool {
+func (r connectivityReport) IsSuccess() bool {
 	if r.Error == nil {
 		return true
 	} else {
@@ -172,7 +172,7 @@ func main() {
 			if testErr == nil {
 				success = true
 			}
-			var r report.Report = jsonRecord{
+			var r report.Report = connectivityReport{
 				Resolver: resolverAddress,
 				Proto:    proto,
 				Time:     testTime.UTC().Truncate(time.Second),
@@ -182,13 +182,13 @@ func main() {
 				DurationMs: testDuration.Milliseconds(),
 				Error:      makeErrorRecord(testErr),
 			}
-			u, err := url.Parse(*reportToFlag)
+			collectorURL, err := url.Parse(*reportToFlag)
 			if err != nil {
 				debugLog.Printf("Expected no error, but got: %v", err)
 			}
 			remoteCollector := &report.RemoteCollector{
-				CollectorEndpoint: u,
-				HttpClient:        &http.Client{Timeout: 10 * time.Second},
+				CollectorURL: collectorURL,
+				HttpClient:   &http.Client{Timeout: 10 * time.Second},
 			}
 			retryCollector := &report.RetryCollector{
 				Collector:    remoteCollector,
