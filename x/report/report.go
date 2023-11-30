@@ -52,8 +52,8 @@ type Collector interface {
 
 // RemoteCollector represents a collector that communicates with a remote endpoint.
 type RemoteCollector struct {
-	HttpClient        *http.Client
-	CollectorEndpoint *url.URL
+	HttpClient   *http.Client
+	CollectorURL *url.URL
 }
 
 // Collect sends the given report to the remote collector.
@@ -123,7 +123,7 @@ type RetryCollector struct {
 // Returns an error if the maximum number of retries is exceeded.
 func (c *RetryCollector) Collect(ctx context.Context, report Report) error {
 	var e *BadRequestError
-	for i := 0; i < c.MaxRetry; i++ {
+	for i := 0; i < c.MaxRetry+1; i++ {
 		err := c.Collector.Collect(ctx, report)
 		if err != nil {
 			if errors.As(err, &e) {
@@ -163,7 +163,7 @@ func (c *FallbackCollector) Collect(ctx context.Context, report Report) error {
 // It returns an error if there was a problem sending the report or reading the response.
 func (c *RemoteCollector) sendReport(ctx context.Context, jsonData []byte) error {
 	// TODO: return status code of HTTP response
-	req, err := http.NewRequest("POST", c.CollectorEndpoint.String(), bytes.NewReader(jsonData))
+	req, err := http.NewRequest("POST", c.CollectorURL.String(), bytes.NewReader(jsonData))
 	if err != nil {
 		return err
 	}
