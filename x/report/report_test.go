@@ -110,8 +110,8 @@ func TestSendReportSuccessfully(t *testing.T) {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
 	c := RemoteCollector{
-		CollectorEndpoint: u,
-		HttpClient:        &http.Client{Timeout: 10 * time.Second},
+		CollectorURL: u,
+		HttpClient:   &http.Client{Timeout: 10 * time.Second},
 	}
 	err = c.Collect(context.Background(), r)
 	if err != nil {
@@ -136,8 +136,8 @@ func TestSendReportUnsuccessfully(t *testing.T) {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
 	c := RemoteCollector{
-		CollectorEndpoint: u,
-		HttpClient:        &http.Client{Timeout: 10 * time.Second},
+		CollectorURL: u,
+		HttpClient:   &http.Client{Timeout: 10 * time.Second},
 	}
 	err = c.Collect(context.Background(), r)
 	if err == nil {
@@ -168,8 +168,8 @@ func TestSamplingCollector(t *testing.T) {
 	}
 	c := SamplingCollector{
 		Collector: &RemoteCollector{
-			CollectorEndpoint: u,
-			HttpClient:        &http.Client{Timeout: 10 * time.Second},
+			CollectorURL: u,
+			HttpClient:   &http.Client{Timeout: 10 * time.Second},
 		},
 		SuccessFraction: 0.5,
 		FailureFraction: 0.1,
@@ -211,8 +211,8 @@ func TestSendJSONToServer(t *testing.T) {
 	}
 	var r Report = testReport
 	c := RemoteCollector{
-		CollectorEndpoint: u,
-		HttpClient:        &http.Client{Timeout: 10 * time.Second},
+		CollectorURL: u,
+		HttpClient:   &http.Client{Timeout: 10 * time.Second},
 	}
 	err = c.Collect(context.Background(), r)
 	if err != nil {
@@ -242,12 +242,12 @@ func TestFallbackCollector(t *testing.T) {
 	c := FallbackCollector{
 		Collectors: []Collector{
 			&RemoteCollector{
-				CollectorEndpoint: u1,
-				HttpClient:        &http.Client{Timeout: 10 * time.Second},
+				CollectorURL: u1,
+				HttpClient:   &http.Client{Timeout: 10 * time.Second},
 			},
 			&RemoteCollector{
-				CollectorEndpoint: u2,
-				HttpClient:        &http.Client{Timeout: 10 * time.Second},
+				CollectorURL: u2,
+				HttpClient:   &http.Client{Timeout: 10 * time.Second},
 			},
 		},
 	}
@@ -274,8 +274,8 @@ func TestRetryCollector(t *testing.T) {
 	}
 	c := RetryCollector{
 		Collector: &RemoteCollector{
-			CollectorEndpoint: u,
-			HttpClient:        &http.Client{Timeout: 10 * time.Second},
+			CollectorURL: u,
+			HttpClient:   &http.Client{Timeout: 10 * time.Second},
 		},
 		MaxRetry:     3,
 		InitialDelay: 1 * time.Second,
