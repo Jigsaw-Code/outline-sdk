@@ -184,7 +184,7 @@ func main() {
 			}
 			collectorURL, err := url.Parse(*reportToFlag)
 			if err != nil {
-				debugLog.Printf("Expected no error, but got: %v", err)
+				debugLog.Printf("Failed to parse collector URL: %v", err)
 			}
 			remoteCollector := &report.RemoteCollector{
 				CollectorURL: collectorURL,
