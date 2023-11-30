@@ -100,12 +100,12 @@ func TestFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 	cases := []struct {
 		msg                string
 		original, splitted net.Buffers
-		splitBytes         int
+		splitLen           int
 	}{
 		{
-			msg:        "split leading bytes",
-			original:   net.Buffers{hello, cipher, req1, hello, cipher, req1},
-			splitBytes: 2,
+			msg:      "split leading bytes",
+			original: net.Buffers{hello, cipher, req1, hello, cipher, req1},
+			splitLen: 2,
 			splitted: net.Buffers{
 				// First two fragments will be merged in one single Write
 				append(
@@ -115,9 +115,9 @@ func TestFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 			},
 		},
 		{
-			msg:        "split trailing bytes",
-			original:   net.Buffers{hello, cipher, req1, hello, cipher, req1},
-			splitBytes: -2,
+			msg:      "split trailing bytes",
+			original: net.Buffers{hello, cipher, req1, hello, cipher, req1},
+			splitLen: -2,
 			splitted: net.Buffers{
 				// First two fragments will be merged in one single Write
 				append(
@@ -127,16 +127,16 @@ func TestFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 			},
 		},
 		{
-			msg:        "no split",
-			original:   net.Buffers{hello, cipher, req1, hello, cipher, req1},
-			splitBytes: 0,
-			splitted:   net.Buffers{hello, cipher, req1, hello, cipher, req1},
+			msg:      "no split",
+			original: net.Buffers{hello, cipher, req1, hello, cipher, req1},
+			splitLen: 0,
+			splitted: net.Buffers{hello, cipher, req1, hello, cipher, req1},
 		},
 	}
 
 	for _, tc := range cases {
 		inner := &collectStreamDialer{}
-		conn := assertCanDialFixedLenFrag(t, inner, "ipinfo.io:443", tc.splitBytes)
+		conn := assertCanDialFixedLenFrag(t, inner, "ipinfo.io:443", tc.splitLen)
 		defer conn.Close()
 
 		assertCanWriteAll(t, conn, tc.original)
@@ -188,8 +188,8 @@ func assertCanDialFragFunc(t *testing.T, inner transport.StreamDialer, raddr str
 	return conn
 }
 
-func assertCanDialFixedLenFrag(t *testing.T, inner transport.StreamDialer, raddr string, splitBytes int) transport.StreamConn {
-	d, err := NewFixedLenStreamDialer(inner, splitBytes)
+func assertCanDialFixedLenFrag(t *testing.T, inner transport.StreamDialer, raddr string, splitLen int) transport.StreamConn {
+	d, err := NewFixedLenStreamDialer(inner, splitLen)
 	require.NoError(t, err)
 	require.NotNil(t, d)
 	conn, err := d.Dial(context.Background(), raddr)
