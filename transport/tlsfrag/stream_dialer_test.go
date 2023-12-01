@@ -28,23 +28,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Make sure only the first Client Hello is splitted.
+// Make sure only the first Client Hello is splitted in half.
 func TestStreamDialerFuncSplitsClientHello(t *testing.T) {
 	hello := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00, 0x03, 0xaa, 0xbb, 0xcc})
 	cipher := constructTLSRecord(t, layers.TLSChangeCipherSpec, 0x0303, []byte{0x01})
 	req1 := constructTLSRecord(t, layers.TLSApplicationData, 0x0303, []byte{0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88})
 
 	inner := &collectStreamDialer{}
-	conn := assertCanDialFragFunc(t, inner, "ipinfo.io:443", func(_ []byte) int { return 2 })
+	conn := assertCanDialFragFunc(t, inner, "ipinfo.io:443", func(payload []byte) int { return len(payload) / 2 })
 	defer conn.Close()
 
 	assertCanWriteAll(t, conn, net.Buffers{hello, cipher, req1, hello, cipher, req1})
 
-	frag1 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00})
-	frag2 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x00, 0x03, 0xaa, 0xbb, 0xcc})
+	frag1 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00})
+	frag2 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x03, 0xaa, 0xbb, 0xcc})
 	expected := net.Buffers{
-		append(frag1, frag2...),           // fragment 1 and fragment 2 will be merged in one single Write
-		cipher, req1, hello, cipher, req1, // unchanged
+		append(frag1, frag2...),           // First two fragments will be merged in one single Write
+		cipher, req1, hello, cipher, req1, // Unchanged
 	}
 	require.Equal(t, expected, inner.bufs)
 }
@@ -78,23 +78,118 @@ func TestStreamDialerFuncDontSplitNonClientHello(t *testing.T) {
 
 	for _, tc := range cases {
 		inner := &collectStreamDialer{}
-		conn := assertCanDialFragFunc(t, inner, "ipinfo.io:443", func(_ []byte) int { return 2 })
+		conn := assertCanDialFragFunc(t, inner, "ipinfo.io:443", func(payload []byte) int { return len(payload) / 2 })
 		defer conn.Close()
 
 		assertCanWriteAll(t, conn, net.Buffers{tc.pkt, cipher, req})
 		expected := net.Buffers{tc.pkt, cipher, req}
 		if len(tc.pkt) > 5 {
-			// header and content of the first pkt might be issued by two Writes, but they are not fragmented
+			// Header and content of the first pkt might be issued by two Writes, but they are not fragmented
 			expected = net.Buffers{tc.pkt[:5], tc.pkt[5:], cipher, req}
 		}
 		require.Equal(t, expected, inner.bufs, tc.msg)
 	}
 }
 
+// Make sure only the first Client Hello is splitted by a fixed length.
+func TestFixedLenStreamDialerSplitsClientHello(t *testing.T) {
+	hello := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00, 0x03, 0xaa, 0xbb, 0xcc})
+	cipher := constructTLSRecord(t, layers.TLSChangeCipherSpec, 0x0303, []byte{0x01})
+	req1 := constructTLSRecord(t, layers.TLSApplicationData, 0x0303, []byte{0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88})
+
+	cases := []struct {
+		msg                string
+		original, splitted net.Buffers
+		splitLen           int
+	}{
+		{
+			msg:      "split leading bytes",
+			original: net.Buffers{hello, cipher, req1, hello, cipher, req1},
+			splitLen: 2,
+			splitted: net.Buffers{
+				// First two fragments will be merged in one single Write
+				append(
+					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00}),
+					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x00, 0x03, 0xaa, 0xbb, 0xcc})...),
+				cipher, req1, hello, cipher, req1,
+			},
+		},
+		{
+			msg:      "split trailing bytes",
+			original: net.Buffers{hello, cipher, req1, hello, cipher, req1},
+			splitLen: -2,
+			splitted: net.Buffers{
+				// First two fragments will be merged in one single Write
+				append(
+					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00, 0x03, 0xaa}),
+					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0xbb, 0xcc})...),
+				cipher, req1, hello, cipher, req1,
+			},
+		},
+		{
+			msg:      "no split",
+			original: net.Buffers{hello, cipher, req1, hello, cipher, req1},
+			splitLen: 0,
+			splitted: net.Buffers{hello, cipher, req1, hello, cipher, req1},
+		},
+	}
+
+	for _, tc := range cases {
+		inner := &collectStreamDialer{}
+		conn := assertCanDialFixedLenFrag(t, inner, "ipinfo.io:443", tc.splitLen)
+		defer conn.Close()
+
+		assertCanWriteAll(t, conn, tc.original)
+		require.Equal(t, tc.splitted, inner.bufs, tc.msg)
+	}
+}
+
+// Make sure the first Client Hello can be splitted multiple times.
+func TestNestedFixedLenStreamDialerSplitsClientHello(t *testing.T) {
+	hello := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{
+		0x01, 0x00, 0x00, 0x03, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11,
+	})
+	frag1 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00})
+	frag2 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x03, 0xaa, 0xbb, 0xcc, 0xdd})
+	frag3 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0xee, 0xff, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44})
+	frag4 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x33, 0x22, 0x11})
+
+	cipher := constructTLSRecord(t, layers.TLSChangeCipherSpec, 0x0303, []byte{0x01})
+	req1 := constructTLSRecord(t, layers.TLSApplicationData, 0x0303, []byte{0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88})
+
+	inner := &collectStreamDialer{}
+	d, err := NewFixedLenStreamDialer(inner, 3) // Further split msg[:8] mentioned below into msg[:3] + msg[3:8]
+	require.NoError(t, err)
+	d, err = NewFixedLenStreamDialer(d, 8) // Further split msg[:16] mentioned below into msg[:8] + msg[8:16]
+	require.NoError(t, err)
+	conn := assertCanDialFixedLenFrag(t, d, "ipinfo.io:443", -3) // Split msg[:19] into msg[:16] + msg[16:19]
+	defer conn.Close()
+
+	assertCanWriteAll(t, conn, net.Buffers{hello, cipher, req1, hello, cipher, req1})
+
+	expected := net.Buffers{
+		append(frag1, frag2...), // First two fragments will be merged in one single Write
+		frag3,
+		frag4,
+		cipher, req1, hello, cipher, req1, // Unchanged
+	}
+	require.Equal(t, expected, inner.bufs)
+}
+
 // test assertions
 
 func assertCanDialFragFunc(t *testing.T, inner transport.StreamDialer, raddr string, frag FragFunc) transport.StreamConn {
 	d, err := NewStreamDialerFunc(inner, frag)
+	require.NoError(t, err)
+	require.NotNil(t, d)
+	conn, err := d.Dial(context.Background(), raddr)
+	require.NoError(t, err)
+	require.NotNil(t, conn)
+	return conn
+}
+
+func assertCanDialFixedLenFrag(t *testing.T, inner transport.StreamDialer, raddr string, splitLen int) transport.StreamConn {
+	d, err := NewFixedLenStreamDialer(inner, splitLen)
 	require.NoError(t, err)
 	require.NotNil(t, d)
 	conn, err := d.Dial(context.Background(), raddr)
@@ -111,7 +206,7 @@ func assertCanWriteAll(t *testing.T, w io.Writer, buf net.Buffers) {
 	}
 }
 
-// private test helpers
+// Private test helpers
 
 func constructTLSRecord(t *testing.T, typ layers.TLSType, ver layers.TLSVersion, payload []byte) []byte {
 	pkt := layers.TLS{
@@ -141,7 +236,7 @@ func (d *collectStreamDialer) Dial(ctx context.Context, raddr string) (transport
 }
 
 func (c *collectStreamDialer) Write(p []byte) (int, error) {
-	c.bufs = append(c.bufs, append([]byte{}, p...)) // copy p rather than retaining it according to the principle of Write
+	c.bufs = append(c.bufs, append([]byte{}, p...)) // Copy p rather than retaining it according to the principle of Write
 	return len(p), nil
 }
 
