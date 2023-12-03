@@ -65,6 +65,7 @@ export class ConnectivityTestPage extends LitElement {
 
     const accessKey = formData.get("accessKey")?.toString().trim();
     const domain = formData.get("domain")?.toString().trim();
+    const reportTo = formData.get("reportTo")?.toString().trim();
     const resolvers =
       formData
         .get("resolvers")
@@ -87,6 +88,7 @@ export class ConnectivityTestPage extends LitElement {
       resolvers,
       protocols,
       prefix,
+      reportTo,
     };
   }
 
@@ -598,7 +600,7 @@ export class ConnectivityTestPage extends LitElement {
     // TODO: move language definitions to a centralized place
     return html`<main dir="${this.locale === "fa-IR" ? "rtl" : "ltr"}">
       <header class=${this.platform?.operatingSystem === OperatingSystem.IOS ? "header--ios" : "header"}>
-        <h1 class="header-text">${msg("Outline Connectivity Test")}</h1>
+        <h1 class="header-text">${msg("Connectivity Tester")}</h1>
       </header>
       ${this.renderResults()}
       <form class="form" @submit=${this.testConnectivity}>
@@ -712,6 +714,20 @@ export class ConnectivityTestPage extends LitElement {
             <option value="POST ">POST</option>
             <option value="HTTP/1.1 ">HTTP/1.1</option>
           </select>
+        </fieldset>
+
+        <fieldset class="field">
+          <span class="field-header">
+            <label class="field-header-label" for="reportTo"
+              >${msg("Report Collector URL")}</label
+            >
+          </span>
+          <input
+            class="field-input"
+            name="reportTo"
+            id="reportTo"
+            value="example_collector.com"
+          />
         </fieldset>
 
         <input

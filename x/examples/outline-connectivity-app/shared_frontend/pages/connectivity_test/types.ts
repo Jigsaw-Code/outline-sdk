@@ -20,6 +20,7 @@ export interface ConnectivityTestRequest {
     tcp: boolean;
     udp: boolean;
   };
+  reportTo: string | undefined;
 }
 
 export interface ConnectivityTestResult {
