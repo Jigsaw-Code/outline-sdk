@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"net/url"
 	"runtime"
 	"strconv"
@@ -31,6 +32,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
+	"github.com/Jigsaw-Code/outline-sdk/x/report"
 
 	_ "golang.org/x/mobile/bind"
 )
@@ -52,6 +54,14 @@ type ConnectivityTestResult struct {
 	Error      *ConnectivityTestError `json:"error"`
 }
 
+func (r ConnectivityTestResult) IsSuccess() bool {
+	if r.Error == nil {
+		return true
+	} else {
+		return false
+	}
+}
+
 type ConnectivityTestError struct {
 	// TODO: add Shadowsocks/Transport error
 	Op string `json:"operation"`
@@ -66,6 +76,7 @@ type ConnectivityTestRequest struct {
 	Domain    string                         `json:"domain"`
 	Resolvers []string                       `json:"resolvers"`
 	Protocols ConnectivityTestProtocolConfig `json:"protocols"`
+	ReportTo  string                         `json:"reportTo"`
 }
 
 type sessionConfig struct {
@@ -78,38 +89,45 @@ type sessionConfig struct {
 type Prefix []byte
 
 func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult, error) {
+	var result ConnectivityTestResult
 	accessKeyParameters, err := parseAccessKey(request.AccessKey)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("AccessKeyParameters: %v\n", accessKeyParameters)
 
 	proxyIPs, err := net.DefaultResolver.LookupIP(context.Background(), "ip", accessKeyParameters.Hostname)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("ProxyIPs: %v\n", proxyIPs)
 
 	// TODO: limit number of IPs. Or force an input IP?
 	var results []ConnectivityTestResult
 	for _, hostIP := range proxyIPs {
 		proxyAddress := net.JoinHostPort(hostIP.String(), fmt.Sprint(accessKeyParameters.Port))
+		fmt.Printf("ProxyAddress: %v\n", proxyAddress)
 
 		for _, resolverHost := range request.Resolvers {
 			resolverHost := strings.TrimSpace(resolverHost)
 			resolverAddress := net.JoinHostPort(resolverHost, "53")
+			fmt.Printf("ResolverAddress: %v\n", resolverAddress)
 
 			if request.Protocols.TCP {
 				testTime := time.Now()
 				var testErr error
 				var testDuration time.Duration
 
-				streamDialer, err := config.NewStreamDialer("")
+				streamDialer, err := config.NewStreamDialer(request.AccessKey)
 				if err != nil {
 					log.Fatalf("Failed to create StreamDialer: %v", err)
 				}
 				resolver := &transport.StreamDialerEndpoint{Dialer: streamDialer, Address: resolverAddress}
 				testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, resolverAddress)
+				fmt.Printf("TestDuration: %v\n", testDuration)
+				fmt.Printf("TestError: %v\n", testErr)
 
-				results = append(results, ConnectivityTestResult{
+				result = ConnectivityTestResult{
 					Proxy:      proxyAddress,
 					Resolver:   resolverAddress,
 					Proto:      "tcp",
@@ -117,7 +135,8 @@ func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult
 					Time:       testTime.UTC().Truncate(time.Second),
 					DurationMs: testDuration.Milliseconds(),
 					Error:      makeErrorRecord(testErr),
-				})
+				}
+				results = append(results, result)
 			}
 
 			if request.Protocols.UDP {
@@ -125,14 +144,16 @@ func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult
 				var testErr error
 				var testDuration time.Duration
 
-				packetDialer, err := config.NewPacketDialer("")
+				packetDialer, err := config.NewPacketDialer(request.AccessKey)
 				if err != nil {
 					log.Fatalf("Failed to create PacketDialer: %v", err)
 				}
 				resolver := &transport.PacketDialerEndpoint{Dialer: packetDialer, Address: resolverAddress}
 				testDuration, testErr = connectivity.TestResolverPacketConnectivity(context.Background(), resolver, resolverAddress)
+				fmt.Printf("TestDuration: %v\n", testDuration)
+				fmt.Printf("TestError: %v\n", testErr)
 
-				results = append(results, ConnectivityTestResult{
+				result = ConnectivityTestResult{
 					Proxy:      proxyAddress,
 					Resolver:   resolverAddress,
 					Proto:      "udp",
@@ -140,7 +161,34 @@ func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult
 					Time:       testTime.UTC().Truncate(time.Second),
 					DurationMs: testDuration.Milliseconds(),
 					Error:      makeErrorRecord(testErr),
-				})
+				}
+				results = append(results, result)
+			}
+		}
+		for _, result := range results {
+			fmt.Printf("Result: %v\n", result)
+			var r report.Report = result
+			u, err := url.Parse(request.ReportTo)
+			if err != nil {
+				log.Printf("Expected no error, but got: %v", err)
+			}
+			remoteCollector := &report.RemoteCollector{
+				CollectorURL: u,
+				HttpClient:   &http.Client{Timeout: 10 * time.Second},
+			}
+			retryCollector := &report.RetryCollector{
+				Collector:    remoteCollector,
+				MaxRetry:     3,
+				InitialDelay: 1 * time.Second,
+			}
+			c := report.SamplingCollector{
+				Collector:       retryCollector,
+				SuccessFraction: 0.1,
+				FailureFraction: 1.0,
+			}
+			err = c.Collect(context.Background(), r)
+			if err != nil {
+				log.Printf("Failed to collect report: %v\n", err)
 			}
 		}
 	}
