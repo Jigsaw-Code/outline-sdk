@@ -16,7 +16,8 @@ package shared_backend
 
 import (
 	"context"
-	"encoding/base64"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -24,12 +25,10 @@ import (
 	"net/http"
 	"net/url"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
 	"github.com/Jigsaw-Code/outline-sdk/x/report"
@@ -44,10 +43,9 @@ type ConnectivityTestProtocolConfig struct {
 
 type ConnectivityTestResult struct {
 	// Inputs
-	Proxy    string `json:"proxy"`
-	Resolver string `json:"resolver"`
-	Proto    string `json:"proto"`
-	Prefix   string `json:"prefix"`
+	Transport string `json:"transport"`
+	Resolver  string `json:"resolver"`
+	Proto     string `json:"proto"`
 	// Observations
 	Time       time.Time              `json:"time"`
 	DurationMs int64                  `json:"durationMs"`
@@ -79,99 +77,82 @@ type ConnectivityTestRequest struct {
 	ReportTo  string                         `json:"reportTo"`
 }
 
-type sessionConfig struct {
-	Hostname  string
-	Port      int
-	CryptoKey *shadowsocks.EncryptionKey
-	Prefix    Prefix
-}
-
-type Prefix []byte
-
 func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult, error) {
 	var result ConnectivityTestResult
-	accessKeyParameters, err := parseAccessKey(request.AccessKey)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Printf("AccessKeyParameters: %v\n", accessKeyParameters)
-
-	proxyIPs, err := net.DefaultResolver.LookupIP(context.Background(), "ip", accessKeyParameters.Hostname)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Printf("ProxyIPs: %v\n", proxyIPs)
-
-	// TODO: limit number of IPs. Or force an input IP?
 	var results []ConnectivityTestResult
-	for _, hostIP := range proxyIPs {
-		proxyAddress := net.JoinHostPort(hostIP.String(), fmt.Sprint(accessKeyParameters.Port))
-		fmt.Printf("ProxyAddress: %v\n", proxyAddress)
 
-		for _, resolverHost := range request.Resolvers {
-			resolverHost := strings.TrimSpace(resolverHost)
-			resolverAddress := net.JoinHostPort(resolverHost, "53")
-			fmt.Printf("ResolverAddress: %v\n", resolverAddress)
+	transportConfig := replaceSSKeyWithHash(request.AccessKey)
 
-			if request.Protocols.TCP {
-				testTime := time.Now()
-				var testErr error
-				var testDuration time.Duration
+	for _, resolverHost := range request.Resolvers {
+		resolverHost := strings.TrimSpace(resolverHost)
+		resolverAddress := net.JoinHostPort(resolverHost, "53")
+		fmt.Printf("ResolverAddress: %v\n", resolverAddress)
 
-				streamDialer, err := config.NewStreamDialer(request.AccessKey)
-				if err != nil {
-					log.Fatalf("Failed to create StreamDialer: %v", err)
-				}
+		if request.Protocols.TCP {
+			testTime := time.Now()
+			var testErr error
+			var testDuration time.Duration
+
+			streamDialer, err := config.NewStreamDialer(request.AccessKey)
+			if err != nil {
+				//log.Fatalf("Failed to create StreamDialer: %v", err)
+				testDuration = time.Duration(0)
+				testErr = err
+			} else {
 				resolver := &transport.StreamDialerEndpoint{Dialer: streamDialer, Address: resolverAddress}
 				testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, resolverAddress)
 				fmt.Printf("TestDuration: %v\n", testDuration)
 				fmt.Printf("TestError: %v\n", testErr)
-
-				result = ConnectivityTestResult{
-					Proxy:      proxyAddress,
-					Resolver:   resolverAddress,
-					Proto:      "tcp",
-					Prefix:     accessKeyParameters.Prefix.String(),
-					Time:       testTime.UTC().Truncate(time.Second),
-					DurationMs: testDuration.Milliseconds(),
-					Error:      makeErrorRecord(testErr),
-				}
-				results = append(results, result)
 			}
+			result = ConnectivityTestResult{
+				Transport:  transportConfig,
+				Resolver:   resolverAddress,
+				Proto:      "tcp",
+				Time:       testTime.UTC().Truncate(time.Second),
+				DurationMs: testDuration.Milliseconds(),
+				Error:      makeErrorRecord(testErr),
+			}
+			results = append(results, result)
+		}
 
-			if request.Protocols.UDP {
-				testTime := time.Now()
-				var testErr error
-				var testDuration time.Duration
+		if request.Protocols.UDP {
+			testTime := time.Now()
+			var testErr error
+			var testDuration time.Duration
 
-				packetDialer, err := config.NewPacketDialer(request.AccessKey)
-				if err != nil {
-					log.Fatalf("Failed to create PacketDialer: %v", err)
-				}
+			packetDialer, err := config.NewPacketDialer(request.AccessKey)
+			if err != nil {
+				//log.Fatalf("Failed to create PacketDialer: %v", err)
+				testDuration = time.Duration(0)
+				testErr = err
+			} else {
 				resolver := &transport.PacketDialerEndpoint{Dialer: packetDialer, Address: resolverAddress}
 				testDuration, testErr = connectivity.TestResolverPacketConnectivity(context.Background(), resolver, resolverAddress)
 				fmt.Printf("TestDuration: %v\n", testDuration)
 				fmt.Printf("TestError: %v\n", testErr)
+			}
 
-				result = ConnectivityTestResult{
-					Proxy:      proxyAddress,
-					Resolver:   resolverAddress,
-					Proto:      "udp",
-					Prefix:     accessKeyParameters.Prefix.String(),
-					Time:       testTime.UTC().Truncate(time.Second),
-					DurationMs: testDuration.Milliseconds(),
-					Error:      makeErrorRecord(testErr),
-				}
-				results = append(results, result)
+			result = ConnectivityTestResult{
+				Transport:  transportConfig,
+				Resolver:   resolverAddress,
+				Proto:      "udp",
+				Time:       testTime.UTC().Truncate(time.Second),
+				DurationMs: testDuration.Milliseconds(),
+				Error:      makeErrorRecord(testErr),
 			}
+			results = append(results, result)
 		}
-		for _, result := range results {
-			fmt.Printf("Result: %v\n", result)
-			var r report.Report = result
-			u, err := url.Parse(request.ReportTo)
-			if err != nil {
-				log.Printf("Expected no error, but got: %v", err)
-			}
+	}
+	for _, result := range results {
+		fmt.Printf("Result: %v\n", result)
+		var r report.Report = result
+		u, err := url.Parse(request.ReportTo)
+		if err != nil {
+			log.Printf("Expected no error, but got: %v", err)
+			//return results, errors.New("failed to parse collector URL")
+		}
+		fmt.Println("Parsed URL: ", u.String())
+		if u.String() != "" {
 			remoteCollector := &report.RemoteCollector{
 				CollectorURL: u,
 				HttpClient:   &http.Client{Timeout: 10 * time.Second},
@@ -189,6 +170,7 @@ func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult
 			err = c.Collect(context.Background(), r)
 			if err != nil {
 				log.Printf("Failed to collect report: %v\n", err)
+				//return results, errors.New("failed to collect report")
 			}
 		}
 	}
@@ -230,60 +212,34 @@ func unwrapAll(err error) error {
 	}
 }
 
-func (p Prefix) String() string {
-	runes := make([]rune, len(p))
-	for i, b := range p {
-		runes[i] = rune(b)
-	}
-	return string(runes)
+// hashKey hashes the given key and returns the hexadecimal representation
+func hashKey(key string) string {
+	hasher := sha256.New()
+	hasher.Write([]byte(key))
+	fullHash := hex.EncodeToString(hasher.Sum(nil))
+	return fullHash[:10] // Truncate the hash to 10 characters
+
 }
 
-func parseAccessKey(accessKey string) (*sessionConfig, error) {
-	var config sessionConfig
-	accessKeyURL, err := url.Parse(accessKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse access key: %w", err)
-	}
-	var portString string
-	// Host is a <host>:<port> string
-	config.Hostname, portString, err = net.SplitHostPort(accessKeyURL.Host)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse endpoint address: %w", err)
-	}
-	config.Port, err = strconv.Atoi(portString)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse port number: %w", err)
-	}
-	cipherInfoBytes, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(accessKeyURL.User.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode cipher info [%v]: %v", accessKeyURL.User.String(), err)
-	}
-	cipherName, secret, found := strings.Cut(string(cipherInfoBytes), ":")
-	if !found {
-		return nil, fmt.Errorf("invalid cipher info: no ':' separator")
-	}
-	config.CryptoKey, err = shadowsocks.NewEncryptionKey(cipherName, secret)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cipher: %w", err)
-	}
-	prefixStr := accessKeyURL.Query().Get("prefix")
-	if len(prefixStr) > 0 {
-		config.Prefix, err = ParseStringPrefix(prefixStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse prefix: %w", err)
-		}
-	}
-	return &config, nil
-}
+// replaceSSKeyWithHash function replaces the key value with its hash in parts that start with "ss://"
+func replaceSSKeyWithHash(input string) string {
+	// Split the string into parts
+	parts := strings.Split(input, "|")
 
-func ParseStringPrefix(utf8Str string) (Prefix, error) {
-	runes := []rune(utf8Str)
-	rawBytes := make([]byte, len(runes))
-	for i, r := range runes {
-		if (r & 0xFF) != r {
-			return nil, fmt.Errorf("character out of range: %d", r)
+	// Iterate through each part
+	for i, part := range parts {
+		if strings.HasPrefix(part, "ss://") {
+			// Find the key part and replace it with its hash
+			keyStart := strings.Index(part, "//") + 2
+			keyEnd := strings.Index(part, "@")
+			if keyStart != -1 && keyEnd != -1 && keyEnd > keyStart {
+				key := part[keyStart:keyEnd]
+				hashedKey := hashKey(key)
+				parts[i] = part[:keyStart] + hashedKey + part[keyEnd:]
+			}
 		}
-		rawBytes[i] = byte(r)
 	}
-	return rawBytes, nil
+
+	// Join the parts back into a string
+	return strings.Join(parts, "|")
 }
