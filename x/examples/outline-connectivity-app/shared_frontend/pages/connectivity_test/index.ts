@@ -78,7 +78,7 @@ export class ConnectivityTestPage extends LitElement {
     };
     const prefix = formData.get("prefix")?.toString();
 
-    if (!accessKey || !domain || !resolvers) {
+    if (!domain || !resolvers) {
       return null;
     }
 
@@ -600,22 +600,30 @@ export class ConnectivityTestPage extends LitElement {
     // TODO: move language definitions to a centralized place
     return html`<main dir="${this.locale === "fa-IR" ? "rtl" : "ltr"}">
       <header class=${this.platform?.operatingSystem === OperatingSystem.IOS ? "header--ios" : "header"}>
-        <h1 class="header-text">${msg("Connectivity Tester")}</h1>
+        <h1 class="header-text">${msg("Transport Tester")}</h1>
       </header>
       ${this.renderResults()}
       <form class="form" @submit=${this.testConnectivity}>
         <fieldset class="field">
           <span class="field-header">
             <label class="field-header-label" for="accessKey">
-              ${msg("Outline Access Key")}
+              ${msg("Transport")}
             </label>
-            <span class="field-header-label-required">*</span>
+            <i
+            class="field-header-info"
+            title=${msg(
+              "Transport String. Can include ss://[USERINFO]@[HOST]:[PORT]?prefix=[PREFIX] \
+              socks5://[HOST]:[PORT], split:[PREFIX_LENGTH], tls:sni=[SNI]&certname=[CERT_NAME] \
+              and combination of these using | operand.",
+            )}
+            >ℹ️</i
+          >
           </span>
           <textarea
             class="field-input-textarea"
             name="accessKey"
             id="accessKey"
-            required
+            ""
           ></textarea>
         </fieldset>
 
@@ -698,35 +706,22 @@ export class ConnectivityTestPage extends LitElement {
 
         <fieldset class="field">
           <span class="field-header">
-            <label class="field-header-label" for="prefix">
-              ${msg("TCP Stream Prefix")}
-            </label>
-            <i
-              class="field-header-info"
-              title=${msg(
-                "The TCP stream prefix is a plaintext string appended to the start of the encrypted TCP payload, making the data transfer appear like an acceptable method."
-              )}
-              >ℹ️</i
-            >
-          </span>
-          <select class="field-input" name="prefix" id="prefix">
-            <option value="">${msg("None")}</option>
-            <option value="POST ">POST</option>
-            <option value="HTTP/1.1 ">HTTP/1.1</option>
-          </select>
-        </fieldset>
-
-        <fieldset class="field">
-          <span class="field-header">
             <label class="field-header-label" for="reportTo"
               >${msg("Report Collector URL")}</label
             >
+            <i
+            class="field-header-info"
+            title=${msg(
+              "URL of the remote collector server to report and send the test results."
+            )}
+            >ℹ️</i
+          >
           </span>
           <input
             class="field-input"
             name="reportTo"
             id="reportTo"
-            value="example_collector.com"
+            value=""
           />
         </fieldset>
 
@@ -827,6 +822,9 @@ export class ConnectivityTestPage extends LitElement {
 
             <dt class="results-list-item-data-key">${msg("Time")}</dt>
             <dd class="results-list-item-data-value">${result.durationMs}ms</dd>
+
+            <dt class="results-list-item-data-key">${msg("Error")}</dt>
+            <dd class="results-list-item-data-value">${result.error?.message}</dd>
           </dl>
         </li>`;
       })}
