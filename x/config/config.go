@@ -95,12 +95,12 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 		return newTlsStreamDialerFromURL(innerDialer, url)
 
 	case "tlsfrag":
-		fixedBytesStr := url.Opaque
-		fixedBytes, err := strconv.Atoi(fixedBytesStr)
+		lenStr := url.Opaque
+		fixedLen, err := strconv.Atoi(lenStr)
 		if err != nil {
-			return nil, fmt.Errorf("invalid tlsfrag option: %v. It should be in tlsfrag:<number> format", fixedBytesStr)
+			return nil, fmt.Errorf("invalid tlsfrag option: %v. It should be in tlsfrag:<number> format", lenStr)
 		}
-		return tlsfrag.NewFixedBytesStreamDialer(innerDialer, fixedBytes)
+		return tlsfrag.NewFixedLenStreamDialer(innerDialer, fixedLen)
 
 	default:
 		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
