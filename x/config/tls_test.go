@@ -19,7 +19,7 @@ import (
 	"testing"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/tls"
+	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
 	"github.com/stretchr/testify/require"
 )
 
