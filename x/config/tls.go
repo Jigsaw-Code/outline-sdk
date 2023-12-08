@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/tls"
+	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
 )
 
 func parseOptions(configURL *url.URL) ([]tls.ClientOption, error) {
