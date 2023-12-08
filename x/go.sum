@@ -1,5 +1,5 @@
-github.com/Jigsaw-Code/outline-sdk v0.0.9 h1:FuyrqJ5OBh5y8mpXkSomdGJreGi8bAOWRXRNB2B+Hdc=
-github.com/Jigsaw-Code/outline-sdk v0.0.9/go.mod h1:hhlKz0+r9wSDFT8usvN8Zv/BFToCIFAUn1P2Qk8G2CM=
+github.com/Jigsaw-Code/outline-sdk v0.0.10 h1:pmEliVQAcEncxwxv7sBk29L3SMSB1Elm0nvNJYFPdvU=
+github.com/Jigsaw-Code/outline-sdk v0.0.10/go.mod h1:hhlKz0+r9wSDFT8usvN8Zv/BFToCIFAUn1P2Qk8G2CM=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

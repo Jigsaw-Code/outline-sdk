@@ -48,7 +48,7 @@ It takes the length of the prefix. The stream will be split when PREFIX_LENGTH b
 
 	split:[PREFIX_LENGTH]
 
-TLS transport (currently streams only, package [github.com/Jigsaw-Code/outline-sdk/x/tls])
+TLS transport (currently streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/tls])
 
 The sni parameter defines the name to be sent in the TLS SNI. It can be empty.
 The certname parameter defines what name to validate against the server certificate.
