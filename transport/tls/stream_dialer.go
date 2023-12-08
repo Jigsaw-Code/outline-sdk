@@ -92,8 +92,8 @@ type ClientConfig struct {
 	SessionCache tls.ClientSessionCache
 }
 
-// ToStdConfig creates a [tls.Config] based on the configured parameters.
-func (cfg *ClientConfig) ToStdConfig() *tls.Config {
+// toStdConfig creates a [tls.Config] based on the configured parameters.
+func (cfg *ClientConfig) toStdConfig() *tls.Config {
 	return &tls.Config{
 		ServerName:         cfg.ServerName,
 		NextProtos:         cfg.NextProtos,
@@ -137,7 +137,7 @@ func WrapConn(ctx context.Context, conn transport.StreamConn, remoteAdr string, 
 	for _, option := range options {
 		option(host, port, &cfg)
 	}
-	tlsConn := tls.Client(conn, cfg.ToStdConfig())
+	tlsConn := tls.Client(conn, cfg.toStdConfig())
 	err = tlsConn.HandshakeContext(ctx)
 	if err != nil {
 		return nil, err

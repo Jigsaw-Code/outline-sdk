@@ -52,8 +52,8 @@ type Collector interface {
 
 // RemoteCollector represents a collector that communicates with a remote endpoint.
 type RemoteCollector struct {
-	httpClient        *http.Client
-	collectorEndpoint *url.URL
+	HttpClient   *http.Client
+	CollectorURL *url.URL
 }
 
 // Collect sends the given report to the remote collector.
@@ -74,9 +74,9 @@ func (c *RemoteCollector) Collect(ctx context.Context, report Report) error {
 
 // SamplingCollector represents a collector that randomly samples and collects a report.
 type SamplingCollector struct {
-	collector       Collector
-	successFraction float64
-	failureFraction float64
+	Collector       Collector
+	SuccessFraction float64
+	FailureFraction float64
 }
 
 // Collect collects the given report based on the sampling rate defined in the [SamplingCollector].
@@ -92,14 +92,14 @@ func (c *SamplingCollector) Collect(ctx context.Context, report Report) error {
 		return nil
 	}
 	if hs.IsSuccess() {
-		samplingRate = c.successFraction
+		samplingRate = c.SuccessFraction
 	} else {
-		samplingRate = c.failureFraction
+		samplingRate = c.FailureFraction
 	}
 	// Generate a random float64 number between 0 and 1
 	random := rand.Float64()
 	if random < samplingRate {
-		err := c.collector.Collect(ctx, report)
+		err := c.Collector.Collect(ctx, report)
 		if err != nil {
 			return err
 		}
@@ -111,9 +111,9 @@ func (c *SamplingCollector) Collect(ctx context.Context, report Report) error {
 
 // RetryCollector represents a collector that supports retrying failed operations.
 type RetryCollector struct {
-	collector    Collector
-	maxRetry     int
-	initialDelay time.Duration
+	Collector    Collector
+	MaxRetry     int
+	InitialDelay time.Duration
 }
 
 // Collect collects the report by making multiple attempts with retries.
@@ -123,13 +123,13 @@ type RetryCollector struct {
 // Returns an error if the maximum number of retries is exceeded.
 func (c *RetryCollector) Collect(ctx context.Context, report Report) error {
 	var e *BadRequestError
-	for i := 0; i < c.maxRetry; i++ {
-		err := c.collector.Collect(ctx, report)
+	for i := 0; i < c.MaxRetry+1; i++ {
+		err := c.Collector.Collect(ctx, report)
 		if err != nil {
 			if errors.As(err, &e) {
 				break
 			} else {
-				time.Sleep(time.Duration(math.Pow(2, float64(i))) * c.initialDelay)
+				time.Sleep(time.Duration(math.Pow(2, float64(i))) * c.InitialDelay)
 			}
 		} else {
 			return nil
@@ -140,7 +140,7 @@ func (c *RetryCollector) Collect(ctx context.Context, report Report) error {
 
 // FallbackCollector is a type that represents a collector that falls back to multiple collectors.
 type FallbackCollector struct {
-	collectors []Collector
+	Collectors []Collector
 }
 
 // Collect implements [Collector] interface on [FallbackCollector] type that collects a report using the provided context and report data.
@@ -148,8 +148,8 @@ type FallbackCollector struct {
 // If any of the collectors succeeds in collecting the report, operation aborts, and it returns nil.
 // If all collectors fail to collect the report, it returns an error indicating the failure.
 func (c *FallbackCollector) Collect(ctx context.Context, report Report) error {
-	for i := range c.collectors {
-		err := c.collectors[i].Collect(ctx, report)
+	for i := range c.Collectors {
+		err := c.Collectors[i].Collect(ctx, report)
 		if err == nil {
 			return nil
 		}
@@ -163,13 +163,13 @@ func (c *FallbackCollector) Collect(ctx context.Context, report Report) error {
 // It returns an error if there was a problem sending the report or reading the response.
 func (c *RemoteCollector) sendReport(ctx context.Context, jsonData []byte) error {
 	// TODO: return status code of HTTP response
-	req, err := http.NewRequest("POST", c.collectorEndpoint.String(), bytes.NewReader(jsonData))
+	req, err := http.NewRequest("POST", c.CollectorURL.String(), bytes.NewReader(jsonData))
 	if err != nil {
 		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	resp, err := c.httpClient.Do(req.WithContext(ctx))
+	resp, err := c.HttpClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func (c *RemoteCollector) sendReport(ctx context.Context, jsonData []byte) error
 
 // WriteCollector represents a collector that writes the report to an io.Writer.
 type WriteCollector struct {
-	writer io.Writer
+	Writer io.Writer
 }
 
 // Collect writes the report to the underlying io.Writer.
@@ -198,7 +198,7 @@ func (c *WriteCollector) Collect(ctx context.Context, report Report) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	_, err = c.writer.Write(jsonData)
+	_, err = c.Writer.Write(jsonData)
 	if err != nil {
 		return err
 	}
