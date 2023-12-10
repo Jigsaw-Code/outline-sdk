@@ -14,7 +14,7 @@
 
 import { configureLocalization, msg, localized } from "@lit/localize";
 import { css, html, LitElement, nothing } from "lit";
-import { property } from "lit/decorators.js";
+import { property, customElement } from "lit/decorators.js";
 import { sourceLocale, targetLocales } from "./generated/messages";
 import { ConnectivityTestRequest, ConnectivityTestResponse, ConnectivityTestResult, OperatingSystem, PlatformMetadata } from "./types";
 
@@ -609,15 +609,9 @@ export class ConnectivityTestPage extends LitElement {
             <label class="field-header-label" for="accessKey">
               ${msg("Transport")}
             </label>
-            <i
-            class="field-header-info"
-            title=${msg(
-              "Transport String. Can include ss://[USERINFO]@[HOST]:[PORT]?prefix=[PREFIX] \
-              socks5://[HOST]:[PORT], split:[PREFIX_LENGTH], tls:sni=[SNI]&certname=[CERT_NAME] \
-              and combination of these using | operand.",
-            )}
-            >ℹ️</i
-          >
+          <info-popup popupText="Transport string can include: **ss://[USERINFO]@[HOST]:[PORT]?prefix=[PREFIX]** \
+          socks5://[HOST]:[PORT] split:[PREFIX_LENGTH] tls:sni=[SNI]&certname=[CERT_NAME] \
+          and combination of these using | operand."></info-popup>
           </span>
           <textarea
             class="field-input-textarea"
@@ -672,13 +666,10 @@ export class ConnectivityTestPage extends LitElement {
           <label class="field-header-label"
             >${msg("Protocols to Check")}
           </label>
-          <i
-            class="field-header-info"
-            title=${msg(
-              "The main difference between TCP (transmission control protocol) and UDP (user datagram protocol) is that TCP is a connection-based protocol and UDP is connectionless. While TCP is more reliable, it transfers data more slowly. UDP is less reliable but works more quickly."
-            )}
-            >ℹ️</i
-          >
+          <info-popup popupText="The main difference between TCP (transmission control protocol) and UDP
+          (user datagram protocol) is that TCP is a connection-based protocol and UDP is connectionless.
+          While TCP is more reliable, it transfers data more slowly. UDP is less reliable but works more quickly.
+          "></info-popup>
         </span>
         <fieldset class="field field-group">
           <span class="field-group-item">
@@ -823,11 +814,55 @@ export class ConnectivityTestPage extends LitElement {
             <dt class="results-list-item-data-key">${msg("Time")}</dt>
             <dd class="results-list-item-data-value">${result.durationMs}ms</dd>
 
-            <dt class="results-list-item-data-key">${msg("Error")}</dt>
-            <dd class="results-list-item-data-value">${result.error?.message}</dd>
+            ${isSuccess
+              ? nothing
+              : html`
+                  <dt class="results-list-item-data-key">${msg("Error")}</dt>
+                  <dd class="results-list-item-data-value">${result.error?.message}</dd>
+                `}
           </dl>
         </li>`;
       })}
     </ul>`;
+  }
+}
+
+@customElement('info-popup')
+export class InfoPopup extends LitElement {
+  @property({ type: Boolean }) isPopupVisible = false;
+  @property({ type: String }) popupText = 'This is an info pop-up. Click the button to toggle visibility.'
+
+  static styles = css`
+  .popup {
+    display: none;
+    position: absolute;
+    z-index: 1000; /* A high value to ensure it's on top */
+    background-color: white;
+    border: 1px solid black;
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+    max-width: 50%; /* Maximum width of the pop-up, relative to the screen width */
+    max-height: 50vh; /* Maximum height of the pop-up, relative to the screen height */
+    overflow: auto; /* Enables scrollbars if the content overflows */
+    word-wrap: break-word; /* Ensures the text breaks to prevent overflow */
+    box-sizing: border-box; /* Includes padding and border in the element's total width and height */
+  }
+  .popup.visible {
+    display: block;
+  }
+`;
+
+  render() {
+    return html`
+      <dev @click="${this.togglePopup}">ℹ️</dev>
+      <div markdown=1 class="popup ${this.isPopupVisible ? 'visible' : ''}">
+        <p>${this.popupText}</p>
+      </div>
+    `;
+  }
+
+  togglePopup() {
+    this.isPopupVisible = !this.isPopupVisible;
   }
 }
