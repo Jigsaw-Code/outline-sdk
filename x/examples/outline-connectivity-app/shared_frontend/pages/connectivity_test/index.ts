@@ -14,7 +14,7 @@
 
 import { configureLocalization, msg, localized } from "@lit/localize";
 import { css, html, LitElement, nothing } from "lit";
-import { property, customElement } from "lit/decorators.js";
+import { property, customElement, query } from "lit/decorators.js";
 import { sourceLocale, targetLocales } from "./generated/messages";
 import { ConnectivityTestRequest, ConnectivityTestResponse, ConnectivityTestResult, OperatingSystem, PlatformMetadata } from "./types";
 
@@ -627,13 +627,8 @@ export class ConnectivityTestPage extends LitElement {
               ${msg("DNS Resolvers to Try")}
             </label>
             <span class="field-header-label-required">*</span>
-            <i
-              class="field-header-info"
-              title=${msg(
-                "A DNS resolver is an online service that returns the direct IP address of a given website domain."
-              )}
-              >ℹ️</i
-            >
+            <info-popup popupText="A DNS resolver is an online service
+             that returns the direct IP address of a given website domain."></info-popup>
           </span>
           <textarea
             class="field-input-textarea"
@@ -700,13 +695,8 @@ export class ConnectivityTestPage extends LitElement {
             <label class="field-header-label" for="reportTo"
               >${msg("Report Collector URL")}</label
             >
-            <i
-            class="field-header-info"
-            title=${msg(
-              "URL of the remote collector server to report and send the test results."
-            )}
-            >ℹ️</i
-          >
+            <info-popup popupText="URL of the remote collector server
+             to report and send the test results."></info-popup>
           </span>
           <input
             class="field-input"
@@ -832,37 +822,33 @@ export class InfoPopup extends LitElement {
   @property({ type: Boolean }) isPopupVisible = false;
   @property({ type: String }) popupText = 'This is an info pop-up. Click the button to toggle visibility.'
 
+  @query('#my-popover')
+  popoverElement: HTMLElement;
+
   static styles = css`
   .popup {
-    display: none;
-    position: absolute;
-    z-index: 1000; /* A high value to ensure it's on top */
-    background-color: white;
-    border: 1px solid black;
+    top: -50%; /* Position above the element */
+    font-family: var(--font-sans-serif);
     padding: 10px;
-    border-radius: 5px;
-    box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
-    max-width: 50%; /* Maximum width of the pop-up, relative to the screen width */
-    max-height: 50vh; /* Maximum height of the pop-up, relative to the screen height */
-    overflow: auto; /* Enables scrollbars if the content overflows */
-    word-wrap: break-word; /* Ensures the text breaks to prevent overflow */
-    box-sizing: border-box; /* Includes padding and border in the element's total width and height */
-  }
-  .popup.visible {
-    display: block;
+    max-width: 75%;
+    box-sizing: border-box;
+    border: 1px solid black;
+    background-color: white;
+    box-shadow: 0px 0px 10px rgba(0,0,0,0.7);
   }
 `;
 
   render() {
     return html`
-      <dev @click="${this.togglePopup}">ℹ️</dev>
-      <div markdown=1 class="popup ${this.isPopupVisible ? 'visible' : ''}">
-        <p>${this.popupText}</p>
+      <div @click="${this.showPopover}" popovertarget="my-popover">ℹ️</div>
+      <div popover="auto" class="popup" id="my-popover">
+      <p>${this.popupText}</p>
       </div>
     `;
   }
 
-  togglePopup() {
-    this.isPopupVisible = !this.isPopupVisible;
+  showPopover() {
+    this.popoverElement.showPopover();
   }
+
 }
