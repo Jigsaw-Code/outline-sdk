@@ -55,6 +55,14 @@ The certname parameter defines what name to validate against the server certific
 
 	tls:sni=[SNI]&certname=[CERT_NAME]
 
+TLS fragmentation (streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag]).
+
+The Client Hello record payload will be split into two fragments of size LENGTH and len(payload)-LENGTH if LENGTH>0.
+If LENGTH<0, the two fragments will be of size len(payload)-LENGTH and LENGTH respectively.
+For more details, refer to [github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag].
+
+	tlsfrag:[LENGTH]
+
 # Examples
 
 Packet splitting - To split outgoing streams on bytes 2 and 123, you can use:

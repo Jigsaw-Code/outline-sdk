@@ -24,6 +24,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/transport/socks5"
 	"github.com/Jigsaw-Code/outline-sdk/transport/split"
+	"github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag"
 )
 
 func parseConfigPart(oneDialerConfig string) (*url.URL, error) {
@@ -92,6 +93,14 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 
 	case "tls":
 		return newTlsStreamDialerFromURL(innerDialer, url)
+
+	case "tlsfrag":
+		lenStr := url.Opaque
+		fixedLen, err := strconv.Atoi(lenStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid tlsfrag option: %v. It should be in tlsfrag:<number> format", lenStr)
+		}
+		return tlsfrag.NewFixedLenStreamDialer(innerDialer, fixedLen)
 
 	default:
 		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
