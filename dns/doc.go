@@ -16,20 +16,24 @@
 Package dns provides utilities to interact with the Domain Name System (DNS).
 
 The [Domain Name System] (DNS) is responsible for mapping domain names to IP addresses.
-Because domain resolution gatekeeps connections and is predominantly done in plaintext, it is commonly used
-for network-level filtering.
+Because domain resolution gatekeeps connections and is predominantly done in plaintext, it is [commonly used
+for network-level filtering].
+
+# Transports
 
 The main concept in this library is that of a [Resolver], which allows code to query the DNS. Different implementations are provided
-to perform DNS resolution over multiple transports:
+to perform DNS resolution over different transports:
 
-  - DNS-over-UDP: the standard mechanism of querying resolvers. Communication is done in plaintext, using port 53.
-  - [DNS-over-TCP]: alternative to UDP when responses are large. Communication is done in plaintext, using port 53.
+  - [DNS-over-UDP]: the standard mechanism of querying resolvers. Communication is done in plaintext, using port 53.
+  - [DNS-over-TCP]: alternative to UDP that allows for more reliable delivery and larger responses, but requires establishing a connection. Communication is done in plaintext, using port 53.
   - [DNS-over-TLS] (DoT): uses the TCP protocol, but over a connection encrypted with TLS. Is uses port 853, which
     makes it very easy to block using the port number, as no other protocol is assigned to that port.
   - [DNS-over-HTTPS] (DoH): uses HTTP exchanges for querying the resolver and communicates over a connection encrypted with TLS. It uses
     port 443. That makes the DoH traffic undistinguishable from web traffic, making it harder to block.
 
 [Domain Name System]: https://datatracker.ietf.org/doc/html/rfc1034
+[commonly used for network-level filtering]: https://datatracker.ietf.org/doc/html/rfc9505#section-5.1.1
+[DNS-over-UDP]: https://datatracker.ietf.org/doc/html/rfc1035#section-4.2.1
 [DNS-over-TCP]: https://datatracker.ietf.org/doc/html/rfc7766
 [DNS-over-TLS]: https://datatracker.ietf.org/doc/html/rfc7858
 [DNS-over-HTTPS]: https://datatracker.ietf.org/doc/html/rfc8484

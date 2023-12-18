@@ -132,3 +132,11 @@ func (d *TCPStreamDialer) Dial(ctx context.Context, addr string) (StreamConn, er
 	}
 	return conn.(*net.TCPConn), nil
 }
+
+// FuncStreamDialer is a [StreamDialer] that uses the given function to dial.
+type FuncStreamDialer func(ctx context.Context, addr string) (StreamConn, error)
+
+// Query implements the [Resolver] interface.
+func (f FuncStreamDialer) Dial(ctx context.Context, addr string) (StreamConn, error) {
+	return f(ctx, addr)
+}
