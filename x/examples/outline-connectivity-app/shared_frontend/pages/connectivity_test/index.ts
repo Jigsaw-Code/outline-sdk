@@ -17,6 +17,8 @@ import { css, html, LitElement, nothing } from "lit";
 import { property, customElement, query } from "lit/decorators.js";
 import { sourceLocale, targetLocales } from "./generated/messages";
 import { ConnectivityTestRequest, ConnectivityTestResponse, ConnectivityTestResult, OperatingSystem, PlatformMetadata } from "./types";
+import "./popover_info";
+import "./outline_logo";
 
 export * from "./types";
 
@@ -327,6 +329,13 @@ export class ConnectivityTestPage extends LitElement {
       margin-top: var(--size-gap);
     }
 
+    .logo {
+      display: block;
+      margin-top: 40px;
+      max-width: 300px;
+      min-width: 250px;
+    }
+
     .field {
       display: block;
       margin-bottom: var(--size-gap);
@@ -607,11 +616,13 @@ export class ConnectivityTestPage extends LitElement {
         <fieldset class="field">
           <span class="field-header">
             <label class="field-header-label" for="accessKey">
-              ${msg("Transport")}
+              ${msg("Transport to Test")}
             </label>
-          <info-popup popupText="Transport string can include: **ss://[USERINFO]@[HOST]:[PORT]?prefix=[PREFIX]** \
-          socks5://[HOST]:[PORT] split:[PREFIX_LENGTH] tls:sni=[SNI]&certname=[CERT_NAME] \
-          and combination of these using | operand."></info-popup>
+          <info-popup popupText="Options include <strong>ss://</strong>, <strong>split://</strong>,
+          <strong>tls://</strong>, <strong>socks5://</strong>, and/or a combination of them.
+          For examples and more information check out the documentation
+          <a href='https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config'> here</a>.">
+          </info-popup>
           </span>
           <textarea
             class="field-input-textarea"
@@ -627,7 +638,7 @@ export class ConnectivityTestPage extends LitElement {
               ${msg("DNS Resolvers to Try")}
             </label>
             <span class="field-header-label-required">*</span>
-            <info-popup popupText="A DNS resolver is an online service
+            <info-popup popupText="Add the DNS resolvers to use for test. This is an online service
              that returns the direct IP address of a given website domain."></info-popup>
           </span>
           <textarea
@@ -661,8 +672,8 @@ export class ConnectivityTestPage extends LitElement {
           <label class="field-header-label"
             >${msg("Protocols to Check")}
           </label>
-          <info-popup popupText="The main difference between TCP (transmission control protocol) and UDP
-          (user datagram protocol) is that TCP is a connection-based protocol and UDP is connectionless.
+          <info-popup popupText="TCP (transmission control protocol) is a connection-based protocol whereas UDP
+          (user datagram protocol) is connectionless.
           While TCP is more reliable, it transfers data more slowly. UDP is less reliable but works more quickly.
           "></info-popup>
         </span>
@@ -712,7 +723,11 @@ export class ConnectivityTestPage extends LitElement {
           type="submit"
           value="${this.isSubmitting ? msg("Testing...") : msg("Run Test")}"
         />
+        <div class="logo">
+          <outline-logo></outline-logo>
+        </div>
       </form>
+
       <footer class="footer">
         <div class="footer-inner">
           <label class="footer-selector-label" for="language"
@@ -815,40 +830,4 @@ export class ConnectivityTestPage extends LitElement {
       })}
     </ul>`;
   }
-}
-
-@customElement('info-popup')
-export class InfoPopup extends LitElement {
-  @property({ type: Boolean }) isPopupVisible = false;
-  @property({ type: String }) popupText = 'This is an info pop-up. Click the button to toggle visibility.'
-
-  @query('#my-popover')
-  popoverElement: HTMLElement;
-
-  static styles = css`
-  .popup {
-    top: -50%; /* Position above the element */
-    font-family: var(--font-sans-serif);
-    padding: 10px;
-    max-width: 75%;
-    box-sizing: border-box;
-    border: 1px solid black;
-    background-color: white;
-    box-shadow: 0px 0px 10px rgba(0,0,0,0.7);
-  }
-`;
-
-  render() {
-    return html`
-      <div @click="${this.showPopover}" popovertarget="my-popover">ℹ️</div>
-      <div popover="auto" class="popup" id="my-popover">
-      <p>${this.popupText}</p>
-      </div>
-    `;
-  }
-
-  showPopover() {
-    this.popoverElement.showPopover();
-  }
-
 }
