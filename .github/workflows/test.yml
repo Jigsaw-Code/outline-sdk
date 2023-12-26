@@ -34,12 +34,12 @@ jobs:
         run: go build -v ./...
 
       - name: Build X
-        run: go build -C x -o "${{ env.OUTPUT_DIR }}" -v ./...
+        run: go build -C x -o "${{ env.OUTPUT_DIR }}/" -v ./...
       
       - name: Build Mobileproxy
         if: matrix.os == 'macos-latest'
         run: |
-          go build -C x -o "${{ env.OUTPUT_DIR }}" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
+          go build -C x -o "${{ env.OUTPUT_DIR }}/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
           cd "${{ github.workspace }}/x/mobileproxy"
           PATH="${{ env.OUTPUT_DIR }}:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -o "${{ env.OUTPUT_DIR }}/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
 
