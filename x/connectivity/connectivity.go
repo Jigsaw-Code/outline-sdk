@@ -95,9 +95,10 @@ func makeConnectivityError(op string, err error) *ConnectivityError {
 // Valid tests will return (*ConnectivityError, nil), where *ConnectivityError will be nil if there's connectivity or
 // a structure with details of the error found.
 func TestConnectivityWithResolver(ctx context.Context, resolver Resolver, testDomain string) (*ConnectivityError, error) {
-	if _, ok := ctx.Deadline(); !ok {
+	deadline, ok := ctx.Deadline()
+	if !ok {
 		// Default deadline is 5 seconds.
-		deadline := time.Now().Add(5 * time.Second)
+		deadline = time.Now().Add(5 * time.Second)
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithDeadline(ctx, deadline)
 		// Releases the timer.
@@ -109,9 +110,7 @@ func TestConnectivityWithResolver(ctx context.Context, resolver Resolver, testDo
 		return makeConnectivityError("connect", err), nil
 	}
 	defer dnsConn.Close()
-	if deadline, ok := ctx.Deadline(); ok {
-		dnsConn.SetDeadline(deadline)
-	}
+	dnsConn.SetDeadline(deadline)
 
 	var dnsRequest dns.Msg
 	dnsRequest.SetQuestion(dns.Fqdn(testDomain), dns.TypeA)
