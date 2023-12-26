@@ -53,11 +53,7 @@ type ConnectivityTestResult struct {
 }
 
 func (r ConnectivityTestResult) IsSuccess() bool {
-	if r.Error == nil {
-		return true
-	} else {
-		return false
-	}
+	return r.Error == nil
 }
 
 type ConnectivityTestError struct {
