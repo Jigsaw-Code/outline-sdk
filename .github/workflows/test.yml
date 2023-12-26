@@ -19,7 +19,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     env:
-      OUTPUT_DIR: ${{ env.GITHUB_WORKSPACE }}/out
+      OUTPUT_DIR: ${{ github.workspace }}/out
 
     steps:
       - name: Check out code into the Go module directory
@@ -40,7 +40,7 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           go build -C x -o "${{ env.OUTPUT_DIR }}" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
-          cd "${{ env.GITHUB_WORKSPACE }}/x/mobileproxy"
+          cd "${{ github.workspace }}/x/mobileproxy"
           PATH="${{ env.OUTPUT_DIR }}:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -o "${{ env.OUTPUT_DIR }}/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
 
       - name: Test SDK
