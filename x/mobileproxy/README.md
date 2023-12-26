@@ -21,6 +21,8 @@ Note: Gomobile expects gobind to be in the PATH, that's why we need to prebuild 
 
 The `-ldflags='-s -w'` flag strips debug symbols to reduce the size of the output library.
 
+See [our Github Test Action](https://github.com/Jigsaw-Code/outline-sdk/blob/main/.github/workflows/test.yml) for how we build the Mobileproxy in our tests.
+
 <details>
 <summary>Sample iOS generated Code</summary>
 
