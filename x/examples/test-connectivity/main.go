@@ -43,9 +43,9 @@ type connectivityReport struct {
 	// Inputs
 	Resolver string `json:"resolver"`
 	Proto    string `json:"proto"`
-	// TODO(fortuna): get details from trace
-	// Proxy    string `json:"proxy"`
-	// Prefix   string `json:"prefix"`
+	// TODO(fortuna): add sanitized transport config.
+	// Transport    string `json:"transport"`
+
 	// Observations
 	Time       time.Time  `json:"time"`
 	DurationMs int64      `json:"duration_ms"`
@@ -196,9 +196,8 @@ func main() {
 				Resolver: resolverAddress,
 				Proto:    proto,
 				Time:     startTime.UTC().Truncate(time.Second),
-				// TODO(fortuna): Add tracing to get more detailed info:
-				// Proxy:    proxyAddress,
-				// Prefix:   config.Prefix.String(),
+				// TODO(fortuna): Add sanitized config:
+				// Transport:   config.SanitizedConfig(*transportFlag),
 				DurationMs: testDuration.Milliseconds(),
 				Error:      makeErrorRecord(result),
 			}
