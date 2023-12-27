@@ -43,12 +43,12 @@ jobs:
       - name: Build Mobileproxy (Android)
         if: matrix.os == 'ubuntu-latest'
         run: PATH="${{ env.OUTPUT_DIR }}:$PATH" gomobile bind -ldflags='-s -w' -v -target=android -androidapi=21 -o "${{ env.OUTPUT_DIR }}/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
-        working-directory: ${{ github.workspace }}/x/mobileproxy
+        working-directory: ${{ github.workspace }}/x
 
       - name: Build Mobileproxy (iOS)
         if: matrix.os == 'macos-latest'
         run: PATH="${{ env.OUTPUT_DIR }}:$PATH" gomobile bind -ldflags='-s -w' -v -target=ios -iosversion=11.0 -o "${{ env.OUTPUT_DIR }}/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
-        working-directory: ${{ github.workspace }}/x/mobileproxy
+        working-directory: ${{ github.workspace }}/x
 
       - name: Test SDK
         run: go test -v -race -bench '.' ./... -benchtime=100ms
