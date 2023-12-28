@@ -51,6 +51,7 @@ func main() {
 	resolverFlag := flag.String("resolver", "", "The address of the recursive DNS resolver to use in host:port format. If the port is missing, it's assumed to be 53")
 	transportFlag := flag.String("transport", "", "The transport for the connection to the recursive DNS resolver")
 	tcpFlag := flag.Bool("tcp", false, "Force TCP when querying the DNS resolver")
+	timeoutFlag := flag.Int("timeout", 2, "Timeout in seconds")
 
 	flag.Parse()
 	if *verboseFlag {
@@ -102,7 +103,7 @@ func main() {
 		log.Fatalf("Question creation failed: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*timeoutFlag)*time.Second)
 	defer cancel()
 	response, err := resolver.Query(ctx, *q)
 
