@@ -1,5 +1,5 @@
-github.com/Jigsaw-Code/outline-sdk v0.0.10 h1:pmEliVQAcEncxwxv7sBk29L3SMSB1Elm0nvNJYFPdvU=
-github.com/Jigsaw-Code/outline-sdk v0.0.10/go.mod h1:hhlKz0+r9wSDFT8usvN8Zv/BFToCIFAUn1P2Qk8G2CM=
+github.com/Jigsaw-Code/outline-sdk v0.0.11-0.20231220175639-51e55dde245a h1:Wbz/5J93viNrNcss1K/NYJTILVIR80v7rH4o8lMQtkY=
+github.com/Jigsaw-Code/outline-sdk v0.0.11-0.20231220175639-51e55dde245a/go.mod h1:g0xdRhOHeuOWJ+vG/cQKRZ/ZzzpP3lGhyTSnw2h+QLg=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
@@ -10,8 +10,6 @@ github.com/google/gopacket v1.1.19 h1:ves8RnFZPGiFnTS0uPQStjwru6uO6h+nlr9j6fL7kF
 github.com/kr/pretty v0.1.0 h1:L/CwN0zerZDmRFUapSPitk6f+Q3+0za1rQkzVuMiMFI=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
 github.com/kr/text v0.2.0/go.mod h1:eLer722TekiGuMkidMxC/pM04lWEeraHUUmBw8l2grE=
-github.com/miekg/dns v1.1.54 h1:5jon9mWcb0sFJGpnI99tOMhCPyJ+RPVz5b63MQG0VWI=
-github.com/miekg/dns v1.1.54/go.mod h1:uInx36IzPl7FYnDcMeVWxj9byh7DutNykX4G9Sj60FY=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/riobard/go-bloom v0.0.0-20200614022211-cdc8013cb5b3 h1:f/FNXud6gA3MNr8meMVVGxhp+QBTqY91tM8HjEuMjGg=

@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/network"
 	"github.com/Jigsaw-Code/outline-sdk/network/dnstruncate"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -53,7 +54,7 @@ func newOutlinePacketProxy(transportConfig string) (opp *outlinePacketProxy, err
 
 func (proxy *outlinePacketProxy) testConnectivityAndRefresh(resolverAddr, domain string) error {
 	dialer := transport.PacketListenerDialer{Listener: proxy.remotePl}
-	dnsResolver := connectivity.NewUDPResolver(dialer, resolverAddr)
+	dnsResolver := dns.NewUDPResolver(dialer, resolverAddr)
 	result, err := connectivity.TestConnectivityWithResolver(context.Background(), dnsResolver, domain)
 
 	if err != nil {

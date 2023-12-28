@@ -16,7 +16,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -27,8 +26,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 var debugLog log.Logger = *log.New(io.Discard, "", 0)
@@ -38,15 +38,6 @@ func init() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags...] <domain>\n", path.Base(os.Args[0]))
 		flag.PrintDefaults()
 	}
-}
-
-func cleanDNSError(err error, resolverAddr string) error {
-	dnsErr := &net.DNSError{}
-	if resolverAddr != "" && errors.As(err, &dnsErr) {
-		dnsErr.Server = resolverAddr
-		return dnsErr
-	}
-	return err
 }
 
 func main() {
@@ -67,84 +58,74 @@ func main() {
 	}
 
 	resolverAddr := *resolverFlag
-	if resolverAddr != "" && !strings.Contains(resolverAddr, ":") {
-		resolverAddr = net.JoinHostPort(resolverAddr, "53")
-	}
 
-	var err error
-	var packetDialer transport.PacketDialer
-	if !*tcpFlag {
-		packetDialer, err = config.NewPacketDialer(*transportFlag)
+	var resolver dns.Resolver
+	if *tcpFlag {
+		streamDialer, err := config.NewStreamDialer(*transportFlag)
+		if err != nil {
+			log.Fatalf("Could not create stream dialer: %v", err)
+		}
+		resolver = dns.NewTCPResolver(streamDialer, resolverAddr)
+	} else {
+		packetDialer, err := config.NewPacketDialer(*transportFlag)
 		if err != nil {
 			log.Fatalf("Could not create packet dialer: %v", err)
 		}
-	}
-	streamDialer, err := config.NewStreamDialer(*transportFlag)
-	if err != nil {
-		log.Fatalf("Could not create stream dialer: %v", err)
+		resolver = dns.NewUDPResolver(packetDialer, resolverAddr)
 	}
 
-	resolver := net.Resolver{PreferGo: true}
-	resolver.Dial = func(ctx context.Context, network, sysResolverAddr string) (net.Conn, error) {
-		dialAddr := sysResolverAddr
-		if resolverAddr != "" {
-			dialAddr = resolverAddr
-		}
-		if strings.HasPrefix(network, "tcp") || *tcpFlag {
-			debugLog.Printf("Dial TCP: %v", dialAddr)
-			return streamDialer.Dial(ctx, dialAddr)
-		}
-		debugLog.Printf("Dial UDP: %v", dialAddr)
-		return packetDialer.Dial(ctx, dialAddr)
+	var qtype dnsmessage.Type
+	switch strings.ToUpper(*typeFlag) {
+	case "A":
+		qtype = dnsmessage.TypeA
+	case "AAAA":
+		qtype = dnsmessage.TypeAAAA
+	case "CNAME":
+		qtype = dnsmessage.TypeCNAME
+	case "NS":
+		qtype = dnsmessage.TypeNS
+	case "SOA":
+		qtype = dnsmessage.TypeSOA
+	case "TXT":
+		qtype = dnsmessage.TypeTXT
+	default:
+		log.Fatalf("Unsupported query type %v", *typeFlag)
+	}
+
+	q, err := dns.NewQuestion(domain, qtype)
+	if err != nil {
+		log.Fatalf("Question creation failed: %v", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	switch strings.ToUpper(*typeFlag) {
-	case "A":
-		ips, err := resolver.LookupIP(ctx, "ip4", domain)
-		err = cleanDNSError(err, resolverAddr)
-		if err != nil {
-			log.Fatalf("Failed to lookup IPs: %v", err)
+	response, err := resolver.Query(ctx, *q)
+
+	if err != nil {
+		log.Fatalf("Query failed: %v", err)
+	}
+
+	debugLog.Println(response.GoString())
+	for _, answer := range response.Answers {
+		if answer.Header.Type != qtype {
+			continue
 		}
-		for _, ip := range ips {
-			fmt.Println(ip.String())
+		switch answer.Header.Type {
+		case dnsmessage.TypeA:
+			fmt.Println(net.IP(answer.Body.(*dnsmessage.AResource).A[:]))
+		case dnsmessage.TypeAAAA:
+			fmt.Println(net.IP(answer.Body.(*dnsmessage.AAAAResource).AAAA[:]))
+		case dnsmessage.TypeCNAME:
+			fmt.Println(answer.Body.(*dnsmessage.CNAMEResource).CNAME.String())
+		case dnsmessage.TypeNS:
+			fmt.Println(answer.Body.(*dnsmessage.NSResource).NS.String())
+		case dnsmessage.TypeSOA:
+			soa := answer.Body.(*dnsmessage.SOAResource)
+			fmt.Printf("ns: %v email: %v minTTL: %v\n", soa.NS, soa.MBox, soa.MinTTL)
+		case dnsmessage.TypeTXT:
+			fmt.Println(strings.Join(answer.Body.(*dnsmessage.TXTResource).TXT, ", "))
+		default:
+			fmt.Println(answer.Body.GoString())
 		}
-	case "AAAA":
-		ips, err := resolver.LookupIP(ctx, "ip6", domain)
-		err = cleanDNSError(err, resolverAddr)
-		if err != nil {
-			log.Fatalf("Failed to lookup IPs: %v", err)
-		}
-		for _, ip := range ips {
-			fmt.Println(ip.String())
-		}
-	case "CNAME":
-		cname, err := resolver.LookupCNAME(ctx, domain)
-		err = cleanDNSError(err, resolverAddr)
-		if err != nil {
-			log.Fatalf("Failed to lookup CNAME: %v", err)
-		}
-		fmt.Println(cname)
-	case "NS":
-		nss, err := resolver.LookupNS(ctx, domain)
-		err = cleanDNSError(err, resolverAddr)
-		if err != nil {
-			log.Fatalf("Failed to lookup NS: %v", err)
-		}
-		for _, ns := range nss {
-			fmt.Println(ns.Host)
-		}
-	case "TXT":
-		lines, err := resolver.LookupTXT(ctx, domain)
-		err = cleanDNSError(err, resolverAddr)
-		if err != nil {
-			log.Fatalf("Failed to lookup TXT: %v", err)
-		}
-		for _, line := range lines {
-			fmt.Println(line)
-		}
-	default:
-		log.Fatalf("Invalid query type %v", *typeFlag)
 	}
 }
