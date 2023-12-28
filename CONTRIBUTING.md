@@ -43,23 +43,23 @@ In Go you can compile for other target operating system and architecture by spec
 
 MacOS example:
 ```
-% GOOS=darwin go build -C x -o ./bin/ ./outline-connectivity 
-% file ./x/bin/outline-connectivity 
-./x/bin/outline-connectivity: Mach-O 64-bit executable x86_64
+% GOOS=darwin go build -C x -o ./bin/ ./examples/test-connectivity 
+% file ./x/bin/test-connectivity 
+./x/bin/test-connectivity: Mach-O 64-bit executable x86_64
 ```
 
 Linux example:
 ```
-% GOOS=linux go build -C x -o ./bin/ ./outline-connectivity 
-% file ./x/bin/outline-connectivity                      
-./x/bin/outline-connectivity: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked, Go BuildID=n0WfUGLum4Y6OpYxZYuz/lbtEdv_kvyUCd3V_qOqb/CC_6GAQqdy_ebeYTdn99/Tk_G3WpBWi8vxqmIlIuU, with debug_info, not stripped
+% GOOS=linux go build -C x -o ./bin/ ./examples/test-connectivity 
+% file ./x/bin/test-connectivity                      
+./x/bin/test-connectivity: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked, Go BuildID=n0WfUGLum4Y6OpYxZYuz/lbtEdv_kvyUCd3V_qOqb/CC_6GAQqdy_ebeYTdn99/Tk_G3WpBWi8vxqmIlIuU, with debug_info, not stripped
 ```
 
 Windows example:
 ```
-% GOOS=windows go build -C x -o ./bin/ ./outline-connectivity 
-% file ./x/bin/outline-connectivity.exe 
-./x/bin/outline-connectivity.exe: PE32+ executable (console) x86-64 (stripped to external PDB), for MS Windows
+% GOOS=windows go build -C x -o ./bin/ ./examples/test-connectivity 
+% file ./x/bin/test-connectivity.exe 
+./x/bin/test-connectivity.exe: PE32+ executable (console) x86-64 (stripped to external PDB), for MS Windows
 ```
 </details>
 
@@ -103,7 +103,7 @@ podman machine stop
 
 The easiest way is to run a binary is to use the [`go run` command](https://pkg.go.dev/cmd/go#hdr-Compile_and_run_Go_program) directly with the `-exec` flag and our convenience tool `run_on_podman.sh`:
 ```sh
-GOOS=linux go run -C x -exec "$(pwd)/run_on_podman.sh" ./outline-connectivity
+GOOS=linux go run -C x -exec "$(pwd)/run_on_podman.sh" ./examples/test-connectivity
 ```
 
 It also works with the [`go test` command](https://pkg.go.dev/cmd/go#hdr-Test_packages):
@@ -121,8 +121,8 @@ podman run --arch $(uname -m) --rm -it -v "${bin}":/outline/bin gcr.io/distroles
 
 You can also use `podman run` directly to run a pre-built binary:
 ```
-% podman run --rm -it -v ./x/bin:/outline gcr.io/distroless/static-debian11 /outline/outline-connectivity
-Usage of /outline/outline-connectivity:
+% podman run --rm -it -v ./x/bin:/outline gcr.io/distroless/static-debian11 /outline/test-connectivity
+Usage of /outline/test-connectivity:
   -domain string
         Domain name to resolve in the test (default "example.com.")
   -key string
@@ -173,7 +173,7 @@ You can pass `wine64` as the `-exec` parameter in the `go` calls.
 To build:
 
 ```sh
-GOOS=windows go run -C x -exec "wine64" ./outline-connectivity
+GOOS=windows go run -C x -exec "wine64" ./examples/test-connectivity
 ```
 
 For tests:

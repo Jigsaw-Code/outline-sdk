@@ -198,10 +198,9 @@ func (c *WriteCollector) Collect(ctx context.Context, report Report) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	_, err = c.Writer.Write(jsonData)
+	_, err = fmt.Fprintln(c.Writer, string(jsonData))
 	if err != nil {
 		return err
 	}
-	fmt.Println("Report written")
 	return nil
 }

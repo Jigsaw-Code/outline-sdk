@@ -119,7 +119,7 @@ This launch is currently in Beta. Most of the code is not new. It's the same cod
     - [x] Connectivity Test mobile app (iOS and Android) using [Capacitor](https://capacitorjs.com/)
   - For Go apps
     - [x] Connectivity Test example [Wails](https://wails.io/) graphical app
-    - [x] Connectivity Test example command-line app ([source](./x/examples/outline-connectivity/))
+    - [x] Connectivity Test example command-line app ([source](./x/examples/test-connectivity/))
     - [x] Outline Client example command-line app ([source](./x/examples/outline-cli/))
     - [x] Page fetch example command-line app ([source](./x/examples/outline-fetch/))
     - [x] Local proxy example command-line app ([source](./x/examples/http2transport/))
