@@ -40,6 +40,11 @@ func init() {
 	}
 }
 
+func rcodeToString(rcode dnsmessage.RCode) string {
+	rcodeStr, _ := strings.CutPrefix(strings.ToUpper(rcode.String()), "RCODE")
+	return rcodeStr
+}
+
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
 	typeFlag := flag.String("type", "A", "The type of the query (A, AAAA, CNAME, NS or TXT).")
@@ -97,7 +102,7 @@ func main() {
 		log.Fatalf("Question creation failed: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	response, err := resolver.Query(ctx, *q)
 
@@ -105,6 +110,9 @@ func main() {
 		log.Fatalf("Query failed: %v", err)
 	}
 
+	if response.RCode != dnsmessage.RCodeSuccess {
+		log.Fatalf("Got response code %v", rcodeToString(response.RCode))
+	}
 	debugLog.Println(response.GoString())
 	for _, answer := range response.Answers {
 		if answer.Header.Type != qtype {
