@@ -35,7 +35,9 @@ jobs:
         run: go build -C x -o bin/ -v ./...
 
       - name: Test SDK
+        # Enable nettests, which executes external network requests.
         run: go test -v -race -bench '.' ./... -benchtime=100ms -tags nettest
 
       - name: Test X
+        # Enable nettests, which executes external network requests.
         run: go test -C x -v -race -bench '.' ./... -benchtime=100ms -tags nettest
