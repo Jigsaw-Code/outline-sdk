@@ -27,17 +27,18 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
 // StreamDialer Tests
 func TestTestResolverStreamConnectivityOk(t *testing.T) {
 	// TODO(fortuna): Run a local resolver and make test not depend on an external server.
-	resolver := &transport.TCPEndpoint{Address: "8.8.8.8:53"}
-	_, err := TestResolverStreamConnectivity(context.Background(), resolver, "example.com")
+	resolver := NewTCPResolver(&transport.TCPStreamDialer{}, "8.8.8.8:53")
+	result, err := TestConnectivityWithResolver(context.Background(), resolver, "example.com")
 	require.NoError(t, err)
+	require.Nil(t, result)
 }
 
 // TODO: Move this to the SDK.
@@ -69,15 +70,15 @@ func TestTestResolverStreamConnectivityRefused(t *testing.T) {
 	// Close right away to ensure the port is closed. The OS will likely not reuse it soon enough.
 	require.Nil(t, listener.Close())
 
-	resolver := &transport.TCPEndpoint{Address: listener.Addr().String()}
-	_, err = TestResolverStreamConnectivity(context.Background(), resolver, "anything")
-	var testErr *TestError
-	require.ErrorAs(t, err, &testErr)
-	require.Equal(t, "dial", testErr.Op)
-	require.Equal(t, "ECONNREFUSED", testErr.PosixError)
+	resolver := NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
+	result, err := TestConnectivityWithResolver(context.Background(), resolver, "anything")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, "connect", result.Op)
+	require.Equal(t, "ECONNREFUSED", result.PosixError)
 
 	var sysErr *os.SyscallError
-	require.ErrorAs(t, err, &sysErr)
+	require.ErrorAs(t, result.Err, &sysErr)
 	expectedSyscall := "connect"
 	if runtime.GOOS == "windows" {
 		expectedSyscall = "connectex"
@@ -85,7 +86,7 @@ func TestTestResolverStreamConnectivityRefused(t *testing.T) {
 	require.Equal(t, expectedSyscall, sysErr.Syscall)
 
 	var errno syscall.Errno
-	require.ErrorAs(t, sysErr.Err, &errno)
+	require.ErrorAs(t, result.Err, &errno)
 	require.Equal(t, "ECONNREFUSED", errnoName(errno))
 }
 
@@ -104,16 +105,15 @@ func TestTestResolverStreamConnectivityReset(t *testing.T) {
 	}, &running)
 	defer listener.Close()
 
-	resolver := &transport.TCPEndpoint{Address: listener.Addr().String()}
-	_, err := TestResolverStreamConnectivity(context.Background(), resolver, "anything")
-
-	var testErr *TestError
-	require.ErrorAs(t, err, &testErr)
-	require.Equalf(t, "read", testErr.Op, "Wrong test operation. Error: %v", testErr.Err)
-	require.Equal(t, "ECONNRESET", testErr.PosixError)
+	resolver := NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
+	result, err := TestConnectivityWithResolver(context.Background(), resolver, "anything")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equalf(t, "receive", result.Op, "Wrong test operation. Error: %v", result.Err)
+	require.Equal(t, "ECONNRESET", result.PosixError)
 
 	var sysErr *os.SyscallError
-	require.ErrorAs(t, err, &sysErr)
+	require.ErrorAs(t, result.Err, &sysErr)
 	expectedSyscall := "read"
 	if runtime.GOOS == "windows" {
 		expectedSyscall = "wsarecv"
@@ -121,7 +121,7 @@ func TestTestResolverStreamConnectivityReset(t *testing.T) {
 	require.Equalf(t, expectedSyscall, sysErr.Syscall, "Wrong system call. Error: %v", sysErr)
 
 	var errno syscall.Errno
-	require.ErrorAs(t, err, &errno)
+	require.ErrorAs(t, result.Err, &errno)
 	require.Equal(t, "ECONNRESET", errnoName(errno))
 }
 
@@ -136,17 +136,16 @@ func TestTestStreamDialerEarlyClose(t *testing.T) {
 	}, &running)
 	defer listener.Close()
 
-	resolver := &transport.TCPEndpoint{Address: listener.Addr().String()}
-	_, err := TestResolverStreamConnectivity(context.Background(), resolver, "anything")
-
-	var testErr *TestError
-	require.ErrorAs(t, err, &testErr)
-	require.Equalf(t, "read", testErr.Op, "Wrong test operation. Error: %v", testErr.Err)
-	require.Equal(t, "", testErr.PosixError)
-	require.Error(t, err, "unexpected EOF")
+	resolver := NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
+	result, err := TestConnectivityWithResolver(context.Background(), resolver, "anything")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equalf(t, "receive", result.Op, "Wrong test operation. Error: %v", result.Err)
+	require.Equal(t, "", result.PosixError)
+	require.ErrorIs(t, result.Err, io.EOF)
 
 	var sysErr *os.SyscallError
-	require.False(t, errors.As(err, &sysErr))
+	require.False(t, errors.As(result.Err, &sysErr))
 }
 
 func TestTestResolverStreamConnectivityTimeout(t *testing.T) {
@@ -161,16 +160,16 @@ func TestTestResolverStreamConnectivityTimeout(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	resolver := &transport.TCPEndpoint{Address: listener.Addr().String()}
-	_, err := TestResolverStreamConnectivity(ctx, resolver, "anything")
+	resolver := NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
+	result, err := TestConnectivityWithResolver(ctx, resolver, "anything")
+	require.NoError(t, err)
+	require.NotNil(t, result)
 
-	var testErr *TestError
-	require.ErrorAs(t, err, &testErr)
-	assert.Equalf(t, "read", testErr.Op, "Wrong test operation. Error: %v", testErr.Err)
+	assert.Equalf(t, "receive", result.Op, "Wrong test operation. Error: %v", result.Err)
 
-	assert.ErrorContains(t, err, "i/o timeout")
-	assert.True(t, isTimeout(err))
-	assert.Equalf(t, "ETIMEDOUT", testErr.PosixError, "Wrong posix error code. Error: %#v, %v", testErr.Err, testErr.Err.Error())
+	assert.ErrorContains(t, result.Err, "i/o timeout")
+	assert.True(t, isTimeout(result.Err))
+	assert.Equalf(t, "ETIMEDOUT", result.PosixError, "Wrong posix error code. Error: %#v, %v", result.Err, result.Err.Error())
 
 	timeout.Done()
 	listener.Close()
@@ -188,21 +187,22 @@ func TestTestPacketPacketConnectivityOk(t *testing.T) {
 		buf := make([]byte, 512)
 		n, clientAddr, err := server.ReadFrom(buf)
 		require.NoError(t, err)
-		var request dns.Msg
+		var request dnsmessage.Message
 		err = request.Unpack(buf[:n])
 		require.NoError(t, err)
 
-		var response dns.Msg
-		response.SetReply(&request)
-		responseBytes, err := response.Pack()
+		request.Response = true
+		request.RecursionAvailable = true
+		responseBytes, err := request.AppendPack(buf[0:0])
 		require.NoError(t, err)
 		_, err = server.WriteTo(responseBytes, clientAddr)
 		require.NoError(t, err)
 	}()
 
-	resolver := &transport.UDPEndpoint{Address: server.LocalAddr().String()}
-	_, err = TestResolverPacketConnectivity(context.Background(), resolver, "example.com")
+	resolver := NewUDPResolver(&transport.UDPPacketDialer{}, server.LocalAddr().String())
+	result, err := TestConnectivityWithResolver(context.Background(), resolver, "anything")
 	require.NoError(t, err)
+	require.Nil(t, result)
 }
 
 // TODO: Add more tests
