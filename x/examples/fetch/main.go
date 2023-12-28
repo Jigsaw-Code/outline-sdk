@@ -42,35 +42,61 @@ func init() {
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
 	transportFlag := flag.String("transport", "", "Transport config")
+	addressFlag := flag.String("address", "", "Address to connecto to. If empty, use the URL authority.")
+	methodFlag := flag.String("method", "GET", "The HTTP method to use.")
 
 	flag.Parse()
 
 	if *verboseFlag {
 		debugLog = *log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 	}
+	var overrideHost, overridePort string
+	if *addressFlag != "" {
+		var err error
+		overrideHost, overridePort, err = net.SplitHostPort(*addressFlag)
+		if err != nil {
+			// Fail to parse. Assume the flag is host only.
+			overrideHost = *addressFlag
+			overridePort = ""
+		}
+	}
 
 	url := flag.Arg(0)
 	if url == "" {
-		log.Print("Need to pass the URL to fetch in the command-line")
+		log.Println("Need to pass the URL to fetch in the command-line")
 		flag.Usage()
 		os.Exit(1)
 	}
 
 	dialer, err := config.NewStreamDialer(*transportFlag)
 	if err != nil {
-		log.Fatalf("Could not create dialer: %v", err)
+		log.Fatalf("Could not create dialer: %v\n", err)
 	}
 	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid address: %w", err)
+		}
+		if overrideHost != "" {
+			host = overrideHost
+		}
+		if overridePort != "" {
+			port = overridePort
+		}
 		if !strings.HasPrefix(network, "tcp") {
 			return nil, fmt.Errorf("protocol not supported: %v", network)
 		}
-		return dialer.Dial(ctx, addr)
+		return dialer.Dial(ctx, net.JoinHostPort(host, port))
 	}
 	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: 5 * time.Second}
 
-	resp, err := httpClient.Get(url)
+	req, err := http.NewRequest(*methodFlag, url, nil)
 	if err != nil {
-		log.Fatalf("URL GET failed: %v", err)
+		log.Fatalln("Failed to create request:", err)
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		log.Fatalf("URL GET failed: %v\n", err)
 	}
 	defer resp.Body.Close()
 
@@ -81,7 +107,8 @@ func main() {
 	}
 
 	_, err = io.Copy(os.Stdout, resp.Body)
+	fmt.Println()
 	if err != nil {
-		log.Fatalf("Read of page body failed: %v", err)
+		log.Fatalf("Read of page body failed: %v\n", err)
 	}
 }
