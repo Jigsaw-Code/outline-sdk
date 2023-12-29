@@ -120,7 +120,7 @@ You can find detailed steps at the tutorial [Go for beginners: Getting started](
 
 The Outline SDK has several command-line utilities that illustrate the usage of the SDK, but are also valuable for debugging and trying the different strategies without having to build an app.
 
-They all take `-transport` flag with a config that specifies what transport should be used to establish connections.
+They all take a `-transport` flag with a config that specifies what transport should be used to establish connections.
 The config format can be found in [x/config](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config).
 
 
