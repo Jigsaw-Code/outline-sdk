@@ -50,7 +50,7 @@ The Outline SDK offers two protocols to create connections over proxies:
 
 ### Build a VPN
 
-Use the [network](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/network) package to create TUN-based VPNs using transport-layer proxies.
+Use the [network](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/network) package to create TUN-based VPNs using transport-layer proxies (often called "tun2socks").
 
 
 ## Add the SDK to Your App
