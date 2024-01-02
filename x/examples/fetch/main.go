@@ -42,7 +42,7 @@ func init() {
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
 	transportFlag := flag.String("transport", "", "Transport config")
-	addressFlag := flag.String("address", "", "Address to connecto to. If empty, use the URL authority.")
+	addressFlag := flag.String("address", "", "Address to connect to. If empty, use the URL authority")
 	methodFlag := flag.String("method", "GET", "The HTTP method to use.")
 
 	flag.Parse()
