@@ -8,9 +8,9 @@ require (
 	github.com/songgao/water v0.0.0-20190725173103-fd331bda3f4b
 	github.com/stretchr/testify v1.8.2
 	github.com/vishvananda/netlink v1.1.0
-	golang.org/x/mobile v0.0.0-20230905140555-fbe1c053b6a9
+	golang.org/x/mobile v0.0.0-20231127183840-76ac6878050a
 	golang.org/x/net v0.17.0
-	golang.org/x/sys v0.13.0
+	golang.org/x/sys v0.15.0
 )
 
 require (
@@ -20,9 +20,9 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/shadowsocks/go-shadowsocks2 v0.1.5 // indirect
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect
-	golang.org/x/crypto v0.14.0 // indirect
-	golang.org/x/mod v0.12.0 // indirect
-	golang.org/x/sync v0.3.0 // indirect
-	golang.org/x/tools v0.12.1-0.20230818130535-1517d1a3ba60 // indirect
+	golang.org/x/crypto v0.16.0 // indirect
+	golang.org/x/mod v0.14.0 // indirect
+	golang.org/x/sync v0.5.0 // indirect
+	golang.org/x/tools v0.16.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

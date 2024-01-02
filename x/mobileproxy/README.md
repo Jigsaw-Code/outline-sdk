@@ -7,7 +7,7 @@ This package enables the use Go Mobile to generate a mobile library to run a loc
 From the `x/` directory:
 
 ```bash
-go build -o ./out/ golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
+go build -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
 ```
 
 ## Build the iOS and Android libraries with [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile#hdr-Build_a_library_for_Android_and_iOS)
@@ -20,6 +20,8 @@ PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=android -androida
 Note: Gomobile expects gobind to be in the PATH, that's why we need to prebuild it, and set up the PATH accordingly.
 
 The `-ldflags='-s -w'` flag strips debug symbols to reduce the size of the output library.
+
+See [our Github Test Action](https://github.com/Jigsaw-Code/outline-sdk/blob/main/.github/workflows/test.yml) for how we build the Mobileproxy in our tests.
 
 <details>
 <summary>Sample iOS generated Code</summary>
