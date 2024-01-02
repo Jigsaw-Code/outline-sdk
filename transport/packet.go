@@ -42,6 +42,16 @@ func (e UDPEndpoint) Connect(ctx context.Context) (net.Conn, error) {
 	return e.Dialer.DialContext(ctx, "udp", e.Address)
 }
 
+// FuncPacketEndpoint is a [PacketEndpoint] that uses the given function to connect.
+type FuncPacketEndpoint func(ctx context.Context) (net.Conn, error)
+
+var _ PacketEndpoint = (*FuncPacketEndpoint)(nil)
+
+// Connect implements the [PacketEndpoint] interface.
+func (f FuncPacketEndpoint) Connect(ctx context.Context) (net.Conn, error) {
+	return f(ctx)
+}
+
 // PacketDialerEndpoint is a [PacketEndpoint] that connects to the given address using the specified [PacketDialer].
 type PacketDialerEndpoint struct {
 	Dialer  PacketDialer
@@ -154,4 +164,14 @@ var _ PacketListener = (*UDPPacketListener)(nil)
 // ListenPacket implements [PacketListener].ListenPacket
 func (l UDPPacketListener) ListenPacket(ctx context.Context) (net.PacketConn, error) {
 	return l.ListenConfig.ListenPacket(ctx, "udp", l.Address)
+}
+
+// FuncPacketDialer is a [PacketDialer] that uses the given function to dial.
+type FuncPacketDialer func(ctx context.Context, addr string) (net.Conn, error)
+
+var _ PacketDialer = (*FuncPacketDialer)(nil)
+
+// Dial implements the [PacketDialer] interface.
+func (f FuncPacketDialer) Dial(ctx context.Context, addr string) (net.Conn, error) {
+	return f(ctx, addr)
 }

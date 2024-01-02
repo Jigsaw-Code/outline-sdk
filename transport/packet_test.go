@@ -16,6 +16,7 @@ package transport
 
 import (
 	"context"
+	"errors"
 	"net"
 	"sync"
 	"syscall"
@@ -67,6 +68,29 @@ func TestUDPEndpointDomain(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "udp", conn.RemoteAddr().Network())
 	assert.Equal(t, resolvedAddr, conn.RemoteAddr().String())
+}
+
+func TestFuncPacketEndpoint(t *testing.T) {
+	expectedConn := &fakeConn{}
+	expectedErr := errors.New("fake error")
+	endpoint := FuncPacketEndpoint(func(ctx context.Context) (net.Conn, error) {
+		return expectedConn, expectedErr
+	})
+	conn, err := endpoint.Connect(context.Background())
+	require.Equal(t, expectedConn, conn)
+	require.Equal(t, expectedErr, err)
+}
+
+func TestFuncPacketDialer(t *testing.T) {
+	expectedConn := &fakeConn{}
+	expectedErr := errors.New("fake error")
+	dialer := FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+		require.Equal(t, "unused", addr)
+		return expectedConn, expectedErr
+	})
+	conn, err := dialer.Dial(context.Background(), "unused")
+	require.Equal(t, expectedConn, conn)
+	require.Equal(t, expectedErr, err)
 }
 
 // UDPPacketListener
