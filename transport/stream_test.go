@@ -27,6 +27,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type fakeConn struct {
+	StreamConn
+}
+
+func TestFuncStreamEndpoint(t *testing.T) {
+	expectedConn := &fakeConn{}
+	expectedErr := errors.New("fake error")
+	endpoint := FuncStreamEndpoint(func(ctx context.Context) (StreamConn, error) {
+		return expectedConn, expectedErr
+	})
+	conn, err := endpoint.Connect(context.Background())
+	require.Equal(t, expectedConn, conn)
+	require.Equal(t, expectedErr, err)
+}
+
+func TestFuncStreamDialer(t *testing.T) {
+	expectedConn := &fakeConn{}
+	expectedErr := errors.New("fake error")
+	dialer := FuncStreamDialer(func(ctx context.Context, add string) (StreamConn, error) {
+		return expectedConn, expectedErr
+	})
+	conn, err := dialer.Dial(context.Background(), "unused")
+	require.Equal(t, expectedConn, conn)
+	require.Equal(t, expectedErr, err)
+}
+
 func TestNewTCPStreamDialerIPv4(t *testing.T) {
 	requestText := []byte("Request")
 	responseText := []byte("Response")
