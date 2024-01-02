@@ -84,7 +84,8 @@ func TestFuncPacketEndpoint(t *testing.T) {
 func TestFuncPacketDialer(t *testing.T) {
 	expectedConn := &fakeConn{}
 	expectedErr := errors.New("fake error")
-	dialer := FuncPacketDialer(func(ctx context.Context, add string) (net.Conn, error) {
+	dialer := FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+		require.Equal(t, "unused", addr)
 		return expectedConn, expectedErr
 	})
 	conn, err := dialer.Dial(context.Background(), "unused")

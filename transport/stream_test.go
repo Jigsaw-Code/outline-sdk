@@ -45,7 +45,8 @@ func TestFuncStreamEndpoint(t *testing.T) {
 func TestFuncStreamDialer(t *testing.T) {
 	expectedConn := &fakeConn{}
 	expectedErr := errors.New("fake error")
-	dialer := FuncStreamDialer(func(ctx context.Context, add string) (StreamConn, error) {
+	dialer := FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
+		require.Equal(t, "unused", addr)
 		return expectedConn, expectedErr
 	})
 	conn, err := dialer.Dial(context.Background(), "unused")
