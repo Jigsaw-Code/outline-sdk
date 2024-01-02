@@ -96,6 +96,16 @@ func (e *TCPEndpoint) Connect(ctx context.Context) (StreamConn, error) {
 	return conn.(*net.TCPConn), nil
 }
 
+// FuncStreamEndpoint is a [StreamEndpoint] that uses the given function to connect.
+type FuncStreamEndpoint func(ctx context.Context) (StreamConn, error)
+
+var _ StreamEndpoint = (*FuncStreamEndpoint)(nil)
+
+// Connect implements the [StreamEndpoint] interface.
+func (f FuncStreamEndpoint) Connect(ctx context.Context) (StreamConn, error) {
+	return f(ctx)
+}
+
 // StreamDialerEndpoint is a [StreamEndpoint] that connects to the specified address using the specified
 // [StreamDialer].
 type StreamDialerEndpoint struct {
@@ -136,7 +146,9 @@ func (d *TCPStreamDialer) Dial(ctx context.Context, addr string) (StreamConn, er
 // FuncStreamDialer is a [StreamDialer] that uses the given function to dial.
 type FuncStreamDialer func(ctx context.Context, addr string) (StreamConn, error)
 
-// Query implements the [Resolver] interface.
+var _ StreamDialer = (*FuncStreamDialer)(nil)
+
+// Dial implements the [StreamDialer] interface.
 func (f FuncStreamDialer) Dial(ctx context.Context, addr string) (StreamConn, error) {
 	return f(ctx, addr)
 }
