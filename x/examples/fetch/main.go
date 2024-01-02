@@ -43,7 +43,7 @@ func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
 	transportFlag := flag.String("transport", "", "Transport config")
 	addressFlag := flag.String("address", "", "Address to connect to. If empty, use the URL authority")
-	methodFlag := flag.String("method", "GET", "The HTTP method to use.")
+	methodFlag := flag.String("method", "GET", "The HTTP method to use")
 
 	flag.Parse()
 
@@ -96,7 +96,7 @@ func main() {
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		log.Fatalf("URL GET failed: %v\n", err)
+		log.Fatalf("HTTP request failed: %v\n", err)
 	}
 	defer resp.Body.Close()
 
