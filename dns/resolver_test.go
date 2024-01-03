@@ -101,7 +101,7 @@ func Test_appendRequest(t *testing.T) {
 		Header: dnsmessage.ResourceHeader{
 			Name:   dnsmessage.MustNewName("."),
 			Type:   dnsmessage.TypeOPT,
-			Class:  maxDNSPacketSize,
+			Class:  maxUDPMessageSize,
 			TTL:    0,
 			Length: 0,
 		},
