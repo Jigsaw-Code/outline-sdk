@@ -33,7 +33,7 @@ import (
 )
 
 var (
-	ErrBadRequest  = errors.New("request input is bad")
+	ErrBadRequest  = errors.New("request input is invalid")
 	ErrDial        = errors.New("dial DNS resolver failed")
 	ErrSend        = errors.New("send DNS message failed")
 	ErrReceive     = errors.New("receive DNS message failed")
