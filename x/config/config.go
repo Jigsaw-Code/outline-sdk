@@ -68,7 +68,18 @@ func WrapStreamDialer(dialer transport.StreamDialer, transportConfig string) (tr
 	return dialer, nil
 }
 
-func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig string) (transport.StreamDialer, error) {
+
+
+type StreamDialer struct {
+	transport.StreamDialer
+	config string
+}
+
+func (sd *streamDialer) SanitizedConfig() string {
+	return sd.config
+}
+
+func newStreamDialerFromPart(innerDialer *StreamDialer, oneDialerConfig string) (*StreamDialer, error) {
 	url, err := parseConfigPart(oneDialerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config part: %w", err)
@@ -78,7 +89,7 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 	switch strings.ToLower(url.Scheme) {
 	case "socks5":
 		endpoint := transport.StreamDialerEndpoint{Dialer: innerDialer, Address: url.Host}
-		return socks5.NewStreamDialer(&endpoint)
+		return &streamDialer{StreamDialer: socks5.NewStreamDialer(&endpoint); config: innerDialer.SanitizedConfig() + "|" + oneDialerConfig}
 
 	case "split":
 		prefixBytesStr := url.Opaque
