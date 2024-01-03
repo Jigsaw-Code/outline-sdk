@@ -171,3 +171,59 @@ func NewPacketListener(transportConfig string) (transport.PacketListener, error)
 		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
 	}
 }
+
+func SanitizeConfig(transportConfig string) (string, error) {
+	// Do nothing if the config is empty
+	if transportConfig == "" {
+		return "", nil
+	}
+	// Split the string into parts
+	parts := strings.Split(transportConfig, "|")
+
+	// Iterate through each part
+	for i, part := range parts {
+		url, err := parseConfigPart(part)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse config part: %w", err)
+		}
+		// This can be extended to support other schemes that need sanitization
+		if strings.HasPrefix(part, "ss://") {
+			host := url.Host
+			if host == "" {
+				return "", errors.New("host not specified in ss:// config")
+			}
+			prefixStr := url.Query().Get("prefix")
+			if len(prefixStr) > 0 {
+				parts[i] = "ss://" + "[redacted]@" + host + "?prefix=" + prefixStr
+			} else {
+				parts[i] = "ss://" + "[redacted]@" + host
+			}
+		}
+	}
+
+	// Join the parts back into a string
+	return strings.Join(parts, "|"), nil
+}
+
+func GetHostnamesFromConfig(transportConfig string) ([]string, error) {
+	// Return empty slice if the config is empty
+	if transportConfig == "" {
+		return []string{}, nil
+	}
+	// Split the string into parts
+	parts := strings.Split(transportConfig, "|")
+
+	// Iterate through each part
+	var hostnames []string
+	for _, part := range parts {
+		url, err := parseConfigPart(part)
+		if err != nil {
+			return hostnames, fmt.Errorf("failed to parse config part: %w", err)
+		}
+		// This can be extended to support other schemes that have hostnames that need DNS resolution
+		if strings.HasPrefix(part, "ss://") || strings.HasPrefix(part, "socks5://") {
+			hostnames = append(hostnames, url.Hostname())
+		}
+	}
+	return hostnames, nil
+}
