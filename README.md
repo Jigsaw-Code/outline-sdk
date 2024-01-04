@@ -27,7 +27,7 @@ The Outline SDK allows you to:
 We are working on a [new DNS library](https://github.com/Jigsaw-Code/outline-sdk/pull/141) that will let people bypass DNS-based blocking by using alternative
 resolvers and ports, and encrypted DNS (DNS-over-HTTPS and DNS-over-TLS).
 
-Meanwhile, you can force a specific address resolution with an override, as implemented by the `override` config in [x/config](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config).
+Meanwhile, you can force a specific address resolution with an override, by implementing your own dialer, or leveraging the `override` config from [x/config](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config).
 
 ### Bypass SNI-based Blocking
 
