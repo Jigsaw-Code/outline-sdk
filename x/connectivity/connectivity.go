@@ -16,7 +16,6 @@ package connectivity
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -31,10 +30,6 @@ import (
 type ConnectivityError struct {
 	// Which operation in the test that failed: "connect", "send" or "receive"
 	Op string
-	// The time when the test started
-	StartTime time.Time
-	// The duration of the test
-	Duration time.Duration
 	// The POSIX error, when available
 	PosixError string
 	// The error observed for the action
@@ -49,23 +44,6 @@ func (err *ConnectivityError) Error() string {
 
 func (err *ConnectivityError) Unwrap() error {
 	return err.Err
-}
-
-// MarshalJSON implements the json.Marshaler interface.
-func (err *ConnectivityError) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&struct {
-		Op         string        `json:"operation"`
-		StartTime  time.Time     `json:"startTime"`
-		Duration   time.Duration `json:"durationNs"`
-		PosixError string        `json:"posixError"`
-		Err        string        `json:"error"`
-	}{
-		Op:         err.Op,
-		StartTime:  err.StartTime,
-		Duration:   err.Duration,
-		PosixError: err.PosixError,
-		Err:        err.Err.Error(),
-	})
 }
 
 // Resolver encapsulates the DNS resolution logic for connectivity tests.
@@ -100,7 +78,7 @@ func isTimeout(err error) bool {
 	return errors.As(err, &timeErr) && timeErr.Timeout()
 }
 
-func makeConnectivityError(op string, startTime time.Time, duration time.Duration, err error) *ConnectivityError {
+func makeConnectivityError(op string, err error) *ConnectivityError {
 	var code string
 	var errno syscall.Errno
 	if errors.As(err, &errno) {
@@ -108,7 +86,7 @@ func makeConnectivityError(op string, startTime time.Time, duration time.Duratio
 	} else if isTimeout(err) {
 		code = "ETIMEDOUT"
 	}
-	return &ConnectivityError{Op: op, StartTime: startTime, Duration: duration, PosixError: code, Err: err}
+	return &ConnectivityError{Op: op, PosixError: code, Err: err}
 }
 
 // TestConnectivityWithResolver tests weather we can get a response from the given [Resolver]. It can be used
@@ -127,32 +105,26 @@ func TestConnectivityWithResolver(ctx context.Context, resolver Resolver, testDo
 		defer cancel()
 	}
 
-	connectStartTime := time.Now()
 	dnsConn, err := resolver.connect(ctx)
-	connectDuration := time.Since(connectStartTime)
 	if err != nil {
-		return makeConnectivityError("connect", connectStartTime, connectDuration, err), nil
+		return makeConnectivityError("connect", err), nil
 	}
 	defer dnsConn.Close()
 	dnsConn.SetDeadline(deadline)
 
 	var dnsRequest dns.Msg
 	dnsRequest.SetQuestion(dns.Fqdn(testDomain), dns.TypeA)
-	writeStartTime := time.Now()
 	err = dnsConn.WriteMsg(&dnsRequest)
-	writeDuration := time.Since(writeStartTime)
 	if err != nil {
-		return makeConnectivityError("send", writeStartTime, writeDuration, err), nil
+		return makeConnectivityError("send", err), nil
 	}
 
-	readStartTime := time.Now()
 	_, err = dnsConn.ReadMsg()
-	readDuration := time.Since(readStartTime)
 	if err != nil {
 		// An early close on the connection may cause a "unexpected EOF" error. That's an application-layer error,
 		// not triggered by a syscall error so we don't capture an error code.
 		// TODO: figure out how to standardize on those errors.
-		return makeConnectivityError("receive", readStartTime, readDuration, err), nil
+		return makeConnectivityError("receive", err), nil
 	}
 	return nil, nil
 }
