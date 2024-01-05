@@ -16,9 +16,7 @@ package connectivity
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"os"
@@ -39,8 +37,6 @@ func TestTestResolverStreamConnectivityOk(t *testing.T) {
 	// TODO(fortuna): Run a local resolver and make test not depend on an external server.
 	resolver := NewTCPResolver(&transport.TCPStreamDialer{}, "8.8.8.8:53")
 	result, err := TestConnectivityWithResolver(context.Background(), resolver, "example.com")
-	res2B, _ := json.Marshal(result)
-	fmt.Println(string(res2B))
 	require.NoError(t, err)
 	require.Nil(t, result)
 }
@@ -76,8 +72,6 @@ func TestTestResolverStreamConnectivityRefused(t *testing.T) {
 
 	resolver := NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
 	result, err := TestConnectivityWithResolver(context.Background(), resolver, "anything")
-	res2B, _ := json.Marshal(result)
-	fmt.Println(string(res2B))
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Equal(t, "connect", result.Op)
@@ -113,8 +107,6 @@ func TestTestResolverStreamConnectivityReset(t *testing.T) {
 
 	resolver := NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
 	result, err := TestConnectivityWithResolver(context.Background(), resolver, "anything")
-	res2B, _ := json.Marshal(result)
-	fmt.Println(string(res2B))
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Equalf(t, "receive", result.Op, "Wrong test operation. Error: %v", result.Err)
@@ -146,8 +138,6 @@ func TestTestStreamDialerEarlyClose(t *testing.T) {
 
 	resolver := NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
 	result, err := TestConnectivityWithResolver(context.Background(), resolver, "anything")
-	res2B, _ := json.Marshal(result)
-	fmt.Println(string(res2B))
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Equalf(t, "receive", result.Op, "Wrong test operation. Error: %v", result.Err)
@@ -172,8 +162,6 @@ func TestTestResolverStreamConnectivityTimeout(t *testing.T) {
 	defer cancel()
 	resolver := NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
 	result, err := TestConnectivityWithResolver(ctx, resolver, "anything")
-	res2B, _ := json.Marshal(result)
-	fmt.Println(string(res2B))
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -213,8 +201,6 @@ func TestTestPacketPacketConnectivityOk(t *testing.T) {
 
 	resolver := NewUDPResolver(&transport.UDPPacketDialer{}, server.LocalAddr().String())
 	result, err := TestConnectivityWithResolver(context.Background(), resolver, "anything")
-	res2B, _ := json.Marshal(result)
-	fmt.Println(string(res2B))
 	require.NoError(t, err)
 	require.Nil(t, result)
 }

@@ -114,13 +114,11 @@ func TestConnectivityWithResolver(ctx context.Context, resolver Resolver, testDo
 
 	var dnsRequest dns.Msg
 	dnsRequest.SetQuestion(dns.Fqdn(testDomain), dns.TypeA)
-	err = dnsConn.WriteMsg(&dnsRequest)
-	if err != nil {
+	if err = dnsConn.WriteMsg(&dnsRequest); err != nil {
 		return makeConnectivityError("send", err), nil
 	}
 
-	_, err = dnsConn.ReadMsg()
-	if err != nil {
+	if _, err = dnsConn.ReadMsg(); err != nil {
 		// An early close on the connection may cause a "unexpected EOF" error. That's an application-layer error,
 		// not triggered by a syscall error so we don't capture an error code.
 		// TODO: figure out how to standardize on those errors.
