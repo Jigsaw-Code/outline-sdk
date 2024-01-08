@@ -77,7 +77,7 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 	// Dial the target.
 	transportConfig := proxyReq.Header.Get("Transport")
 
-	dialer, err := config.WrapStreamDialer(&config.StreamDialer{StreamDialer: h.dialer, Config: ""}, transportConfig)
+	dialer, err := config.WrapStreamDialer(&config.StreamDialer{StreamDialer: h.dialer, SanitizedConfig: ""}, transportConfig)
 	if err != nil {
 		// Because we sanitize the base dialer error, it's safe to return error details here.
 		http.Error(proxyResp, fmt.Sprintf("Invalid config in Transport header: %v", err), http.StatusBadRequest)
