@@ -48,6 +48,10 @@ func newOverrideFromURL(configURL *url.URL) (func(string) (string, error), error
 		}
 	}
 	return func(address string) (string, error) {
+		// Optimization when we fully override the address.
+		if hostOverride != "" && portOverride != "" {
+			return net.JoinHostPort(hostOverride, portOverride), nil
+		}
 		host, port, err := net.SplitHostPort(address)
 		if err != nil {
 			return "", fmt.Errorf("address is not valid host:port: %w", err)
