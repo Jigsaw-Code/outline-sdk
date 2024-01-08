@@ -97,6 +97,7 @@ func Test_appendRequest(t *testing.T) {
 	require.Equal(t, 0, len(request.Authorities))
 	// ENDS(0) OPT resource record.
 	require.Equal(t, 1, len(request.Additionals))
+	// As per https://datatracker.ietf.org/doc/html/rfc6891#section-6.1.2
 	optRR := dnsmessage.Resource{
 		Header: dnsmessage.ResourceHeader{
 			Name:   dnsmessage.MustNewName("."),
