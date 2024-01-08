@@ -158,7 +158,7 @@ func main() {
 	// - Server IPv6 dial support
 
 	success := false
-	var transportConfig string
+	var sanitizedConfig string
 	jsonEncoder := json.NewEncoder(os.Stdout)
 	jsonEncoder.SetEscapeHTML(false)
 	for _, resolverHost := range strings.Split(*resolverFlag, ",") {
@@ -170,14 +170,14 @@ func main() {
 			switch proto {
 			case "tcp":
 				streamDialer, err := config.NewStreamDialer(*transportFlag)
-				transportConfig = streamDialer.Config
+				sanitizedConfig = streamDialer.SanitizedConfig
 				if err != nil {
 					log.Fatalf("Failed to create StreamDialer: %v", err)
 				}
 				resolver = connectivity.NewTCPResolver(streamDialer, resolverAddress)
 			case "udp":
 				packetDialer, err := config.NewPacketDialer(*transportFlag)
-				transportConfig = ""
+				sanitizedConfig = packetDialer.SanitizedConfig
 				if err != nil {
 					log.Fatalf("Failed to create PacketDialer: %v", err)
 				}
@@ -200,7 +200,7 @@ func main() {
 				Proto:    proto,
 				Time:     startTime.UTC().Truncate(time.Second),
 				// TODO(fortuna): Add sanitized config:
-				Transport:  transportConfig,
+				Transport:  sanitizedConfig,
 				DurationMs: testDuration.Milliseconds(),
 				Error:      makeErrorRecord(result),
 			}
