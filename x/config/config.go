@@ -124,8 +124,7 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 	}
 
 	// Please keep scheme list sorted.
-	scheme := strings.ToLower(url.Scheme)
-	switch scheme {
+	switch strings.ToLower(url.Scheme) {
 	case "socks5":
 		endpoint := transport.StreamDialerEndpoint{Dialer: innerDialer, Address: url.Host}
 		return socks5.NewStreamDialer(&endpoint)

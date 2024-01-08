@@ -41,9 +41,8 @@ var debugLog log.Logger = *log.New(io.Discard, "", 0)
 
 type connectivityReport struct {
 	// Inputs
-	Resolver string `json:"resolver"`
-	Proto    string `json:"proto"`
-	// TODO(fortuna): add sanitized transport config.
+	Resolver  string `json:"resolver"`
+	Proto     string `json:"proto"`
 	Transport string `json:"transport"`
 
 	// Observations
@@ -196,10 +195,9 @@ func main() {
 			}
 			debugLog.Printf("Test %v %v result: %v", proto, resolverAddress, result)
 			var r report.Report = connectivityReport{
-				Resolver: resolverAddress,
-				Proto:    proto,
-				Time:     startTime.UTC().Truncate(time.Second),
-				// TODO(fortuna): Add sanitized config:
+				Resolver:   resolverAddress,
+				Proto:      proto,
+				Time:       startTime.UTC().Truncate(time.Second),
 				Transport:  sanitizedConfig,
 				DurationMs: testDuration.Milliseconds(),
 				Error:      makeErrorRecord(result),
