@@ -44,13 +44,14 @@ func parseConfigPart(oneDialerConfig string) (*url.URL, error) {
 }
 
 // NewStreamDialer creates a new [transport.StreamDialer] according to the given config.
-func NewStreamDialer(transportConfig string) (transport.StreamDialer, error) {
-	return WrapStreamDialer(&transport.TCPStreamDialer{}, transportConfig)
+func NewStreamDialer(transportConfig string) (*StreamDialer, error) {
+
+	return WrapStreamDialer(&StreamDialer{StreamDialer: &transport.TCPStreamDialer{}, Config: ""}, transportConfig)
 }
 
 // WrapStreamDialer created a [transport.StreamDialer] according to transportConfig, using dialer as the
 // base [transport.StreamDialer]. The given dialer must not be nil.
-func WrapStreamDialer(dialer transport.StreamDialer, transportConfig string) (transport.StreamDialer, error) {
+func WrapStreamDialer(dialer *StreamDialer, transportConfig string) (*StreamDialer, error) {
 	if dialer == nil {
 		return nil, errors.New("base dialer must not be nil")
 	}
@@ -68,15 +69,47 @@ func WrapStreamDialer(dialer transport.StreamDialer, transportConfig string) (tr
 	return dialer, nil
 }
 
-
-
 type StreamDialer struct {
 	transport.StreamDialer
-	config string
+	Config string
 }
 
-func (sd *streamDialer) SanitizedConfig() string {
-	return sd.config
+func (sd *StreamDialer) SanitizedConfig(scheme string, oneDialerConfig string) string {
+	var sanitizedConfig string
+	u, err := parseConfigPart(oneDialerConfig)
+	if err != nil {
+		return ""
+	}
+	switch scheme {
+	case "socks5":
+		if u.User != nil {
+			u.User = url.User("redacted")
+			sanitizedConfig = u.String()
+		} else {
+			sanitizedConfig = oneDialerConfig
+		}
+	case "ss":
+		if u.User != nil {
+			u.User = url.User("redacted")
+			sanitizedConfig = u.String()
+		} else {
+			sanitizedConfig = oneDialerConfig
+		}
+	case "split":
+		sanitizedConfig = oneDialerConfig
+	case "tls":
+		sanitizedConfig = oneDialerConfig
+	case "tlsfrag":
+		sanitizedConfig = oneDialerConfig
+	default:
+		sanitizedConfig = scheme + ":redacted"
+	}
+
+	if sd.Config == "" {
+		return sanitizedConfig
+	} else {
+		return sd.Config + "|" + sanitizedConfig
+	}
 }
 
 func newStreamDialerFromPart(innerDialer *StreamDialer, oneDialerConfig string) (*StreamDialer, error) {
@@ -86,10 +119,12 @@ func newStreamDialerFromPart(innerDialer *StreamDialer, oneDialerConfig string) 
 	}
 
 	// Please keep scheme list sorted.
-	switch strings.ToLower(url.Scheme) {
+	scheme := strings.ToLower(url.Scheme)
+	switch scheme {
 	case "socks5":
 		endpoint := transport.StreamDialerEndpoint{Dialer: innerDialer, Address: url.Host}
-		return &streamDialer{StreamDialer: socks5.NewStreamDialer(&endpoint); config: innerDialer.SanitizedConfig() + "|" + oneDialerConfig}
+		dialer, err := socks5.NewStreamDialer(&endpoint)
+		return &StreamDialer{StreamDialer: dialer, Config: innerDialer.SanitizedConfig(scheme, oneDialerConfig)}, err
 
 	case "split":
 		prefixBytesStr := url.Opaque
@@ -97,13 +132,16 @@ func newStreamDialerFromPart(innerDialer *StreamDialer, oneDialerConfig string) 
 		if err != nil {
 			return nil, fmt.Errorf("prefixBytes is not a number: %v. Split config should be in split:<number> format", prefixBytesStr)
 		}
-		return split.NewStreamDialer(innerDialer, int64(prefixBytes))
+		dialer, err := split.NewStreamDialer(innerDialer, int64(prefixBytes))
+		return &StreamDialer{StreamDialer: dialer, Config: innerDialer.SanitizedConfig(scheme, oneDialerConfig)}, err
 
 	case "ss":
-		return newShadowsocksStreamDialerFromURL(innerDialer, url)
+		dialer, err := newShadowsocksStreamDialerFromURL(innerDialer, url)
+		return &StreamDialer{StreamDialer: dialer, Config: innerDialer.SanitizedConfig(scheme, oneDialerConfig)}, err
 
 	case "tls":
-		return newTlsStreamDialerFromURL(innerDialer, url)
+		dialer, err := newTlsStreamDialerFromURL(innerDialer, url)
+		return &StreamDialer{StreamDialer: dialer, Config: innerDialer.SanitizedConfig(scheme, oneDialerConfig)}, err
 
 	case "tlsfrag":
 		lenStr := url.Opaque
@@ -111,7 +149,8 @@ func newStreamDialerFromPart(innerDialer *StreamDialer, oneDialerConfig string) 
 		if err != nil {
 			return nil, fmt.Errorf("invalid tlsfrag option: %v. It should be in tlsfrag:<number> format", lenStr)
 		}
-		return tlsfrag.NewFixedLenStreamDialer(innerDialer, fixedLen)
+		dialer, err := tlsfrag.NewFixedLenStreamDialer(innerDialer, fixedLen)
+		return &StreamDialer{StreamDialer: dialer, Config: innerDialer.SanitizedConfig(scheme, oneDialerConfig)}, err
 
 	default:
 		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
