@@ -46,7 +46,7 @@ func parseConfigPart(oneDialerConfig string) (*url.URL, error) {
 // NewStreamDialer creates a new [transport.StreamDialer] according to the given config.
 func NewStreamDialer(transportConfig string) (*StreamDialer, error) {
 
-	return WrapStreamDialer(&StreamDialer{StreamDialer: &transport.TCPStreamDialer{}, Config: ""}, transportConfig)
+	return WrapStreamDialer(&StreamDialer{StreamDialer: &transport.TCPStreamDialer{}, SanitizedConfig: ""}, transportConfig)
 }
 
 // WrapStreamDialer created a [transport.StreamDialer] according to transportConfig, using dialer as the
@@ -61,7 +61,8 @@ func WrapStreamDialer(dialer *StreamDialer, transportConfig string) (*StreamDial
 	}
 	var err error
 	for _, part := range strings.Split(transportConfig, "|") {
-		dialer, err = newStreamDialerFromPart(dialer, part)
+		dialer.StreamDialer, err = newStreamDialerFromPart(dialer.StreamDialer, part)
+		dialer.SanitizedConfig = dialer.SanitizeConfig(part)
 		if err != nil {
 			return nil, err
 		}
@@ -71,26 +72,30 @@ func WrapStreamDialer(dialer *StreamDialer, transportConfig string) (*StreamDial
 
 type StreamDialer struct {
 	transport.StreamDialer
-	Config string
+	SanitizedConfig string
 }
 
-func (sd *StreamDialer) SanitizedConfig(scheme string, oneDialerConfig string) string {
+const redactedPlaceholder = "REDACTED"
+
+// SanitizeConfig returns a sanitized version of the given config that could contain sensitive information
+func (sd *StreamDialer) SanitizeConfig(oneDialerConfig string) string {
 	var sanitizedConfig string
 	u, err := parseConfigPart(oneDialerConfig)
 	if err != nil {
 		return ""
 	}
+	scheme := strings.ToLower(u.Scheme)
 	switch scheme {
 	case "socks5":
 		if u.User != nil {
-			u.User = url.User("redacted")
+			u.User = url.User(redactedPlaceholder)
 			sanitizedConfig = u.String()
 		} else {
 			sanitizedConfig = oneDialerConfig
 		}
 	case "ss":
 		if u.User != nil {
-			u.User = url.User("redacted")
+			u.User = url.User(redactedPlaceholder)
 			sanitizedConfig = u.String()
 		} else {
 			sanitizedConfig = oneDialerConfig
@@ -102,17 +107,17 @@ func (sd *StreamDialer) SanitizedConfig(scheme string, oneDialerConfig string) s
 	case "tlsfrag":
 		sanitizedConfig = oneDialerConfig
 	default:
-		sanitizedConfig = scheme + ":redacted"
+		sanitizedConfig = scheme + ":" + redactedPlaceholder
 	}
 
-	if sd.Config == "" {
+	if sd.SanitizedConfig == "" {
 		return sanitizedConfig
 	} else {
-		return sd.Config + "|" + sanitizedConfig
+		return sd.SanitizedConfig + "|" + sanitizedConfig
 	}
 }
 
-func newStreamDialerFromPart(innerDialer *StreamDialer, oneDialerConfig string) (*StreamDialer, error) {
+func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig string) (transport.StreamDialer, error) {
 	url, err := parseConfigPart(oneDialerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config part: %w", err)
@@ -123,8 +128,7 @@ func newStreamDialerFromPart(innerDialer *StreamDialer, oneDialerConfig string) 
 	switch scheme {
 	case "socks5":
 		endpoint := transport.StreamDialerEndpoint{Dialer: innerDialer, Address: url.Host}
-		dialer, err := socks5.NewStreamDialer(&endpoint)
-		return &StreamDialer{StreamDialer: dialer, Config: innerDialer.SanitizedConfig(scheme, oneDialerConfig)}, err
+		return socks5.NewStreamDialer(&endpoint)
 
 	case "split":
 		prefixBytesStr := url.Opaque
@@ -132,16 +136,13 @@ func newStreamDialerFromPart(innerDialer *StreamDialer, oneDialerConfig string) 
 		if err != nil {
 			return nil, fmt.Errorf("prefixBytes is not a number: %v. Split config should be in split:<number> format", prefixBytesStr)
 		}
-		dialer, err := split.NewStreamDialer(innerDialer, int64(prefixBytes))
-		return &StreamDialer{StreamDialer: dialer, Config: innerDialer.SanitizedConfig(scheme, oneDialerConfig)}, err
+		return split.NewStreamDialer(innerDialer, int64(prefixBytes))
 
 	case "ss":
-		dialer, err := newShadowsocksStreamDialerFromURL(innerDialer, url)
-		return &StreamDialer{StreamDialer: dialer, Config: innerDialer.SanitizedConfig(scheme, oneDialerConfig)}, err
+		return newShadowsocksStreamDialerFromURL(innerDialer, url)
 
 	case "tls":
-		dialer, err := newTlsStreamDialerFromURL(innerDialer, url)
-		return &StreamDialer{StreamDialer: dialer, Config: innerDialer.SanitizedConfig(scheme, oneDialerConfig)}, err
+		return newTlsStreamDialerFromURL(innerDialer, url)
 
 	case "tlsfrag":
 		lenStr := url.Opaque
@@ -149,23 +150,55 @@ func newStreamDialerFromPart(innerDialer *StreamDialer, oneDialerConfig string) 
 		if err != nil {
 			return nil, fmt.Errorf("invalid tlsfrag option: %v. It should be in tlsfrag:<number> format", lenStr)
 		}
-		dialer, err := tlsfrag.NewFixedLenStreamDialer(innerDialer, fixedLen)
-		return &StreamDialer{StreamDialer: dialer, Config: innerDialer.SanitizedConfig(scheme, oneDialerConfig)}, err
+		return tlsfrag.NewFixedLenStreamDialer(innerDialer, fixedLen)
 
 	default:
 		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
 	}
 }
 
+type PacketDialer struct {
+	transport.PacketDialer
+	SanitizedConfig string
+}
+
+// SanitizeConfig returns a sanitized version of the given config that could contain sensitive information
+func (pd *PacketDialer) SanitizeConfig(oneDialerConfig string) string {
+	var sanitizedConfig string
+	u, err := parseConfigPart(oneDialerConfig)
+	if err != nil {
+		return ""
+	}
+	scheme := strings.ToLower(u.Scheme)
+	switch scheme {
+	case "ss":
+		if u.User != nil {
+			u.User = url.User(redactedPlaceholder)
+			sanitizedConfig = u.String()
+		} else {
+			sanitizedConfig = oneDialerConfig
+		}
+	default:
+		sanitizedConfig = scheme + ":" + redactedPlaceholder
+	}
+
+	if pd.SanitizedConfig == "" {
+		return sanitizedConfig
+	} else {
+		return pd.SanitizedConfig + "|" + sanitizedConfig
+	}
+}
+
 // NewPacketDialer creates a new [transport.PacketDialer] according to the given config.
-func NewPacketDialer(transportConfig string) (dialer transport.PacketDialer, err error) {
-	dialer = &transport.UDPPacketDialer{}
+func NewPacketDialer(transportConfig string) (dialer *PacketDialer, err error) {
+	dialer = &PacketDialer{PacketDialer: &transport.UDPPacketDialer{}, SanitizedConfig: ""}
 	transportConfig = strings.TrimSpace(transportConfig)
 	if transportConfig == "" {
 		return dialer, nil
 	}
 	for _, part := range strings.Split(transportConfig, "|") {
-		dialer, err = newPacketDialerFromPart(dialer, part)
+		dialer.PacketDialer, err = newPacketDialerFromPart(dialer.PacketDialer, part)
+		dialer.SanitizedConfig = dialer.SanitizeConfig(part)
 		if err != nil {
 			return nil, err
 		}
