@@ -45,7 +45,6 @@ func newOverrideFromURL(configURL *url.URL) (func(string) (string, error), error
 			portOverride = values[0]
 		default:
 			return nil, fmt.Errorf("unsupported option %v", key)
-
 		}
 	}
 	return func(address string) (string, error) {
