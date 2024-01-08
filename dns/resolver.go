@@ -40,6 +40,9 @@ var (
 	ErrBadResponse = errors.New("response message is invalid")
 )
 
+// nestedError allows us to use errors.Is and still preserve the error cause.
+// This is unlike fmt.Errorf, which creates a new error and preserves the cause,
+// but you can't specify the type of the resulting top-level error.
 type nestedError struct {
 	is      error
 	wrapped error
