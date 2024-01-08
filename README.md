@@ -145,7 +145,7 @@ The [`fetch` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examp
 a URL, similar to `curl`. The example below would bypass blocking of `meduza.io` in Russia:
 
 ```console
-$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch@latest -transport "tlsfrag:1" -method HEAD -v -address "cloudflare.net" https://meduza.io/ 
+$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch@latest -transport "override:host=cloudflare.net|tlsfrag:1" -method HEAD -v https://meduza.io/ 
 [DEBUG] 2023/12/28 18:44:56.490836 main.go:105: Cf-Ray: [83cdac8ecdccc40e-EWR]
 [DEBUG] 2023/12/28 18:44:56.491231 main.go:105: Alt-Svc: [h3=":443"; ma=86400]
 [DEBUG] 2023/12/28 18:44:56.491237 main.go:105: Date: [Thu, 28 Dec 2023 23:44:56 GMT]
@@ -168,14 +168,14 @@ The example below is analogous to the previous fetch example.
 Start the local proxy:
 
 ```console
-$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/http2transport@latest -transport "tlsfrag:1" -localAddr localhost:8080
+$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/http2transport@latest -transport "override:host=cloudflare.net|tlsfrag:1" -localAddr localhost:8080
 2023/12/28 18:50:48 Proxy listening on 127.0.0.1:8080
 ```
 
 Using the proxy with `curl`:
 
 ```console
-$ curl -p -x http://localhost:8080 --connect-to ::cloudflare.net: https://meduza.io --head
+$ curl -p -x http://localhost:8080 https://meduza.io --head
 HTTP/1.1 200 Connection established
 
 HTTP/2 200 
