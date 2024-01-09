@@ -3,7 +3,7 @@ module github.com/Jigsaw-Code/outline-sdk/x
 go 1.20
 
 require (
-	github.com/Jigsaw-Code/outline-sdk v0.0.10
+	github.com/Jigsaw-Code/outline-sdk v0.0.11-0.20240102182541-4e52008ee3c2
 	github.com/miekg/dns v1.1.54
 	github.com/songgao/water v0.0.0-20190725173103-fd331bda3f4b
 	github.com/stretchr/testify v1.8.2
