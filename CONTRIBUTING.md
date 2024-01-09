@@ -42,25 +42,29 @@ In Go you can compile for other target operating system and architecture by spec
   <summary>Examples</summary>
 
 MacOS example:
-```
+
+```console
 % GOOS=darwin go build -C x -o ./bin/ ./examples/test-connectivity 
 % file ./x/bin/test-connectivity 
 ./x/bin/test-connectivity: Mach-O 64-bit executable x86_64
 ```
 
 Linux example:
-```
+
+```console
 % GOOS=linux go build -C x -o ./bin/ ./examples/test-connectivity 
 % file ./x/bin/test-connectivity                      
 ./x/bin/test-connectivity: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked, Go BuildID=n0WfUGLum4Y6OpYxZYuz/lbtEdv_kvyUCd3V_qOqb/CC_6GAQqdy_ebeYTdn99/Tk_G3WpBWi8vxqmIlIuU, with debug_info, not stripped
 ```
 
 Windows example:
-```
+
+```console
 % GOOS=windows go build -C x -o ./bin/ ./examples/test-connectivity 
 % file ./x/bin/test-connectivity.exe 
 ./x/bin/test-connectivity.exe: PE32+ executable (console) x86-64 (stripped to external PDB), for MS Windows
 ```
+
 </details>
 
 ## Running Linux binaries
@@ -72,41 +76,49 @@ To run Linux binaries you can use a Linux container via [Podman](https://podman.
   <summary>Instructions</summary>
 
 [Install Podman](https://podman.io/docs/installation) (once). On macOS:
+
 ```sh
 brew install podman
 ```
 
 Create the podman service VM (once) with the [`podman machine init` command](https://docs.podman.io/en/latest/markdown/podman-machine-init.1.html):
+
 ```sh
 podman machine init
 ```
 
 Start the VM with the [`podman machine start` command](https://docs.podman.io/en/latest/markdown/podman-machine-start.1.html), after every time it is stopped:
+
 ```sh
 podman machine start
-``` 
+```
 
 You can see the VM running with the [`podman machine list` command](https://docs.podman.io/en/latest/markdown/podman-machine-list.1.html):
-```
+
+```console
 % podman machine list
 NAME                     VM TYPE     CREATED        LAST UP            CPUS        MEMORY      DISK SIZE
 podman-machine-default*  qemu        3 minutes ago  Currently running  1           2.147GB     107.4GB
 ```
 
 When you are done with development, you can stop the machine with the [`podman machine stop` command](https://docs.podman.io/en/latest/markdown/podman-machine-stop.1.html):
+
 ```sh
 podman machine stop
 ```
+
 </details>
 
 ### Run
 
 The easiest way is to run a binary is to use the [`go run` command](https://pkg.go.dev/cmd/go#hdr-Compile_and_run_Go_program) directly with the `-exec` flag and our convenience tool `run_on_podman.sh`:
+
 ```sh
 GOOS=linux go run -C x -exec "$(pwd)/run_on_podman.sh" ./examples/test-connectivity
 ```
 
 It also works with the [`go test` command](https://pkg.go.dev/cmd/go#hdr-Test_packages):
+
 ```sh
 GOOS=linux go test -exec "$(pwd)/run_on_podman.sh"  ./...
 ```
@@ -115,12 +127,14 @@ GOOS=linux go test -exec "$(pwd)/run_on_podman.sh"  ./...
   <summary>Details and direct invocation</summary>
 
 The `run_on_podman.sh` script uses the [`podman run` command](https://docs.podman.io/en/latest/markdown/podman-run.1.html) and a minimal ["distroless" container image](https://github.com/GoogleContainerTools/distroless) to run the binary you want:
+
 ```sh
 podman run --arch $(uname -m) --rm -it -v "${bin}":/outline/bin gcr.io/distroless/static-debian11 /outline/bin "$@"
 ```
 
 You can also use `podman run` directly to run a pre-built binary:
-```
+
+```console
 % podman run --rm -it -v ./x/bin:/outline gcr.io/distroless/static-debian11 /outline/test-connectivity
 Usage of /outline/test-connectivity:
   -domain string
@@ -153,14 +167,16 @@ This is not the same as a real Windows environment, so make sure you test on act
 
 Follow the instructions at https://wiki.winehq.org/Download.
 
-On macOS: 
-```
+On macOS:
+
+```sh
 brew tap homebrew/cask-versions
 brew install --cask --no-quarantine wine-stable
 ```
 
 After installation, `wine64` should be on your `PATH`. Check with `wine64 --version`:
-```
+
+```sh
 wine64 --version
 ```
 
@@ -177,6 +193,17 @@ GOOS=windows go run -C x -exec "wine64" ./examples/test-connectivity
 ```
 
 For tests:
+
 ```sh
 GOOS=windows go test -exec "wine64"  ./...
+```
+
+# Tests with external network dependencies
+
+Some tests are implemented talking to external services. That's undesirable, but convenient.
+We started tagging them with the `nettest` tag, so they don't run by default. To run them, you need to specify `-tags nettest`, as done in our CI.
+For example:
+
+```sh
+go test -v -race -bench '.' ./... -benchtime=100ms -tags nettest
 ```

@@ -95,8 +95,8 @@ func TestAllCustom(t *testing.T) {
 
 func TestHostSelector(t *testing.T) {
 	sd, err := NewStreamDialer(&transport.TCPStreamDialer{},
-		IfHostPort("dns.google", 0, WithSNI("decoy.example.com")),
-		IfHostPort("www.youtube.com", 0, WithSNI("notyoutube.com")),
+		IfHost("dns.google", WithSNI("decoy.example.com")),
+		IfHost("www.youtube.com", WithSNI("notyoutube.com")),
 	)
 	require.NoError(t, err)
 
@@ -113,35 +113,14 @@ func TestHostSelector(t *testing.T) {
 	conn.Close()
 }
 
-func TestPortSelector(t *testing.T) {
-	sd, err := NewStreamDialer(&transport.TCPStreamDialer{},
-		IfHostPort("", 443, WithALPN([]string{"http/1.1"})),
-		IfHostPort("www.google.com", 443, WithALPN([]string{"h2"})),
-		IfHostPort("", 853, WithALPN([]string{"dot"})),
-	)
-	require.NoError(t, err)
-
-	conn, err := sd.Dial(context.Background(), "dns.google:443")
-	require.NoError(t, err)
-	tlsConn := conn.(streamConn)
-	require.Equal(t, "http/1.1", tlsConn.ConnectionState().NegotiatedProtocol)
-	conn.Close()
-
-	conn, err = sd.Dial(context.Background(), "www.google.com:443")
-	require.NoError(t, err)
-	tlsConn = conn.(streamConn)
-	require.Equal(t, "h2", tlsConn.ConnectionState().NegotiatedProtocol)
-	conn.Close()
-}
-
 func TestWithSNI(t *testing.T) {
 	var cfg ClientConfig
-	WithSNI("example.com")("", 0, &cfg)
+	WithSNI("example.com")("", &cfg)
 	require.Equal(t, "example.com", cfg.ServerName)
 }
 
 func TestWithALPN(t *testing.T) {
 	var cfg ClientConfig
-	WithALPN([]string{"h2", "http/1.1"})("", 0, &cfg)
+	WithALPN([]string{"h2", "http/1.1"})("", &cfg)
 	require.Equal(t, []string{"h2", "http/1.1"}, cfg.NextProtos)
 }

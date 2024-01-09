@@ -51,7 +51,9 @@ jobs:
         working-directory: ${{ github.workspace }}/x
 
       - name: Test SDK
-        run: go test -v -race -bench '.' ./... -benchtime=100ms
+        # Enable nettests, which executes external network requests.
+        run: go test -v -race -bench '.' ./... -benchtime=100ms -tags nettest
 
       - name: Test X
-        run: go test -C x -v -race -bench '.' ./... -benchtime=100ms
+        # Enable nettests, which executes external network requests.
+        run: go test -C x -v -race -bench '.' ./... -benchtime=100ms -tags nettest
