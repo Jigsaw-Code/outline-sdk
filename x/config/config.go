@@ -230,13 +230,11 @@ func checkBase64Encoding(u *url.URL) (*url.URL, error) {
 	// check if url has scheme://host#fragment format with host being base64 encoded string
 	if u.Host != "" {
 		decoded, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(u.Host)
-		fmt.Printf("decoded string: %v\n", string(decoded))
 		if err != nil {
 			// If decoding fails, return the original url with error
 			return u, fmt.Errorf("failed to decode host string [%v]: %w", u.String(), err)
 		}
 		newURL, err := url.Parse(strings.ToLower(u.Scheme) + "://" + string(decoded) + u.Fragment)
-		fmt.Println(newURL)
 		if err != nil {
 			// if parsing fails, return the original url with error
 			return u, fmt.Errorf("failed to parse config part: %w", err)
