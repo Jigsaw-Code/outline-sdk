@@ -41,6 +41,8 @@ func parseConfigPart(oneDialerConfig string) (*url.URL, error) {
 	if err != nil {
 		return nil, fmt.Errorf("part is not a valid URL: %w", err)
 	}
+	// This does not thing to the url if it's not base64 encoded.
+	url, _ = checkBase64Encoding(url)
 	return url, nil
 }
 
