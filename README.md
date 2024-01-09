@@ -22,10 +22,30 @@ The Outline SDK allows you to:
 |:-:|:-:|:-:|
 | Supports Android, iOS, Windows, macOS and Linux. | Field-tested in the Outline Client and Server, helping millions to access the internet under harsh conditions. | Designed for modularity and reuse, allowing you to craft custom transports. |
 
+### Interoperable and Reusable
+
+The Outline SDK is built upon a simple basic concepts, defined as interoperable interfaces that allow for composition and easy reuse.
+
+**Connections** enable communication between two endpoints over an abstract transport. There are two types of connections:
+  - `transport.StreamConn`: stream-based connection, like TCP and the `SOCK_STREAM` Posix socket type.
+  - `transport.PacketConn`: datagram-based connection, like UDP and the `SOCK_DGRAM` Posix socket type. We use "Packet" instead of "Datagram" because that is the convention in the Go standard library.
+
+Connections can be wrapped to create nested connections over a new transport. For example, a `StreamConn` could be over TCP, over TLS over TCP, over HTTP over TLS over TCP, over QUIC, among oter options.
+
+**Dialers** enable the creation of connections given a host:port address while encapsulating the underlying transport or proxy protocol. The `StreamDialer` and `PacketDialer` types create `StreamConn` and `PacketConn` connections, respectively, given an address. Dialers can also be nested. For example, a TLS Stream Dialer can use a TCP dialer to create a `StreamConn` backed by a TCP connection, then create a TLS `StreamConn` backed by the TCP `StreamConn`. A SOCKS5-over-TLS Dialer could use the TLS Dialer to create the TLS `StreamConn` to the proxy before doing the SOCKS5 connection to the target address.
+
+**Resolvers** (`dns.Resolver`) enable the answering of DNS questions while encapsulating the underlying algorithm or protocol. Resolvers are primarily used to map domain names to IP addresses.
+
+
 ### Bypass DNS-based Blocking
 
-We are working on a [new DNS library](https://github.com/Jigsaw-Code/outline-sdk/pull/141) that will let people bypass DNS-based blocking by using alternative
-resolvers and ports, and encrypted DNS (DNS-over-HTTPS and DNS-over-TLS).
+The Outline SDK offers two types of strategies for evading DNS-based blocking: resillient DNS or address override.
+
+- The [dns](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/dns) package can replace the resolution based on the system resolver with more resillient options:
+  - Encrypted DNS over HTTPS (DoH) or TLS (DoT)
+  - Alternative hosts and ports for UDP and TCP resolvers, making it possible to use resolvers that are not blocked.
+- The `override` config from [x/config](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config) with a `host` option can be used to force a specific address,
+  or you can implement your own Dialer that can map addresses.
 
 ### Bypass SNI-based Blocking
 
@@ -143,7 +163,7 @@ The [`fetch` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examp
 a URL, similar to `curl`. The example below would bypass blocking of `meduza.io` in Russia:
 
 ```console
-$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch@latest -transport "tlsfrag:1" -method HEAD -v -address "cloudflare.net" https://meduza.io/ 
+$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch@latest -transport "override:host=cloudflare.net|tlsfrag:1" -method HEAD -v https://meduza.io/ 
 [DEBUG] 2023/12/28 18:44:56.490836 main.go:105: Cf-Ray: [83cdac8ecdccc40e-EWR]
 [DEBUG] 2023/12/28 18:44:56.491231 main.go:105: Alt-Svc: [h3=":443"; ma=86400]
 [DEBUG] 2023/12/28 18:44:56.491237 main.go:105: Date: [Thu, 28 Dec 2023 23:44:56 GMT]
@@ -166,14 +186,14 @@ The example below is analogous to the previous fetch example.
 Start the local proxy:
 
 ```console
-$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/http2transport@latest -transport "tlsfrag:1" -localAddr localhost:8080
+$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/http2transport@latest -transport "override:host=cloudflare.net|tlsfrag:1" -localAddr localhost:8080
 2023/12/28 18:50:48 Proxy listening on 127.0.0.1:8080
 ```
 
 Using the proxy with `curl`:
 
 ```console
-$ curl -p -x http://localhost:8080 --connect-to ::cloudflare.net: https://meduza.io --head
+$ curl -p -x http://localhost:8080 https://meduza.io --head
 HTTP/1.1 200 Connection established
 
 HTTP/2 200 

@@ -33,13 +33,16 @@ import (
 )
 
 var (
-	ErrBadRequest  = errors.New("request input is bad")
+	ErrBadRequest  = errors.New("request input is invalid")
 	ErrDial        = errors.New("dial DNS resolver failed")
 	ErrSend        = errors.New("send DNS message failed")
 	ErrReceive     = errors.New("receive DNS message failed")
 	ErrBadResponse = errors.New("response message is invalid")
 )
 
+// nestedError allows us to use errors.Is and still preserve the error cause.
+// This is unlike fmt.Errorf, which creates a new error and preserves the cause,
+// but you can't specify the type of the resulting top-level error.
 type nestedError struct {
 	is      error
 	wrapped error
@@ -83,11 +86,14 @@ func NewQuestion(domain string, qtype dnsmessage.Type) (*dnsmessage.Question, er
 	}, nil
 }
 
-// Maximum DNS packet size.
-// Value taken from https://dnsflagday.net/2020/.
-const maxDNSPacketSize = 1232
+// Maximum UDP message size that we support.
+// The value is taken from https://dnsflagday.net/2020/, which says:
+// "An EDNS buffer size of 1232 bytes will avoid fragmentation on nearly all current networks.
+// This is based on an MTU of 1280, which is required by the IPv6 specification, minus 48 bytes
+// for the IPv6 and UDP headers".
+const maxUDPMessageSize = 1232
 
-// Creates a DNS request using the id and question and appends the bytes to buf.
+// appendRequest appends the bytes a DNS request using the id and question to buf.
 func appendRequest(id uint16, q dnsmessage.Question, buf []byte) ([]byte, error) {
 	b := dnsmessage.NewBuilder(buf, dnsmessage.Header{ID: id, RecursionDesired: true})
 	if err := b.StartQuestions(); err != nil {
@@ -102,7 +108,7 @@ func appendRequest(id uint16, q dnsmessage.Question, buf []byte) ([]byte, error)
 
 	var rh dnsmessage.ResourceHeader
 	// Set the maximum payload size we support, as per https://datatracker.ietf.org/doc/html/rfc6891#section-4.3
-	if err := rh.SetEDNS0(maxDNSPacketSize, dnsmessage.RCodeSuccess, false); err != nil {
+	if err := rh.SetEDNS0(maxUDPMessageSize, dnsmessage.RCodeSuccess, false); err != nil {
 		return nil, fmt.Errorf("set EDNS(0) failed: %w", err)
 	}
 	if err := b.OPTResource(rh, dnsmessage.OPTResource{}); err != nil {
@@ -160,13 +166,11 @@ func checkResponse(reqID uint16, reqQues dnsmessage.Question, respHdr dnsmessage
 	return nil
 }
 
-const maxMsgSize = 65535
-
 // queryDatagram implements a DNS query over a datagram protocol.
 func queryDatagram(conn io.ReadWriter, q dnsmessage.Question) (*dnsmessage.Message, error) {
 	// Reference: https://cs.opensource.google/go/go/+/master:src/net/dnsclient_unix.go?q=func:dnsPacketRoundTrip&ss=go%2Fgo
 	id := uint16(rand.Uint32())
-	buf, err := appendRequest(id, q, make([]byte, 0, maxDNSPacketSize))
+	buf, err := appendRequest(id, q, make([]byte, 0, maxUDPMessageSize))
 	if err != nil {
 		return nil, &nestedError{ErrBadRequest, fmt.Errorf("append request failed: %w", err)}
 	}
@@ -177,12 +181,17 @@ func queryDatagram(conn io.ReadWriter, q dnsmessage.Question) (*dnsmessage.Messa
 	var returnErr error
 	for {
 		n, err := conn.Read(buf)
+		// Handle bad io.Reader.
+		if err == io.EOF && n > 0 {
+			err = nil
+		}
 		if err != nil {
 			return nil, &nestedError{ErrReceive, errors.Join(returnErr, fmt.Errorf("read message failed: %w", err))}
 		}
 		var msg dnsmessage.Message
 		if err := msg.Unpack(buf[:n]); err != nil {
 			returnErr = errors.Join(returnErr, err)
+			// Ignore invalid packets that fail to parse. It could be injected.
 			continue
 		}
 		if err := checkResponse(id, q, msg.Header, msg.Questions); err != nil {
@@ -201,7 +210,8 @@ func queryStream(conn io.ReadWriter, q dnsmessage.Question) (*dnsmessage.Message
 	if err != nil {
 		return nil, &nestedError{ErrBadRequest, fmt.Errorf("append request failed: %w", err)}
 	}
-	if len(buf) > maxMsgSize {
+	// Buffer length must fit in a uint16.
+	if len(buf) > 1<<16-1 {
 		return nil, &nestedError{ErrBadRequest, fmt.Errorf("message too large: %v bytes", len(buf))}
 	}
 	binary.BigEndian.PutUint16(buf[:2], uint16(len(buf)-2))

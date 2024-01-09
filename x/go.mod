@@ -3,7 +3,8 @@ module github.com/Jigsaw-Code/outline-sdk/x
 go 1.20
 
 require (
-	github.com/Jigsaw-Code/outline-sdk v0.0.11-0.20231220175639-51e55dde245a
+	github.com/Jigsaw-Code/outline-sdk v0.0.11-0.20240102182541-4e52008ee3c2
+	github.com/miekg/dns v1.1.54
 	github.com/songgao/water v0.0.0-20190725173103-fd331bda3f4b
 	github.com/stretchr/testify v1.8.2
 	github.com/vishvananda/netlink v1.1.0
@@ -19,7 +20,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/shadowsocks/go-shadowsocks2 v0.1.5 // indirect
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect
-	golang.org/x/crypto v0.16.0 // indirect
+	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/sync v0.5.0 // indirect
 	golang.org/x/tools v0.16.0 // indirect

@@ -63,11 +63,25 @@ For more details, refer to [github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag
 
 	tlsfrag:[LENGTH]
 
+Address override.
+
+This dialer configuration is helpful for testing and development or if you need to fix the domain
+resolution.
+The host parameter, if not empty, specifies the host to dial instead of the original host.
+The port parameter, if not empty, specifies the port to dial instead of the original port.
+
+	override:host=[HOST]&port=[PORT]
+
 # Examples
 
 Packet splitting - To split outgoing streams on bytes 2 and 123, you can use:
 
 	split:2|split:123
+
+Evading DNS and SNI blocking - A blocked site hosted on Cloudflare can potentially be accessed by resolving cloudflare.net instead of the original
+domain and using stream split:
+
+	override:host=cloudflare.net.|split:2
 
 SOCKS5-over-TLS, with domain-fronting - To tunnel SOCKS5 over TLS, and set the SNI to decoy.example.com, while still validating against your host name, use:
 
