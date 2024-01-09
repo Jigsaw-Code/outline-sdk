@@ -15,6 +15,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -32,7 +33,7 @@ func parseConfigPart(oneDialerConfig string) (*url.URL, error) {
 	if oneDialerConfig == "" {
 		return nil, errors.New("empty config part")
 	}
-	// Make it "<scheme>:" it it's only "<scheme>" to parse as a URL.
+	// Make it "<scheme>:" if it's only "<scheme>" to parse as a URL.
 	if !strings.Contains(oneDialerConfig, ":") {
 		oneDialerConfig += ":"
 	}
@@ -186,12 +187,66 @@ func SanitizeConfig(transportConfig string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to parse config part: %w", err)
 		}
-		if u.User != nil {
-			u.User = url.User("redacted")
+		scheme := strings.ToLower(u.Scheme)
+		switch scheme {
+		case "ss", "socks5", "vless":
+			parts[i], _ = sanitizeURL(u)
+		case "split", "tls", "tlsfrag":
+			// No sanitization needed
 			parts[i] = u.String()
+		default:
+			parts[i] = scheme + "://UNKNOWN"
 		}
 	}
 
 	// Join the parts back into a string
 	return strings.Join(parts, "|"), nil
+}
+
+func sanitizeURL(u *url.URL) (string, error) {
+	const redactedPlaceholder = "REDACTED"
+	scheme := strings.ToLower(u.Scheme)
+	if u.User != nil {
+		u.User = url.User(redactedPlaceholder)
+		return u.String(), nil
+	} else {
+		newURL, err := checkBase64Encoding(u)
+		if err != nil {
+			return scheme + ":" + redactedPlaceholder, err
+		}
+		if newURL.User != nil {
+			newURL.User = url.User(redactedPlaceholder)
+			return newURL.String(), nil
+		} else {
+			// If no user info is found, return the scheme and redacted placeholder
+			return scheme + ":" + redactedPlaceholder, nil
+		}
+	}
+}
+
+// checkBase64Encoding checks if url has scheme://host#fragment with host being base64
+// encoded string. iIf so, then decodes the base64 string and parses it as a url
+func checkBase64Encoding(u *url.URL) (*url.URL, error) {
+	// check if url has scheme://host#fragment format with host being base64 encoded string
+	if u.Host != "" {
+		decoded, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(u.Host)
+		fmt.Printf("decoded string: %v\n", string(decoded))
+		if err != nil {
+			// If decoding fails, return the original url with error
+			return u, fmt.Errorf("failed to decode host string [%v]: %w", u.String(), err)
+		}
+		newURL, err := url.Parse(strings.ToLower(u.Scheme) + "://" + string(decoded) + u.Fragment)
+		fmt.Println(newURL)
+		if err != nil {
+			// if parsing fails, return the original url with error
+			return u, fmt.Errorf("failed to parse config part: %w", err)
+		}
+		// extend this check to see if decoded string contains contains other valid fields
+		if newURL.User != nil {
+			return newURL, nil
+		} else {
+			return u, nil
+		}
+	}
+	return u, nil
 }
