@@ -76,6 +76,9 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 
 	// Please keep scheme list sorted.
 	switch strings.ToLower(url.Scheme) {
+	case "override":
+		return newOverrideStreamDialerFromURL(innerDialer, url)
+
 	case "socks5":
 		endpoint := transport.StreamDialerEndpoint{Dialer: innerDialer, Address: url.Host}
 		return socks5.NewStreamDialer(&endpoint)
@@ -131,6 +134,9 @@ func newPacketDialerFromPart(innerDialer transport.PacketDialer, oneDialerConfig
 
 	// Please keep scheme list sorted.
 	switch strings.ToLower(url.Scheme) {
+	case "override":
+		return newOverridePacketDialerFromURL(innerDialer, url)
+
 	case "socks5":
 		return nil, errors.New("socks5 is not supported for PacketDialers")
 
