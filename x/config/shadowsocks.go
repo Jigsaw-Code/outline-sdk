@@ -72,14 +72,17 @@ type shadowsocksConfig struct {
 }
 
 func parseShadowsocksURL(url *url.URL) (*shadowsocksConfig, error) {
-	// attempt to decode as legacy base64 URI
-	config, err := parseShadowsocksLegacyBase64URL(url)
+	// attempt to decode as SIP002 URI format and
+	// fall back to legacy base64 format if decoding fails
+	config, err := parseShadowsocksSIP002URL(url)
 	if err == nil {
 		return config, nil
 	}
-	return parseShadowsocksSIP002URL(url)
+	return parseShadowsocksLegacyBase64URL(url)
 }
 
+// Parses URL based on legacy base64 format:
+// https://shadowsocks.org/doc/configs.html#uri-and-qr-code
 func parseShadowsocksLegacyBase64URL(url *url.URL) (*shadowsocksConfig, error) {
 	config := &shadowsocksConfig{}
 	if url.Host == "" {
@@ -125,6 +128,8 @@ func parseShadowsocksLegacyBase64URL(url *url.URL) (*shadowsocksConfig, error) {
 	return config, nil
 }
 
+// Parses URL based on SIP002 format:
+// https://shadowsocks.org/doc/sip002.html
 func parseShadowsocksSIP002URL(url *url.URL) (*shadowsocksConfig, error) {
 	config := &shadowsocksConfig{}
 	if url.Host == "" {
@@ -169,7 +174,6 @@ func sanitizeShadowsocksURL(u *url.URL) (string, error) {
 	const redactedPlaceholder = "REDACTED"
 	config, err := parseShadowsocksURL(u)
 	if err != nil {
-		//fmt.Printf("Failed to parse config: %v", err)
 		return "ss://ERROR", err
 	}
 	return "ss://" + redactedPlaceholder + "@" + config.serverAddress + "?prefix=" + url.PathEscape(string(config.prefix)), nil
