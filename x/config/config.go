@@ -190,8 +190,8 @@ func SanitizeConfig(transportConfig string) (string, error) {
 		switch scheme {
 		case "ss":
 			parts[i], _ = sanitizeShadowsocksURL(u)
-		case "socks5", "vless":
-			parts[i], _ = sanitizeURLGeneric(u)
+		case "socks5":
+			parts[i], _ = sanitizeSocks5URL(u)
 		case "split", "tls", "tlsfrag":
 			// No sanitization needed
 			parts[i] = u.String()
@@ -203,14 +203,11 @@ func SanitizeConfig(transportConfig string) (string, error) {
 	return strings.Join(parts, "|"), nil
 }
 
-func sanitizeURLGeneric(u *url.URL) (string, error) {
+func sanitizeSocks5URL(u *url.URL) (string, error) {
 	const redactedPlaceholder = "REDACTED"
 	if u.User != nil {
 		u.User = url.User(redactedPlaceholder)
 		return u.String(), nil
-	} else {
-		// If no user info is found, return the scheme and redacted placeholder
-		scheme := strings.ToLower(u.Scheme)
-		return scheme + ":" + redactedPlaceholder, nil
 	}
+	return u.String(), nil
 }
