@@ -17,22 +17,22 @@ func TestSanitizeConfig(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "split:5|ss://ERROR", sanitizedConfig)
 
-	// Test that a valid config is accepted.
+	// Test that a valid config is accepted and user info is redacted.
 	sanitizedConfig, err = SanitizeConfig("split:5|ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpLeTUyN2duU3FEVFB3R0JpQ1RxUnlT@example.com:1234?prefix=HTTP%2F1.1%20")
 	require.NoError(t, err)
 	require.Equal(t, "split:5|ss://REDACTED@example.com:1234?prefix=HTTP%2F1.1%20", sanitizedConfig)
 
-	// Test that a valid config is accepted.
+	// Test sanitizer with unknown transport.
 	sanitizedConfig, err = SanitizeConfig("split:5|vless://ac08785d-203d-4db4-915c-eb4e23435fd62@example.com:443?path=%2Fvless&security=tls&encryption=none&alpn=h2&host=sub.hello.com&fp=chrome&type=ws&sni=sub.hello.com#vless-ws-tls-cdn")
 	require.NoError(t, err)
-	require.Equal(t, "split:5|vless://REDACTED@example.com:443?path=%2Fvless&security=tls&encryption=none&alpn=h2&host=sub.hello.com&fp=chrome&type=ws&sni=sub.hello.com#vless-ws-tls-cdn", sanitizedConfig)
+	require.Equal(t, "split:5|vless://UNKNOWN", sanitizedConfig)
 
-	// Test that a valid config is accepted.
+	// Test sanitizer with transport that don't have user info.
 	sanitizedConfig, err = SanitizeConfig("split:5|tlsfrag:5")
 	require.NoError(t, err)
 	require.Equal(t, "split:5|tlsfrag:5", sanitizedConfig)
 
-	// Test that a valid config is accepted.
+	// Test sanitization on an unknown transport.
 	sanitizedConfig, err = SanitizeConfig("transport://hjdbfjhbqfjheqrf")
 	require.NoError(t, err)
 	require.Equal(t, "transport://UNKNOWN", sanitizedConfig)
@@ -57,6 +57,14 @@ func TestParseShadowsocksURL(t *testing.T) {
 	u, err := parseConfigPart("ss://" + string(encoded) + "#outline-123")
 	require.NoError(t, err)
 	config, err := parseShadowsocksURL(u)
+	require.Equal(t, "example.com:1234", config.serverAddress)
+	require.Equal(t, "HTTP/1.1 ", string(config.prefix))
+	require.NoError(t, err)
+
+	encoded = base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte("aes-256-gcm:1234567"))
+	u, err = parseConfigPart("ss://" + string(encoded) + "@example.com:1234?prefix=HTTP%2F1.1%20" + "#outline-123")
+	require.NoError(t, err)
+	config, err = parseShadowsocksURL(u)
 	require.Equal(t, "example.com:1234", config.serverAddress)
 	require.Equal(t, "HTTP/1.1 ", string(config.prefix))
 	require.NoError(t, err)
