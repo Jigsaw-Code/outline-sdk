@@ -1,0 +1,5 @@
+[Details]
+  Icon = "Icon.png"
+  Name = "Local Proxy"
+  ID = "org.getoutline.sdk.examples.fyne_probe"
+  Build = 1
