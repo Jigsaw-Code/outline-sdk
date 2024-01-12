@@ -30,6 +30,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
 	"github.com/Jigsaw-Code/outline-sdk/x/report"
@@ -165,20 +166,20 @@ func main() {
 		resolverAddress := net.JoinHostPort(resolverHost, "53")
 		for _, proto := range strings.Split(*protoFlag, ",") {
 			proto = strings.TrimSpace(proto)
-			var resolver connectivity.Resolver
+			var resolver dns.Resolver
 			switch proto {
 			case "tcp":
 				streamDialer, err := config.NewStreamDialer(*transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create StreamDialer: %v", err)
 				}
-				resolver = connectivity.NewTCPResolver(streamDialer, resolverAddress)
+				resolver = dns.NewTCPResolver(streamDialer, resolverAddress)
 			case "udp":
 				packetDialer, err := config.NewPacketDialer(*transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create PacketDialer: %v", err)
 				}
-				resolver = connectivity.NewUDPResolver(packetDialer, resolverAddress)
+				resolver = dns.NewUDPResolver(packetDialer, resolverAddress)
 			default:
 				log.Fatalf(`Invalid proto %v. Must be "tcp" or "udp"`, proto)
 			}

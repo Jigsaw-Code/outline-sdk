@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,7 +36,7 @@ import (
 // StreamDialer Tests
 func TestTestResolverStreamConnectivityOk(t *testing.T) {
 	// TODO(fortuna): Run a local resolver and make test not depend on an external server.
-	resolver := NewTCPResolver(&transport.TCPStreamDialer{}, "8.8.8.8:53")
+	resolver := dns.NewTCPResolver(&transport.TCPStreamDialer{}, "8.8.8.8:53")
 	result, err := TestConnectivityWithResolver(context.Background(), resolver, "example.com")
 	require.NoError(t, err)
 	require.Nil(t, result)
@@ -70,10 +71,11 @@ func TestTestResolverStreamConnectivityRefused(t *testing.T) {
 	// Close right away to ensure the port is closed. The OS will likely not reuse it soon enough.
 	require.Nil(t, listener.Close())
 
-	resolver := NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
+	resolver := dns.NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
 	result, err := TestConnectivityWithResolver(context.Background(), resolver, "anything")
 	require.NoError(t, err)
 	require.NotNil(t, result)
+	require.ErrorIs(t, result.Err, dns.ErrDial)
 	require.Equal(t, "connect", result.Op)
 	require.Equal(t, "ECONNREFUSED", result.PosixError)
 
@@ -105,11 +107,12 @@ func TestTestResolverStreamConnectivityReset(t *testing.T) {
 	}, &running)
 	defer listener.Close()
 
-	resolver := NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
+	resolver := dns.NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
 	result, err := TestConnectivityWithResolver(context.Background(), resolver, "anything")
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Equalf(t, "receive", result.Op, "Wrong test operation. Error: %v", result.Err)
+	require.ErrorIs(t, result.Err, dns.ErrReceive)
 	require.Equal(t, "ECONNRESET", result.PosixError)
 
 	var sysErr *os.SyscallError
@@ -136,12 +139,13 @@ func TestTestStreamDialerEarlyClose(t *testing.T) {
 	}, &running)
 	defer listener.Close()
 
-	resolver := NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
+	resolver := dns.NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
 	result, err := TestConnectivityWithResolver(context.Background(), resolver, "anything")
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Equalf(t, "receive", result.Op, "Wrong test operation. Error: %v", result.Err)
 	require.Equal(t, "", result.PosixError)
+	require.ErrorIs(t, result.Err, dns.ErrReceive)
 	require.ErrorIs(t, result.Err, io.EOF)
 
 	var sysErr *os.SyscallError
@@ -160,13 +164,14 @@ func TestTestResolverStreamConnectivityTimeout(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	resolver := NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
+	resolver := dns.NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
 	result, err := TestConnectivityWithResolver(ctx, resolver, "anything")
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
 	assert.Equalf(t, "receive", result.Op, "Wrong test operation. Error: %v", result.Err)
 
+	require.ErrorIs(t, result.Err, dns.ErrReceive)
 	assert.ErrorContains(t, result.Err, "i/o timeout")
 	assert.True(t, isTimeout(result.Err))
 	assert.Equalf(t, "ETIMEDOUT", result.PosixError, "Wrong posix error code. Error: %#v, %v", result.Err, result.Err.Error())
@@ -199,7 +204,7 @@ func TestTestPacketPacketConnectivityOk(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	resolver := NewUDPResolver(&transport.UDPPacketDialer{}, server.LocalAddr().String())
+	resolver := dns.NewUDPResolver(&transport.UDPPacketDialer{}, server.LocalAddr().String())
 	result, err := TestConnectivityWithResolver(context.Background(), resolver, "anything")
 	require.NoError(t, err)
 	require.Nil(t, result)
