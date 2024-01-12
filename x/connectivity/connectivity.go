@@ -51,7 +51,7 @@ func isTimeout(err error) bool {
 }
 
 func makeConnectivityError(op string, err error) *ConnectivityError {
-	// An early close on the connection may cause a "unexpected EOF" error. That's an application-layer error,
+	// An early close on the connection may cause an "unexpected EOF" error. That's an application-layer error,
 	// not triggered by a syscall error so we don't capture an error code.
 	// TODO: figure out how to standardize on those errors.
 	var code string
@@ -80,7 +80,7 @@ func TestConnectivityWithResolver(ctx context.Context, resolver dns.Resolver, te
 	}
 	q, err := dns.NewQuestion(testDomain, dnsmessage.TypeA)
 	if err != nil {
-		return nil, fmt.Errorf("question creation failed: %v", err)
+		return nil, fmt.Errorf("question creation failed: %w", err)
 	}
 
 	_, err = resolver.Query(ctx, *q)
