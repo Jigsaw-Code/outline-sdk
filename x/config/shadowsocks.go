@@ -81,7 +81,7 @@ func parseShadowsocksURL(url *url.URL) (*shadowsocksConfig, error) {
 	return parseShadowsocksLegacyBase64URL(url)
 }
 
-// Parses URL based on legacy base64 format:
+// parseShadowsocksLegacyBase64URL parses URL based on legacy base64 format:
 // https://shadowsocks.org/doc/configs.html#uri-and-qr-code
 func parseShadowsocksLegacyBase64URL(url *url.URL) (*shadowsocksConfig, error) {
 	config := &shadowsocksConfig{}
