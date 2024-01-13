@@ -192,7 +192,7 @@ func SanitizeConfig(transportConfig string) (string, error) {
 			parts[i], _ = sanitizeShadowsocksURL(u)
 		case "socks5":
 			parts[i], _ = sanitizeSocks5URL(u)
-		case "split", "tls", "tlsfrag":
+		case "override", "split", "tls", "tlsfrag":
 			// No sanitization needed
 			parts[i] = u.String()
 		default:
