@@ -45,7 +45,7 @@ type connectivityReport struct {
 	Resolver string `json:"resolver"`
 	Proto    string `json:"proto"`
 	// TODO(fortuna): add sanitized transport config.
-	// Transport    string `json:"transport"`
+	Transport string `json:"transport"`
 
 	// Observations
 	Time       time.Time  `json:"time"`
@@ -193,12 +193,16 @@ func main() {
 				success = true
 			}
 			debugLog.Printf("Test %v %v result: %v", proto, resolverAddress, result)
+			sanitizedConfig, err := config.SanitizeConfig(*transportFlag)
+			if err != nil {
+				log.Fatalf("Failed to sanitize config: %v", err)
+			}
 			var r report.Report = connectivityReport{
 				Resolver: resolverAddress,
 				Proto:    proto,
 				Time:     startTime.UTC().Truncate(time.Second),
 				// TODO(fortuna): Add sanitized config:
-				// Transport:   config.SanitizedConfig(*transportFlag),
+				Transport:  sanitizedConfig,
 				DurationMs: testDuration.Milliseconds(),
 				Error:      makeErrorRecord(result),
 			}

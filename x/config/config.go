@@ -32,7 +32,7 @@ func parseConfigPart(oneDialerConfig string) (*url.URL, error) {
 	if oneDialerConfig == "" {
 		return nil, errors.New("empty config part")
 	}
-	// Make it "<scheme>:" it it's only "<scheme>" to parse as a URL.
+	// Make it "<scheme>:" if it's only "<scheme>" to parse as a URL.
 	if !strings.Contains(oneDialerConfig, ":") {
 		oneDialerConfig += ":"
 	}
@@ -176,4 +176,44 @@ func NewPacketListener(transportConfig string) (transport.PacketListener, error)
 	default:
 		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
 	}
+}
+
+func SanitizeConfig(transportConfig string) (string, error) {
+	// Do nothing if the config is empty
+	if transportConfig == "" {
+		return "", nil
+	}
+	// Split the string into parts
+	parts := strings.Split(transportConfig, "|")
+
+	// Iterate through each part
+	for i, part := range parts {
+		u, err := parseConfigPart(part)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse config part: %w", err)
+		}
+		scheme := strings.ToLower(u.Scheme)
+		switch scheme {
+		case "ss":
+			parts[i], _ = sanitizeShadowsocksURL(u)
+		case "socks5":
+			parts[i], _ = sanitizeSocks5URL(u)
+		case "override", "split", "tls", "tlsfrag":
+			// No sanitization needed
+			parts[i] = u.String()
+		default:
+			parts[i] = scheme + "://UNKNOWN"
+		}
+	}
+	// Join the parts back into a string
+	return strings.Join(parts, "|"), nil
+}
+
+func sanitizeSocks5URL(u *url.URL) (string, error) {
+	const redactedPlaceholder = "REDACTED"
+	if u.User != nil {
+		u.User = url.User(redactedPlaceholder)
+		return u.String(), nil
+	}
+	return u.String(), nil
 }
