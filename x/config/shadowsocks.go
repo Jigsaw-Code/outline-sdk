@@ -128,7 +128,7 @@ func parseShadowsocksLegacyBase64URL(url *url.URL) (*shadowsocksConfig, error) {
 	return config, nil
 }
 
-// Parses URL based on SIP002 format:
+// parseShadowsocksSIP002URL parses URL based on SIP002 format:
 // https://shadowsocks.org/doc/sip002.html
 func parseShadowsocksSIP002URL(url *url.URL) (*shadowsocksConfig, error) {
 	config := &shadowsocksConfig{}
