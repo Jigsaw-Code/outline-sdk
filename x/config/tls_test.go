@@ -37,7 +37,7 @@ func TestTLS_SNI(t *testing.T) {
 	require.NoError(t, err)
 	cfg := tls.ClientConfig{ServerName: "host", CertificateName: "host"}
 	for _, option := range options {
-		option("host", 443, &cfg)
+		option("host", &cfg)
 	}
 	require.Equal(t, "www.google.com", cfg.ServerName)
 	require.Equal(t, "host", cfg.CertificateName)
@@ -50,7 +50,7 @@ func TestTLS_NoSNI(t *testing.T) {
 	require.NoError(t, err)
 	cfg := tls.ClientConfig{ServerName: "host", CertificateName: "host"}
 	for _, option := range options {
-		option("host", 443, &cfg)
+		option("host", &cfg)
 	}
 	require.Equal(t, "", cfg.ServerName)
 	require.Equal(t, "host", cfg.CertificateName)
@@ -70,7 +70,7 @@ func TestTLS_CertName(t *testing.T) {
 	require.NoError(t, err)
 	cfg := tls.ClientConfig{ServerName: "host", CertificateName: "host"}
 	for _, option := range options {
-		option("host", 443, &cfg)
+		option("host", &cfg)
 	}
 	require.Equal(t, "host", cfg.ServerName)
 	require.Equal(t, "www.google.com", cfg.CertificateName)
@@ -83,7 +83,7 @@ func TestTLS_Combined(t *testing.T) {
 	require.NoError(t, err)
 	cfg := tls.ClientConfig{ServerName: "host", CertificateName: "host"}
 	for _, option := range options {
-		option("host", 443, &cfg)
+		option("host", &cfg)
 	}
 	require.Equal(t, "sni.example.com", cfg.ServerName)
 	require.Equal(t, "certname.example.com", cfg.CertificateName)
