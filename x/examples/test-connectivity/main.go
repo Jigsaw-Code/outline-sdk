@@ -127,6 +127,19 @@ func main() {
 		debugLog = *log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 	}
 
+	var transportConfigs []string
+	var err error
+	if strings.HasPrefix(*transportFlag, "ssconfig:") {
+		newURL := strings.Replace(*transportFlag, "ssconfig", "https", -1)
+		transportConfigs, err = getDynamicConfig(newURL)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+	} else {
+		transportConfigs = []string{*transportFlag}
+	}
+
 	var reportCollector report.Collector
 	if *reportToFlag != "" {
 		collectorURL, err := url.Parse(*reportToFlag)
@@ -158,63 +171,87 @@ func main() {
 	// - Server IPv4 dial support
 	// - Server IPv6 dial support
 
-	success := false
-	jsonEncoder := json.NewEncoder(os.Stdout)
-	jsonEncoder.SetEscapeHTML(false)
-	for _, resolverHost := range strings.Split(*resolverFlag, ",") {
-		resolverHost := strings.TrimSpace(resolverHost)
-		resolverAddress := net.JoinHostPort(resolverHost, "53")
-		for _, proto := range strings.Split(*protoFlag, ",") {
-			proto = strings.TrimSpace(proto)
-			var resolver dns.Resolver
-			switch proto {
-			case "tcp":
-				streamDialer, err := config.NewStreamDialer(*transportFlag)
-				if err != nil {
-					log.Fatalf("Failed to create StreamDialer: %v", err)
+	for _, c := range transportConfigs {
+		//success := false
+		jsonEncoder := json.NewEncoder(os.Stdout)
+		jsonEncoder.SetEscapeHTML(false)
+		for _, resolverHost := range strings.Split(*resolverFlag, ",") {
+			resolverHost := strings.TrimSpace(resolverHost)
+			resolverAddress := net.JoinHostPort(resolverHost, "53")
+			for _, proto := range strings.Split(*protoFlag, ",") {
+				proto = strings.TrimSpace(proto)
+				var resolver dns.Resolver
+				switch proto {
+				case "tcp":
+					streamDialer, err := config.NewStreamDialer(c)
+					if err != nil {
+						log.Fatalf("Failed to create StreamDialer: %v", err)
+					}
+					resolver = dns.NewTCPResolver(streamDialer, resolverAddress)
+				case "udp":
+					packetDialer, err := config.NewPacketDialer(c)
+					if err != nil {
+						log.Fatalf("Failed to create PacketDialer: %v", err)
+					}
+					resolver = dns.NewUDPResolver(packetDialer, resolverAddress)
+				default:
+					log.Fatalf(`Invalid proto %v. Must be "tcp" or "udp"`, proto)
 				}
-				resolver = dns.NewTCPResolver(streamDialer, resolverAddress)
-			case "udp":
-				packetDialer, err := config.NewPacketDialer(*transportFlag)
+				startTime := time.Now()
+				result, err := connectivity.TestConnectivityWithResolver(context.Background(), resolver, *domainFlag)
 				if err != nil {
-					log.Fatalf("Failed to create PacketDialer: %v", err)
+					log.Fatalf("Connectivity test failed to run: %v", err)
 				}
-				resolver = dns.NewUDPResolver(packetDialer, resolverAddress)
-			default:
-				log.Fatalf(`Invalid proto %v. Must be "tcp" or "udp"`, proto)
-			}
-			startTime := time.Now()
-			result, err := connectivity.TestConnectivityWithResolver(context.Background(), resolver, *domainFlag)
-			if err != nil {
-				log.Fatalf("Connectivity test failed to run: %v", err)
-			}
-			testDuration := time.Since(startTime)
-			if result == nil {
-				success = true
-			}
-			debugLog.Printf("Test %v %v result: %v", proto, resolverAddress, result)
-			sanitizedConfig, err := config.SanitizeConfig(*transportFlag)
-			if err != nil {
-				log.Fatalf("Failed to sanitize config: %v", err)
-			}
-			var r report.Report = connectivityReport{
-				Resolver: resolverAddress,
-				Proto:    proto,
-				Time:     startTime.UTC().Truncate(time.Second),
-				// TODO(fortuna): Add sanitized config:
-				Transport:  sanitizedConfig,
-				DurationMs: testDuration.Milliseconds(),
-				Error:      makeErrorRecord(result),
-			}
-			if reportCollector != nil {
-				err = reportCollector.Collect(context.Background(), r)
+				testDuration := time.Since(startTime)
+				// if result == nil {
+				// 	success = true
+				// }
+				debugLog.Printf("Test %v %v result: %v", proto, resolverAddress, result)
+				sanitizedConfig, err := config.SanitizeConfig(c)
 				if err != nil {
-					debugLog.Printf("Failed to collect report: %v\n", err)
+					log.Fatalf("Failed to sanitize config: %v", err)
+				}
+				var r report.Report = connectivityReport{
+					Resolver: resolverAddress,
+					Proto:    proto,
+					Time:     startTime.UTC().Truncate(time.Second),
+					// TODO(fortuna): Add sanitized config:
+					Transport:  sanitizedConfig,
+					DurationMs: testDuration.Milliseconds(),
+					Error:      makeErrorRecord(result),
+				}
+				if reportCollector != nil {
+					err = reportCollector.Collect(context.Background(), r)
+					if err != nil {
+						debugLog.Printf("Failed to collect report: %v\n", err)
+					}
 				}
 			}
-		}
-		if !success {
-			os.Exit(1)
+			// if !success {
+			// 	os.Exit(1)
+			// }
 		}
 	}
+}
+
+func getDynamicConfig(url string) ([]string, error) {
+	response, err := http.Get(url)
+	if err != nil {
+		fmt.Println("Error fetching URL:", err)
+		return []string{}, err
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		fmt.Println("Error reading response:", err)
+		return []string{}, err
+	}
+
+	conf, err := parseDynamicConfig(body)
+	if err != nil {
+		fmt.Println("Error detecting format:", err)
+		return []string{}, err
+	}
+	return conf, nil
 }
