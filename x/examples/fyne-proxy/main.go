@@ -20,6 +20,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"syscall"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -28,6 +29,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
 )
@@ -41,15 +43,38 @@ func (p *runningProxy) Close() {
 	p.server.Close()
 }
 
+// newFilteredStreamDialer creates a direct [transport.StreamDialer] that blocks
+// non public IPs to prevent access to localhost or the local network.
+func newFilteredStreamDialer() transport.StreamDialer {
+	var dialer net.Dialer
+	dialer.Control = func(network, address string, c syscall.RawConn) error {
+		host, _, err := net.SplitHostPort(address)
+		if err != nil {
+			return fmt.Errorf("failed to parse address: %w", err)
+		}
+		if ip := net.ParseIP(host); ip != nil {
+			if !ip.IsGlobalUnicast() {
+				return fmt.Errorf("addresses that are not global unicast are fobidden")
+			}
+			if ip.IsPrivate() {
+				return fmt.Errorf("private addresses are forbidden")
+			}
+		}
+		return nil
+	}
+	return &transport.TCPStreamDialer{Dialer: dialer}
+}
+
 func runServer(address, transport string) (*runningProxy, error) {
-	dialer, err := config.NewStreamDialer(transport)
+	// TODO: block localhost, maybe local net.
+	dialer, err := config.WrapStreamDialer(newFilteredStreamDialer(), transport)
 	if err != nil {
-		return nil, fmt.Errorf("could not create dialer: %v", err)
+		return nil, fmt.Errorf("could not create dialer: %w", err)
 	}
 
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		return nil, fmt.Errorf("could not listen on address %v: %v", address, err)
+		return nil, fmt.Errorf("could not listen on address %v: %w", address, err)
 	}
 
 	server := http.Server{Handler: httpproxy.NewProxyHandler(dialer)}
@@ -113,7 +138,6 @@ func main() {
 	statusBox := widget.NewLabel("")
 	statusBox.Wrapping = fyne.TextWrapWord
 
-	var proxy *runningProxy
 	startStopButton := widget.NewButton("", func() {})
 	setProxyUI := func(proxy *runningProxy, err error) {
 		if proxy != nil {
@@ -134,6 +158,7 @@ func main() {
 		startStopButton.SetText("Start")
 		startStopButton.SetIcon(theme.MediaPlayIcon())
 	}
+	var proxy *runningProxy
 	startStopButton.OnTapped = func() {
 		log.Println(startStopButton.Text)
 		var err error
