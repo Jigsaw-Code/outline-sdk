@@ -90,14 +90,24 @@ type appTheme struct {
 	fyne.Theme
 }
 
-const ColorNameHeaderForeground = "headerForeground"
+const ColorNameOnPrimary = "OnPrimary"
 
 func (t *appTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
 	switch name {
 	case theme.ColorNameHeaderBackground:
-		return color.RGBA{R: 0x00, G: 0x45, B: 0x60, A: 255}
-	case ColorNameHeaderForeground:
-		return color.White
+		return t.Color(theme.ColorNamePrimary, variant)
+	case theme.ColorNamePrimary:
+		if variant == theme.VariantLight {
+			return color.RGBA{R: 0x00, G: 0x67, B: 0x7F, A: 255}
+		} else {
+			return color.RGBA{R: 0x7C, G: 0xD2, B: 0xF0, A: 255}
+		}
+	case ColorNameOnPrimary:
+		if variant == theme.VariantLight {
+			return color.White
+		} else {
+			return color.RGBA{R: 0x00, G: 0x35, B: 0x43, A: 255}
+		}
 	default:
 		return t.Theme.Color(name, variant)
 	}
@@ -107,7 +117,7 @@ func makeAppHeader(title string) *fyne.Container {
 	titleLabel := &widget.RichText{Scroll: container.ScrollNone, Segments: []widget.RichTextSegment{
 		&widget.TextSegment{Text: title, Style: widget.RichTextStyle{
 			Alignment: fyne.TextAlignCenter,
-			ColorName: ColorNameHeaderForeground,
+			ColorName: ColorNameOnPrimary,
 			SizeName:  theme.SizeNameHeadingText,
 			TextStyle: fyne.TextStyle{Bold: true},
 		}},
@@ -139,6 +149,7 @@ func main() {
 	statusBox.Wrapping = fyne.TextWrapWord
 
 	startStopButton := widget.NewButton("", func() {})
+	startStopButton.Importance = widget.HighImportance
 	setProxyUI := func(proxy *runningProxy, err error) {
 		if proxy != nil {
 			statusBox.SetText("Proxy listening on " + proxy.Address)
