@@ -3,11 +3,11 @@
 This folder has a graphical application that runs a local proxy given a address and configuration.
 It uses [Fyne](https://fyne.io/) for the UI.
 
-<img width="231" alt="image" src="https://github.com/Jigsaw-Code/outline-sdk/assets/113565/c2c998d9-b1c9-4876-b407-a80a4e1a660b">
+<img width="231" alt="image" src="https://github.com/Jigsaw-Code/outline-sdk/assets/113565/33bdcefc-7fff-44b4-a70b-a892fd5c9d3b">
 
 ## Desktop
 
-You can run the app without explicitly cloning the repository with
+You can run the app without explicitly cloning the repository with:
 
 ```sh
 go run github.com/Jigsaw-Code/outline-sdk/x/examples/fyne-proxy@latest
@@ -17,6 +17,12 @@ To run the local version while developing, from the `fyne-proxy` directory:
 
 ```sh
 go run .
+```
+
+To package, from the app folder:
+
+```sh
+go run fyne.io/fyne/v2/cmd/fyne package
 ```
 
 

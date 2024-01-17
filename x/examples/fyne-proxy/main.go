@@ -70,7 +70,7 @@ const ColorNameHeaderForeground = "headerForeground"
 func (t *appTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
 	switch name {
 	case theme.ColorNameHeaderBackground:
-		return color.RGBA{R: 0x26, G: 0x32, B: 0x38, A: 255}
+		return color.RGBA{R: 0x00, G: 0x45, B: 0x60, A: 255}
 	case ColorNameHeaderForeground:
 		return color.White
 	default:
