@@ -4,13 +4,13 @@ go 1.20
 
 require (
 	fyne.io/fyne/v2 v2.4.3
-	github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20240112224558-7294484cf816
+	github.com/Jigsaw-Code/outline-sdk v0.0.12-0.20240117212231-233d1898e1db
+	github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20240117212231-233d1898e1db
 )
 
 require (
 	fyne.io/systray v1.10.1-0.20231115130155-104f5ef7839e // indirect
 	github.com/BurntSushi/toml v1.3.2 // indirect
-	github.com/Jigsaw-Code/outline-sdk v0.0.11 // indirect
 	github.com/akavel/rsrc v0.10.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

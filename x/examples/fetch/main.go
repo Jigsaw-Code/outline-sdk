@@ -86,7 +86,7 @@ func main() {
 		if !strings.HasPrefix(network, "tcp") {
 			return nil, fmt.Errorf("protocol not supported: %v", network)
 		}
-		return dialer.Dial(ctx, net.JoinHostPort(host, port))
+		return dialer.DialStream(ctx, net.JoinHostPort(host, port))
 	}
 	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: 5 * time.Second}
 

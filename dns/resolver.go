@@ -263,7 +263,7 @@ func ensurePort(address string, defaultPort string) string {
 func NewUDPResolver(pd transport.PacketDialer, resolverAddr string) Resolver {
 	resolverAddr = ensurePort(resolverAddr, "53")
 	return FuncResolver(func(ctx context.Context, q dnsmessage.Question) (*dnsmessage.Message, error) {
-		conn, err := pd.Dial(ctx, resolverAddr)
+		conn, err := pd.DialPacket(ctx, resolverAddr)
 		if err != nil {
 			return nil, &nestedError{ErrDial, err}
 		}
@@ -301,7 +301,7 @@ func NewTCPResolver(sd transport.StreamDialer, resolverAddr string) Resolver {
 	resolverAddr = ensurePort(resolverAddr, "53")
 	return &streamResolver{
 		NewConn: func(ctx context.Context) (transport.StreamConn, error) {
-			return sd.Dial(ctx, resolverAddr)
+			return sd.DialStream(ctx, resolverAddr)
 		},
 	}
 }
@@ -315,7 +315,7 @@ func NewTLSResolver(sd transport.StreamDialer, resolverAddr string, resolverName
 	resolverAddr = ensurePort(resolverAddr, "853")
 	return &streamResolver{
 		NewConn: func(ctx context.Context) (transport.StreamConn, error) {
-			baseConn, err := sd.Dial(ctx, resolverAddr)
+			baseConn, err := sd.DialStream(ctx, resolverAddr)
 			if err != nil {
 				return nil, err
 			}
@@ -336,7 +336,7 @@ func NewHTTPSResolver(sd transport.StreamDialer, resolverAddr string, url string
 			// TODO: Support UDP for QUIC.
 			return nil, fmt.Errorf("protocol not supported: %v", network)
 		}
-		conn, err := sd.Dial(ctx, resolverAddr)
+		conn, err := sd.DialStream(ctx, resolverAddr)
 		if err != nil {
 			return nil, &nestedError{ErrDial, err}
 		}

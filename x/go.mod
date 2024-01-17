@@ -3,7 +3,7 @@ module github.com/Jigsaw-Code/outline-sdk/x
 go 1.20
 
 require (
-	github.com/Jigsaw-Code/outline-sdk v0.0.11
+	github.com/Jigsaw-Code/outline-sdk v0.0.12-0.20240117212550-6cd87709dc1e
 	github.com/songgao/water v0.0.0-20190725173103-fd331bda3f4b
 	github.com/stretchr/testify v1.8.2
 	github.com/vishvananda/netlink v1.1.0
@@ -15,7 +15,6 @@ require (
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/eycorsican/go-tun2socks v1.16.11 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/shadowsocks/go-shadowsocks2 v0.1.5 // indirect
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect

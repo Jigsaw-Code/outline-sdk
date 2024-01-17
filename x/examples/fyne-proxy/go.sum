@@ -45,10 +45,10 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/toml v1.3.2 h1:o7IhLm0Msx3BaB+n3Ag7L8EVlByGnpq14C4YWiu/gL8=
 github.com/BurntSushi/toml v1.3.2/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/Jigsaw-Code/outline-sdk v0.0.11 h1:dJ2QMQJJmQ1J4/XvJ9lWpdhg40SKNBmmKffV5wyL00I=
-github.com/Jigsaw-Code/outline-sdk v0.0.11/go.mod h1:m+KaWzU05VOIdAC0MVnV0HwyzdzH4WIJ8w7eaMrPp70=
-github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20240112224558-7294484cf816 h1:NOoDy92LN2qGLu5s3imiAbYCxH/k6ZlE4N8eXqfZbgw=
-github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20240112224558-7294484cf816/go.mod h1:MeTl41RMo9izytmQUWkvulEOMEsZVbuMutAoLwAlshE=
+github.com/Jigsaw-Code/outline-sdk v0.0.12-0.20240117212231-233d1898e1db h1:I1guGrgFXY/w+YWt7QNcb3nrTNts5opuPO44XlRF0xI=
+github.com/Jigsaw-Code/outline-sdk v0.0.12-0.20240117212231-233d1898e1db/go.mod h1:FtzQwsbvAT55lpc4kmOaHyvfX8MFW8y7yOHL81wHOVQ=
+github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20240117212231-233d1898e1db h1:pVN7fcEihOgzIUVBn92y84HsXrZlaHRkUgnm7Rn7lUo=
+github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20240117212231-233d1898e1db/go.mod h1:VVVqAev7l5HwkQVZfs79UrXWtmU3rq76+PLAhkSvFRs=
 github.com/akavel/rsrc v0.10.2 h1:Zxm8V5eI1hW4gGaYsJQUhxpjkENuG91ki8B4zCrvEsw=
 github.com/akavel/rsrc v0.10.2/go.mod h1:uLoCtb9J+EyAqh+26kdrTgmzRBFPGOolLWKpdxkKq+c=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=

@@ -57,10 +57,10 @@ func NewStreamDialerFunc(base transport.StreamDialer, frag FragFunc) (transport.
 	return &tlsFragDialer{base, frag}, nil
 }
 
-// Dial implements [transport.StreamConn].Dial. It establishes a connection to raddr in the format "host-or-ip:port".
+// DialStream implements [transport.StreamConn].DialStream. It establishes a connection to raddr in the format "host-or-ip:port".
 // The initial TLS Client Hello record sent through the connection will be fragmented.
-func (d *tlsFragDialer) Dial(ctx context.Context, raddr string) (conn transport.StreamConn, err error) {
-	conn, err = d.dialer.Dial(ctx, raddr)
+func (d *tlsFragDialer) DialStream(ctx context.Context, raddr string) (conn transport.StreamConn, err error) {
+	conn, err = d.dialer.DialStream(ctx, raddr)
 	if err != nil {
 		return
 	}

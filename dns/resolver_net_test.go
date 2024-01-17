@@ -37,7 +37,7 @@ func newTestContext(t *testing.T) context.Context {
 
 func TestNewUDPResolver(t *testing.T) {
 	ctx := newTestContext(t)
-	resolver := NewUDPResolver(&transport.UDPPacketDialer{}, "8.8.8.8")
+	resolver := NewUDPResolver(&transport.UDPDialer{}, "8.8.8.8")
 	q, err := NewQuestion("getoutline.org.", dnsmessage.TypeAAAA)
 	require.NoError(t, err)
 	resp, err := resolver.Query(ctx, *q)
@@ -47,7 +47,7 @@ func TestNewUDPResolver(t *testing.T) {
 
 func TestNewTCPResolver(t *testing.T) {
 	ctx := newTestContext(t)
-	resolver := NewTCPResolver(&transport.TCPStreamDialer{}, "8.8.8.8")
+	resolver := NewTCPResolver(&transport.TCPDialer{}, "8.8.8.8")
 	q, err := NewQuestion("getoutline.org.", dnsmessage.TypeAAAA)
 	require.NoError(t, err)
 	resp, err := resolver.Query(ctx, *q)
@@ -57,7 +57,7 @@ func TestNewTCPResolver(t *testing.T) {
 
 func TestNewTLSResolver(t *testing.T) {
 	ctx := newTestContext(t)
-	resolver := NewTLSResolver(&transport.TCPStreamDialer{}, "8.8.8.8", "8.8.8.8")
+	resolver := NewTLSResolver(&transport.TCPDialer{}, "8.8.8.8", "8.8.8.8")
 	q, err := NewQuestion("getoutline.org.", dnsmessage.TypeAAAA)
 	require.NoError(t, err)
 	resp, err := resolver.Query(ctx, *q)
@@ -67,7 +67,7 @@ func TestNewTLSResolver(t *testing.T) {
 
 func TestNewHTTPSResolver(t *testing.T) {
 	ctx := newTestContext(t)
-	resolver := NewHTTPSResolver(&transport.TCPStreamDialer{}, "8.8.8.8", "https://8.8.8.8/dns-query")
+	resolver := NewHTTPSResolver(&transport.TCPDialer{}, "8.8.8.8", "https://8.8.8.8/dns-query")
 	q, err := NewQuestion("getoutline.org.", dnsmessage.TypeAAAA)
 	require.NoError(t, err)
 	resp, err := resolver.Query(ctx, *q)
