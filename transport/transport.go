@@ -1,4 +1,4 @@
-// Copyright 2019 Jigsaw Operations LLC
+// Copyright 2024 Jigsaw Operations LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ CloseRead doesn't generate packets, but it allows for releasing resources (e.g. 
 if more data does arrive (TCP will usually send a RST).
 
 Connections can be wrapped to create nested connections over a new transport. For example, a StreamConn could be over TCP,
-over TLS over TCP, over HTTP over TLS over TCP, over QUIC, among oter options.
+over TLS over TCP, over HTTP over TLS over TCP, over QUIC, among other options.
 
 # Dialers
 
@@ -46,7 +46,7 @@ to the proxy before doing the SOCKS5 connection to the target address.
 */
 package transport
 
-// Endpoint is the interface that groups StreamEndpoint and PacketEndpoint.
+// Endpoint is the interface that groups [StreamEndpoint] and [PacketEndpoint].
 // It encapsulates the notion that you can establish Stream or Packet connections
 // with the same endpoint.
 type Endpoint interface {
@@ -54,7 +54,7 @@ type Endpoint interface {
 	PacketEndpoint
 }
 
-// Dialer is the interface that groups StreamDialer and PacketDialer.
+// Dialer is the interface that groups [StreamDialer] and [PacketDialer].
 // It encapsulates the ability to dial both stream and packet connections,
 // similar to [net.Dialer], but with strict types.
 type Dialer interface {
