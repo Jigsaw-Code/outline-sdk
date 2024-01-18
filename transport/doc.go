@@ -45,19 +45,3 @@ then create a TLS StreamConn backed by the TCP StreamConn. A SOCKS5-over-TLS Dia
 to the proxy before doing the SOCKS5 connection to the target address.
 */
 package transport
-
-// Endpoint is the interface that groups [StreamEndpoint] and [PacketEndpoint].
-// It encapsulates the notion that you can establish Stream or Packet connections
-// with the same endpoint.
-type Endpoint interface {
-	StreamEndpoint
-	PacketEndpoint
-}
-
-// Dialer is the interface that groups [StreamDialer] and [PacketDialer].
-// It encapsulates the ability to dial both stream and packet connections,
-// similar to [net.Dialer], but with strict types.
-type Dialer interface {
-	StreamDialer
-	PacketDialer
-}
