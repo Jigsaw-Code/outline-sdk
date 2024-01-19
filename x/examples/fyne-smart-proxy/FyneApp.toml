@@ -1,0 +1,5 @@
+[Details]
+  Icon = "Icon.png"
+  Name = "Smart Proxy"
+  ID = "org.getoutline.sdk.examples.fyne_smart_proxy"
+  Build = 3
