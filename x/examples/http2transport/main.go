@@ -28,6 +28,16 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
 )
 
+type getStatusReponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (w *getStatusReponseWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
 func main() {
 	transportFlag := flag.String("transport", "", "Transport config")
 	addrFlag := flag.String("localAddr", "localhost:1080", "Local proxy address")
@@ -45,7 +55,13 @@ func main() {
 	defer listener.Close()
 	log.Printf("Proxy listening on %v", listener.Addr().String())
 
-	server := http.Server{Handler: httpproxy.NewProxyHandler(dialer)}
+	proxyHandler := httpproxy.NewProxyHandler(dialer)
+	loggingHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rw := &getStatusReponseWriter{ResponseWriter: w, statusCode: 200}
+		proxyHandler.ServeHTTP(rw, r)
+		log.Printf("Handled %v %v -> %v", r.Method, r.URL, rw.statusCode)
+	})
+	server := http.Server{Handler: loggingHandler}
 	go func() {
 		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Error running web server: %v", err)
