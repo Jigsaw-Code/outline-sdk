@@ -24,11 +24,15 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
+	"github.com/Jigsaw-Code/outline-sdk/x/smart"
 )
 
 // Proxy enables you to get the actual address bound by the server and stop the service when no longer needed.
@@ -78,6 +82,68 @@ func RunProxy(localAddress string, transportConfig string) (*Proxy, error) {
 	}
 
 	server := &http.Server{Handler: httpproxy.NewProxyHandler(dialer)}
+	go server.Serve(listener)
+
+	host, portStr, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		return nil, fmt.Errorf("could not parse proxy address '%v': %v", listener.Addr().String(), err)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse proxy port '%v': %v", portStr, err)
+	}
+	return &Proxy{host: host, port: port, server: server}, nil
+}
+
+// NewListFromLines creates a StringList by splitting the input string on new lines.
+func NewListFromLines(lines string) *StringList {
+	return &StringList{list: strings.Split(lines, "\n")}
+}
+
+// StringList allows us to pass a list of strings to the Go Mobile functions, since Go Mobiule doesn't
+// support slices as parameters.
+type StringList struct {
+	list []string
+}
+
+// Append adds the string value to the end of the list.
+func (l *StringList) Append(value string) {
+	l.list = append(l.list, value)
+}
+
+// RunSmartProxy will run a local proxy that automatically selects a DNS and TLS strategy to use.
+// The local proxy will listen on localAddress. It will use testDomain to find a strategy that works.
+// The strategies to search are given in the searchConfig.
+func RunSmartProxy(localAddress string, testDomains *StringList, searchConfig string) (*Proxy, error) {
+	// TODO: inject the base dialer for tests.
+	logWriter := os.Stderr
+	finder := smart.StrategyFinder{
+		LogWriter:    logWriter,
+		TestTimeout:  5 * time.Second,
+		StreamDialer: &transport.TCPDialer{},
+		PacketDialer: &transport.UDPDialer{},
+	}
+
+	fmt.Println("Finding strategy")
+	testDomainsSlice := append(make([]string, 0, len(testDomains.list)), testDomains.list...)
+	dialer, err := finder.NewDialer(context.Background(), testDomainsSlice, []byte(searchConfig))
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dialer: %v", err)
+	}
+	logDialer := transport.FuncStreamDialer(func(ctx context.Context, address string) (transport.StreamConn, error) {
+		conn, err := dialer.DialStream(ctx, address)
+		if err != nil {
+			fmt.Fprintf(logWriter, "Failed to dial %v: %v\n", address, err)
+		}
+		return conn, err
+	})
+
+	listener, err := net.Listen("tcp", localAddress)
+	if err != nil {
+		return nil, fmt.Errorf("could not listen on address %v: %v", localAddress, err)
+	}
+
+	server := &http.Server{Handler: httpproxy.NewProxyHandler(logDialer)}
 	go server.Serve(listener)
 
 	host, portStr, err := net.SplitHostPort(listener.Addr().String())
