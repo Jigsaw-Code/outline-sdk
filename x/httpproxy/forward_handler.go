@@ -71,7 +71,7 @@ func NewForwardHandler(dialer transport.StreamDialer) http.Handler {
 		if !strings.HasPrefix(network, "tcp") {
 			return nil, fmt.Errorf("protocol not supported: %v", network)
 		}
-		return dialer.Dial(ctx, addr)
+		return dialer.DialStream(ctx, addr)
 	}
 	return &forwardHandler{http.Client{Transport: &http.Transport{DialContext: dialContext}}}
 }

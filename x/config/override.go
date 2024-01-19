@@ -76,7 +76,7 @@ func newOverrideStreamDialerFromURL(innerDialer transport.StreamDialer, configUR
 		if err != nil {
 			return nil, err
 		}
-		return innerDialer.Dial(ctx, addr)
+		return innerDialer.DialStream(ctx, addr)
 	}), nil
 }
 
@@ -90,6 +90,6 @@ func newOverridePacketDialerFromURL(innerDialer transport.PacketDialer, configUR
 		if err != nil {
 			return nil, err
 		}
-		return innerDialer.Dial(ctx, addr)
+		return innerDialer.DialPacket(ctx, addr)
 	}), nil
 }

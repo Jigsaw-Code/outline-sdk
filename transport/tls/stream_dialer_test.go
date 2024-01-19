@@ -24,9 +24,9 @@ import (
 )
 
 func TestDomain(t *testing.T) {
-	sd, err := NewStreamDialer(&transport.TCPStreamDialer{})
+	sd, err := NewStreamDialer(&transport.TCPDialer{})
 	require.NoError(t, err)
-	conn, err := sd.Dial(context.Background(), "dns.google:443")
+	conn, err := sd.DialStream(context.Background(), "dns.google:443")
 	require.NoError(t, err)
 	tlsConn, ok := conn.(streamConn)
 	require.True(t, ok)
@@ -37,76 +37,76 @@ func TestDomain(t *testing.T) {
 }
 
 func TestUntrustedRoot(t *testing.T) {
-	sd, err := NewStreamDialer(&transport.TCPStreamDialer{})
+	sd, err := NewStreamDialer(&transport.TCPDialer{})
 	require.NoError(t, err)
-	_, err = sd.Dial(context.Background(), "untrusted-root.badssl.com:443")
+	_, err = sd.DialStream(context.Background(), "untrusted-root.badssl.com:443")
 	var certErr x509.UnknownAuthorityError
 	require.ErrorAs(t, err, &certErr)
 }
 
 func TestRevoked(t *testing.T) {
-	sd, err := NewStreamDialer(&transport.TCPStreamDialer{})
+	sd, err := NewStreamDialer(&transport.TCPDialer{})
 	require.NoError(t, err)
-	_, err = sd.Dial(context.Background(), "revoked.badssl.com:443")
+	_, err = sd.DialStream(context.Background(), "revoked.badssl.com:443")
 	var certErr x509.CertificateInvalidError
 	require.ErrorAs(t, err, &certErr)
 	require.Equal(t, x509.Expired, certErr.Reason)
 }
 
 func TestIP(t *testing.T) {
-	sd, err := NewStreamDialer(&transport.TCPStreamDialer{})
+	sd, err := NewStreamDialer(&transport.TCPDialer{})
 	require.NoError(t, err)
-	conn, err := sd.Dial(context.Background(), "8.8.8.8:443")
+	conn, err := sd.DialStream(context.Background(), "8.8.8.8:443")
 	require.NoError(t, err)
 	conn.Close()
 }
 
 func TestIPOverride(t *testing.T) {
-	sd, err := NewStreamDialer(&transport.TCPStreamDialer{}, WithCertificateName("8.8.8.8"))
+	sd, err := NewStreamDialer(&transport.TCPDialer{}, WithCertificateName("8.8.8.8"))
 	require.NoError(t, err)
-	conn, err := sd.Dial(context.Background(), "dns.google:443")
+	conn, err := sd.DialStream(context.Background(), "dns.google:443")
 	require.NoError(t, err)
 	conn.Close()
 }
 
 func TestFakeSNI(t *testing.T) {
-	sd, err := NewStreamDialer(&transport.TCPStreamDialer{}, WithSNI("decoy.example.com"))
+	sd, err := NewStreamDialer(&transport.TCPDialer{}, WithSNI("decoy.example.com"))
 	require.NoError(t, err)
-	conn, err := sd.Dial(context.Background(), "www.youtube.com:443")
+	conn, err := sd.DialStream(context.Background(), "www.youtube.com:443")
 	require.NoError(t, err)
 	conn.Close()
 }
 
 func TestNoSNI(t *testing.T) {
-	sd, err := NewStreamDialer(&transport.TCPStreamDialer{}, WithSNI(""))
+	sd, err := NewStreamDialer(&transport.TCPDialer{}, WithSNI(""))
 	require.NoError(t, err)
-	conn, err := sd.Dial(context.Background(), "dns.google:443")
+	conn, err := sd.DialStream(context.Background(), "dns.google:443")
 	require.NoError(t, err)
 	conn.Close()
 }
 
 func TestAllCustom(t *testing.T) {
-	sd, err := NewStreamDialer(&transport.TCPStreamDialer{}, WithSNI("decoy.android.com"), WithCertificateName("www.youtube.com"))
+	sd, err := NewStreamDialer(&transport.TCPDialer{}, WithSNI("decoy.android.com"), WithCertificateName("www.youtube.com"))
 	require.NoError(t, err)
-	conn, err := sd.Dial(context.Background(), "www.google.com:443")
+	conn, err := sd.DialStream(context.Background(), "www.google.com:443")
 	require.NoError(t, err)
 	conn.Close()
 }
 
 func TestHostSelector(t *testing.T) {
-	sd, err := NewStreamDialer(&transport.TCPStreamDialer{},
+	sd, err := NewStreamDialer(&transport.TCPDialer{},
 		IfHost("dns.google", WithSNI("decoy.example.com")),
 		IfHost("www.youtube.com", WithSNI("notyoutube.com")),
 	)
 	require.NoError(t, err)
 
-	conn, err := sd.Dial(context.Background(), "dns.google:443")
+	conn, err := sd.DialStream(context.Background(), "dns.google:443")
 	require.NoError(t, err)
 	tlsConn := conn.(streamConn)
 	require.Equal(t, "decoy.example.com", tlsConn.ConnectionState().ServerName)
 	conn.Close()
 
-	conn, err = sd.Dial(context.Background(), "www.youtube.com:443")
+	conn, err = sd.DialStream(context.Background(), "www.youtube.com:443")
 	require.NoError(t, err)
 	tlsConn = conn.(streamConn)
 	require.Equal(t, "notyoutube.com", tlsConn.ConnectionState().ServerName)

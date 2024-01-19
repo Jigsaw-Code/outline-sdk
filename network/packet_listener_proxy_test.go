@@ -23,7 +23,7 @@ import (
 )
 
 func TestWithWriteTimeoutOptionWorks(t *testing.T) {
-	pl := &transport.UDPPacketListener{}
+	pl := &transport.UDPListener{}
 
 	defProxy, err := NewPacketProxyFromPacketListener(pl)
 	require.NoError(t, err)

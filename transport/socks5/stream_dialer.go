@@ -38,12 +38,12 @@ type streamDialer struct {
 
 var _ transport.StreamDialer = (*streamDialer)(nil)
 
-// Dial implements [transport.StreamDialer].Dial using SOCKS5.
+// DialStream implements [transport.StreamDialer].DialStream using SOCKS5.
 // It will send the method and the connect requests in one packet, to avoid an unnecessary roundtrip.
 // The returned [error] will be of type [ReplyCode] if the server sends a SOCKS error reply code, which
 // you can check against the error constants in this package using [errors.Is].
-func (c *streamDialer) Dial(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
-	proxyConn, err := c.proxyEndpoint.Connect(ctx)
+func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
+	proxyConn, err := c.proxyEndpoint.ConnectStream(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to SOCKS5 proxy: %w", err)
 	}
