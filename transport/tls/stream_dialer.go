@@ -62,9 +62,9 @@ func (c streamConn) CloseRead() error {
 	return c.innerConn.CloseRead()
 }
 
-// Dial implements [transport.StreamDialer].Dial.
-func (d *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
-	innerConn, err := d.dialer.Dial(ctx, remoteAddr)
+// DialStream implements [transport.StreamDialer].DialStream.
+func (d *StreamDialer) DialStream(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
+	innerConn, err := d.dialer.DialStream(ctx, remoteAddr)
 	if err != nil {
 		return nil, err
 	}

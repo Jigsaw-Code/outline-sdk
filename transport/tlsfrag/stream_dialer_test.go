@@ -182,7 +182,7 @@ func assertCanDialFragFunc(t *testing.T, inner transport.StreamDialer, raddr str
 	d, err := NewStreamDialerFunc(inner, frag)
 	require.NoError(t, err)
 	require.NotNil(t, d)
-	conn, err := d.Dial(context.Background(), raddr)
+	conn, err := d.DialStream(context.Background(), raddr)
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 	return conn
@@ -192,7 +192,7 @@ func assertCanDialFixedLenFrag(t *testing.T, inner transport.StreamDialer, raddr
 	d, err := NewFixedLenStreamDialer(inner, splitLen)
 	require.NoError(t, err)
 	require.NotNil(t, d)
-	conn, err := d.Dial(context.Background(), raddr)
+	conn, err := d.DialStream(context.Background(), raddr)
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 	return conn
@@ -231,7 +231,7 @@ type collectStreamDialer struct {
 	bufs net.Buffers
 }
 
-func (d *collectStreamDialer) Dial(ctx context.Context, raddr string) (transport.StreamConn, error) {
+func (d *collectStreamDialer) DialStream(ctx context.Context, raddr string) (transport.StreamConn, error) {
 	return d, nil
 }
 

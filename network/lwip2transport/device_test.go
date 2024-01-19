@@ -54,7 +54,7 @@ type errTcpUdpHandler struct {
 	err error
 }
 
-func (h *errTcpUdpHandler) Dial(context.Context, string) (transport.StreamConn, error) {
+func (h *errTcpUdpHandler) DialStream(context.Context, string) (transport.StreamConn, error) {
 	return nil, h.err
 }
 

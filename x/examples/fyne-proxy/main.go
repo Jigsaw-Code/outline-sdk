@@ -62,7 +62,7 @@ func newFilteredStreamDialer() transport.StreamDialer {
 		}
 		return nil
 	}
-	return &transport.TCPStreamDialer{Dialer: dialer}
+	return &transport.TCPDialer{Dialer: dialer}
 }
 
 func runServer(address, transport string) (*runningProxy, error) {

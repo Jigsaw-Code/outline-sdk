@@ -34,7 +34,7 @@ func TestStreamDialer_Dial(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
-	conn, err := d.Dial(context.Background(), testTargetAddr)
+	conn, err := d.DialStream(context.Background(), testTargetAddr)
 	if err != nil {
 		t.Fatalf("StreamDialer.Dial failed: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestStreamDialer_DialNoPayload(t *testing.T) {
 	// Extend the wait to be safer.
 	d.ClientDataWait = 0 * time.Millisecond
 
-	conn, err := d.Dial(context.Background(), testTargetAddr)
+	conn, err := d.DialStream(context.Background(), testTargetAddr)
 	if err != nil {
 		t.Fatalf("StreamDialer.Dial failed: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestStreamDialer_DialFastClose(t *testing.T) {
 		// Extend the wait to be safer.
 		d.ClientDataWait = 100 * time.Millisecond
 
-		conn, err := d.Dial(context.Background(), testTargetAddr)
+		conn, err := d.DialStream(context.Background(), testTargetAddr)
 		require.NoError(t, err, "StreamDialer.Dial failed: %v", err)
 
 		// Wait for less than 100 milliseconds to ensure that the target
@@ -151,7 +151,7 @@ func TestStreamDialer_TCPPrefix(t *testing.T) {
 		t.Fatalf("Failed to create StreamDialer: %v", err)
 	}
 	d.SaltGenerator = NewPrefixSaltGenerator(prefix)
-	conn, err := d.Dial(context.Background(), testTargetAddr)
+	conn, err := d.DialStream(context.Background(), testTargetAddr)
 	if err != nil {
 		t.Fatalf("StreamDialer.Dial failed: %v", err)
 	}
@@ -170,7 +170,7 @@ func BenchmarkStreamDialer_Dial(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create StreamDialer: %v", err)
 	}
-	conn, err := d.Dial(context.Background(), testTargetAddr)
+	conn, err := d.DialStream(context.Background(), testTargetAddr)
 	if err != nil {
 		b.Fatalf("StreamDialer.Dial failed: %v", err)
 	}

@@ -63,7 +63,7 @@ type StreamDialer struct {
 
 var _ transport.StreamDialer = (*StreamDialer)(nil)
 
-// Dial implements StreamDialer.Dial using a Shadowsocks server.
+// DialStream implements StreamDialer.DialStream using a Shadowsocks server.
 //
 // The Shadowsocks StreamDialer returns a connection after the connection to the proxy is established,
 // but before the connection to the target is established. That means we cannot signal "connection refused"
@@ -78,12 +78,12 @@ var _ transport.StreamDialer = (*StreamDialer)(nil)
 // initial data from the application in order to send the Shadowsocks salt, SOCKS address and initial data
 // all in one packet. This makes the size of the initial packet hard to predict, avoiding packet size
 // fingerprinting. We can only get the application initial data if we return a connection first.
-func (c *StreamDialer) Dial(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
+func (c *StreamDialer) DialStream(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
 	socksTargetAddr := socks.ParseAddr(remoteAddr)
 	if socksTargetAddr == nil {
 		return nil, errors.New("failed to parse target address")
 	}
-	proxyConn, err := c.endpoint.Connect(ctx)
+	proxyConn, err := c.endpoint.ConnectStream(ctx)
 	if err != nil {
 		return nil, err
 	}
