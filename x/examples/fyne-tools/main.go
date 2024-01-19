@@ -175,6 +175,7 @@ func main() {
 			aaaaBox.SetText(strings.Join(texts, ", "))
 		}
 		cname, err := lookupCNAME(context.Background(), domain)
+		// This doesn't work on mobile:
 		// cname, err := resolver.LookupCNAME(context.Background(), domain)
 		if err != nil {
 			cnameBox.SetText("❌ " + err.Error())
