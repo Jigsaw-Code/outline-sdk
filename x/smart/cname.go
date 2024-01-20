@@ -23,8 +23,4 @@ import (
 
 func lookupCNAME(ctx context.Context, domain string) (string, error) {
 	return net.DefaultResolver.LookupCNAME(ctx, domain)
-	type result struct {
-		cname string
-		err   error
-	}
 }
