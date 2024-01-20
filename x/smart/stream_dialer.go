@@ -154,7 +154,7 @@ func fingerprint(pd transport.PacketDialer, sd transport.StreamDialer, testDomai
 
 func evaluateNetResolver(ctx context.Context, resolver *net.Resolver, testDomain string) ([]net.IP, error) {
 	requestDomain := mixCase(testDomain)
-	_, err := resolver.LookupCNAME(ctx, requestDomain)
+	_, err := lookupCNAME(ctx, requestDomain)
 	if err != nil {
 		return nil, fmt.Errorf("could not get cname: %w", err)
 	}
