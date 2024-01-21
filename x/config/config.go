@@ -45,7 +45,7 @@ func parseConfigPart(oneDialerConfig string) (*url.URL, error) {
 
 // NewStreamDialer creates a new [transport.StreamDialer] according to the given config.
 func NewStreamDialer(transportConfig string) (transport.StreamDialer, error) {
-	return WrapStreamDialer(&transport.TCPStreamDialer{}, transportConfig)
+	return WrapStreamDialer(&transport.TCPDialer{}, transportConfig)
 }
 
 // WrapStreamDialer created a [transport.StreamDialer] according to transportConfig, using dialer as the
@@ -112,7 +112,7 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 
 // NewPacketDialer creates a new [transport.PacketDialer] according to the given config.
 func NewPacketDialer(transportConfig string) (dialer transport.PacketDialer, err error) {
-	dialer = &transport.UDPPacketDialer{}
+	dialer = &transport.UDPDialer{}
 	transportConfig = strings.TrimSpace(transportConfig)
 	if transportConfig == "" {
 		return dialer, nil

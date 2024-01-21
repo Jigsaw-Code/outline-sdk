@@ -50,7 +50,7 @@ func NewPacketListener(endpoint transport.PacketEndpoint, key *EncryptionKey) (t
 }
 
 func (c *packetListener) ListenPacket(ctx context.Context) (net.PacketConn, error) {
-	proxyConn, err := c.endpoint.Connect(ctx)
+	proxyConn, err := c.endpoint.ConnectPacket(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to endpoint: %w", err)
 	}

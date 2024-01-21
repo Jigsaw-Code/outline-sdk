@@ -36,7 +36,7 @@ import (
 // StreamDialer Tests
 func TestTestResolverStreamConnectivityOk(t *testing.T) {
 	// TODO(fortuna): Run a local resolver and make test not depend on an external server.
-	resolver := dns.NewTCPResolver(&transport.TCPStreamDialer{}, "8.8.8.8:53")
+	resolver := dns.NewTCPResolver(&transport.TCPDialer{}, "8.8.8.8:53")
 	result, err := TestConnectivityWithResolver(context.Background(), resolver, "example.com")
 	require.NoError(t, err)
 	require.Nil(t, result)
@@ -71,7 +71,7 @@ func TestTestResolverStreamConnectivityRefused(t *testing.T) {
 	// Close right away to ensure the port is closed. The OS will likely not reuse it soon enough.
 	require.Nil(t, listener.Close())
 
-	resolver := dns.NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
+	resolver := dns.NewTCPResolver(&transport.TCPDialer{}, listener.Addr().String())
 	result, err := TestConnectivityWithResolver(context.Background(), resolver, "anything")
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -107,7 +107,7 @@ func TestTestResolverStreamConnectivityReset(t *testing.T) {
 	}, &running)
 	defer listener.Close()
 
-	resolver := dns.NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
+	resolver := dns.NewTCPResolver(&transport.TCPDialer{}, listener.Addr().String())
 	result, err := TestConnectivityWithResolver(context.Background(), resolver, "anything")
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -139,7 +139,7 @@ func TestTestStreamDialerEarlyClose(t *testing.T) {
 	}, &running)
 	defer listener.Close()
 
-	resolver := dns.NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
+	resolver := dns.NewTCPResolver(&transport.TCPDialer{}, listener.Addr().String())
 	result, err := TestConnectivityWithResolver(context.Background(), resolver, "anything")
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -164,7 +164,7 @@ func TestTestResolverStreamConnectivityTimeout(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	resolver := dns.NewTCPResolver(&transport.TCPStreamDialer{}, listener.Addr().String())
+	resolver := dns.NewTCPResolver(&transport.TCPDialer{}, listener.Addr().String())
 	result, err := TestConnectivityWithResolver(ctx, resolver, "anything")
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -204,7 +204,7 @@ func TestTestPacketPacketConnectivityOk(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	resolver := dns.NewUDPResolver(&transport.UDPPacketDialer{}, server.LocalAddr().String())
+	resolver := dns.NewUDPResolver(&transport.UDPDialer{}, server.LocalAddr().String())
 	result, err := TestConnectivityWithResolver(context.Background(), resolver, "anything")
 	require.NoError(t, err)
 	require.Nil(t, result)

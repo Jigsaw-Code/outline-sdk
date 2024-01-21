@@ -39,7 +39,7 @@ func TestSOCKS5Dialer_BadConnection(t *testing.T) {
 	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.0:0"})
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
-	_, err = dialer.Dial(context.Background(), "example.com:443")
+	_, err = dialer.DialStream(context.Background(), "example.com:443")
 	require.Error(t, err)
 }
 
@@ -52,7 +52,7 @@ func TestSOCKS5Dialer_BadAddress(t *testing.T) {
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
 
-	_, err = dialer.Dial(context.Background(), "noport")
+	_, err = dialer.DialStream(context.Background(), "noport")
 	require.Error(t, err)
 }
 
@@ -97,7 +97,7 @@ func testExchange(tb testing.TB, listener *net.TCPListener, destAddr string, req
 		defer running.Done()
 		dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String()})
 		require.NoError(tb, err)
-		serverConn, err := dialer.Dial(context.Background(), destAddr)
+		serverConn, err := dialer.DialStream(context.Background(), destAddr)
 		if replyCode != 0 {
 			require.ErrorIs(tb, err, replyCode)
 			var extractedReplyCode ReplyCode

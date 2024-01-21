@@ -36,7 +36,7 @@ func newTCPHandler(client transport.StreamDialer) *tcpHandler {
 }
 
 func (h *tcpHandler) Handle(conn net.Conn, target *net.TCPAddr) error {
-	proxyConn, err := h.dialer.Dial(context.Background(), target.String())
+	proxyConn, err := h.dialer.DialStream(context.Background(), target.String())
 	if err != nil {
 		return err
 	}

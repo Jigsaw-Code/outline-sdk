@@ -39,8 +39,8 @@ func isCancelledError(err error) bool {
 	return errors.Is(err, context.Canceled) || strings.HasSuffix(err.Error(), "operation was canceled")
 }
 
-func (d *sanitizeErrorDialer) Dial(ctx context.Context, addr string) (transport.StreamConn, error) {
-	conn, err := d.StreamDialer.Dial(ctx, addr)
+func (d *sanitizeErrorDialer) DialStream(ctx context.Context, addr string) (transport.StreamConn, error) {
+	conn, err := d.StreamDialer.DialStream(ctx, addr)
 	if isCancelledError(err) {
 		return nil, context.Canceled
 	}
@@ -82,7 +82,7 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 		http.Error(proxyResp, fmt.Sprintf("Invalid config in Transport header: %v", err), http.StatusBadRequest)
 		return
 	}
-	targetConn, err := dialer.Dial(proxyReq.Context(), proxyReq.Host)
+	targetConn, err := dialer.DialStream(proxyReq.Context(), proxyReq.Host)
 	if err != nil {
 		http.Error(proxyResp, fmt.Sprintf("Failed to connect to %v: %v", proxyReq.Host, err), http.StatusServiceUnavailable)
 		return
