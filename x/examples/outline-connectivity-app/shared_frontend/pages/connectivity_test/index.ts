@@ -703,16 +703,10 @@ export class ConnectivityTestPage extends LitElement {
 
         <fieldset class="field">
           <span class="field-header">
-            <label class="field-header-label" for="reportTo"
-              >${msg("Report Collector URL")}</label
-            >
-            <i
-            class="field-header-info"
-            title=${msg(
-              "URL of the remote collector server to report and send the test results."
-            )}
-            >ℹ️</i
-          >
+            <label class="field-header-label"
+            >${msg("Report Collector URL")}
+            </label>
+            <info-popup popupText="URL of the remote collector server to report and send the test results."></info-popup>
           </span>
           <input
             class="field-input"
@@ -824,8 +818,12 @@ export class ConnectivityTestPage extends LitElement {
             <dt class="results-list-item-data-key">${msg("Time")}</dt>
             <dd class="results-list-item-data-value">${result.durationMs}ms</dd>
 
-            <dt class="results-list-item-data-key">${msg("Error")}</dt>
-            <dd class="results-list-item-data-value">${result.error?.message}</dd>
+            ${isSuccess
+              ? nothing
+              : html`
+                  <dt class="results-list-item-data-key">${msg("Error")}</dt>
+                  <dd class="results-list-item-data-value">${result.error?.message}</dd>
+                `}
           </dl>
         </li>`;
       })}
