@@ -20,6 +20,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -30,13 +31,12 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/dns"
-	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
 	"github.com/Jigsaw-Code/outline-sdk/x/report"
 )
 
-var debugLog log.Logger = *log.New(os.Stdout, "", 0)
+var debugLog log.Logger = *log.New(io.Discard, "", 0)
 
 // var errorLog log.Logger = *log.New(os.Stderr, "[ERROR] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
@@ -177,14 +177,9 @@ func main() {
 			case "udp":
 				packetDialer, err := config.NewPacketDialer(*transportFlag)
 				if err != nil {
-					// log.Fatalf("Failed to create PacketDialer: %v", err)
-					debugLog.Printf("Failed to create PacketDialer: %v", err)
-					testDuration = time.Duration(0)
-					testErr = err
-				} else {
-					resolver := &transport.PacketDialerEndpoint{Dialer: packetDialer, Address: resolverAddress}
-					testDuration, testErr = connectivity.TestResolverPacketConnectivity(context.Background(), resolver, *domainFlag)
+					log.Fatalf("Failed to create PacketDialer: %v", err)
 				}
+				resolver = dns.NewUDPResolver(packetDialer, resolverAddress)
 			default:
 				log.Fatalf(`Invalid proto %v. Must be "tcp" or "udp"`, proto)
 			}
@@ -211,33 +206,11 @@ func main() {
 				DurationMs: testDuration.Milliseconds(),
 				Error:      makeErrorRecord(result),
 			}
-			collectorURL, err := url.Parse(*reportToFlag)
-			if err != nil {
-				debugLog.Printf("Failed to parse collector URL: %v", err)
-			}
-			remoteCollector := &report.RemoteCollector{
-				CollectorURL: collectorURL,
-				HttpClient:   &http.Client{Timeout: 10 * time.Second},
-			}
-			retryCollector := &report.RetryCollector{
-				Collector:    remoteCollector,
-				MaxRetry:     3,
-				InitialDelay: 1 * time.Second,
-			}
-			c := report.SamplingCollector{
-				Collector:       retryCollector,
-				SuccessFraction: *reportSuccessFlag,
-				FailureFraction: *reportFailureFlag,
-			}
-			err = c.Collect(context.Background(), r)
-			if err != nil {
-				debugLog.Printf("Failed to collect report: %v\n", err)
-			}
-			// log report on stdout
-			writeColelctor := report.WriteCollector{Writer: os.Stdout}
-			err = writeColelctor.Collect(context.Background(), r)
-			if err != nil {
-				debugLog.Printf("Failed to write report: %v\n", err)
+			if reportCollector != nil {
+				err = reportCollector.Collect(context.Background(), r)
+				if err != nil {
+					debugLog.Printf("Failed to collect report: %v\n", err)
+				}
 			}
 		}
 		if !success {
