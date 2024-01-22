@@ -65,7 +65,7 @@ export class ConnectivityTestPage extends LitElement {
 
     const formData = new FormData(formElement);
 
-    const accessKey = formData.get("accessKey")?.toString().trim();
+    const transport = formData.get("transport")?.toString().trim();
     const domain = formData.get("domain")?.toString().trim();
     const reportTo = formData.get("reportTo")?.toString().trim();
     const resolvers =
@@ -85,7 +85,7 @@ export class ConnectivityTestPage extends LitElement {
     }
 
     return {
-      accessKey,
+      transport,
       domain,
       resolvers,
       protocols,
@@ -615,7 +615,7 @@ export class ConnectivityTestPage extends LitElement {
       <form class="form" @submit=${this.testConnectivity}>
         <fieldset class="field">
           <span class="field-header">
-            <label class="field-header-label" for="accessKey">
+            <label class="field-header-label" for="transport">
               ${msg("Transport to Test")}
             </label>
           <info-popup popupText="Options include <strong>ss://</strong>, <strong>split://</strong>,
@@ -626,8 +626,8 @@ export class ConnectivityTestPage extends LitElement {
           </span>
           <textarea
             class="field-input-textarea"
-            name="accessKey"
-            id="accessKey"
+            name="transport"
+            id="transport"
             ""
           ></textarea>
         </fieldset>
