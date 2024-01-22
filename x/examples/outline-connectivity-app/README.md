@@ -6,13 +6,15 @@ This is a simple cross-platform app to test connectivity to Outline servers, usi
 
 ## Usage
 
-The app accepts a transport configuration (for example `Shadowsocks`) as defined [here](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config) and performs DNS resolution over the specified transport using provided list of resolvers and domain name. 
+This is an example application that accepts a transport configuration (for example `shadowsocks`) as defined [here](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config) and performs DNS resolution over the specified transport using provided list of resolvers and domain name.
 
-The resolution is attempted over `upd` and `tcp` if both options are enabled in the app.
+DNS resolution is attempted over `upd` and `tcp` if both options are enabled in the app.
 
 The test result is then displayed on the app and submitted to a remote report collection server if URL is specified.
 
 One simple approach to set up a remote collector using Google Spreadsheet is discussed [here](https://github.com/amircybersec/report-collector).
+
+The following are app screenshots on Android and iOS. The app can also run on Linux, MacOs and Windows.
 
 <img width="300" alt="ios" src="https://github.com/Jigsaw-Code/outline-sdk/assets/117060873/19a2df0f-ae30-4925-b65a-481c747eb1a3">
 
