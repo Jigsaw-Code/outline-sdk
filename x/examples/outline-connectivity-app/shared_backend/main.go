@@ -16,8 +16,6 @@ package shared_backend
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -28,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
 	"github.com/Jigsaw-Code/outline-sdk/x/report"
@@ -58,15 +56,15 @@ func (r ConnectivityTestResult) IsSuccess() bool {
 
 type ConnectivityTestError struct {
 	// TODO: add Shadowsocks/Transport error
-	Op string `json:"operation"`
+	Op string `json:"op,omitempty"`
 	// Posix error, when available
-	PosixError string `json:"posixError"`
+	PosixError string `json:"posixError,omitempty"`
 	// TODO: remove IP addresses
-	Msg string `json:"message"`
+	Msg string `json:"message,omitempty"`
 }
 
 type ConnectivityTestRequest struct {
-	AccessKey string                         `json:"accessKey"`
+	Transport string                         `json:"transport"`
 	Domain    string                         `json:"domain"`
 	Resolvers []string                       `json:"resolvers"`
 	Protocols ConnectivityTestProtocolConfig `json:"protocols"`
@@ -77,7 +75,10 @@ func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult
 	var result ConnectivityTestResult
 	var results []ConnectivityTestResult
 
-	transportConfig := replaceSSKeyWithHash(request.AccessKey)
+	sanitizedConfig, err := config.SanitizeConfig(request.Transport)
+	if err != nil {
+		log.Fatalf("Failed to sanitize config: %v", err)
+	}
 
 	for _, resolverHost := range request.Resolvers {
 		resolverHost := strings.TrimSpace(resolverHost)
@@ -89,19 +90,23 @@ func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult
 			var testErr error
 			var testDuration time.Duration
 
-			streamDialer, err := config.NewStreamDialer(request.AccessKey)
+			streamDialer, err := config.NewStreamDialer(request.Transport)
 			if err != nil {
 				//log.Fatalf("Failed to create StreamDialer: %v", err)
 				testDuration = time.Duration(0)
 				testErr = err
 			} else {
-				resolver := &transport.StreamDialerEndpoint{Dialer: streamDialer, Address: resolverAddress}
-				testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, resolverAddress)
+				resolver := dns.NewTCPResolver(streamDialer, resolverAddress)
+				startTime := time.Now()
+				// TODO: report question fail
+				testErr, _ := connectivity.TestConnectivityWithResolver(context.Background(), resolver, request.Domain)
+				testDuration := time.Since(startTime)
+				//testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, resolverAddress)
 				fmt.Printf("TestDuration: %v\n", testDuration)
 				fmt.Printf("TestError: %v\n", testErr)
 			}
 			result = ConnectivityTestResult{
-				Transport:  transportConfig,
+				Transport:  sanitizedConfig,
 				Resolver:   resolverAddress,
 				Proto:      "tcp",
 				Time:       testTime.UTC().Truncate(time.Second),
@@ -116,20 +121,24 @@ func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult
 			var testErr error
 			var testDuration time.Duration
 
-			packetDialer, err := config.NewPacketDialer(request.AccessKey)
+			packetDialer, err := config.NewPacketDialer(request.Transport)
 			if err != nil {
 				//log.Fatalf("Failed to create PacketDialer: %v", err)
 				testDuration = time.Duration(0)
 				testErr = err
 			} else {
-				resolver := &transport.PacketDialerEndpoint{Dialer: packetDialer, Address: resolverAddress}
-				testDuration, testErr = connectivity.TestResolverPacketConnectivity(context.Background(), resolver, resolverAddress)
+				resolver := dns.NewUDPResolver(packetDialer, resolverAddress)
+				startTime := time.Now()
+				// TODO: report question fail
+				testErr, _ := connectivity.TestConnectivityWithResolver(context.Background(), resolver, request.Domain)
+				testDuration := time.Since(startTime)
+				//testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, resolverAddress)
 				fmt.Printf("TestDuration: %v\n", testDuration)
 				fmt.Printf("TestError: %v\n", testErr)
 			}
 
 			result = ConnectivityTestResult{
-				Transport:  transportConfig,
+				Transport:  sanitizedConfig,
 				Resolver:   resolverAddress,
 				Proto:      "udp",
 				Time:       testTime.UTC().Truncate(time.Second),
@@ -187,7 +196,7 @@ func makeErrorRecord(err error) *ConnectivityTestError {
 		return nil
 	}
 	var record = new(ConnectivityTestError)
-	var testErr *connectivity.TestError
+	var testErr *connectivity.ConnectivityError
 	if errors.As(err, &testErr) {
 		record.Op = testErr.Op
 		record.PosixError = testErr.PosixError
@@ -206,36 +215,4 @@ func unwrapAll(err error) error {
 		}
 		err = unwrapped
 	}
-}
-
-// hashKey hashes the given key and returns the hexadecimal representation
-func hashKey(key string) string {
-	hasher := sha256.New()
-	hasher.Write([]byte(key))
-	fullHash := hex.EncodeToString(hasher.Sum(nil))
-	return fullHash[:10] // Truncate the hash to 10 characters
-
-}
-
-// replaceSSKeyWithHash function replaces the key value with its hash in parts that start with "ss://"
-func replaceSSKeyWithHash(input string) string {
-	// Split the string into parts
-	parts := strings.Split(input, "|")
-
-	// Iterate through each part
-	for i, part := range parts {
-		if strings.HasPrefix(part, "ss://") {
-			// Find the key part and replace it with its hash
-			keyStart := strings.Index(part, "//") + 2
-			keyEnd := strings.Index(part, "@")
-			if keyStart != -1 && keyEnd != -1 && keyEnd > keyStart {
-				key := part[keyStart:keyEnd]
-				hashedKey := hashKey(key)
-				parts[i] = part[:keyStart] + hashedKey + part[keyEnd:]
-			}
-		}
-	}
-
-	// Join the parts back into a string
-	return strings.Join(parts, "|")
 }
