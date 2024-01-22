@@ -4,6 +4,20 @@
 
 This is a simple cross-platform app to test connectivity to Outline servers, using the Outline SDK. It is built with [Wails](https://wails.app/) and [Capacitor](https://capacitorjs.com/).
 
+## Usage
+
+The app accepts a transport configuration (for example `Shadowsocks`) as defined [here](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config) and performs DNS resolution over the specified transport using provided list of resolvers and domain name. 
+
+The resolution is attempted over `upd` and `tcp` if both options are enabled in the app.
+
+The test result is then displayed on the app and submitted to a remote report collection server if URL is specified.
+
+One simple approach to set up a remote collector using Google Spreadsheet is discussed [here](https://github.com/amircybersec/report-collector).
+
+<img width="300" alt="ios" src="https://github.com/Jigsaw-Code/outline-sdk/assets/117060873/19a2df0f-ae30-4925-b65a-481c747eb1a3">
+
+<img width="300" alt="android" src="https://github.com/Jigsaw-Code/outline-sdk/assets/117060873/c9aba28e-64a8-4ca6-9634-65dc265908c6">
+
 ### Architecture
 
 The overarching goal of this application is to demonstrate how the Outline SDK enables you to write each line of business logic only once across all platforms.
