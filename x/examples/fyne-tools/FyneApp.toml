@@ -2,4 +2,4 @@
   Icon = "Icon.png"
   Name = "Net Tools"
   ID = "org.getoutline.sdk.examples.fyne_tools"
-  Build = 8
+  Build = 9
