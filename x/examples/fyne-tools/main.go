@@ -17,7 +17,6 @@ package main
 import (
 	"context"
 	"image/color"
-	"log"
 	"net"
 	"strings"
 
@@ -25,18 +24,17 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
-type appTheme struct {
+type customTheme struct {
 	fyne.Theme
 }
 
 const ColorNameOnPrimary = "OnPrimary"
 
-func (t *appTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
+func (t *customTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
 	switch name {
 	case theme.ColorNameHeaderBackground:
 		return t.Color(theme.ColorNamePrimary, variant)
@@ -66,7 +64,9 @@ func makeAppHeader(title string) *fyne.Container {
 			TextStyle: fyne.TextStyle{Bold: true},
 		}},
 	}}
-	return container.NewStack(canvas.NewRectangle(theme.HeaderBackgroundColor()), titleLabel)
+	settings := fyne.CurrentApp().Settings()
+	bgColor := settings.Theme().Color(theme.ColorNameHeaderBackground, settings.ThemeVariant())
+	return container.NewStack(canvas.NewRectangle(bgColor), titleLabel)
 }
 
 func main() {
@@ -76,7 +76,7 @@ func main() {
 		meta.Name = "Net Tools"
 		app.SetMetadata(meta)
 	}
-	fyneApp.Settings().SetTheme(&appTheme{theme.DefaultTheme()})
+	fyneApp.Settings().SetTheme(&customTheme{theme.DefaultTheme()})
 
 	mainWin := fyneApp.NewWindow(fyneApp.Metadata().Name)
 	mainWin.Resize(fyne.Size{Width: 350})
@@ -98,7 +98,6 @@ func main() {
 	lookupButton.Importance = widget.HighImportance
 	lookupButton.OnTapped = func() {
 		domain := domainEntry.Text
-		log.Println("Lookup", domain)
 		var resolver net.Resolver
 
 		ips, err := resolver.LookupIP(context.Background(), "ip4", domain)
@@ -122,9 +121,9 @@ func main() {
 			}
 			aaaaBox.SetText(strings.Join(texts, ", "))
 		}
-		cname, err := lookupCNAME(context.Background(), domain)
 		// This doesn't work on mobile:
 		// cname, err := resolver.LookupCNAME(context.Background(), domain)
+		cname, err := lookupCNAME(context.Background(), domain)
 		if err != nil {
 			cnameBox.SetText("❌ " + err.Error())
 		} else {
@@ -137,9 +136,7 @@ func main() {
 		container.NewPadded(
 			container.NewVBox(
 				widget.NewLabelWithStyle("Domain", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-				domainEntry,
-				container.NewHBox(layout.NewSpacer(), lookupButton),
-				// widget.NewLabelWithStyle("Results", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+				container.NewBorder(nil, nil, nil, lookupButton, domainEntry),
 				&widget.Separator{},
 				widget.NewLabelWithStyle("A", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 				aBox,
