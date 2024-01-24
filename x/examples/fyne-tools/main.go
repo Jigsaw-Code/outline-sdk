@@ -40,14 +40,17 @@ func (t *customTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant)
 		return t.Color(theme.ColorNamePrimary, variant)
 	case theme.ColorNamePrimary:
 		if variant == theme.VariantLight {
+			// Dark teal.
 			return color.RGBA{R: 0x00, G: 0x67, B: 0x7F, A: 255}
 		} else {
+			// Sky blue.
 			return color.RGBA{R: 0x7C, G: 0xD2, B: 0xF0, A: 255}
 		}
 	case ColorNameOnPrimary:
 		if variant == theme.VariantLight {
 			return color.White
 		} else {
+			// Deep dark teal.
 			return color.RGBA{R: 0x00, G: 0x35, B: 0x43, A: 255}
 		}
 	default:
