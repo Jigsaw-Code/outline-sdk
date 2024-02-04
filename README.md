@@ -30,7 +30,7 @@ The Outline SDK is built upon a simple basic concepts, defined as interoperable 
   - `transport.StreamConn`: stream-based connection, like TCP and the `SOCK_STREAM` Posix socket type.
   - `transport.PacketConn`: datagram-based connection, like UDP and the `SOCK_DGRAM` Posix socket type. We use "Packet" instead of "Datagram" because that is the convention in the Go standard library.
 
-Connections can be wrapped to create nested connections over a new transport. For example, a `StreamConn` could be over TCP, over TLS over TCP, over HTTP over TLS over TCP, over QUIC, among oter options.
+Connections can be wrapped to create nested connections over a new transport. For example, a `StreamConn` could be over TCP, over TLS over TCP, over HTTP over TLS over TCP, over QUIC, among other options.
 
 **Dialers** enable the creation of connections given a host:port address while encapsulating the underlying transport or proxy protocol. The `StreamDialer` and `PacketDialer` types create `StreamConn` and `PacketConn` connections, respectively, given an address. Dialers can also be nested. For example, a TLS Stream Dialer can use a TCP dialer to create a `StreamConn` backed by a TCP connection, then create a TLS `StreamConn` backed by the TCP `StreamConn`. A SOCKS5-over-TLS Dialer could use the TLS Dialer to create the TLS `StreamConn` to the proxy before doing the SOCKS5 connection to the target address.
 
