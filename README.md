@@ -39,7 +39,7 @@ Connections can be wrapped to create nested connections over a new transport. Fo
 
 ### Bypass DNS-based Blocking
 
-The Outline SDK offers two types of strategies for evading DNS-based blocking: resillient DNS or address override.
+The Outline SDK offers two types of strategies for evading DNS-based blocking: resilient DNS or address override.
 
 - The [dns](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/dns) package can replace the resolution based on the system resolver with more resillient options:
   - Encrypted DNS over HTTPS (DoH) or TLS (DoT)
