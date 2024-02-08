@@ -138,6 +138,7 @@ func (d *StreamDialer) DialStream(ctx context.Context, addr string) (transport.S
 			readyToDialCh = nil
 		}
 		select {
+		// Receive IPv4 results.
 		case lookupRes := <-lookup4Ch:
 			opsPending--
 			// Set to nil to make the read on lookup4Ch block.
@@ -150,6 +151,7 @@ func (d *StreamDialer) DialStream(ctx context.Context, addr string) (transport.S
 			ips = append(ips, lookupRes.IPs...)
 			// TODO: sort IPs as per https://datatracker.ietf.org/doc/html/rfc8305#section-4
 
+		// Receive IPv6 results.
 		case lookupRes := <-lookup6Ch:
 			opsPending--
 			// Set to nil to make the read on lookup6Ch block.
@@ -162,6 +164,7 @@ func (d *StreamDialer) DialStream(ctx context.Context, addr string) (transport.S
 			ips = append(ips, lookupRes.IPs...)
 			// TODO: sort IPs as per https://datatracker.ietf.org/doc/html/rfc8305#section-4
 
+		// Wait for new attempt done. Dial new IP address.
 		case <-readyToDialCh:
 			// The len(ips) > 0 condition before the select protects this.
 			ip := ips[0]
@@ -182,6 +185,7 @@ func (d *StreamDialer) DialStream(ctx context.Context, addr string) (transport.S
 				}
 			}(net.JoinHostPort(ip.String(), port), waitDone)
 
+		// Receive dial result.
 		case dialRes := <-dialCh:
 			opsPending--
 			if dialRes.Err != nil {
@@ -190,6 +194,7 @@ func (d *StreamDialer) DialStream(ctx context.Context, addr string) (transport.S
 			}
 			return dialRes.Conn, nil
 
+		// Dial has been canceled. Return.
 		case <-searchCtx.Done():
 			return nil, searchCtx.Err()
 		}
