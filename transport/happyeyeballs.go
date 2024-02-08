@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"sort"
 	"time"
 )
@@ -54,18 +55,42 @@ func (d *HappyEyeballsStreamDialer) dial(ctx context.Context, addr string) (Stre
 	return (&TCPDialer{}).DialStream(ctx, addr)
 }
 
-func (d *HappyEyeballsStreamDialer) lookupIPv4(ctx context.Context, host string) ([]net.IP, error) {
+func (d *HappyEyeballsStreamDialer) lookupIPv4(ctx context.Context, host string) ([]netip.Addr, error) {
+	var netIPs []net.IP
+	var err error
 	if d.LookupIPv4 != nil {
-		return d.LookupIPv4(ctx, host)
+		netIPs, err = d.LookupIPv4(ctx, host)
+	} else {
+		netIPs, err = net.DefaultResolver.LookupIP(ctx, "ip4", host)
 	}
-	return net.DefaultResolver.LookupIP(ctx, "ip4", host)
+	ips := make([]netip.Addr, 0, len(netIPs))
+	for _, netIP := range netIPs {
+		// Make sure it's a 4-byte IP, not IPv6-mapped IPv4.
+		netIP = netIP.To4()
+		if len(netIP) == 4 {
+			ips = append(ips, netip.AddrFrom4([4]byte(netIP)))
+		}
+	}
+	return ips, err
 }
 
-func (d *HappyEyeballsStreamDialer) lookupIPv6(ctx context.Context, host string) ([]net.IP, error) {
+func (d *HappyEyeballsStreamDialer) lookupIPv6(ctx context.Context, host string) ([]netip.Addr, error) {
+	var netIPs []net.IP
+	var err error
 	if d.LookupIPv6 != nil {
-		return d.LookupIPv6(ctx, host)
+		netIPs, err = d.LookupIPv6(ctx, host)
+	} else {
+		netIPs, err = net.DefaultResolver.LookupIP(ctx, "ip6", host)
 	}
-	return net.DefaultResolver.LookupIP(ctx, "ip6", host)
+	ips := make([]netip.Addr, 0, len(netIPs))
+	for _, netIP := range netIPs {
+		// Make sure it's an IPv6.
+		netIP = netIP.To16()
+		if len(netIP) == 16 {
+			ips = append(ips, netip.AddrFrom16([16]byte(netIP)))
+		}
+	}
+	return ips, err
 }
 
 func newClosedChan() <-chan struct{} {
@@ -74,18 +99,12 @@ func newClosedChan() <-chan struct{} {
 	return closedCh
 }
 
-func mergeIPs(ipList []net.IP, newIPs ...net.IP) []net.IP {
+func mergeIPs(ipList []netip.Addr, newIPs ...netip.Addr) []netip.Addr {
 	ipList = append(ipList, newIPs...)
-	// Normalize IP lengths.
-	for i, ip := range ipList {
-		if ip4 := ip.To4(); ip4 != nil {
-			ipList[i] = ip4
-		}
-	}
 	// TODO: sort IPs as per https://datatracker.ietf.org/doc/html/rfc8305#section-4
 	sort.SliceStable(ipList, func(i, j int) bool {
 		// Place IPv6 before IPv4.
-		return len(ipList[i]) > len(ipList[j])
+		return ipList[i].Is6() && ipList[j].Is4()
 	})
 	return ipList
 }
@@ -109,7 +128,7 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 	// We start the IPv4 and IPv6 lookups in parallel, writing to lookup4Ch
 	// and lookup6Ch when they are done.
 	type LookupResult struct {
-		IPs []net.IP
+		IPs []netip.Addr
 		Err error
 	}
 	lookup6Ch := make(chan LookupResult)
@@ -133,7 +152,7 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 
 	// DIAL ATTEMPTS SECTION
 	// All the IPs to still attempt.
-	ips := make([]net.IP, 0, 2)
+	ips := make([]netip.Addr, 0, 2)
 	var lookupErr error
 	var dialErr error
 	type DialResult struct {
