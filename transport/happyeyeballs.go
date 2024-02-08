@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"net"
 	"time"
-
-	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
 )
 
 /*
@@ -76,7 +74,7 @@ func newClosedChan() <-chan struct{} {
 }
 
 // DialStream implements [StreamDialer].
-func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string) (transport.StreamConn, error) {
+func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string) (StreamConn, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse address: %w", err)
@@ -119,9 +117,10 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 
 	// DIAL ATTEMPTS SECTION
 	ips := []net.IP{}
+	var lookupErr error
 	var dialErr error
 	type DialResult struct {
-		Conn transport.StreamConn
+		Conn StreamConn
 		Err  error
 	}
 	// Channel to wait for before a new dial attempt. It starts
@@ -147,7 +146,7 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 			// Set to nil to make the read on lookup4Ch block.
 			lookup4Ch = nil
 			if lookupRes.Err != nil {
-				dialErr = errors.Join(lookupRes.Err)
+				lookupErr = errors.Join(lookupRes.Err)
 				continue
 			}
 			opsPending += len(lookupRes.IPs)
@@ -160,7 +159,7 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 			// Set to nil to make the read on lookup6Ch block.
 			lookup6Ch = nil
 			if lookupRes.Err != nil {
-				dialErr = errors.Join(lookupRes.Err)
+				lookupErr = errors.Join(lookupRes.Err)
 				continue
 			}
 			opsPending += len(lookupRes.IPs)
@@ -202,5 +201,11 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 			return nil, searchCtx.Err()
 		}
 	}
-	return nil, dialErr
+	if dialErr != nil {
+		return nil, dialErr
+	}
+	if lookupErr != nil {
+		return nil, lookupErr
+	}
+	return nil, fmt.Errorf("address lookup returned no IPs")
 }
