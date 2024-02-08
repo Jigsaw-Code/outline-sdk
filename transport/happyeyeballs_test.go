@@ -18,6 +18,7 @@ import (
 	"context"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -57,6 +58,28 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 				return nil, nil
 			}),
 			LookupIPv6: func(ctx context.Context, host string) ([]net.IP, error) {
+				defer t.Log("IPv6 done")
+				return []net.IP{net.ParseIP("2001:4860:4860::8888")}, nil
+			},
+			LookupIPv4: func(ctx context.Context, host string) ([]net.IP, error) {
+				defer t.Log("IPv4 done")
+				return []net.IP{net.ParseIP("8.8.8.8")}, nil
+			},
+		}
+		_, err := dialer.DialStream(context.Background(), "dns.google:53")
+		require.NoError(t, err)
+		require.Equal(t, "[2001:4860:4860::8888]:53", dialedAddr)
+	})
+
+	t.Run("Prefer IPv6 if there's a small delay", func(t *testing.T) {
+		var dialedAddr string
+		dialer := HappyEyeballsStreamDialer{
+			Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
+				dialedAddr = addr
+				return nil, nil
+			}),
+			LookupIPv6: func(ctx context.Context, host string) ([]net.IP, error) {
+				time.Sleep(10 * time.Millisecond)
 				return []net.IP{net.ParseIP("2001:4860:4860::8888")}, nil
 			},
 			LookupIPv4: func(ctx context.Context, host string) ([]net.IP, error) {

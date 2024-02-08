@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sort"
 	"time"
 )
 
@@ -73,6 +74,22 @@ func newClosedChan() <-chan struct{} {
 	return closedCh
 }
 
+func mergeIPs(ipList []net.IP, newIPs ...net.IP) []net.IP {
+	ipList = append(ipList, newIPs...)
+	// Normalize IP lengths.
+	for i, ip := range ipList {
+		if ip4 := ip.To4(); ip4 != nil {
+			ipList[i] = ip4
+		}
+	}
+	// TODO: sort IPs as per https://datatracker.ietf.org/doc/html/rfc8305#section-4
+	sort.SliceStable(ipList, func(i, j int) bool {
+		// Place IPv6 before IPv4.
+		return len(ipList[i]) > len(ipList[j])
+	})
+	return ipList
+}
+
 // DialStream implements [StreamDialer].
 func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string) (StreamConn, error) {
 	host, port, err := net.SplitHostPort(addr)
@@ -106,7 +123,6 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 		close(lookup6Ch)
 	}(lookup6Ch, host)
 	go func(lookup4Ch chan<- LookupResult, host string) {
-		time.Sleep(100 * time.Millisecond)
 		ips, err := d.lookupIPv4(searchCtx, host)
 		if err != nil {
 			err = fmt.Errorf("failed to lookup IPv4 addresses: %w", err)
@@ -116,7 +132,8 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 	}(lookup4Ch, host)
 
 	// DIAL ATTEMPTS SECTION
-	ips := []net.IP{}
+	// All the IPs to still attempt.
+	ips := make([]net.IP, 0, 2)
 	var lookupErr error
 	var dialErr error
 	type DialResult struct {
@@ -135,43 +152,53 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 		var readyToDialCh <-chan struct{} = nil
 		// Enable dial if there are IPs available.
 		if len(ips) > 0 {
-			readyToDialCh = dialWaitCh
+			if lookup6Ch != nil {
+				fmt.Println("wait for Resolution delay")
+				// IPv6 lookup not done yet. Set up Resolution Delay, as per
+				// https://datatracker.ietf.org/doc/html/rfc8305#section-8
+				resolutionDelayCtx, cancelResolutionDelay := context.WithTimeout(searchCtx, 50*time.Millisecond)
+				defer cancelResolutionDelay()
+				readyToDialCh = resolutionDelayCtx.Done()
+			} else {
+				fmt.Println("Dial wait")
+				readyToDialCh = dialWaitCh
+			}
 		} else {
+			fmt.Println("No IP to wait")
 			readyToDialCh = nil
 		}
 		select {
-		// Receive IPv4 results.
-		case lookupRes := <-lookup4Ch:
-			opsPending--
-			// Set to nil to make the read on lookup4Ch block.
-			lookup4Ch = nil
-			if lookupRes.Err != nil {
-				lookupErr = errors.Join(lookupRes.Err)
-				continue
-			}
-			opsPending += len(lookupRes.IPs)
-			ips = append(ips, lookupRes.IPs...)
-			// TODO: sort IPs as per https://datatracker.ietf.org/doc/html/rfc8305#section-4
-
 		// Receive IPv6 results.
 		case lookupRes := <-lookup6Ch:
 			opsPending--
-			// Set to nil to make the read on lookup6Ch block.
+			// Set to nil to make the read on lookup6Ch block and to signal IPv6 lookup is done.
 			lookup6Ch = nil
 			if lookupRes.Err != nil {
 				lookupErr = errors.Join(lookupRes.Err)
 				continue
 			}
 			opsPending += len(lookupRes.IPs)
-			ips = append(ips, lookupRes.IPs...)
+			ips = mergeIPs(ips, lookupRes.IPs...)
+
+		// Receive IPv4 results.
+		case lookupRes := <-lookup4Ch:
+			opsPending--
+			// Set to nil to make the read on lookup4Ch block and to signal IPv4 lookup is done.
+			lookup4Ch = nil
+			if lookupRes.Err != nil {
+				lookupErr = errors.Join(lookupRes.Err)
+				continue
+			}
+			opsPending += len(lookupRes.IPs)
 			// TODO: sort IPs as per https://datatracker.ietf.org/doc/html/rfc8305#section-4
+			ips = mergeIPs(ips, lookupRes.IPs...)
 
 		// Wait for new attempt done. Dial new IP address.
 		case <-readyToDialCh:
 			// The len(ips) > 0 condition before the select protects this.
 			ip := ips[0]
 			ips = ips[1:]
-			// As per https://datatracker.ietf.org/doc/html/rfc8305#section-8
+			// Connection Attempt Delay, as per https://datatracker.ietf.org/doc/html/rfc8305#section-8
 			waitCtx, waitDone := context.WithTimeout(searchCtx, 250*time.Millisecond)
 			dialWaitCh = waitCtx.Done()
 			go func(addr string, waitDone context.CancelFunc) {
