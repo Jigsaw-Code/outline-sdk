@@ -148,18 +148,15 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 		// Enable dial if there are IPs available.
 		if len(ips) > 0 {
 			if lookup6Ch != nil {
-				fmt.Println("wait for Resolution delay")
 				// IPv6 lookup not done yet. Set up Resolution Delay, as per
 				// https://datatracker.ietf.org/doc/html/rfc8305#section-8
 				resolutionDelayCtx, cancelResolutionDelay := context.WithTimeout(searchCtx, 50*time.Millisecond)
 				defer cancelResolutionDelay()
 				readyToDialCh = resolutionDelayCtx.Done()
 			} else {
-				fmt.Println("Dial wait")
 				readyToDialCh = dialWaitCh
 			}
 		} else {
-			fmt.Println("No IP to wait")
 			readyToDialCh = nil
 		}
 		select {

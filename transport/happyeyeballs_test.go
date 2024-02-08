@@ -16,6 +16,7 @@ package transport
 
 import (
 	"context"
+	"errors"
 	"net/netip"
 	"testing"
 	"time"
@@ -58,11 +59,9 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 				return nil, nil
 			}),
 			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				defer t.Log("IPv6 done")
 				return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
 			},
 			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				defer t.Log("IPv4 done")
 				return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
 			},
 		}
@@ -112,5 +111,65 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		_, err := dialer.DialStream(ctx, "dns.google:53")
 		require.NoError(t, err)
 		require.Equal(t, "8.8.8.8:53", dialedAddr)
+	})
+
+	t.Run("Use IPv6 if IPv4 fails", func(t *testing.T) {
+		var dialedAddr string
+		dialer := HappyEyeballsStreamDialer{
+			Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
+				dialedAddr = addr
+				return nil, nil
+			}),
+			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
+				time.Sleep(10 * time.Millisecond)
+				return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
+
+			},
+			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
+				return nil, errors.New("lookup failed")
+			},
+		}
+		_, err := dialer.DialStream(context.Background(), "dns.google:53")
+		require.NoError(t, err)
+		require.Equal(t, "[2001:4860:4860::8888]:53", dialedAddr)
+	})
+
+	t.Run("Use IPv4 if IPv6 fails", func(t *testing.T) {
+		var dialedAddr string
+		dialer := HappyEyeballsStreamDialer{
+			Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
+				dialedAddr = addr
+				return nil, nil
+			}),
+			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
+				return nil, errors.New("lookup failed")
+			},
+			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
+				time.Sleep(10 * time.Millisecond)
+				return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
+			},
+		}
+		_, err := dialer.DialStream(context.Background(), "dns.google:53")
+		require.NoError(t, err)
+		require.Equal(t, "8.8.8.8:53", dialedAddr)
+	})
+
+	t.Run("No dial if lookup fails", func(t *testing.T) {
+		var dialedAddr string
+		dialer := HappyEyeballsStreamDialer{
+			Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
+				dialedAddr = addr
+				return nil, nil
+			}),
+			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
+				return nil, errors.New("lookup failed")
+			},
+			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
+				return nil, errors.New("lookup failed")
+			},
+		}
+		_, err := dialer.DialStream(context.Background(), "dns.google:53")
+		require.Error(t, err)
+		require.Empty(t, dialedAddr)
 	})
 }
