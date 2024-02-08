@@ -172,4 +172,26 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		require.Error(t, err)
 		require.Empty(t, dialedAddr)
 	})
+
+	t.Run("Fallback to second address", func(t *testing.T) {
+		var lastDialedAddr string
+		dialer := HappyEyeballsStreamDialer{
+			Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
+				lastDialedAddr = addr
+				if addr == "[2001:4860:4860::8888]:53" {
+					return nil, errors.New("dial failed")
+				}
+				return nil, nil
+			}),
+			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
+				return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
+			},
+			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
+				return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
+			},
+		}
+		_, err := dialer.DialStream(context.Background(), "dns.google:53")
+		require.NoError(t, err)
+		require.Equal(t, "8.8.8.8:53", lastDialedAddr)
+	})
 }
