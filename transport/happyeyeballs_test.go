@@ -16,7 +16,7 @@ package transport
 
 import (
 	"context"
-	"net"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -57,13 +57,13 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 				dialedAddr = addr
 				return nil, nil
 			}),
-			LookupIPv6: func(ctx context.Context, host string) ([]net.IP, error) {
+			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
 				defer t.Log("IPv6 done")
-				return []net.IP{net.ParseIP("2001:4860:4860::8888")}, nil
+				return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
 			},
-			LookupIPv4: func(ctx context.Context, host string) ([]net.IP, error) {
+			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
 				defer t.Log("IPv4 done")
-				return []net.IP{net.ParseIP("8.8.8.8")}, nil
+				return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
 			},
 		}
 		_, err := dialer.DialStream(context.Background(), "dns.google:53")
@@ -78,12 +78,12 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 				dialedAddr = addr
 				return nil, nil
 			}),
-			LookupIPv6: func(ctx context.Context, host string) ([]net.IP, error) {
+			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
 				time.Sleep(10 * time.Millisecond)
-				return []net.IP{net.ParseIP("2001:4860:4860::8888")}, nil
+				return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
 			},
-			LookupIPv4: func(ctx context.Context, host string) ([]net.IP, error) {
-				return []net.IP{net.ParseIP("8.8.8.8")}, nil
+			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
+				return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
 			},
 		}
 		_, err := dialer.DialStream(context.Background(), "dns.google:53")
@@ -100,13 +100,13 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 				dialedAddr = addr
 				return nil, nil
 			}),
-			LookupIPv6: func(ctx context.Context, host string) ([]net.IP, error) {
+			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
 				// Make it hang.
 				<-ctx.Done()
-				return []net.IP{net.ParseIP("2001:4860:4860::8888")}, nil
+				return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
 			},
-			LookupIPv4: func(ctx context.Context, host string) ([]net.IP, error) {
-				return []net.IP{net.ParseIP("8.8.8.8")}, nil
+			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
+				return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
 			},
 		}
 		_, err := dialer.DialStream(ctx, "dns.google:53")

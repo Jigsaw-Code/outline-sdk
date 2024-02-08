@@ -41,9 +41,9 @@ type HappyEyeballsStreamDialer struct {
 	// The base dialer to establish connections. If nil, a direct TCP connection is established.
 	Dialer StreamDialer
 	// Function to map a host name to IPv6 addresses. If nil, net.DefaultResolver is used.
-	LookupIPv6 func(ctx context.Context, host string) ([]net.IP, error)
+	LookupIPv6 func(ctx context.Context, host string) ([]netip.Addr, error)
 	// Function to map a host name to IPv4 addresses. If nil, net.DefaultResolver is used.
-	LookupIPv4 func(ctx context.Context, host string) ([]net.IP, error)
+	LookupIPv4 func(ctx context.Context, host string) ([]netip.Addr, error)
 }
 
 var _ StreamDialer = (*HappyEyeballsStreamDialer)(nil)
@@ -56,41 +56,17 @@ func (d *HappyEyeballsStreamDialer) dial(ctx context.Context, addr string) (Stre
 }
 
 func (d *HappyEyeballsStreamDialer) lookupIPv4(ctx context.Context, host string) ([]netip.Addr, error) {
-	var netIPs []net.IP
-	var err error
 	if d.LookupIPv4 != nil {
-		netIPs, err = d.LookupIPv4(ctx, host)
-	} else {
-		netIPs, err = net.DefaultResolver.LookupIP(ctx, "ip4", host)
+		return d.LookupIPv4(ctx, host)
 	}
-	ips := make([]netip.Addr, 0, len(netIPs))
-	for _, netIP := range netIPs {
-		// Make sure it's a 4-byte IP, not IPv6-mapped IPv4.
-		netIP = netIP.To4()
-		if len(netIP) == 4 {
-			ips = append(ips, netip.AddrFrom4([4]byte(netIP)))
-		}
-	}
-	return ips, err
+	return net.DefaultResolver.LookupNetIP(ctx, "ip4", host)
 }
 
 func (d *HappyEyeballsStreamDialer) lookupIPv6(ctx context.Context, host string) ([]netip.Addr, error) {
-	var netIPs []net.IP
-	var err error
 	if d.LookupIPv6 != nil {
-		netIPs, err = d.LookupIPv6(ctx, host)
-	} else {
-		netIPs, err = net.DefaultResolver.LookupIP(ctx, "ip6", host)
+		return d.LookupIPv6(ctx, host)
 	}
-	ips := make([]netip.Addr, 0, len(netIPs))
-	for _, netIP := range netIPs {
-		// Make sure it's an IPv6.
-		netIP = netIP.To16()
-		if len(netIP) == 16 {
-			ips = append(ips, netip.AddrFrom16([16]byte(netIP)))
-		}
-	}
-	return ips, err
+	return net.DefaultResolver.LookupNetIP(ctx, "ip6", host)
 }
 
 func newClosedChan() <-chan struct{} {
