@@ -12,15 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/*
-Package happyeyeballs provides a simplified implementation of Happy Eyeballs v2.
-
-The Happy Eyeballs v2 algorithm ([RFC 8305]) reduces the delay in establishing connectivity
-in dual-stack (IPv4/IPv6) networks.
-
-[RFC 8305]: https://datatracker.ietf.org/doc/html/rfc8305
-*/
-package happyeyeballs
+package transport
 
 import (
 	"context"
@@ -29,37 +21,48 @@ import (
 	"net"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-internal-sdk/transport"
 )
 
-// StreamDialer is a [transport.StreamDialer] that uses HappyEyeballs v2 to establish a connection
-// to the destination address.
-type StreamDialer struct {
+/*
+HappyEyeballsStreamDialer is a [StreamDialer] that uses [Happy Eyeballs v2] to establish a connection
+to the destination address.
+
+Happy Eyeballs v2 reduces the connection delay when compared to v1, with significant differences when one of the
+address lookups times out. V1 will wait for both the IPv4 and IPv6 lookups to return before attempting connections,
+while V2 starts connections as soon as it gets a lookup result, with a slight delay if IPv4 arrives before IPv6.
+
+Go and most platforms provide V1 only, so you will benefit from using the HappyEyeballsStreamDialer in place of the
+standard dialer, even if you are not using custom transports.
+
+[Happy Eyeballs v2]: https://datatracker.ietf.org/doc/html/rfc8305
+*/
+type HappyEyeballsStreamDialer struct {
 	// The base dialer to establish connections. If nil, a direct TCP connection is established.
-	Dialer transport.StreamDialer
-	// Function to map a host name to IPv6 addresses. If nil, the system resolver is used.
+	Dialer StreamDialer
+	// Function to map a host name to IPv6 addresses. If nil, net.DefaultResolver is used.
 	LookupIPv6 func(ctx context.Context, host string) ([]net.IP, error)
-	// Function to map a host name to IPv4 addresses. If nil, the system resolver is used.
+	// Function to map a host name to IPv4 addresses. If nil, net.DefaultResolver is used.
 	LookupIPv4 func(ctx context.Context, host string) ([]net.IP, error)
 }
 
-var _ transport.StreamDialer = (*StreamDialer)(nil)
+var _ StreamDialer = (*HappyEyeballsStreamDialer)(nil)
 
-func (d *StreamDialer) dial(ctx context.Context, addr string) (transport.StreamConn, error) {
+func (d *HappyEyeballsStreamDialer) dial(ctx context.Context, addr string) (StreamConn, error) {
 	if d.Dialer != nil {
 		return d.Dialer.DialStream(ctx, addr)
 	}
-	return (&transport.TCPDialer{}).DialStream(ctx, addr)
+	return (&TCPDialer{}).DialStream(ctx, addr)
 }
 
-func (d *StreamDialer) lookupIPv4(ctx context.Context, host string) ([]net.IP, error) {
+func (d *HappyEyeballsStreamDialer) lookupIPv4(ctx context.Context, host string) ([]net.IP, error) {
 	if d.LookupIPv4 != nil {
 		return d.LookupIPv4(ctx, host)
 	}
 	return net.DefaultResolver.LookupIP(ctx, "ip4", host)
 }
 
-func (d *StreamDialer) lookupIPv6(ctx context.Context, host string) ([]net.IP, error) {
+func (d *HappyEyeballsStreamDialer) lookupIPv6(ctx context.Context, host string) ([]net.IP, error) {
 	if d.LookupIPv6 != nil {
 		return d.LookupIPv6(ctx, host)
 	}
@@ -72,8 +75,8 @@ func newClosedChan() <-chan struct{} {
 	return closedCh
 }
 
-// DialStream implements [transport.StreamDialer].
-func (d *StreamDialer) DialStream(ctx context.Context, addr string) (transport.StreamConn, error) {
+// DialStream implements [StreamDialer].
+func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string) (transport.StreamConn, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse address: %w", err)
