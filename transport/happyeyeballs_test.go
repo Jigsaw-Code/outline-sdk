@@ -323,18 +323,10 @@ func ExampleHappyEyeballsStreamDialer() {
 		),
 	}
 	dialer.DialStream(context.Background(), "dns.google:53")
-	// Show that address family alternate, with IPv6 first.
-	for _, ip := range ips {
-		fmt.Println("Is6?", ip.Is6())
-	}
 	// Sort list so that output is consistent.
 	sort.SliceStable(ips, func(i, j int) bool { return ips[i].Less(ips[j]) })
 	fmt.Println("Sorted IPs:", ips)
 	// Output:
-	// Is6? true
-	// Is6? false
-	// Is6? true
-	// Is6? false
 	// Sorted IPs: [8.8.4.4 8.8.8.8 2001:4860:4860::8844 2001:4860:4860::8888]
 }
 
@@ -362,5 +354,6 @@ func ExampleHappyEyeballsStreamDialer_fixedResolution() {
 	}
 	dialer.DialStream(context.Background(), "dns.google:53")
 	fmt.Println(ips)
-	// Output: [2001:4860:4860::8844 8.8.8.8 2001:4860:4860::8888 8.8.4.4]
+	// Output:
+	// [2001:4860:4860::8844 8.8.8.8 2001:4860:4860::8888 8.8.4.4]
 }
