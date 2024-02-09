@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -27,12 +28,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type colletcStreamDialer struct {
+type collectStreamDialer struct {
 	Dialer StreamDialer
 	Addrs  []string
 }
 
-func (d *colletcStreamDialer) DialStream(ctx context.Context, addr string) (StreamConn, error) {
+func (d *collectStreamDialer) DialStream(ctx context.Context, addr string) (StreamConn, error) {
 	d.Addrs = append(d.Addrs, addr)
 	return d.Dialer.DialStream(ctx, addr)
 }
@@ -49,7 +50,7 @@ func newErrorStreamDialer(err error) StreamDialer {
 
 func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 	t.Run("Works with IPv4 hosts", func(t *testing.T) {
-		baseDialer := colletcStreamDialer{Dialer: nilDialer}
+		baseDialer := collectStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{Dialer: &baseDialer}
 		_, err := dialer.DialStream(context.Background(), "8.8.8.8:53")
 		require.NoError(t, err)
@@ -57,7 +58,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 	})
 
 	t.Run("Works with IPv6 hosts", func(t *testing.T) {
-		baseDialer := colletcStreamDialer{Dialer: nilDialer}
+		baseDialer := collectStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{Dialer: &baseDialer}
 		_, err := dialer.DialStream(context.Background(), "[2001:4860:4860::8888]:53")
 		require.NoError(t, err)
@@ -65,7 +66,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 	})
 
 	t.Run("Prefer IPv6", func(t *testing.T) {
-		baseDialer := colletcStreamDialer{Dialer: nilDialer}
+		baseDialer := collectStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
 			Resolve: func(ctx context.Context, hostname string) <-chan HappyEyeballsResolution {
@@ -82,7 +83,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 	})
 
 	t.Run("Prefer IPv6 if there's a small delay", func(t *testing.T) {
-		baseDialer := colletcStreamDialer{Dialer: nilDialer}
+		baseDialer := collectStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
 			Resolve: NewDualStackHappyEyeballsResolver(
@@ -103,7 +104,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 	t.Run("Use IPv4 if IPv6 hangs, with fallback", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		baseDialer := colletcStreamDialer{Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
+		baseDialer := collectStreamDialer{Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
 			if addr == "8.8.8.8:53" {
 				return nil, errors.New("failed to dial")
 			}
@@ -128,7 +129,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 	})
 
 	t.Run("Use IPv6 if IPv4 fails", func(t *testing.T) {
-		baseDialer := colletcStreamDialer{Dialer: nilDialer}
+		baseDialer := collectStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
 			Resolve: NewDualStackHappyEyeballsResolver(
@@ -148,7 +149,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 	})
 
 	t.Run("Use IPv4 if IPv6 fails", func(t *testing.T) {
-		baseDialer := colletcStreamDialer{Dialer: nilDialer}
+		baseDialer := collectStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
 			Resolve: NewDualStackHappyEyeballsResolver(
@@ -167,7 +168,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 	})
 
 	t.Run("No dial if lookup fails", func(t *testing.T) {
-		baseDialer := colletcStreamDialer{Dialer: nilDialer}
+		baseDialer := collectStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
 			Resolve: NewDualStackHappyEyeballsResolver(
@@ -185,7 +186,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 	})
 
 	t.Run("No IPs returned", func(t *testing.T) {
-		baseDialer := colletcStreamDialer{Dialer: nilDialer}
+		baseDialer := collectStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
 			Resolve: NewDualStackHappyEyeballsResolver(
@@ -228,7 +229,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 
 	t.Run("IP order", func(t *testing.T) {
 		dialFailErr := errors.New("failed to dial")
-		baseDialer := colletcStreamDialer{Dialer: newErrorStreamDialer(dialFailErr)}
+		baseDialer := collectStreamDialer{Dialer: newErrorStreamDialer(dialFailErr)}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
 			Resolve: NewDualStackHappyEyeballsResolver(
@@ -258,7 +259,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		hold.Add(1)
 		defer hold.Done()
 		ctx, cancel := context.WithCancel(context.Background())
-		baseDialer := colletcStreamDialer{Dialer: nilDialer}
+		baseDialer := collectStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
 			Resolve: NewDualStackHappyEyeballsResolver(
@@ -283,7 +284,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		hold.Add(1)
 		defer hold.Done()
 		ctx, cancel := context.WithCancel(context.Background())
-		baseDialer := colletcStreamDialer{Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
+		baseDialer := collectStreamDialer{Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
 			go cancel()
 			hold.Wait()
 			return nil, nil
@@ -322,8 +323,19 @@ func ExampleHappyEyeballsStreamDialer() {
 		),
 	}
 	dialer.DialStream(context.Background(), "dns.google:53")
-	fmt.Println(ips)
-	// Output: [2001:4860:4860::8844 8.8.8.8 2001:4860:4860::8888 8.8.4.4]
+	// Show that address family alternate, with IPv6 first.
+	for _, ip := range ips {
+		fmt.Println("Is6?", ip.Is6())
+	}
+	// Sort list so that output is consistent.
+	sort.SliceStable(ips, func(i, j int) bool { return ips[i].Less(ips[j]) })
+	fmt.Println("Sorted IPs:", ips)
+	// Output:
+	// Is6? true
+	// Is6? false
+	// Is6? true
+	// Is6? false
+	// Sorted IPs: [8.8.4.4 8.8.8.8 2001:4860:4860::8844 2001:4860:4860::8888]
 }
 
 func ExampleHappyEyeballsStreamDialer_fixedResolution() {
