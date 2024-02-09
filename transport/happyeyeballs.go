@@ -37,12 +37,61 @@ standard dialer, even if you are not using custom transports.
 [Happy Eyeballs v2]: https://datatracker.ietf.org/doc/html/rfc8305
 */
 type HappyEyeballsStreamDialer struct {
-	// The base dialer to establish connections. If nil, a direct TCP connection is established.
+	// Dialer is used to establish the connection attempts. If nil, a direct TCP connection is established.
 	Dialer StreamDialer
-	// Function to map a host name to IPv6 addresses. If nil, net.DefaultResolver is used.
-	LookupIPv6 func(ctx context.Context, host string) ([]netip.Addr, error)
-	// Function to map a host name to IPv4 addresses. If nil, net.DefaultResolver is used.
-	LookupIPv4 func(ctx context.Context, host string) ([]netip.Addr, error)
+	// Resolve is a function to map a host name to IP addresses. See HappyEyeballsResolver.
+	Resolve HappyEyeballsResolver
+}
+
+// It must return a channel from where the dialer will read the resolution results.
+// It's recommended to resolve IPv6 and IPv4 in parallel, so the connection attempts
+// are started as soon as addresses are received. That's the primary benefit of Happy
+// eyeballs v2. If you resolve in series, and only send the addresses when both
+// resolutions are done, you will get behavior similar to Happy Eyeballs v1.
+// The channel must be closed when all the lookups are done. Otherwise the
+// Happy Eyeballs logic will keep waiting.
+// It's recommended to return a buffered channel with size equal to the number of
+// lookups, so that it will never block.
+// If the channel is unbuffered, you must select the write to the channel against
+// ctx.Done(), to make sure you don't write when the dial is no longer reading.
+type HappyEyeballsResolver = func(ctx context.Context, hostname string) <-chan HappyEyeballsResolution
+
+// HappyEyeballsResolution represents a result of a hostname resolution.
+// Happy Eyeballs sorts the IPs in a specific way, updating the order as
+// new results are received. It's recommended to returns all IPs you receive
+// as a group, rather than one IP at a time, since a later IP may be preferred.
+type HappyEyeballsResolution struct {
+	IPs []netip.Addr
+	Err error
+}
+
+// NewDualStackHappyEyeballsResolver creates a [HappyEyeballsResolver] that uses the given functions to resolve IPv6 and IPv4.
+// It takes care of the parallelization and coordination between the.
+func NewDualStackHappyEyeballsResolver(resolveIPv6, resolveIPv4 func(ctx context.Context, hostname string) ([]netip.Addr, error)) HappyEyeballsResolver {
+	return func(ctx context.Context, host string) <-chan HappyEyeballsResolution {
+		// Use a buffered channel with space for both lookups, to ensure the goroutines won't
+		// block on channel write if the Happy Eyeballs algorithm is cancelled and no longer reading.
+		resultsCh := make(chan HappyEyeballsResolution, 2)
+		v6DoneCh := make(chan struct{})
+		go func(hostname string) {
+			defer close(v6DoneCh)
+			ips, err := resolveIPv6(ctx, hostname)
+			if err != nil {
+				err = fmt.Errorf("failed to resolve IPv6 addresses: %w", err)
+			}
+			resultsCh <- HappyEyeballsResolution{ips, err}
+		}(host)
+		go func(hostname string) {
+			ips, err := resolveIPv4(ctx, hostname)
+			if err != nil {
+				err = fmt.Errorf("failed to resolve IPv4 addresses: %w", err)
+			}
+			resultsCh <- HappyEyeballsResolution{ips, err}
+			<-v6DoneCh
+			close(resultsCh)
+		}(host)
+		return resultsCh
+	}
 }
 
 var _ StreamDialer = (*HappyEyeballsStreamDialer)(nil)
@@ -54,20 +103,6 @@ func (d *HappyEyeballsStreamDialer) dial(ctx context.Context, addr string) (Stre
 	return (&TCPDialer{}).DialStream(ctx, addr)
 }
 
-func (d *HappyEyeballsStreamDialer) lookupIPv4(ctx context.Context, host string) ([]netip.Addr, error) {
-	if d.LookupIPv4 != nil {
-		return d.LookupIPv4(ctx, host)
-	}
-	return net.DefaultResolver.LookupNetIP(ctx, "ip4", host)
-}
-
-func (d *HappyEyeballsStreamDialer) lookupIPv6(ctx context.Context, host string) ([]netip.Addr, error) {
-	if d.LookupIPv6 != nil {
-		return d.LookupIPv6(ctx, host)
-	}
-	return net.DefaultResolver.LookupNetIP(ctx, "ip6", host)
-}
-
 func newClosedChan() <-chan struct{} {
 	closedCh := make(chan struct{})
 	close(closedCh)
@@ -76,11 +111,11 @@ func newClosedChan() <-chan struct{} {
 
 // DialStream implements [StreamDialer].
 func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string) (StreamConn, error) {
-	host, port, err := net.SplitHostPort(addr)
+	hostname, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse address: %w", err)
 	}
-	if net.ParseIP(host) != nil {
+	if net.ParseIP(hostname) != nil {
 		// Host is already an IP address, just dial the address.
 		return d.dial(ctx, addr)
 	}
@@ -89,36 +124,12 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 	ctx, dialDone := context.WithCancel(ctx)
 	defer dialDone()
 
-	// DOMAIN NAME LOOKUP SECTION
-	// We start the IPv4 and IPv6 lookups in parallel, writing to lookup4Ch
-	// and lookup6Ch when they are done.
-	type LookupResult struct {
-		IPs []netip.Addr
-		Err error
-	}
-	// Use a buffered channed with one slot per lookup to ensure they won't
-	// block on a lookupCh read in case of early cancellation.
-	lookupCh := make(chan LookupResult, 2)
-	ip6DoneCh := make(chan struct{})
-	go func(host string) {
-		defer close(ip6DoneCh)
-		ips, err := d.lookupIPv6(ctx, host)
-		if err != nil {
-			err = fmt.Errorf("failed to lookup IPv6 addresses: %w", err)
-		}
-		lookupCh <- LookupResult{ips, err}
-	}(host)
-	go func(host string) {
-		ips, err := d.lookupIPv4(ctx, host)
-		if err != nil {
-			err = fmt.Errorf("failed to lookup IPv4 addresses: %w", err)
-		}
-		lookupCh <- LookupResult{ips, err}
-		<-ip6DoneCh
-		close(lookupCh)
-	}(host)
+	// HOSTNAME RESOLUTION QUERY HANDLING
+	// https://datatracker.ietf.org/doc/html/rfc8305#section-3
+	resolutionCh := d.Resolve(ctx, hostname)
 
-	// DIAL ATTEMPTS SECTION
+	// CONNECTION ATTEMPTS
+	// https://datatracker.ietf.org/doc/html/rfc8305#section-5
 	// We keep IPv4s and IPv6 separate and track the last one attempted so we can
 	// alternate the address family in the connection attempts.
 	ip4s := make([]netip.Addr, 0, 1)
@@ -149,7 +160,7 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 			readyToDialCh = nil
 		} else {
 			// There are IPs to dial.
-			if !lastDialed.IsValid() && len(ip6s) == 0 && lookupCh != nil {
+			if !lastDialed.IsValid() && len(ip6s) == 0 && resolutionCh != nil {
 				// Attempts haven't started and IPv6 lookup is not done yet. Set up Resolution Delay, as per
 				// https://datatracker.ietf.org/doc/html/rfc8305#section-8, if it hasn't been set up yet.
 				if readyToDialCh == nil {
@@ -164,11 +175,11 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 		}
 		select {
 		// Receive lookup results.
-		case lookupRes, ok := <-lookupCh:
+		case lookupRes, ok := <-resolutionCh:
 			if !ok {
 				opsPending--
 				// Set to nil to make the read on lookupCh block and to signal lookup is done.
-				lookupCh = nil
+				resolutionCh = nil
 			}
 			if lookupRes.Err != nil {
 				lookupErr = errors.Join(lookupErr, lookupRes.Err)

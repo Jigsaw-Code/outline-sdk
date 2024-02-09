@@ -17,6 +17,8 @@ package transport
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
 	"net/netip"
 	"sync"
 	"testing"
@@ -66,11 +68,12 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		baseDialer := colletcStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
-			},
-			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
+			Resolve: func(ctx context.Context, hostname string) <-chan HappyEyeballsResolution {
+				resultsCh := make(chan HappyEyeballsResolution, 2)
+				resultsCh <- HappyEyeballsResolution{[]netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil}
+				resultsCh <- HappyEyeballsResolution{[]netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil}
+				close(resultsCh)
+				return resultsCh
 			},
 		}
 		_, err := dialer.DialStream(context.Background(), "dns.google:53")
@@ -82,13 +85,15 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		baseDialer := colletcStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				time.Sleep(10 * time.Millisecond)
-				return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
-			},
-			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
-			},
+			Resolve: NewDualStackHappyEyeballsResolver(
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					time.Sleep(10 * time.Millisecond)
+					return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
+				},
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
+				},
+			),
 		}
 		_, err := dialer.DialStream(context.Background(), "dns.google:53")
 		require.NoError(t, err)
@@ -106,14 +111,16 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		})}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				// Make it hang.
-				<-ctx.Done()
-				return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
-			},
-			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				return []netip.Addr{netip.MustParseAddr("8.8.8.8"), netip.MustParseAddr("8.8.4.4")}, nil
-			},
+			Resolve: NewDualStackHappyEyeballsResolver(
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					// Make it hang.
+					<-ctx.Done()
+					return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
+				},
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					return []netip.Addr{netip.MustParseAddr("8.8.8.8"), netip.MustParseAddr("8.8.4.4")}, nil
+				},
+			),
 		}
 		_, err := dialer.DialStream(ctx, "dns.google:53")
 		require.NoError(t, err)
@@ -124,14 +131,16 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		baseDialer := colletcStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				time.Sleep(10 * time.Millisecond)
-				return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
+			Resolve: NewDualStackHappyEyeballsResolver(
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					time.Sleep(10 * time.Millisecond)
+					return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
 
-			},
-			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				return nil, errors.New("lookup failed")
-			},
+				},
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					return nil, errors.New("lookup failed")
+				},
+			),
 		}
 		_, err := dialer.DialStream(context.Background(), "dns.google:53")
 		require.NoError(t, err)
@@ -142,13 +151,15 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		baseDialer := colletcStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				return nil, errors.New("lookup failed")
-			},
-			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				time.Sleep(10 * time.Millisecond)
-				return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
-			},
+			Resolve: NewDualStackHappyEyeballsResolver(
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					return nil, errors.New("lookup failed")
+				},
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					time.Sleep(10 * time.Millisecond)
+					return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
+				},
+			),
 		}
 		_, err := dialer.DialStream(context.Background(), "dns.google:53")
 		require.NoError(t, err)
@@ -159,12 +170,14 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		baseDialer := colletcStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				return nil, errors.New("lookup failed")
-			},
-			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				return nil, errors.New("lookup failed")
-			},
+			Resolve: NewDualStackHappyEyeballsResolver(
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					return nil, errors.New("lookup failed")
+				},
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					return nil, errors.New("lookup failed")
+				},
+			),
 		}
 		_, err := dialer.DialStream(context.Background(), "dns.google:53")
 		require.Error(t, err)
@@ -175,12 +188,14 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		baseDialer := colletcStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				return []netip.Addr{}, nil
-			},
-			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				return []netip.Addr{}, nil
-			},
+			Resolve: NewDualStackHappyEyeballsResolver(
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					return []netip.Addr{}, nil
+				},
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					return []netip.Addr{}, nil
+				},
+			),
 		}
 		_, err := dialer.DialStream(context.Background(), "dns.google:53")
 		require.Error(t, err)
@@ -197,12 +212,14 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 				}
 				return nil, nil
 			}),
-			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
-			},
-			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
-			},
+			Resolve: NewDualStackHappyEyeballsResolver(
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
+				},
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
+				},
+			),
 		}
 		_, err := dialer.DialStream(context.Background(), "dns.google:53")
 		require.NoError(t, err)
@@ -214,20 +231,22 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		baseDialer := colletcStreamDialer{Dialer: newErrorStreamDialer(dialFailErr)}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				return []netip.Addr{
-					netip.MustParseAddr("::1"),
-					netip.MustParseAddr("::2"),
-					netip.MustParseAddr("::3"),
-				}, nil
-			},
-			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				return []netip.Addr{
-					netip.MustParseAddr("1.1.1.1"),
-					netip.MustParseAddr("2.2.2.2"),
-					netip.MustParseAddr("3.3.3.3"),
-				}, nil
-			},
+			Resolve: NewDualStackHappyEyeballsResolver(
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					return []netip.Addr{
+						netip.MustParseAddr("::1"),
+						netip.MustParseAddr("::2"),
+						netip.MustParseAddr("::3"),
+					}, nil
+				},
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					return []netip.Addr{
+						netip.MustParseAddr("1.1.1.1"),
+						netip.MustParseAddr("2.2.2.2"),
+						netip.MustParseAddr("3.3.3.3"),
+					}, nil
+				},
+			),
 		}
 		_, err := dialer.DialStream(context.Background(), "dns.google:53")
 		require.ErrorIs(t, err, dialFailErr)
@@ -242,15 +261,17 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		baseDialer := colletcStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				hold.Wait()
-				return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
-			},
-			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				cancel()
-				hold.Wait()
-				return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
-			},
+			Resolve: NewDualStackHappyEyeballsResolver(
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					hold.Wait()
+					return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
+				},
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					cancel()
+					hold.Wait()
+					return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
+				},
+			),
 		}
 		_, err := dialer.DialStream(ctx, "dns.google:53")
 		require.ErrorIs(t, err, context.Canceled)
@@ -269,15 +290,65 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		})}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
-			},
-			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
-				return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
-			},
+			Resolve: NewDualStackHappyEyeballsResolver(
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
+				},
+				func(ctx context.Context, host string) ([]netip.Addr, error) {
+					return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
+				},
+			),
 		}
 		_, err := dialer.DialStream(ctx, "dns.google:53")
 		require.ErrorIs(t, err, context.Canceled)
 		require.Equal(t, []string{"[2001:4860:4860::8888]:53"}, baseDialer.Addrs)
 	})
+}
+
+func ExampleHappyEyeballsStreamDialer() {
+	ips := []netip.Addr{}
+	dialer := HappyEyeballsStreamDialer{
+		Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
+			ips = append(ips, netip.MustParseAddrPort(addr).Addr())
+			return nil, errors.New("not implemented")
+		}),
+		Resolve: NewDualStackHappyEyeballsResolver(
+			func(ctx context.Context, hostname string) ([]netip.Addr, error) {
+				return net.DefaultResolver.LookupNetIP(ctx, "ip6", hostname)
+			},
+			func(ctx context.Context, hostname string) ([]netip.Addr, error) {
+				return net.DefaultResolver.LookupNetIP(ctx, "ip4", hostname)
+			},
+		),
+	}
+	dialer.DialStream(context.Background(), "dns.google:53")
+	fmt.Println(ips)
+	// Output: [2001:4860:4860::8844 8.8.8.8 2001:4860:4860::8888 8.8.4.4]
+}
+
+func ExampleHappyEyeballsStreamDialer_fixedResolution() {
+	ips := []netip.Addr{}
+	dialer := HappyEyeballsStreamDialer{
+		Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
+			ips = append(ips, netip.MustParseAddrPort(addr).Addr())
+			return nil, errors.New("not implemented")
+		}),
+		Resolve: func(ctx context.Context, hostname string) <-chan HappyEyeballsResolution {
+			resultCh := make(chan HappyEyeballsResolution, 1)
+			resultCh <- HappyEyeballsResolution{
+				IPs: []netip.Addr{
+					netip.MustParseAddr("2001:4860:4860::8844"),
+					netip.MustParseAddr("2001:4860:4860::8888"),
+					netip.MustParseAddr("8.8.8.8"),
+					netip.MustParseAddr("8.8.4.4"),
+				},
+				Err: nil,
+			}
+			close(resultCh)
+			return resultCh
+		},
+	}
+	dialer.DialStream(context.Background(), "dns.google:53")
+	fmt.Println(ips)
+	// Output: [2001:4860:4860::8844 8.8.8.8 2001:4860:4860::8888 8.8.4.4]
 }
