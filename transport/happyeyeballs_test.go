@@ -171,6 +171,22 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		require.Empty(t, baseDialer.Addrs)
 	})
 
+	t.Run("No IPs returned", func(t *testing.T) {
+		baseDialer := colletcStreamDialer{Dialer: nilDialer}
+		dialer := HappyEyeballsStreamDialer{
+			Dialer: &baseDialer,
+			LookupIPv6: func(ctx context.Context, host string) ([]netip.Addr, error) {
+				return []netip.Addr{}, nil
+			},
+			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
+				return []netip.Addr{}, nil
+			},
+		}
+		_, err := dialer.DialStream(context.Background(), "dns.google:53")
+		require.Error(t, err)
+		require.Empty(t, baseDialer.Addrs)
+	})
+
 	t.Run("Fallback to second address", func(t *testing.T) {
 		var dialedAddrs []string
 		dialer := HappyEyeballsStreamDialer{
