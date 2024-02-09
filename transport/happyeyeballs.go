@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"sort"
 	"time"
 )
 
@@ -75,16 +74,6 @@ func newClosedChan() <-chan struct{} {
 	return closedCh
 }
 
-func mergeIPs(ipList []netip.Addr, newIPs ...netip.Addr) []netip.Addr {
-	ipList = append(ipList, newIPs...)
-	// TODO: sort IPs as per https://datatracker.ietf.org/doc/html/rfc8305#section-4
-	sort.SliceStable(ipList, func(i, j int) bool {
-		// Place IPv6 before IPv4.
-		return ipList[i].Is6() && ipList[j].Is4()
-	})
-	return ipList
-}
-
 // DialStream implements [StreamDialer].
 func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string) (StreamConn, error) {
 	host, port, err := net.SplitHostPort(addr)
@@ -97,7 +86,7 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 	}
 
 	// Indicates to attempts that the search is done, so they don't get stuck.
-	searchCtx, searchDone := context.WithCancel(context.Background())
+	searchCtx, searchDone := context.WithCancel(ctx)
 	defer searchDone()
 
 	// DOMAIN NAME LOOKUP SECTION
@@ -127,8 +116,13 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 	}(lookup4Ch, host)
 
 	// DIAL ATTEMPTS SECTION
-	// All the IPs to still attempt.
-	ips := make([]netip.Addr, 0, 2)
+	// We keep IPv4s and IPv6 separate and track the last one attempted so we can
+	// alternate the address family in the connection attempts.
+	var ip4s []netip.Addr
+	var ip6s []netip.Addr
+	var lastDialed netip.Addr
+	// Keep track of the lookup and dial errors separately. We prefer the dial errors
+	// when returning.
 	var lookupErr error
 	var dialErr error
 	type DialResult struct {
@@ -146,9 +140,11 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 	for opsPending := 2; opsPending > 0; {
 		var readyToDialCh <-chan struct{} = nil
 		// Enable dial if there are IPs available.
-		if len(ips) > 0 {
-			if lookup6Ch != nil {
-				// IPv6 lookup not done yet. Set up Resolution Delay, as per
+		if len(ip6s) > 0 {
+			readyToDialCh = dialWaitCh
+		} else if len(ip4s) > 0 {
+			if lookup6Ch != nil && !lastDialed.IsValid() {
+				// IPv6 lookup not done yet and we havent' waited for it. Set up Resolution Delay, as per
 				// https://datatracker.ietf.org/doc/html/rfc8305#section-8
 				resolutionDelayCtx, cancelResolutionDelay := context.WithTimeout(searchCtx, 50*time.Millisecond)
 				defer cancelResolutionDelay()
@@ -157,6 +153,7 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 				readyToDialCh = dialWaitCh
 			}
 		} else {
+			// No IPs. Keep dial disabled.
 			readyToDialCh = nil
 		}
 		select {
@@ -170,7 +167,8 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 				continue
 			}
 			opsPending += len(lookupRes.IPs)
-			ips = mergeIPs(ips, lookupRes.IPs...)
+			// TODO: sort IPs as per https://datatracker.ietf.org/doc/html/rfc8305#section-4
+			ip6s = lookupRes.IPs
 
 		// Receive IPv4 results.
 		case lookupRes := <-lookup4Ch:
@@ -183,13 +181,18 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 			}
 			opsPending += len(lookupRes.IPs)
 			// TODO: sort IPs as per https://datatracker.ietf.org/doc/html/rfc8305#section-4
-			ips = mergeIPs(ips, lookupRes.IPs...)
+			ip4s = lookupRes.IPs
 
 		// Wait for new attempt done. Dial new IP address.
 		case <-readyToDialCh:
-			// The len(ips) > 0 condition before the select protects this.
-			ip := ips[0]
-			ips = ips[1:]
+			var toDial netip.Addr
+			if len(ip6s) == 0 || (lastDialed.Is6() && len(ip4s) > 0) {
+				toDial = ip4s[0]
+				ip4s = ip4s[1:]
+			} else {
+				toDial = ip6s[0]
+				ip6s = ip6s[1:]
+			}
 			// Connection Attempt Delay, as per https://datatracker.ietf.org/doc/html/rfc8305#section-8
 			waitCtx, waitDone := context.WithTimeout(searchCtx, 250*time.Millisecond)
 			dialWaitCh = waitCtx.Done()
@@ -204,7 +207,8 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 					}
 				case dialCh <- DialResult{conn, err}:
 				}
-			}(net.JoinHostPort(ip.String(), port), waitDone)
+			}(net.JoinHostPort(toDial.String(), port), waitDone)
+			lastDialed = toDial
 
 		// Receive dial result.
 		case dialRes := <-dialCh:
