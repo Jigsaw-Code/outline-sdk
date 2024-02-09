@@ -125,36 +125,39 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 	// when returning.
 	var lookupErr error
 	var dialErr error
+	// Channel to wait for before a new dial attempt. It starts
+	// with a closed channel that doesn't block because there's no
+	// wait initially.
+	var attemptDelayCh <-chan struct{} = newClosedChan()
 	type DialResult struct {
 		Conn StreamConn
 		Err  error
 	}
-	// Channel to wait for before a new dial attempt. It starts
-	// with a closed channel that doesn't block because there's no
-	// wait initially.
-	var dialWaitCh <-chan struct{} = newClosedChan()
 	var dialCh = make(chan DialResult)
 
+	// Channel that triggers when a new connection can be made. Starts blocked (nil)
+	// because we need IPs first.
+	var readyToDialCh <-chan struct{} = nil
 	// We keep track of pending operations (lookups and IPs to dial) so we can stop when
 	// there's no more work to wait for.
 	for opsPending := 2; opsPending > 0; {
-		var readyToDialCh <-chan struct{} = nil
-		// Enable dial if there are IPs available.
-		if len(ip6s) > 0 {
-			readyToDialCh = dialWaitCh
-		} else if len(ip4s) > 0 {
-			if lookup6Ch != nil && !lastDialed.IsValid() {
-				// IPv6 lookup not done yet and we havent' waited for it. Set up Resolution Delay, as per
-				// https://datatracker.ietf.org/doc/html/rfc8305#section-8
-				resolutionDelayCtx, cancelResolutionDelay := context.WithTimeout(searchCtx, 50*time.Millisecond)
-				defer cancelResolutionDelay()
-				readyToDialCh = resolutionDelayCtx.Done()
-			} else {
-				readyToDialCh = dialWaitCh
-			}
-		} else {
+		if len(ip6s) == 0 && len(ip4s) == 0 {
 			// No IPs. Keep dial disabled.
 			readyToDialCh = nil
+		} else {
+			// There are IPs to dial.
+			if !lastDialed.IsValid() && len(ip6s) == 0 && lookup6Ch != nil {
+				// Attempts haven't started and IPv6 lookup is not done yet. Set up Resolution Delay, as per
+				// https://datatracker.ietf.org/doc/html/rfc8305#section-8, if it hasn't been set up yet.
+				if readyToDialCh == nil {
+					resolutionDelayCtx, cancelResolutionDelay := context.WithTimeout(searchCtx, 50*time.Millisecond)
+					defer cancelResolutionDelay()
+					readyToDialCh = resolutionDelayCtx.Done()
+				}
+			} else {
+				// Wait for the previous attempt.
+				readyToDialCh = attemptDelayCh
+			}
 		}
 		select {
 		// Receive IPv6 results.
@@ -195,7 +198,7 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 			}
 			// Connection Attempt Delay, as per https://datatracker.ietf.org/doc/html/rfc8305#section-8
 			waitCtx, waitDone := context.WithTimeout(searchCtx, 250*time.Millisecond)
-			dialWaitCh = waitCtx.Done()
+			attemptDelayCh = waitCtx.Done()
 			go func(addr string, waitDone context.CancelFunc) {
 				// Cancel the wait if the dial return early.
 				defer waitDone()
