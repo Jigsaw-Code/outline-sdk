@@ -238,6 +238,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		var hold sync.WaitGroup
 		hold.Add(1)
 		defer hold.Done()
+		ctx, cancel := context.WithCancel(context.Background())
 		baseDialer := colletcStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
@@ -246,12 +247,11 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 				return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
 			},
 			LookupIPv4: func(ctx context.Context, host string) ([]netip.Addr, error) {
+				cancel()
 				hold.Wait()
 				return []netip.Addr{netip.MustParseAddr("8.8.8.8")}, nil
 			},
 		}
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
 		_, err := dialer.DialStream(ctx, "dns.google:53")
 		require.ErrorIs(t, err, context.Canceled)
 		require.Empty(t, baseDialer.Addrs)

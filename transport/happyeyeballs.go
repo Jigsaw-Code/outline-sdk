@@ -96,30 +96,40 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 		IPs []netip.Addr
 		Err error
 	}
-	lookup6Ch := make(chan LookupResult)
-	lookup4Ch := make(chan LookupResult)
-	go func(lookup6Ch chan<- LookupResult, host string) {
+	lookupCh := make(chan LookupResult)
+	ip6DoneCh := make(chan struct{})
+	go func(host string) {
+		defer close(ip6DoneCh)
 		ips, err := d.lookupIPv6(searchCtx, host)
 		if err != nil {
 			err = fmt.Errorf("failed to lookup IPv6 addresses: %w", err)
 		}
-		lookup6Ch <- LookupResult{ips, err}
-		close(lookup6Ch)
-	}(lookup6Ch, host)
-	go func(lookup4Ch chan<- LookupResult, host string) {
+		// If the context is cancelled before the lookup is done, the lookupCh won't
+		// be read, and that would block the goroutine, leaking it.
+		// We select against the context to make sure that doesn't happen.
+		select {
+		case <-searchCtx.Done():
+		case lookupCh <- LookupResult{ips, err}:
+		}
+	}(host)
+	go func(host string) {
 		ips, err := d.lookupIPv4(searchCtx, host)
 		if err != nil {
 			err = fmt.Errorf("failed to lookup IPv4 addresses: %w", err)
 		}
-		lookup4Ch <- LookupResult{ips, err}
-		close(lookup4Ch)
-	}(lookup4Ch, host)
+		select {
+		case <-searchCtx.Done():
+		case lookupCh <- LookupResult{ips, err}:
+		}
+		<-ip6DoneCh
+		close(lookupCh)
+	}(host)
 
 	// DIAL ATTEMPTS SECTION
 	// We keep IPv4s and IPv6 separate and track the last one attempted so we can
 	// alternate the address family in the connection attempts.
-	var ip4s []netip.Addr
-	var ip6s []netip.Addr
+	ip4s := make([]netip.Addr, 0, 1)
+	ip6s := make([]netip.Addr, 0, 1)
 	var lastDialed netip.Addr
 	// Keep track of the lookup and dial errors separately. We prefer the dial errors
 	// when returning.
@@ -140,13 +150,13 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 	var readyToDialCh <-chan struct{} = nil
 	// We keep track of pending operations (lookups and IPs to dial) so we can stop when
 	// there's no more work to wait for.
-	for opsPending := 2; opsPending > 0; {
+	for opsPending := 1; opsPending > 0; {
 		if len(ip6s) == 0 && len(ip4s) == 0 {
 			// No IPs. Keep dial disabled.
 			readyToDialCh = nil
 		} else {
 			// There are IPs to dial.
-			if !lastDialed.IsValid() && len(ip6s) == 0 && lookup6Ch != nil {
+			if !lastDialed.IsValid() && len(ip6s) == 0 && lookupCh != nil {
 				// Attempts haven't started and IPv6 lookup is not done yet. Set up Resolution Delay, as per
 				// https://datatracker.ietf.org/doc/html/rfc8305#section-8, if it hasn't been set up yet.
 				if readyToDialCh == nil {
@@ -160,35 +170,31 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 			}
 		}
 		select {
-		// Receive IPv6 results.
-		case lookupRes := <-lookup6Ch:
-			opsPending--
-			// Set to nil to make the read on lookup6Ch block and to signal IPv6 lookup is done.
-			lookup6Ch = nil
+		// Receive lookup results.
+		case lookupRes, ok := <-lookupCh:
+			if !ok {
+				opsPending--
+				// Set to nil to make the read on lookupCh block and to signal lookup is done.
+				lookupCh = nil
+			}
 			if lookupRes.Err != nil {
 				lookupErr = errors.Join(lookupRes.Err)
 				continue
 			}
 			opsPending += len(lookupRes.IPs)
 			// TODO: sort IPs as per https://datatracker.ietf.org/doc/html/rfc8305#section-4
-			ip6s = lookupRes.IPs
-
-		// Receive IPv4 results.
-		case lookupRes := <-lookup4Ch:
-			opsPending--
-			// Set to nil to make the read on lookup4Ch block and to signal IPv4 lookup is done.
-			lookup4Ch = nil
-			if lookupRes.Err != nil {
-				lookupErr = errors.Join(lookupRes.Err)
-				continue
+			for _, ip := range lookupRes.IPs {
+				if ip.Is6() {
+					ip6s = append(ip6s, ip)
+				} else {
+					ip4s = append(ip4s, ip)
+				}
 			}
-			opsPending += len(lookupRes.IPs)
-			// TODO: sort IPs as per https://datatracker.ietf.org/doc/html/rfc8305#section-4
-			ip4s = lookupRes.IPs
 
-		// Wait for new attempt done. Dial new IP address.
+		// Wait for Connection Attempt Delay or attempt done.
 		case <-readyToDialCh:
 			var toDial netip.Addr
+			// Alternate between IPv6 and IPv4.
 			if len(ip6s) == 0 || (lastDialed.Is6() && len(ip4s) > 0) {
 				toDial = ip4s[0]
 				ip4s = ip4s[1:]
@@ -196,7 +202,7 @@ func (d *HappyEyeballsStreamDialer) DialStream(ctx context.Context, addr string)
 				toDial = ip6s[0]
 				ip6s = ip6s[1:]
 			}
-			// Connection Attempt Delay, as per https://datatracker.ietf.org/doc/html/rfc8305#section-8
+			// Reset Connection Attempt Delay, as per https://datatracker.ietf.org/doc/html/rfc8305#section-8
 			waitCtx, waitDone := context.WithTimeout(searchCtx, 250*time.Millisecond)
 			attemptDelayCh = waitCtx.Done()
 			go func(addr string, waitDone context.CancelFunc) {
