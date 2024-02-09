@@ -263,7 +263,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		defer hold.Done()
 		ctx, cancel := context.WithCancel(context.Background())
 		baseDialer := colletcStreamDialer{Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
-			cancel()
+			go cancel()
 			hold.Wait()
 			return nil, nil
 		})}
