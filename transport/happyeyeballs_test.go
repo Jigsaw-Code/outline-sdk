@@ -338,7 +338,7 @@ func ExampleNewDualStackHappyEyeballsResolveFunc() {
 	// [2001:4860:4860::8844 8.8.8.8 2001:4860:4860::8888 8.8.4.4]
 }
 
-func ExampleHappyEyeballsStreamDialer() {
+func ExampleHappyEyeballsStreamDialer_fixedResolution() {
 	ips := []netip.Addr{}
 	dialer := HappyEyeballsStreamDialer{
 		Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
@@ -358,6 +358,47 @@ func ExampleHappyEyeballsStreamDialer() {
 				Err: nil,
 			}
 			return resultCh
+		},
+	}
+	dialer.DialStream(context.Background(), "dns.google:53")
+	fmt.Println(ips)
+	// Output:
+	// [2001:4860:4860::8844 8.8.8.8 2001:4860:4860::8888 8.8.4.4]
+}
+
+func ExampleHappyEyeballsStreamDialer_dualStack() {
+	ips := []netip.Addr{}
+	dialer := HappyEyeballsStreamDialer{
+		Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
+			ips = append(ips, netip.MustParseAddrPort(addr).Addr())
+			return nil, errors.New("not implemented")
+		}),
+		Resolve: func(ctx context.Context, hostname string) <-chan HappyEyeballsResolution {
+			// Use a buffered channel with space for both lookups, to ensure the goroutines won't
+			// block on channel write if the Happy Eyeballs algorithm is cancelled and no longer reading.
+			resultsCh := make(chan HappyEyeballsResolution, 2)
+			v6DoneCh := make(chan struct{})
+			go func(hostname string) {
+				defer close(v6DoneCh)
+				// Add a delay to show that IPv6 is preferred.
+				time.Sleep(10 * time.Millisecond)
+				ips := []netip.Addr{
+					netip.MustParseAddr("2001:4860:4860::8844"),
+					netip.MustParseAddr("2001:4860:4860::8888"),
+				}
+				resultsCh <- HappyEyeballsResolution{ips, nil}
+			}(hostname)
+			go func(hostname string) {
+				ips := []netip.Addr{
+					netip.MustParseAddr("8.8.8.8"),
+					netip.MustParseAddr("8.8.4.4"),
+				}
+				resultsCh <- HappyEyeballsResolution{ips, nil}
+				// Wait for the IPv6 resolution before closing the channel.
+				<-v6DoneCh
+				close(resultsCh)
+			}(hostname)
+			return resultsCh
 		},
 	}
 	dialer.DialStream(context.Background(), "dns.google:53")
