@@ -512,7 +512,7 @@ func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON)
 			f.log("✅ selected resolver %v\n", result.ID)
 			// Tested all domains on this resolver. Return
 			if result.Resolver != nil {
-				return dnsextra.NewCacheResolver(result.Resolver, 100), nil
+				return result.Resolver, nil
 			} else {
 				return nil, nil
 			}
@@ -574,6 +574,16 @@ func (f *StrategyFinder) findTLS(testDomains []string, baseDialer transport.Stre
 	return nil, errors.New("could not find TLS strategy")
 }
 
+// makeFullyQualified makes the domain fully-qualified, ending on a dot (".").
+// This is useful in domain resolution to avoid ambiguity with local domains
+// and domain search.
+func makeFullyQualified(domain string) string {
+	if len(domain) > 0 && domain[len(domain)-1] == '.' {
+		return domain
+	}
+	return domain + "."
+}
+
 // NewDialer uses the config in configBytes to search for a strategy that unblocks all of the testDomains, returning a dialer with the found strategy.
 // It returns an error if no strategy was found that unblocks the testDomains.
 // The testDomains must be domains with a TLS service running on port 443.
@@ -587,7 +597,7 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 	// Make domain fully-qualified to prevent confusing domain search.
 	testDomains = append(make([]string, 0, len(testDomains)), testDomains...)
 	for di, domain := range testDomains {
-		testDomains[di] = dnsextra.MakeFullyQualified(domain)
+		testDomains[di] = makeFullyQualified(domain)
 	}
 
 	dnsRT, err := f.findDNS(testDomains, parsedConfig.DNS)
@@ -601,7 +611,8 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 		}
 		dnsDialer = f.StreamDialer
 	} else {
-		dnsDialer = dnsextra.NewStreamDialer(dnsRT, f.StreamDialer)
+		dnsRT = dnsextra.NewCacheResolver(dnsRT, 100)
+		dnsDialer = newResolverStreamDialer(dnsRT, f.StreamDialer)
 	}
 
 	if len(parsedConfig.TLS) == 0 {
