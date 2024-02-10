@@ -40,9 +40,12 @@ type HappyEyeballsStreamDialer struct {
 	// Dialer is used to establish the connection attempts. If nil, a direct TCP connection is established.
 	Dialer StreamDialer
 	// Resolve is a function to map a host name to IP addresses. See HappyEyeballsResolver.
-	Resolve HappyEyeballsResolver
+	Resolve HappyEyeballsResolve
 }
 
+// HappyEyeballsResolve is a function that returns a channel that received the
+// results of resolving the given hostname. This allows IPv6 and IPv4 resolution
+// to happen concurrently.
 // It must return a channel from where the dialer will read the resolution results.
 // It's recommended to resolve IPv6 and IPv4 in parallel, so the connection attempts
 // are started as soon as addresses are received. That's the primary benefit of Happy
@@ -54,7 +57,7 @@ type HappyEyeballsStreamDialer struct {
 // lookups, so that it will never block.
 // If the channel is unbuffered, you must select the write to the channel against
 // ctx.Done(), to make sure you don't write when the dial is no longer reading.
-type HappyEyeballsResolver = func(ctx context.Context, hostname string) <-chan HappyEyeballsResolution
+type HappyEyeballsResolve = func(ctx context.Context, hostname string) <-chan HappyEyeballsResolution
 
 // HappyEyeballsResolution represents a result of a hostname resolution.
 // Happy Eyeballs sorts the IPs in a specific way, updating the order as
@@ -65,9 +68,9 @@ type HappyEyeballsResolution struct {
 	Err error
 }
 
-// NewDualStackHappyEyeballsResolver creates a [HappyEyeballsResolver] that uses the given functions to resolve IPv6 and IPv4.
+// NewDualStackHappyEyeballsResolve creates a [HappyEyeballsResolver] that uses the given functions to resolve IPv6 and IPv4.
 // It takes care of the parallelization and coordination between the.
-func NewDualStackHappyEyeballsResolver(resolveIPv6, resolveIPv4 func(ctx context.Context, hostname string) ([]netip.Addr, error)) HappyEyeballsResolver {
+func NewDualStackHappyEyeballsResolve(resolveIPv6, resolveIPv4 func(ctx context.Context, hostname string) ([]netip.Addr, error)) HappyEyeballsResolve {
 	return func(ctx context.Context, host string) <-chan HappyEyeballsResolution {
 		// Use a buffered channel with space for both lookups, to ensure the goroutines won't
 		// block on channel write if the Happy Eyeballs algorithm is cancelled and no longer reading.
