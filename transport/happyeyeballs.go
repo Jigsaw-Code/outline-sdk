@@ -43,10 +43,9 @@ type HappyEyeballsStreamDialer struct {
 	Resolve HappyEyeballsResolve
 }
 
-// HappyEyeballsResolve is a function that returns a channel that received the
-// results of resolving the given hostname. This allows IPv6 and IPv4 resolution
-// to happen concurrently.
-// It must return a channel from where the dialer will read the resolution results.
+// HappyEyeballsResolve performs concurrent hostname resolution for [HappyEyeballsStreamDialer].
+// It should return quickly, with a channel that will have the resolution results
+// written to. Happy Eyeballs will read the resolution from the channel
 // It's recommended to resolve IPv6 and IPv4 in parallel, so the connection attempts
 // are started as soon as addresses are received. That's the primary benefit of Happy
 // eyeballs v2. If you resolve in series, and only send the addresses when both
@@ -68,7 +67,7 @@ type HappyEyeballsResolution struct {
 	Err error
 }
 
-// NewDualStackHappyEyeballsResolve creates a [HappyEyeballsResolver] that uses the given functions to resolve IPv6 and IPv4.
+// NewDualStackHappyEyeballsResolve creates a [HappyEyeballsResolve] that uses the given functions to resolve IPv6 and IPv4.
 // It takes care of the parallelization and coordination between the.
 func NewDualStackHappyEyeballsResolve(resolveIPv6, resolveIPv4 func(ctx context.Context, hostname string) ([]netip.Addr, error)) HappyEyeballsResolve {
 	return func(ctx context.Context, host string) <-chan HappyEyeballsResolution {
