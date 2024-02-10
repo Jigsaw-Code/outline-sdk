@@ -367,37 +367,57 @@ func ExampleHappyEyeballsStreamDialer_fixedResolution() {
 }
 
 func ExampleHappyEyeballsStreamDialer_dualStack() {
+	// Fixed resolutions to make the example work consistently without network access.
+	resolveIPv6 := func(ctx context.Context, hostname string) ([]netip.Addr, error) {
+		// Illustrative delay to show that IPv6 is preferred even if it arrives shortly
+		// after IPv4.
+		time.Sleep(10 * time.Millisecond)
+		return []netip.Addr{
+			netip.MustParseAddr("2001:4860:4860::8844"),
+			netip.MustParseAddr("2001:4860:4860::8888"),
+		}, nil
+	}
+	resolveIPv4 := func(ctx context.Context, hostname string) ([]netip.Addr, error) {
+		return []netip.Addr{
+			netip.MustParseAddr("8.8.8.8"),
+			netip.MustParseAddr("8.8.4.4"),
+		}, nil
+	}
+
 	ips := []netip.Addr{}
 	dialer := HappyEyeballsStreamDialer{
 		Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
 			ips = append(ips, netip.MustParseAddrPort(addr).Addr())
 			return nil, errors.New("not implemented")
 		}),
+
+		// This function mimics that created with NewDualStackHappyEyeballsResolveFunc.
 		Resolve: func(ctx context.Context, hostname string) <-chan HappyEyeballsResolution {
 			// Use a buffered channel with space for both lookups, to ensure the goroutines won't
 			// block on channel write if the Happy Eyeballs algorithm is cancelled and no longer reading.
 			resultsCh := make(chan HappyEyeballsResolution, 2)
+			// Used to tell the IPv4 goroutine that the IPv6 one is done, so we can safely
+			// close resultsCh.
 			v6DoneCh := make(chan struct{})
+
+			// Run IPv6 resolution.
 			go func(hostname string) {
+				// Notify the IPv4 goroutine that the IPv6 is done.
 				defer close(v6DoneCh)
-				// Add a delay to show that IPv6 is preferred.
-				time.Sleep(10 * time.Millisecond)
-				ips := []netip.Addr{
-					netip.MustParseAddr("2001:4860:4860::8844"),
-					netip.MustParseAddr("2001:4860:4860::8888"),
-				}
-				resultsCh <- HappyEyeballsResolution{ips, nil}
+				ips, err := resolveIPv6(ctx, hostname)
+				resultsCh <- HappyEyeballsResolution{ips, err}
 			}(hostname)
+
+			// Run IPv4 resolution.
 			go func(hostname string) {
-				ips := []netip.Addr{
-					netip.MustParseAddr("8.8.8.8"),
-					netip.MustParseAddr("8.8.4.4"),
-				}
-				resultsCh <- HappyEyeballsResolution{ips, nil}
+				ips, err := resolveIPv4(ctx, hostname)
+				resultsCh <- HappyEyeballsResolution{ips, err}
 				// Wait for the IPv6 resolution before closing the channel.
 				<-v6DoneCh
 				close(resultsCh)
 			}(hostname)
+
+			// Return the channel quickly, before resolutions are done.
 			return resultsCh
 		},
 	}

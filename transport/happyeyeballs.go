@@ -72,7 +72,7 @@ type HappyEyeballsResolution struct {
 	Err error
 }
 
-// NewDualStackHappyEyeballsResolveFunc creates a [HappyEyeballsResolve] that uses the given functions to resolve IPv6 and IPv4.
+// NewDualStackHappyEyeballsResolveFunc creates a [HappyEyeballsResolveFunc] that uses the given functions to resolve IPv6 and IPv4.
 // It takes care of creating the channel and the parallelization and coordination between the calls.
 func NewDualStackHappyEyeballsResolveFunc(resolveIPv6, resolveIPv4 func(ctx context.Context, hostname string) ([]netip.Addr, error)) HappyEyeballsResolveFunc {
 	return func(ctx context.Context, host string) <-chan HappyEyeballsResolution {
