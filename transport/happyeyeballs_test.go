@@ -304,6 +304,12 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 		require.Equal(t, []string{"[2001:4860:4860::8888]:53"}, baseDialer.Addrs)
 	})
+
+	t.Run("Bad address", func(t *testing.T) {
+		dialer := HappyEyeballsStreamDialer{Dialer: nilDialer}
+		_, err := dialer.DialStream(context.Background(), "invalid address")
+		require.Error(t, err)
+	})
 }
 
 func ExampleHappyEyeballsStreamDialer() {
