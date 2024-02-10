@@ -68,7 +68,7 @@ type HappyEyeballsResolution struct {
 }
 
 // NewDualStackHappyEyeballsResolve creates a [HappyEyeballsResolve] that uses the given functions to resolve IPv6 and IPv4.
-// It takes care of the parallelization and coordination between the.
+// It takes care of creating the channel and the parallelization and coordination between the calls.
 func NewDualStackHappyEyeballsResolve(resolveIPv6, resolveIPv4 func(ctx context.Context, hostname string) ([]netip.Addr, error)) HappyEyeballsResolve {
 	return func(ctx context.Context, host string) <-chan HappyEyeballsResolution {
 		// Use a buffered channel with space for both lookups, to ensure the goroutines won't
