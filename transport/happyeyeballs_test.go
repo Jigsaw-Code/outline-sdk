@@ -347,6 +347,7 @@ func ExampleHappyEyeballsStreamDialer() {
 		}),
 		Resolve: func(ctx context.Context, hostname string) <-chan HappyEyeballsResolution {
 			resultCh := make(chan HappyEyeballsResolution, 1)
+			defer close(resultCh)
 			resultCh <- HappyEyeballsResolution{
 				IPs: []netip.Addr{
 					netip.MustParseAddr("2001:4860:4860::8844"),
@@ -356,7 +357,6 @@ func ExampleHappyEyeballsStreamDialer() {
 				},
 				Err: nil,
 			}
-			close(resultCh)
 			return resultCh
 		},
 	}
