@@ -44,18 +44,23 @@ type HappyEyeballsStreamDialer struct {
 }
 
 // HappyEyeballsResolve performs concurrent hostname resolution for [HappyEyeballsStreamDialer].
-// It should return quickly, with a channel that will have the resolution results
-// written to. Happy Eyeballs will read the resolution from the channel
+//
+// The function should return a channel quickly, and then send the resolution results to it
+// as they become available. HappyEyeballsStreamDialer will read the resolutions from the channel.
+// The returned channel must be closed when there are no
+// more resolutions pending, to indicate that the resolution is done. If that is not
+// done, HappyEyeballsStreamDialer will keep waiting.
+//
+// It's recommended to return a buffered channel with size equal to the number of
+// lookups, so that it will never block on write.
+// If the channel is unbuffered, you must use select when writing to the channel against
+// ctx.Done(), to make sure you don't write when HappyEyeballsStreamDialer is no longer reading.
+// Othewise your goroutine will get stuck.
+//
 // It's recommended to resolve IPv6 and IPv4 in parallel, so the connection attempts
 // are started as soon as addresses are received. That's the primary benefit of Happy
-// eyeballs v2. If you resolve in series, and only send the addresses when both
+// Eyeballs v2. If you resolve in series, and only send the addresses when both
 // resolutions are done, you will get behavior similar to Happy Eyeballs v1.
-// The channel must be closed when all the lookups are done. Otherwise the
-// Happy Eyeballs logic will keep waiting.
-// It's recommended to return a buffered channel with size equal to the number of
-// lookups, so that it will never block.
-// If the channel is unbuffered, you must select the write to the channel against
-// ctx.Done(), to make sure you don't write when the dial is no longer reading.
 type HappyEyeballsResolve = func(ctx context.Context, hostname string) <-chan HappyEyeballsResolution
 
 // HappyEyeballsResolution represents a result of a hostname resolution.
