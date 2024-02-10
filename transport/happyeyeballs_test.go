@@ -18,9 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/netip"
-	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -321,19 +319,23 @@ func ExampleHappyEyeballsStreamDialer() {
 		}),
 		Resolve: NewDualStackHappyEyeballsResolver(
 			func(ctx context.Context, hostname string) ([]netip.Addr, error) {
-				return net.DefaultResolver.LookupNetIP(ctx, "ip6", hostname)
+				return []netip.Addr{
+					netip.MustParseAddr("2001:4860:4860::8844"),
+					netip.MustParseAddr("2001:4860:4860::8888"),
+				}, nil
 			},
 			func(ctx context.Context, hostname string) ([]netip.Addr, error) {
-				return net.DefaultResolver.LookupNetIP(ctx, "ip4", hostname)
+				return []netip.Addr{
+					netip.MustParseAddr("8.8.8.8"),
+					netip.MustParseAddr("8.8.4.4"),
+				}, nil
 			},
 		),
 	}
 	dialer.DialStream(context.Background(), "dns.google:53")
-	// Sort list so that output is consistent.
-	sort.SliceStable(ips, func(i, j int) bool { return ips[i].Less(ips[j]) })
-	fmt.Println("Sorted IPs:", ips)
+	fmt.Println(ips)
 	// Output:
-	// Sorted IPs: [8.8.4.4 8.8.8.8 2001:4860:4860::8844 2001:4860:4860::8888]
+	// [2001:4860:4860::8844 8.8.8.8 2001:4860:4860::8888 8.8.4.4]
 }
 
 func ExampleHappyEyeballsStreamDialer_fixedResolution() {
