@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -79,7 +80,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not create stream dialer: %v", err)
 	}
-
+	if strings.HasPrefix(*transportFlag, "ss:") {
+		innerDialer := streamDialer
+		// Hack to disable IPv6 with Shadowsocks, since it doesn't communicate connection success.
+		streamDialer = transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+			host, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+			if ip := net.ParseIP(host); ip != nil && ip.To4() == nil {
+				return nil, fmt.Errorf("IPv6 not supported")
+			}
+			return innerDialer.DialStream(ctx, addr)
+		})
+	}
 	finder := smart.StrategyFinder{
 		LogWriter:    debugLog.Writer(),
 		TestTimeout:  5 * time.Second,
