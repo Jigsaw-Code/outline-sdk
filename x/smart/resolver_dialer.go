@@ -25,61 +25,45 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 )
 
+func resolveIP(ctx context.Context, resolver dns.Resolver, rrType dnsmessage.Type, hostname string) ([]netip.Addr, error) {
+	ips := []netip.Addr{}
+	q, err := dns.NewQuestion(hostname, rrType)
+	if err != nil {
+		return nil, err
+	}
+	response, err := resolver.Query(ctx, *q)
+	if err != nil {
+		return nil, err
+	}
+	if response.RCode != dnsmessage.RCodeSuccess {
+		return nil, fmt.Errorf("got %v (%d)", response.RCode.String(), response.RCode)
+	}
+	for _, answer := range response.Answers {
+		if answer.Header.Type != rrType {
+			continue
+		}
+		if rr, ok := answer.Body.(*dnsmessage.AResource); ok {
+			ips = append(ips, netip.AddrFrom4(rr.A))
+		}
+		if rr, ok := answer.Body.(*dnsmessage.AAAAResource); ok {
+			ips = append(ips, netip.AddrFrom16(rr.AAAA))
+		}
+	}
+	if len(ips) == 0 {
+		return nil, errors.New("no ips found")
+	}
+	return ips, nil
+}
+
 func newResolverStreamDialer(resolver dns.Resolver, dialer transport.StreamDialer) transport.StreamDialer {
 	return &transport.HappyEyeballsStreamDialer{
 		Dialer: dialer,
 		Resolve: transport.NewDualStackHappyEyeballsResolveFunc(
 			func(ctx context.Context, hostname string) ([]netip.Addr, error) {
-				ips := []netip.Addr{}
-				q, err := dns.NewQuestion(hostname, dnsmessage.TypeA)
-				if err != nil {
-					return nil, err
-				}
-				response, err := resolver.Query(ctx, *q)
-				if err != nil {
-					return nil, err
-				}
-				if response.RCode != dnsmessage.RCodeSuccess {
-					return nil, fmt.Errorf("got %v (%d)", response.RCode.String(), response.RCode)
-				}
-				for _, answer := range response.Answers {
-					if answer.Header.Type != dnsmessage.TypeA {
-						continue
-					}
-					if rr, ok := answer.Body.(*dnsmessage.AResource); ok {
-						ips = append(ips, netip.AddrFrom4(rr.A))
-					}
-				}
-				if len(ips) == 0 {
-					return nil, errors.New("no ips found")
-				}
-				return ips, nil
+				return resolveIP(ctx, resolver, dnsmessage.TypeAAAA, hostname)
 			},
 			func(ctx context.Context, hostname string) ([]netip.Addr, error) {
-				ips := []netip.Addr{}
-				q, err := dns.NewQuestion(hostname, dnsmessage.TypeAAAA)
-				if err != nil {
-					return nil, err
-				}
-				response, err := resolver.Query(ctx, *q)
-				if err != nil {
-					return nil, err
-				}
-				if response.RCode != dnsmessage.RCodeSuccess {
-					return nil, fmt.Errorf("got %v (%d)", response.RCode.String(), response.RCode)
-				}
-				for _, answer := range response.Answers {
-					if answer.Header.Type != dnsmessage.TypeAAAA {
-						continue
-					}
-					if rr, ok := answer.Body.(*dnsmessage.AAAAResource); ok {
-						ips = append(ips, netip.AddrFrom16(rr.AAAA))
-					}
-				}
-				if len(ips) == 0 {
-					return nil, errors.New("no ips found")
-				}
-				return ips, nil
+				return resolveIP(ctx, resolver, dnsmessage.TypeA, hostname)
 			},
 		),
 	}
