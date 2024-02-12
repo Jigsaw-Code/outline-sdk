@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"sync/atomic"
 	"time"
 )
 
@@ -72,31 +73,32 @@ type HappyEyeballsResolution struct {
 	Err error
 }
 
-// NewDualStackHappyEyeballsResolveFunc creates a [HappyEyeballsResolveFunc] that uses the given functions to resolve IPv6 and IPv4.
+// NewParallelHappyEyeballsResolveFunc creates a [HappyEyeballsResolveFunc] that uses the given list of functions to resolve host names.
+// The given functions will all run in parallel, with results being output as they are received.
+// Typically you will pass one function for IPv6 and one for IPv4 to achieve Happy Eyballs v2 behavior.
 // It takes care of creating the channel and the parallelization and coordination between the calls.
-func NewDualStackHappyEyeballsResolveFunc(resolveIPv6, resolveIPv4 func(ctx context.Context, hostname string) ([]netip.Addr, error)) HappyEyeballsResolveFunc {
+func NewParallelHappyEyeballsResolveFunc(resolveFuncs ...func(ctx context.Context, hostname string) ([]netip.Addr, error)) HappyEyeballsResolveFunc {
 	return func(ctx context.Context, host string) <-chan HappyEyeballsResolution {
 		// Use a buffered channel with space for both lookups, to ensure the goroutines won't
 		// block on channel write if the Happy Eyeballs algorithm is cancelled and no longer reading.
-		resultsCh := make(chan HappyEyeballsResolution, 2)
-		v6DoneCh := make(chan struct{})
-		go func(hostname string) {
-			defer close(v6DoneCh)
-			ips, err := resolveIPv6(ctx, hostname)
-			if err != nil {
-				err = fmt.Errorf("failed to resolve IPv6 addresses: %w", err)
-			}
-			resultsCh <- HappyEyeballsResolution{ips, err}
-		}(host)
-		go func(hostname string) {
-			ips, err := resolveIPv4(ctx, hostname)
-			if err != nil {
-				err = fmt.Errorf("failed to resolve IPv4 addresses: %w", err)
-			}
-			resultsCh <- HappyEyeballsResolution{ips, err}
-			<-v6DoneCh
+		resultsCh := make(chan HappyEyeballsResolution, len(resolveFuncs))
+		if len(resolveFuncs) == 0 {
 			close(resultsCh)
-		}(host)
+			return resultsCh
+		}
+
+		var pending atomic.Int32
+		pending.Store(int32(len(resolveFuncs)))
+		for _, resolve := range resolveFuncs {
+			go func(resolve func(ctx context.Context, hostname string) ([]netip.Addr, error), hostname string) {
+				ips, err := resolve(ctx, hostname)
+				resultsCh <- HappyEyeballsResolution{ips, err}
+				if pending.Add(-1) == 0 {
+					// Close results channel when no other goroutine is pending.
+					close(resultsCh)
+				}
+			}(resolve, host)
+		}
 		return resultsCh
 	}
 }

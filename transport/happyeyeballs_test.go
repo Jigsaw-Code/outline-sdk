@@ -84,7 +84,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		baseDialer := collectStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			Resolve: NewDualStackHappyEyeballsResolveFunc(
+			Resolve: NewParallelHappyEyeballsResolveFunc(
 				func(ctx context.Context, host string) ([]netip.Addr, error) {
 					time.Sleep(10 * time.Millisecond)
 					return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
@@ -110,7 +110,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		})}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			Resolve: NewDualStackHappyEyeballsResolveFunc(
+			Resolve: NewParallelHappyEyeballsResolveFunc(
 				func(ctx context.Context, host string) ([]netip.Addr, error) {
 					// Make it hang.
 					<-ctx.Done()
@@ -130,7 +130,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		baseDialer := collectStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			Resolve: NewDualStackHappyEyeballsResolveFunc(
+			Resolve: NewParallelHappyEyeballsResolveFunc(
 				func(ctx context.Context, host string) ([]netip.Addr, error) {
 					time.Sleep(10 * time.Millisecond)
 					return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
@@ -150,7 +150,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		baseDialer := collectStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			Resolve: NewDualStackHappyEyeballsResolveFunc(
+			Resolve: NewParallelHappyEyeballsResolveFunc(
 				func(ctx context.Context, host string) ([]netip.Addr, error) {
 					return nil, errors.New("lookup failed")
 				},
@@ -169,7 +169,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		baseDialer := collectStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			Resolve: NewDualStackHappyEyeballsResolveFunc(
+			Resolve: NewParallelHappyEyeballsResolveFunc(
 				func(ctx context.Context, host string) ([]netip.Addr, error) {
 					return nil, errors.New("lookup failed")
 				},
@@ -187,7 +187,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		baseDialer := collectStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			Resolve: NewDualStackHappyEyeballsResolveFunc(
+			Resolve: NewParallelHappyEyeballsResolveFunc(
 				func(ctx context.Context, host string) ([]netip.Addr, error) {
 					return []netip.Addr{}, nil
 				},
@@ -211,7 +211,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 				}
 				return nil, nil
 			}),
-			Resolve: NewDualStackHappyEyeballsResolveFunc(
+			Resolve: NewParallelHappyEyeballsResolveFunc(
 				func(ctx context.Context, host string) ([]netip.Addr, error) {
 					return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
 				},
@@ -230,7 +230,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		baseDialer := collectStreamDialer{Dialer: newErrorStreamDialer(dialFailErr)}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			Resolve: NewDualStackHappyEyeballsResolveFunc(
+			Resolve: NewParallelHappyEyeballsResolveFunc(
 				func(ctx context.Context, host string) ([]netip.Addr, error) {
 					return []netip.Addr{
 						netip.MustParseAddr("::1"),
@@ -260,7 +260,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		baseDialer := collectStreamDialer{Dialer: nilDialer}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			Resolve: NewDualStackHappyEyeballsResolveFunc(
+			Resolve: NewParallelHappyEyeballsResolveFunc(
 				func(ctx context.Context, host string) ([]netip.Addr, error) {
 					hold.Wait()
 					return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
@@ -289,7 +289,7 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 		})}
 		dialer := HappyEyeballsStreamDialer{
 			Dialer: &baseDialer,
-			Resolve: NewDualStackHappyEyeballsResolveFunc(
+			Resolve: NewParallelHappyEyeballsResolveFunc(
 				func(ctx context.Context, host string) ([]netip.Addr, error) {
 					return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
 				},
@@ -310,14 +310,14 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 	})
 }
 
-func ExampleNewDualStackHappyEyeballsResolveFunc() {
+func ExampleNewParallelHappyEyeballsResolveFunc() {
 	ips := []netip.Addr{}
 	dialer := HappyEyeballsStreamDialer{
 		Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
 			ips = append(ips, netip.MustParseAddrPort(addr).Addr())
 			return nil, errors.New("not implemented")
 		}),
-		Resolve: NewDualStackHappyEyeballsResolveFunc(
+		Resolve: NewParallelHappyEyeballsResolveFunc(
 			func(ctx context.Context, hostname string) ([]netip.Addr, error) {
 				return []netip.Addr{
 					netip.MustParseAddr("2001:4860:4860::8844"),
@@ -391,7 +391,7 @@ func ExampleHappyEyeballsStreamDialer_dualStack() {
 			return nil, errors.New("not implemented")
 		}),
 
-		// This function mimics that created with NewDualStackHappyEyeballsResolveFunc.
+		// This function mimics that created with NewParallelHappyEyeballsResolveFunc.
 		Resolve: func(ctx context.Context, hostname string) <-chan HappyEyeballsResolution {
 			// Use a buffered channel with space for both lookups, to ensure the goroutines won't
 			// block on channel write if the Happy Eyeballs algorithm is cancelled and no longer reading.
