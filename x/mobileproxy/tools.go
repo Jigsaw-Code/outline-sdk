@@ -21,7 +21,6 @@
 package tools
 
 import (
-	_ "github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
 	_ "golang.org/x/mobile/cmd/gobind"
 	_ "golang.org/x/mobile/cmd/gomobile"
 )
