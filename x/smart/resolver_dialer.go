@@ -58,7 +58,7 @@ func resolveIP(ctx context.Context, resolver dns.Resolver, rrType dnsmessage.Typ
 func newResolverStreamDialer(resolver dns.Resolver, dialer transport.StreamDialer) transport.StreamDialer {
 	return &transport.HappyEyeballsStreamDialer{
 		Dialer: dialer,
-		Resolve: transport.NewDualStackHappyEyeballsResolveFunc(
+		Resolve: transport.NewParallelHappyEyeballsResolveFunc(
 			func(ctx context.Context, hostname string) ([]netip.Addr, error) {
 				return resolveIP(ctx, resolver, dnsmessage.TypeAAAA, hostname)
 			},
