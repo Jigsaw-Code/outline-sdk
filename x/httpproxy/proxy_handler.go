@@ -23,6 +23,7 @@ import (
 
 type proxyHandler struct {
 	connectHandler http.Handler
+	pathHandler    http.Handler
 	forwardHandler http.Handler
 }
 

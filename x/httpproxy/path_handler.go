@@ -14,80 +14,85 @@
 // // See the License for the specific language governing permissions and
 // // limitations under the License.
 
-// package httpproxy
+package httpproxy
 
-// import (
-// 	"context"
-// 	"fmt"
-// 	"io"
-// 	"net"
-// 	"net/http"
-// 	"strings"
+import (
+	"context"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"strings"
 
-// 	"github.com/Jigsaw-Code/outline-sdk/transport"
-// )
+	"github.com/Jigsaw-Code/outline-sdk/transport"
+)
 
-// type pathHandler struct {
-// 	client http.Client
-// }
+type pathHandler struct {
+	client http.Client
+}
 
-// var _ http.Handler = (*pathHandler)(nil)
+var _ http.Handler = (*pathHandler)(nil)
 
-// func (h *pathHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Request) {
+func (h *pathHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Request) {
+	if proxyReq.URL.Host == "" {
+		http.Error(proxyResp, "Must specify an absolute request target", http.StatusNotFound)
+		return
+	}
 
-// if strings.HasPrefix(proxyReq.URL.Path, "http://") || strings.HasPrefix(proxyReq.URL.Path, "https://") {
+	pathReqUrl, err := url.Parse(proxyReq.URL.Path)
 
-// 	pathReq := http.Request(*proxyReq)
-// 	pathReqUrl, err := url.Parse(proxyReq.URL.Path)
+	if err != nil {
+		http.Error(proxyResp, fmt.Sprintf("Invalid URL: %s", err.Error()), http.StatusInternalServerError)
+		return
+	}
 
-// 	if err != nil {
-// 		pathReq.URL = pathReqUrl
+	if pathReqUrl.Host == "" {
+		http.Error(proxyResp, "Invalid URL: path must specify a hostname", http.StatusNotFound)
+		return
+	}
 
-// 		h.forwardHandler.ServeHTTP(proxyResp, &pathReq)
-// 		return
-// 	}
-// }
+	if pathReqUrl.Scheme == "" {
+		http.Error(proxyResp, "Invalid URL: path must contain an absolute request target", http.StatusNotFound)
+		return
+	}
 
-// 	if proxyReq.URL.Host == "" {
-// 		http.Error(proxyResp, "Must specify an absolute request target", http.StatusNotFound)
-// 		return
-// 	}
-// 	// We create a new request that uses a relative path + Host header, instead of the absolute URL in the proxy request.
-// 	targetReq, err := http.NewRequestWithContext(proxyReq.Context(), proxyReq.Method, proxyReq.URL.String(), proxyReq.Body)
-// 	if err != nil {
-// 		http.Error(proxyResp, "Error creating target request", http.StatusInternalServerError)
-// 		return
-// 	}
-// 	for key, values := range proxyReq.Header {
-// 		for _, value := range values {
-// 			targetReq.Header.Add(key, value)
-// 		}
-// 	}
-// 	targetResp, err := h.client.Do(targetReq)
-// 	if err != nil {
-// 		http.Error(proxyResp, "Failed to fetch destination", http.StatusServiceUnavailable)
-// 		return
-// 	}
-// 	defer targetResp.Body.Close()
-// 	for key, values := range targetResp.Header {
-// 		for _, value := range values {
-// 			proxyResp.Header().Add(key, value)
-// 		}
-// 	}
-// 	_, err = io.Copy(proxyResp, targetResp.Body)
-// 	if err != nil {
-// 		http.Error(proxyResp, "Failed write response", http.StatusServiceUnavailable)
-// 		return
-// 	}
-// }
+	// We create a new request that uses a relative path + Host header, instead of the absolute URL in the proxy request.
+	targetReq, err := http.NewRequestWithContext(proxyReq.Context(), proxyReq.Method, pathReqUrl.String(), proxyReq.Body)
+	if err != nil {
+		http.Error(proxyResp, "Error creating target request", http.StatusInternalServerError)
+		return
+	}
+	for key, values := range proxyReq.Header {
+		for _, value := range values {
+			targetReq.Header.Add(key, value)
+		}
+	}
+	targetResp, err := h.client.Do(targetReq)
+	if err != nil {
+		http.Error(proxyResp, "Failed to fetch destination", http.StatusServiceUnavailable)
+		return
+	}
+	defer targetResp.Body.Close()
+	for key, values := range targetResp.Header {
+		for _, value := range values {
+			proxyResp.Header().Add(key, value)
+		}
+	}
+	_, err = io.Copy(proxyResp, targetResp.Body)
+	if err != nil {
+		http.Error(proxyResp, "Failed write response", http.StatusServiceUnavailable)
+		return
+	}
+}
 
-// // NewPathHandler creates a [http.Handler] that handles absolute HTTP requests using the given [http.Client].
-// func NewPathHandler(dialer transport.StreamDialer) http.Handler {
-// 	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
-// 		if !strings.HasPrefix(network, "tcp") {
-// 			return nil, fmt.Errorf("protocol not supported: %v", network)
-// 		}
-// 		return dialer.DialStream(ctx, addr)
-// 	}
-// 	return &pathHandler{http.Client{Transport: &http.Transport{DialContext: dialContext}}}
-// }
+// NewPathHandler creates a [http.Handler] that handles absolute HTTP requests using the given [http.Client].
+func NewPathHandler(dialer transport.StreamDialer) http.Handler {
+	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if !strings.HasPrefix(network, "tcp") {
+			return nil, fmt.Errorf("protocol not supported: %v", network)
+		}
+		return dialer.DialStream(ctx, addr)
+	}
+	return &pathHandler{http.Client{Transport: &http.Transport{DialContext: dialContext}}}
+}
