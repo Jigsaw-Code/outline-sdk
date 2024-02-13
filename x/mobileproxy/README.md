@@ -388,10 +388,11 @@ together.
 ```
 git clone --filter=blob:none git@github.com:Jigsaw-Code/outline-sdk
 cd outline-sdk/x/mobileproxy
+git checkout fortuna-dns
 go run github.com/go-task/task/v3/cmd/task -p -v ios+psiphon android+psiphon
 ```
 
-If you are using a specific branch of the Outline SDK, make sure to call `git checkout <branch>` after `cd mobileproxy+psiphon`.
+If you are using a different branch of the Outline SDK, make sure to change the `git checkout <branch>` as needed.
 
 The built libraries will be at `out/mobileproxy+psiphon.xcframework` and `out/mobileproxy+psiphon.aar`.
 
