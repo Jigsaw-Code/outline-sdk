@@ -6,13 +6,13 @@ This package enables the use Go Mobile to generate a mobile library to run a loc
 
 From the `x/` directory:
 
-```bash
+```sh
 go build -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
 ```
 
 ## Build the iOS and Android libraries with [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile#hdr-Build_a_library_for_Android_and_iOS)
 
-```bash
+```sh
 PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -o "$(pwd)/out/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
 PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=android -androidapi=21 -o "$(pwd)/out/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
 ```
@@ -378,6 +378,22 @@ We are working on instructions on how use the local proxy in a Webview.
 On Android, you will likely have to implement [WebViewClient.shouldInterceptRequest](https://developer.android.com/reference/android/webkit/WebViewClient#shouldInterceptRequest(android.webkit.WebView,%20android.webkit.WebResourceRequest)) to fulfill requests using an HTTP client that uses the local proxy.
 
 On iOS, we are still looking for ideas. There's [WKWebViewConfiguration.setURLSchemeHandler](https://developer.apple.com/documentation/webkit/wkwebviewconfiguration/2875766-seturlschemehandler), but the documentation says it can't be used to intercept HTTPS. If you know how to use a proxy with the WKWebView, please let us know!
+
+## Build the Mobileproxy with Psiphon included
+
+Some developers want to have both the Outline SDK and the Psiphon library in the same
+app. Because they both use Go Mobile and define shared symbols, they must be built
+together.
+
+```
+git clone --filter=blob:none git@github.com:Jigsaw-Code/outline-sdk
+cd outline-sdk/x/mobileproxy
+go run github.com/go-task/task/v3/cmd/task -p -v ios+psiphon android+psiphon
+```
+
+If you are using a specific branch of the Outline SDK, make sure to call `git checkout <branch>` after `cd mobileproxy+psiphon`.
+
+The built libraries will be at `out/mobileproxy+psiphon.xcframework` and `out/mobileproxy+psiphon.aar`.
 
 ## Clean up
 
