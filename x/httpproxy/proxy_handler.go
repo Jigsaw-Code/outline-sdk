@@ -17,7 +17,6 @@ package httpproxy
 import (
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
@@ -34,18 +33,15 @@ func (h *proxyHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.R
 		h.connectHandler.ServeHTTP(proxyResp, proxyReq)
 		return
 	}
-	if strings.HasPrefix(proxyReq.URL.Path, "http://") || strings.HasPrefix(proxyReq.URL.Path, "https://") {
-		pathReq := http.Request(*proxyReq)
+	if proxyReq.URL.Host != "" {
+
 		pathReqUrl, err := url.Parse(proxyReq.URL.Path)
 
-		if err != nil {
-			pathReq.URL = pathReqUrl
-
-			h.forwardHandler.ServeHTTP(proxyResp, &pathReq)
+		if err != nil && pathReqUrl.Scheme != "" {
+			h.pathHandler.ServeHTTP(proxyResp, proxyReq)
 			return
 		}
-	}
-	if proxyReq.URL.Host != "" {
+
 		h.forwardHandler.ServeHTTP(proxyResp, proxyReq)
 		return
 	}
@@ -56,6 +52,7 @@ func (h *proxyHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.R
 func NewProxyHandler(dialer transport.StreamDialer) http.Handler {
 	return &proxyHandler{
 		connectHandler: NewConnectHandler(dialer),
+		pathHandler:    NewPathHandler(dialer),
 		forwardHandler: NewForwardHandler(dialer),
 	}
 }
