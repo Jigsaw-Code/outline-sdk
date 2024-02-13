@@ -22,8 +22,8 @@ import (
 
 // PacketEndpoint represents an endpoint that can be used to establish packet connections (like UDP) to a fixed destination.
 type PacketEndpoint interface {
-	// Connect creates a connection bound to an endpoint, returning the connection.
-	Connect(ctx context.Context) (net.Conn, error)
+	// ConnectPacket creates a connection bound to an endpoint, returning the connection.
+	ConnectPacket(ctx context.Context) (net.Conn, error)
 }
 
 // UDPEndpoint is a [PacketEndpoint] that connects to the specified address using UDP.
@@ -37,9 +37,19 @@ type UDPEndpoint struct {
 
 var _ PacketEndpoint = (*UDPEndpoint)(nil)
 
-// Connect implements [PacketEndpoint].Connect.
-func (e UDPEndpoint) Connect(ctx context.Context) (net.Conn, error) {
+// ConnectPacket implements [PacketEndpoint].ConnectPacket.
+func (e UDPEndpoint) ConnectPacket(ctx context.Context) (net.Conn, error) {
 	return e.Dialer.DialContext(ctx, "udp", e.Address)
+}
+
+// FuncPacketEndpoint is a [PacketEndpoint] that uses the given function to connect.
+type FuncPacketEndpoint func(ctx context.Context) (net.Conn, error)
+
+var _ PacketEndpoint = (*FuncPacketEndpoint)(nil)
+
+// ConnectPacket implements the [PacketEndpoint] interface.
+func (f FuncPacketEndpoint) ConnectPacket(ctx context.Context) (net.Conn, error) {
+	return f(ctx)
 }
 
 // PacketDialerEndpoint is a [PacketEndpoint] that connects to the given address using the specified [PacketDialer].
@@ -50,28 +60,28 @@ type PacketDialerEndpoint struct {
 
 var _ PacketEndpoint = (*PacketDialerEndpoint)(nil)
 
-// Connect implements [PacketEndpoint].Connect.
-func (e *PacketDialerEndpoint) Connect(ctx context.Context) (net.Conn, error) {
-	return e.Dialer.Dial(ctx, e.Address)
+// ConnectPacket implements [PacketEndpoint].ConnectPacket.
+func (e *PacketDialerEndpoint) ConnectPacket(ctx context.Context) (net.Conn, error) {
+	return e.Dialer.DialPacket(ctx, e.Address)
 }
 
 // PacketDialer provides a way to dial a destination and establish datagram connections.
 type PacketDialer interface {
-	// Dial connects to `addr`.
+	// DialPacket connects to `addr`.
 	// `addr` has the form "host:port", where "host" can be a domain name or IP address.
-	Dial(ctx context.Context, addr string) (net.Conn, error)
+	DialPacket(ctx context.Context, addr string) (net.Conn, error)
 }
 
-// UDPPacketDialer is a [PacketDialer] that uses the standard [net.Dialer] to dial.
+// UDPDialer is a [PacketDialer] that uses the standard [net.Dialer] to dial.
 // It provides a convenient way to use a [net.Dialer] when you need a [PacketDialer].
-type UDPPacketDialer struct {
+type UDPDialer struct {
 	Dialer net.Dialer
 }
 
-var _ PacketDialer = (*UDPPacketDialer)(nil)
+var _ PacketDialer = (*UDPDialer)(nil)
 
-// Dial implements [PacketDialer].Dial.
-func (d *UDPPacketDialer) Dial(ctx context.Context, addr string) (net.Conn, error) {
+// DialPacket implements [PacketDialer].DialPacket.
+func (d *UDPDialer) DialPacket(ctx context.Context, addr string) (net.Conn, error) {
 	return d.Dialer.DialContext(ctx, "udp", addr)
 }
 
@@ -90,12 +100,12 @@ type boundPacketConn struct {
 
 var _ net.Conn = (*boundPacketConn)(nil)
 
-// Dial implements [PacketDialer].Dial.
+// DialPacket implements [PacketDialer].DialPacket.
 // The address is in "host:port" format and the host must be either a full IP address (not "[::]") or a domain.
 // The address must be supported by the WriteTo call of the [net.PacketConn] returned by the [PacketListener].
 // For example, a [net.UDPConn] only supports IP addresses, not domain names.
 // If the host is a domain name, consider pre-resolving it to avoid resolution calls.
-func (e PacketListenerDialer) Dial(ctx context.Context, address string) (net.Conn, error) {
+func (e PacketListenerDialer) DialPacket(ctx context.Context, address string) (net.Conn, error) {
 	packetConn, err := e.Listener.ListenPacket(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not create PacketConn: %w", err)
@@ -142,16 +152,26 @@ type PacketListener interface {
 	ListenPacket(ctx context.Context) (net.PacketConn, error)
 }
 
-// UDPPacketListener is a [PacketListener] that uses the standard [net.ListenConfig].ListenPacket to listen.
-type UDPPacketListener struct {
+// UDPListener is a [PacketListener] that uses the standard [net.ListenConfig].ListenPacket to listen.
+type UDPListener struct {
 	net.ListenConfig
 	// The local address to bind to, as specified in [net.ListenPacket].
 	Address string
 }
 
-var _ PacketListener = (*UDPPacketListener)(nil)
+var _ PacketListener = (*UDPListener)(nil)
 
 // ListenPacket implements [PacketListener].ListenPacket
-func (l UDPPacketListener) ListenPacket(ctx context.Context) (net.PacketConn, error) {
+func (l UDPListener) ListenPacket(ctx context.Context) (net.PacketConn, error) {
 	return l.ListenConfig.ListenPacket(ctx, "udp", l.Address)
+}
+
+// FuncPacketDialer is a [PacketDialer] that uses the given function to dial.
+type FuncPacketDialer func(ctx context.Context, addr string) (net.Conn, error)
+
+var _ PacketDialer = (*FuncPacketDialer)(nil)
+
+// DialPacket implements the [PacketDialer] interface.
+func (f FuncPacketDialer) DialPacket(ctx context.Context, addr string) (net.Conn, error) {
+	return f(ctx, addr)
 }

@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/network"
 	"github.com/Jigsaw-Code/outline-sdk/network/dnstruncate"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -51,13 +52,17 @@ func newOutlinePacketProxy(transportConfig string) (opp *outlinePacketProxy, err
 	return
 }
 
-func (proxy *outlinePacketProxy) testConnectivityAndRefresh(resolver, domain string) error {
+func (proxy *outlinePacketProxy) testConnectivityAndRefresh(resolverAddr, domain string) error {
 	dialer := transport.PacketListenerDialer{Listener: proxy.remotePl}
-	dnsResolver := &transport.PacketDialerEndpoint{Dialer: dialer, Address: resolver}
-	_, err := connectivity.TestResolverPacketConnectivity(context.Background(), dnsResolver, domain)
+	dnsResolver := dns.NewUDPResolver(dialer, resolverAddr)
+	result, err := connectivity.TestConnectivityWithResolver(context.Background(), dnsResolver, domain)
 
 	if err != nil {
-		logging.Info.Println("remote server cannot handle UDP traffic, switch to DNS truncate mode")
+		logging.Info.Printf("connectivity test failed. Refresh skipped. Error: %v\n", err)
+		return err
+	}
+	if result != nil {
+		logging.Info.Println("remote server cannot handle UDP traffic, switch to DNS truncate mode.")
 		return proxy.SetProxy(proxy.fallback)
 	} else {
 		logging.Info.Println("remote server supports UDP, we will delegate all UDP packets to it")

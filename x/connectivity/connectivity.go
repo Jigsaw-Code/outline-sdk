@@ -18,17 +18,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"syscall"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/miekg/dns"
+	"github.com/Jigsaw-Code/outline-sdk/dns"
+	"golang.org/x/net/dns/dnsmessage"
 )
 
-// TestError captures the observed error of the connectivity test.
-type TestError struct {
-	// Which operation in the test that failed: "dial", "write" or "read"
+// ConnectivityError captures the observed error of the connectivity test.
+type ConnectivityError struct {
+	// Which operation in the test that failed: "connect", "send" or "receive"
 	Op string
 	// The POSIX error, when available
 	PosixError string
@@ -36,26 +35,14 @@ type TestError struct {
 	Err error
 }
 
-var _ error = (*TestError)(nil)
+var _ error = (*ConnectivityError)(nil)
 
-func (err *TestError) Error() string {
+func (err *ConnectivityError) Error() string {
 	return fmt.Sprintf("%v: %v", err.Op, err.Err)
 }
 
-func (err *TestError) Unwrap() error {
+func (err *ConnectivityError) Unwrap() error {
 	return err.Err
-}
-
-// TestResolverStreamConnectivity uses the given [transport.StreamEndpoint] to connect to a DNS resolver and resolve the test domain.
-// The context can be used to set a timeout or deadline, or to pass values to the dialer.
-func TestResolverStreamConnectivity(ctx context.Context, resolver transport.StreamEndpoint, testDomain string) (time.Duration, error) {
-	return testResolver(ctx, resolver.Connect, testDomain)
-}
-
-// TestResolverPacketConnectivity uses the given [transport.PacketEndpoint] to connect to a DNS resolver and resolve the test domain.
-// The context can be used to set a timeout or deadline, or to pass values to the listener.
-func TestResolverPacketConnectivity(ctx context.Context, resolver transport.PacketEndpoint, testDomain string) (time.Duration, error) {
-	return testResolver(ctx, resolver.Connect, testDomain)
 }
 
 func isTimeout(err error) bool {
@@ -63,7 +50,10 @@ func isTimeout(err error) bool {
 	return errors.As(err, &timeErr) && timeErr.Timeout()
 }
 
-func makeTestError(op string, err error) error {
+func makeConnectivityError(op string, err error) *ConnectivityError {
+	// An early close on the connection may cause an "unexpected EOF" error. That's an application-layer error,
+	// not triggered by a syscall error so we don't capture an error code.
+	// TODO: figure out how to standardize on those errors.
 	var code string
 	var errno syscall.Errno
 	if errors.As(err, &errno) {
@@ -71,45 +61,39 @@ func makeTestError(op string, err error) error {
 	} else if isTimeout(err) {
 		code = "ETIMEDOUT"
 	}
-	return &TestError{Op: op, PosixError: code, Err: err}
+	return &ConnectivityError{Op: op, PosixError: code, Err: err}
 }
 
-func testResolver[C net.Conn](ctx context.Context, connect func(context.Context) (C, error), testDomain string) (time.Duration, error) {
-	deadline, ok := ctx.Deadline()
-	if !ok {
+// TestConnectivityWithResolver tests weather we can get a response from the given [Resolver]. It can be used
+// to test connectivity of its underlying [transport.StreamDialer] or [transport.PacketDialer].
+// Invalid tests that cannot assert connectivity will return (nil, error).
+// Valid tests will return (*ConnectivityError, nil), where *ConnectivityError will be nil if there's connectivity or
+// a structure with details of the error found.
+func TestConnectivityWithResolver(ctx context.Context, resolver dns.Resolver, testDomain string) (*ConnectivityError, error) {
+	if _, ok := ctx.Deadline(); !ok {
 		// Default deadline is 5 seconds.
-		deadline = time.Now().Add(5 * time.Second)
+		deadline := time.Now().Add(5 * time.Second)
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithDeadline(ctx, deadline)
 		// Releases the timer.
 		defer cancel()
 	}
-	testTime := time.Now()
-	testErr := func() error {
-		conn, dialErr := connect(ctx)
-		if dialErr != nil {
-			return makeTestError("dial", dialErr)
-		}
-		defer conn.Close()
-		conn.SetDeadline(deadline)
-		dnsConn := dns.Conn{Conn: conn}
+	q, err := dns.NewQuestion(testDomain, dnsmessage.TypeA)
+	if err != nil {
+		return nil, fmt.Errorf("question creation failed: %w", err)
+	}
 
-		var dnsRequest dns.Msg
-		dnsRequest.SetQuestion(dns.Fqdn(testDomain), dns.TypeA)
-		writeErr := dnsConn.WriteMsg(&dnsRequest)
-		if writeErr != nil {
-			return makeTestError("write", writeErr)
-		}
+	_, err = resolver.Query(ctx, *q)
 
-		_, readErr := dnsConn.ReadMsg()
-		if readErr != nil {
-			// An early close on the connection may cause a "unexpected EOF" error. That's an application-layer error,
-			// not triggered by a syscall error so we don't capture an error code.
-			// TODO: figure out how to standardize on those errors.
-			return makeTestError("read", readErr)
-		}
-		return nil
-	}()
-	duration := time.Since(testTime)
-	return duration, testErr
+	if errors.Is(err, dns.ErrBadRequest) {
+		return nil, err
+	}
+	if errors.Is(err, dns.ErrDial) {
+		return makeConnectivityError("connect", err), nil
+	} else if errors.Is(err, dns.ErrSend) {
+		return makeConnectivityError("send", err), nil
+	} else if errors.Is(err, dns.ErrReceive) {
+		return makeConnectivityError("receive", err), nil
+	}
+	return nil, nil
 }

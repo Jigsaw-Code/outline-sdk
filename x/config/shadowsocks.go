@@ -72,6 +72,65 @@ type shadowsocksConfig struct {
 }
 
 func parseShadowsocksURL(url *url.URL) (*shadowsocksConfig, error) {
+	// attempt to decode as SIP002 URI format and
+	// fall back to legacy base64 format if decoding fails
+	config, err := parseShadowsocksSIP002URL(url)
+	if err == nil {
+		return config, nil
+	}
+	return parseShadowsocksLegacyBase64URL(url)
+}
+
+// parseShadowsocksLegacyBase64URL parses URL based on legacy base64 format:
+// https://shadowsocks.org/doc/configs.html#uri-and-qr-code
+func parseShadowsocksLegacyBase64URL(url *url.URL) (*shadowsocksConfig, error) {
+	config := &shadowsocksConfig{}
+	if url.Host == "" {
+		return nil, errors.New("host not specified")
+	}
+	decoded, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(url.Host)
+	if err != nil {
+		// If decoding fails, return the original url with error
+		return nil, fmt.Errorf("failed to decode host string [%v]: %w", url.String(), err)
+	}
+	var fragment string
+	if url.Fragment != "" {
+		fragment = "#" + url.Fragment
+	} else {
+		fragment = ""
+	}
+	newURL, err := url.Parse(strings.ToLower(url.Scheme) + "://" + string(decoded) + fragment)
+	if err != nil {
+		// if parsing fails, return the original url with error
+		return nil, fmt.Errorf("failed to parse config part: %w", err)
+	}
+	// extend this check to see if decoded string contains contains other valid fields
+	if newURL.User == nil {
+		return nil, fmt.Errorf("invalid user info: %w", err)
+	}
+	cipherInfoBytes := newURL.User.String()
+	cipherName, secret, found := strings.Cut(string(cipherInfoBytes), ":")
+	if !found {
+		return nil, errors.New("invalid cipher info: no ':' separator")
+	}
+	config.serverAddress = newURL.Host
+	config.cryptoKey, err = shadowsocks.NewEncryptionKey(cipherName, secret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cipher: %w", err)
+	}
+	prefixStr := newURL.Query().Get("prefix")
+	if len(prefixStr) > 0 {
+		config.prefix, err = parseStringPrefix(prefixStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse prefix: %w", err)
+		}
+	}
+	return config, nil
+}
+
+// parseShadowsocksSIP002URL parses URL based on SIP002 format:
+// https://shadowsocks.org/doc/sip002.html
+func parseShadowsocksSIP002URL(url *url.URL) (*shadowsocksConfig, error) {
 	config := &shadowsocksConfig{}
 	if url.Host == "" {
 		return nil, errors.New("host not specified")
@@ -109,4 +168,13 @@ func parseStringPrefix(utf8Str string) ([]byte, error) {
 		rawBytes[i] = byte(r)
 	}
 	return rawBytes, nil
+}
+
+func sanitizeShadowsocksURL(u *url.URL) (string, error) {
+	const redactedPlaceholder = "REDACTED"
+	config, err := parseShadowsocksURL(u)
+	if err != nil {
+		return "ss://ERROR", err
+	}
+	return "ss://" + redactedPlaceholder + "@" + config.serverAddress + "?prefix=" + url.PathEscape(string(config.prefix)), nil
 }

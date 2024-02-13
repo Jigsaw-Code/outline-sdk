@@ -72,8 +72,8 @@ func WrapConn(c StreamConn, r io.Reader, w io.Writer) StreamConn {
 // StreamEndpoint represents an endpoint that can be used to establish stream connections (like TCP) to a fixed
 // destination.
 type StreamEndpoint interface {
-	// Connect establishes a connection with the endpoint, returning the connection.
-	Connect(ctx context.Context) (StreamConn, error)
+	// ConnectStream establishes a connection with the endpoint, returning the connection.
+	ConnectStream(ctx context.Context) (StreamConn, error)
 }
 
 // TCPEndpoint is a [StreamEndpoint] that connects to the specified address using the specified [StreamDialer].
@@ -87,13 +87,23 @@ type TCPEndpoint struct {
 
 var _ StreamEndpoint = (*TCPEndpoint)(nil)
 
-// Connect implements [StreamEndpoint].Connect.
-func (e *TCPEndpoint) Connect(ctx context.Context) (StreamConn, error) {
+// ConnectStream implements [StreamEndpoint].ConnectStream.
+func (e *TCPEndpoint) ConnectStream(ctx context.Context) (StreamConn, error) {
 	conn, err := e.Dialer.DialContext(ctx, "tcp", e.Address)
 	if err != nil {
 		return nil, err
 	}
 	return conn.(*net.TCPConn), nil
+}
+
+// FuncStreamEndpoint is a [StreamEndpoint] that uses the given function to connect.
+type FuncStreamEndpoint func(ctx context.Context) (StreamConn, error)
+
+var _ StreamEndpoint = (*FuncStreamEndpoint)(nil)
+
+// ConnectStream implements the [StreamEndpoint] interface.
+func (f FuncStreamEndpoint) ConnectStream(ctx context.Context) (StreamConn, error) {
+	return f(ctx)
 }
 
 // StreamDialerEndpoint is a [StreamEndpoint] that connects to the specified address using the specified
@@ -105,30 +115,40 @@ type StreamDialerEndpoint struct {
 
 var _ StreamEndpoint = (*StreamDialerEndpoint)(nil)
 
-// Connect implements [StreamEndpoint].Connect.
-func (e *StreamDialerEndpoint) Connect(ctx context.Context) (StreamConn, error) {
-	return e.Dialer.Dial(ctx, e.Address)
+// ConnectStream implements [StreamEndpoint].ConnectStream.
+func (e *StreamDialerEndpoint) ConnectStream(ctx context.Context) (StreamConn, error) {
+	return e.Dialer.DialStream(ctx, e.Address)
 }
 
 // StreamDialer provides a way to dial a destination and establish stream connections.
 type StreamDialer interface {
-	// Dial connects to `raddr`.
+	// DialStream connects to `raddr`.
 	// `raddr` has the form "host:port", where "host" can be a domain name or IP address.
-	Dial(ctx context.Context, raddr string) (StreamConn, error)
+	DialStream(ctx context.Context, raddr string) (StreamConn, error)
 }
 
-// TCPStreamDialer is a [StreamDialer] that uses the standard [net.Dialer] to dial.
+// TCPDialer is a [StreamDialer] that uses the standard [net.Dialer] to dial.
 // It provides a convenient way to use a [net.Dialer] when you need a [StreamDialer].
-type TCPStreamDialer struct {
+type TCPDialer struct {
 	Dialer net.Dialer
 }
 
-var _ StreamDialer = (*TCPStreamDialer)(nil)
+var _ StreamDialer = (*TCPDialer)(nil)
 
-func (d *TCPStreamDialer) Dial(ctx context.Context, addr string) (StreamConn, error) {
+func (d *TCPDialer) DialStream(ctx context.Context, addr string) (StreamConn, error) {
 	conn, err := d.Dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return nil, err
 	}
 	return conn.(*net.TCPConn), nil
+}
+
+// FuncStreamDialer is a [StreamDialer] that uses the given function to dial.
+type FuncStreamDialer func(ctx context.Context, addr string) (StreamConn, error)
+
+var _ StreamDialer = (*FuncStreamDialer)(nil)
+
+// DialStream implements the [StreamDialer] interface.
+func (f FuncStreamDialer) DialStream(ctx context.Context, addr string) (StreamConn, error) {
+	return f(ctx, addr)
 }

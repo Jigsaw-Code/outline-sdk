@@ -27,6 +27,33 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type fakeConn struct {
+	StreamConn
+}
+
+func TestFuncStreamEndpoint(t *testing.T) {
+	expectedConn := &fakeConn{}
+	expectedErr := errors.New("fake error")
+	endpoint := FuncStreamEndpoint(func(ctx context.Context) (StreamConn, error) {
+		return expectedConn, expectedErr
+	})
+	conn, err := endpoint.ConnectStream(context.Background())
+	require.Equal(t, expectedConn, conn)
+	require.Equal(t, expectedErr, err)
+}
+
+func TestFuncStreamDialer(t *testing.T) {
+	expectedConn := &fakeConn{}
+	expectedErr := errors.New("fake error")
+	dialer := FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
+		require.Equal(t, "unused", addr)
+		return expectedConn, expectedErr
+	})
+	conn, err := dialer.DialStream(context.Background(), "unused")
+	require.Equal(t, expectedConn, conn)
+	require.Equal(t, expectedErr, err)
+}
+
 func TestNewTCPStreamDialerIPv4(t *testing.T) {
 	requestText := []byte("Request")
 	responseText := []byte("Response")
@@ -65,13 +92,13 @@ func TestNewTCPStreamDialerIPv4(t *testing.T) {
 	// Client
 	go func() {
 		defer running.Done()
-		dialer := &TCPStreamDialer{}
+		dialer := &TCPDialer{}
 		dialer.Dialer.Control = func(network, address string, c syscall.RawConn) error {
 			require.Equal(t, "tcp4", network)
 			require.Equal(t, listener.Addr().String(), address)
 			return nil
 		}
-		serverConn, err := dialer.Dial(context.Background(), listener.Addr().String())
+		serverConn, err := dialer.DialStream(context.Background(), listener.Addr().String())
 		require.NoError(t, err, "Dial failed")
 		require.Equal(t, listener.Addr().String(), serverConn.RemoteAddr().String())
 		defer serverConn.Close()
@@ -93,14 +120,14 @@ func TestNewTCPStreamDialerIPv4(t *testing.T) {
 
 func TestNewTCPStreamDialerAddress(t *testing.T) {
 	errCancel := errors.New("cancelled")
-	dialer := &TCPStreamDialer{}
+	dialer := &TCPDialer{}
 
 	dialer.Dialer.Control = func(network, address string, c syscall.RawConn) error {
 		require.Equal(t, "tcp4", network)
 		require.Equal(t, "8.8.8.8:53", address)
 		return errCancel
 	}
-	_, err := dialer.Dial(context.Background(), "8.8.8.8:53")
+	_, err := dialer.DialStream(context.Background(), "8.8.8.8:53")
 	require.ErrorIs(t, err, errCancel)
 
 	dialer.Dialer.Control = func(network, address string, c syscall.RawConn) error {
@@ -108,7 +135,7 @@ func TestNewTCPStreamDialerAddress(t *testing.T) {
 		require.Equal(t, "[2001:4860:4860::8888]:53", address)
 		return errCancel
 	}
-	_, err = dialer.Dial(context.Background(), "[2001:4860:4860::8888]:53")
+	_, err = dialer.DialStream(context.Background(), "[2001:4860:4860::8888]:53")
 	require.ErrorIs(t, err, errCancel)
 }
 
@@ -123,7 +150,7 @@ func TestDialStreamEndpointAddr(t *testing.T) {
 		require.Equal(t, listener.Addr().String(), address)
 		return nil
 	}
-	conn, err := endpoint.Connect(context.Background())
+	conn, err := endpoint.ConnectStream(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, listener.Addr().String(), conn.RemoteAddr().String())
 	require.Nil(t, conn.Close())

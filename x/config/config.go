@@ -24,6 +24,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/transport/socks5"
 	"github.com/Jigsaw-Code/outline-sdk/transport/split"
+	"github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag"
 )
 
 func parseConfigPart(oneDialerConfig string) (*url.URL, error) {
@@ -31,7 +32,7 @@ func parseConfigPart(oneDialerConfig string) (*url.URL, error) {
 	if oneDialerConfig == "" {
 		return nil, errors.New("empty config part")
 	}
-	// Make it "<scheme>:" it it's only "<scheme>" to parse as a URL.
+	// Make it "<scheme>:" if it's only "<scheme>" to parse as a URL.
 	if !strings.Contains(oneDialerConfig, ":") {
 		oneDialerConfig += ":"
 	}
@@ -44,7 +45,7 @@ func parseConfigPart(oneDialerConfig string) (*url.URL, error) {
 
 // NewStreamDialer creates a new [transport.StreamDialer] according to the given config.
 func NewStreamDialer(transportConfig string) (transport.StreamDialer, error) {
-	return WrapStreamDialer(&transport.TCPStreamDialer{}, transportConfig)
+	return WrapStreamDialer(&transport.TCPDialer{}, transportConfig)
 }
 
 // WrapStreamDialer created a [transport.StreamDialer] according to transportConfig, using dialer as the
@@ -75,6 +76,9 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 
 	// Please keep scheme list sorted.
 	switch strings.ToLower(url.Scheme) {
+	case "override":
+		return newOverrideStreamDialerFromURL(innerDialer, url)
+
 	case "socks5":
 		endpoint := transport.StreamDialerEndpoint{Dialer: innerDialer, Address: url.Host}
 		return socks5.NewStreamDialer(&endpoint)
@@ -93,6 +97,14 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 	case "tls":
 		return newTlsStreamDialerFromURL(innerDialer, url)
 
+	case "tlsfrag":
+		lenStr := url.Opaque
+		fixedLen, err := strconv.Atoi(lenStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid tlsfrag option: %v. It should be in tlsfrag:<number> format", lenStr)
+		}
+		return tlsfrag.NewFixedLenStreamDialer(innerDialer, fixedLen)
+
 	default:
 		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
 	}
@@ -100,7 +112,7 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 
 // NewPacketDialer creates a new [transport.PacketDialer] according to the given config.
 func NewPacketDialer(transportConfig string) (dialer transport.PacketDialer, err error) {
-	dialer = &transport.UDPPacketDialer{}
+	dialer = &transport.UDPDialer{}
 	transportConfig = strings.TrimSpace(transportConfig)
 	if transportConfig == "" {
 		return dialer, nil
@@ -122,6 +134,9 @@ func newPacketDialerFromPart(innerDialer transport.PacketDialer, oneDialerConfig
 
 	// Please keep scheme list sorted.
 	switch strings.ToLower(url.Scheme) {
+	case "override":
+		return newOverridePacketDialerFromURL(innerDialer, url)
+
 	case "socks5":
 		return nil, errors.New("socks5 is not supported for PacketDialers")
 
@@ -161,4 +176,44 @@ func NewPacketListener(transportConfig string) (transport.PacketListener, error)
 	default:
 		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
 	}
+}
+
+func SanitizeConfig(transportConfig string) (string, error) {
+	// Do nothing if the config is empty
+	if transportConfig == "" {
+		return "", nil
+	}
+	// Split the string into parts
+	parts := strings.Split(transportConfig, "|")
+
+	// Iterate through each part
+	for i, part := range parts {
+		u, err := parseConfigPart(part)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse config part: %w", err)
+		}
+		scheme := strings.ToLower(u.Scheme)
+		switch scheme {
+		case "ss":
+			parts[i], _ = sanitizeShadowsocksURL(u)
+		case "socks5":
+			parts[i], _ = sanitizeSocks5URL(u)
+		case "override", "split", "tls", "tlsfrag":
+			// No sanitization needed
+			parts[i] = u.String()
+		default:
+			parts[i] = scheme + "://UNKNOWN"
+		}
+	}
+	// Join the parts back into a string
+	return strings.Join(parts, "|"), nil
+}
+
+func sanitizeSocks5URL(u *url.URL) (string, error) {
+	const redactedPlaceholder = "REDACTED"
+	if u.User != nil {
+		u.User = url.User(redactedPlaceholder)
+		return u.String(), nil
+	}
+	return u.String(), nil
 }

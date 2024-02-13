@@ -37,9 +37,9 @@ func NewStreamDialer(dialer transport.StreamDialer, prefixBytes int64) (transpor
 	return &splitDialer{dialer: dialer, splitPoint: prefixBytes}, nil
 }
 
-// Dial implements [transport.StreamDialer].Dial.
-func (d *splitDialer) Dial(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
-	innerConn, err := d.dialer.Dial(ctx, remoteAddr)
+// DialStream implements [transport.StreamDialer].DialStream.
+func (d *splitDialer) DialStream(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
+	innerConn, err := d.dialer.DialStream(ctx, remoteAddr)
 	if err != nil {
 		return nil, err
 	}

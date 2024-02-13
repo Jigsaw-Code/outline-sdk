@@ -15,7 +15,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -23,30 +22,31 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"strings"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
+	"github.com/Jigsaw-Code/outline-sdk/x/report"
 )
 
 var debugLog log.Logger = *log.New(io.Discard, "", 0)
 
 // var errorLog log.Logger = *log.New(os.Stderr, "[ERROR] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
-type jsonRecord struct {
+type connectivityReport struct {
 	// Inputs
 	Resolver string `json:"resolver"`
 	Proto    string `json:"proto"`
-	// TODO(fortuna): get details from trace
-	// Proxy    string `json:"proxy"`
-	// Prefix   string `json:"prefix"`
+	// TODO(fortuna): add sanitized transport config.
+	Transport string `json:"transport"`
+
 	// Observations
 	Time       time.Time  `json:"time"`
 	DurationMs int64      `json:"duration_ms"`
@@ -62,19 +62,14 @@ type errorJSON struct {
 	Msg string `json:"msg,omitempty"`
 }
 
-func makeErrorRecord(err error) *errorJSON {
-	if err == nil {
+func makeErrorRecord(result *connectivity.ConnectivityError) *errorJSON {
+	if result == nil {
 		return nil
 	}
 	var record = new(errorJSON)
-	var testErr *connectivity.TestError
-	if errors.As(err, &testErr) {
-		record.Op = testErr.Op
-		record.PosixError = testErr.PosixError
-		record.Msg = unwrapAll(testErr).Error()
-	} else {
-		record.Msg = err.Error()
-	}
+	record.Op = result.Op
+	record.PosixError = result.PosixError
+	record.Msg = unwrapAll(result.Err).Error()
 	return record
 }
 
@@ -88,35 +83,12 @@ func unwrapAll(err error) error {
 	}
 }
 
-func sendReport(record jsonRecord, collectorURL string) error {
-	jsonData, err := json.Marshal(record)
-	if err != nil {
-		log.Fatalf("Error encoding JSON: %s\n", err)
-		return err
+func (r connectivityReport) IsSuccess() bool {
+	if r.Error == nil {
+		return true
+	} else {
+		return false
 	}
-
-	req, err := http.NewRequest("POST", collectorURL, bytes.NewReader(jsonData))
-	if err != nil {
-		debugLog.Printf("Error creating the HTTP request: %s\n", err)
-		return err
-	}
-
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatalf("Error sending the HTTP request: %s\n", err)
-		return err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		debugLog.Printf("Error reading the HTTP response body: %s\n", err)
-		return err
-	}
-	debugLog.Printf("Response: %s\n", respBody)
-	return nil
 }
 
 func init() {
@@ -155,6 +127,30 @@ func main() {
 		debugLog = *log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 	}
 
+	var reportCollector report.Collector
+	if *reportToFlag != "" {
+		collectorURL, err := url.Parse(*reportToFlag)
+		if err != nil {
+			debugLog.Printf("Failed to parse collector URL: %v", err)
+		}
+		remoteCollector := &report.RemoteCollector{
+			CollectorURL: collectorURL,
+			HttpClient:   &http.Client{Timeout: 10 * time.Second},
+		}
+		retryCollector := &report.RetryCollector{
+			Collector:    remoteCollector,
+			MaxRetry:     3,
+			InitialDelay: 1 * time.Second,
+		}
+		reportCollector = &report.SamplingCollector{
+			Collector:       retryCollector,
+			SuccessFraction: *reportSuccessFlag,
+			FailureFraction: *reportFailureFlag,
+		}
+	} else {
+		reportCollector = &report.WriteCollector{Writer: os.Stdout}
+	}
+
 	// Things to test:
 	// - TCP working. Where's the error?
 	// - UDP working
@@ -170,70 +166,55 @@ func main() {
 		resolverAddress := net.JoinHostPort(resolverHost, "53")
 		for _, proto := range strings.Split(*protoFlag, ",") {
 			proto = strings.TrimSpace(proto)
-
-			testTime := time.Now()
-			var testErr error
-			var testDuration time.Duration
+			var resolver dns.Resolver
 			switch proto {
 			case "tcp":
 				streamDialer, err := config.NewStreamDialer(*transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create StreamDialer: %v", err)
 				}
-				resolver := &transport.StreamDialerEndpoint{Dialer: streamDialer, Address: resolverAddress}
-				testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, *domainFlag)
+				resolver = dns.NewTCPResolver(streamDialer, resolverAddress)
 			case "udp":
 				packetDialer, err := config.NewPacketDialer(*transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create PacketDialer: %v", err)
 				}
-				resolver := &transport.PacketDialerEndpoint{Dialer: packetDialer, Address: resolverAddress}
-				testDuration, testErr = connectivity.TestResolverPacketConnectivity(context.Background(), resolver, *domainFlag)
+				resolver = dns.NewUDPResolver(packetDialer, resolverAddress)
 			default:
 				log.Fatalf(`Invalid proto %v. Must be "tcp" or "udp"`, proto)
 			}
-			debugLog.Printf("Test error: %v", testErr)
-			if testErr == nil {
+			startTime := time.Now()
+			result, err := connectivity.TestConnectivityWithResolver(context.Background(), resolver, *domainFlag)
+			if err != nil {
+				log.Fatalf("Connectivity test failed to run: %v", err)
+			}
+			testDuration := time.Since(startTime)
+			if result == nil {
 				success = true
 			}
-			record := jsonRecord{
+			debugLog.Printf("Test %v %v result: %v", proto, resolverAddress, result)
+			sanitizedConfig, err := config.SanitizeConfig(*transportFlag)
+			if err != nil {
+				log.Fatalf("Failed to sanitize config: %v", err)
+			}
+			var r report.Report = connectivityReport{
 				Resolver: resolverAddress,
 				Proto:    proto,
-				Time:     testTime.UTC().Truncate(time.Second),
-				// TODO(fortuna): Add tracing to get more detailed info:
-				// Proxy:    proxyAddress,
-				// Prefix:   config.Prefix.String(),
+				Time:     startTime.UTC().Truncate(time.Second),
+				// TODO(fortuna): Add sanitized config:
+				Transport:  sanitizedConfig,
 				DurationMs: testDuration.Milliseconds(),
-				Error:      makeErrorRecord(testErr),
+				Error:      makeErrorRecord(result),
 			}
-			err := jsonEncoder.Encode(record)
-			if err != nil {
-				log.Fatalf("Failed to output JSON: %v", err)
-			}
-			// Send error report to collector if specified
-			if *reportToFlag != "" {
-				var samplingRate float64
-				if success {
-					samplingRate = *reportSuccessFlag
-				} else {
-					samplingRate = *reportFailureFlag
-				}
-				// Generate a random number between 0 and 1
-				random := rand.Float64()
-				if random < samplingRate {
-					err = sendReport(record, *reportToFlag)
-					if err != nil {
-						log.Fatalf("Report failed: %v", err)
-					} else {
-						fmt.Println("Report sent")
-					}
-				} else {
-					fmt.Println("Report was not sent this time")
+			if reportCollector != nil {
+				err = reportCollector.Collect(context.Background(), r)
+				if err != nil {
+					debugLog.Printf("Failed to collect report: %v\n", err)
 				}
 			}
 		}
-	}
-	if !success {
-		os.Exit(1)
+		if !success {
+			os.Exit(1)
+		}
 	}
 }

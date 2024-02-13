@@ -15,42 +15,43 @@
 package split
 
 import (
-	"errors"
 	"io"
 )
 
-type SplitWriter struct {
+type splitWriter struct {
 	writer      io.Writer
 	prefixBytes int64
 }
 
-var _ io.Writer = (*SplitWriter)(nil)
-var _ io.ReaderFrom = (*SplitWriter)(nil)
+var _ io.Writer = (*splitWriter)(nil)
+
+type splitWriterReaderFrom struct {
+	*splitWriter
+	rf io.ReaderFrom
+}
+
+var _ io.ReaderFrom = (*splitWriterReaderFrom)(nil)
 
 // NewWriter creates a [io.Writer] that ensures the byte sequence is split at prefixBytes.
 // A write will end right after byte index prefixBytes - 1, before a write starting at byte index prefixBytes.
 // For example, if you have a write of [0123456789] and prefixBytes = 3, you will get writes [012] and [3456789].
-func NewWriter(writer io.Writer, prefixBytes int64) *SplitWriter {
-	return &SplitWriter{writer, prefixBytes}
+// If the input writer is a [io.ReaderFrom], the output writer will be too.
+func NewWriter(writer io.Writer, prefixBytes int64) io.Writer {
+	sw := &splitWriter{writer, prefixBytes}
+	if rf, ok := writer.(io.ReaderFrom); ok {
+		return &splitWriterReaderFrom{sw, rf}
+	}
+	return sw
 }
 
-func (w *SplitWriter) ReadFrom(source io.Reader) (written int64, err error) {
-	if w.prefixBytes > 0 {
-		written, err = io.CopyN(w.writer, source, w.prefixBytes)
-		w.prefixBytes -= written
-		if errors.Is(err, io.EOF) {
-			return written, nil
-		}
-		if err != nil {
-			return written, err
-		}
-	}
-	n, err := io.Copy(w.writer, source)
-	written += n
+func (w *splitWriterReaderFrom) ReadFrom(source io.Reader) (int64, error) {
+	reader := io.MultiReader(io.LimitReader(source, w.prefixBytes), source)
+	written, err := w.rf.ReadFrom(reader)
+	w.prefixBytes -= written
 	return written, err
 }
 
-func (w *SplitWriter) Write(data []byte) (written int, err error) {
+func (w *splitWriter) Write(data []byte) (written int, err error) {
 	if 0 < w.prefixBytes && w.prefixBytes < int64(len(data)) {
 		written, err = w.writer.Write(data[:w.prefixBytes])
 		w.prefixBytes -= int64(written)
