@@ -2,11 +2,9 @@
 
 ## Overview
 
-This is a simple cross-platform app to test connectivity to Outline servers, using the Outline SDK. It is built with [Wails](https://wails.app/) and [Capacitor](https://capacitorjs.com/).
+This is a simple cross-platform app to test connectivity to Outline servers or test supported transports provided in the Outline SDK. It is built with [Wails](https://wails.app/) and [Capacitor](https://capacitorjs.com/).
 
-## Usage
-
-This is an example application that accepts a transport configuration (for example `shadowsocks`) as defined [here](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config) and performs DNS resolution over the specified transport using provided list of resolvers and domain name.
+The app accepts a transport configuration (for example `shadowsocks`) as defined [here](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config) and performs DNS resolution over the specified transport with the provided list of resolvers and domain name.
 
 DNS resolution is attempted over `upd` and `tcp` if both options are enabled in the app.
 
@@ -141,13 +139,13 @@ If you just want to develop ios or android, you can run `yarn watch:ios` or `yar
 
 1. **\[P1\]** read browser language on load, centralize language list, and only localize once
 1. **\[P1\]** documentation on how to generate mobile app build credentials
-1. **\[P1\]** add individual test result errors to the test result output UI
-1. **\[P2\]** use x/config to parse the access key and showcase the different transports (see: https://github.com/Jigsaw-Code/outline-sdk/blob/main/x/examples/test-connectivity/main.go)
 1. **\[P2\]** generalize request handler via generics/reflection
 1. **\[P2\]** create a logo for the app
 1. **\[P2\]** android-specific toggle CSS
 1. **\[P2\]** make backend request calls non-blocking
 1. **\[P2\]** introducing some kind of tracing into the test
+1. **\[P1\]** add mechanism to serve static assets (e.g. images) to the front-end. [This](https://wails.io/docs/guides/dynamic-assets/) is how to serve static assets in Wails. Capacitor [mounts](https://capacitorjs.com/docs/config) a webdir.
+
 
 ### Current Issues
 
