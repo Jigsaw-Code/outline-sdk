@@ -155,7 +155,7 @@ type PacketListener interface {
 // UDPListener is a [PacketListener] that uses the standard [net.ListenConfig].ListenPacket to listen.
 type UDPListener struct {
 	net.ListenConfig
-	// The local address to bind to, as specified in [net.ListenPacket].
+	// The local address to bind to, as specified in net.ListenPacket.
 	Address string
 }
 
