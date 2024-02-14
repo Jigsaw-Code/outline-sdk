@@ -35,18 +35,16 @@ func (h *proxyHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.R
 		return
 	}
 	if proxyReq.URL.Host != "" {
-
-		pathReqUrl, err := url.Parse(proxyReq.URL.Path)
-
-		if err != nil && pathReqUrl.Scheme != "" {
-			h.pathHandler.ServeHTTP(proxyResp, proxyReq)
-			return
-		}
-
 		h.forwardHandler.ServeHTTP(proxyResp, proxyReq)
 		return
 	}
-	http.Error(proxyResp, "Not Found", http.StatusNotFound)
+
+	pathReqUrl, err := url.Parse(proxyReq.URL.Path)
+
+	if err != nil && pathReqUrl.Scheme != "" {
+		h.pathHandler.ServeHTTP(proxyResp, proxyReq)
+		return
+	}
 }
 
 // NewProxyHandler creates a [http.Handler] that works as a web proxy using the given dialer to deach the destination.
