@@ -26,6 +26,7 @@ tasks:
 
   ios+psiphon:
     desc: "Builds the iOS mobileproxy.xcframework library with Psiphon"
+    # See https://github.com/Psiphon-Labs/psiphon-tunnel-core/blob/master/MobileLibrary/iOS/build-psiphon-framework.sh
     deps: [gomobile]
     dir: "mobileproxy+psiphon"
     cmds:
