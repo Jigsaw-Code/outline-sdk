@@ -108,7 +108,7 @@ func main() {
 	// Use a buffer to read the response body
 	buf := new(bytes.Buffer)
 
-	written, err = io.Copy(buf, resp.Body)
+	written, err := io.Copy(buf, resp.Body)
 	fmt.Println()
 	if err != nil {
 		log.Fatalf("Read of page body failed: %v\n", err)
