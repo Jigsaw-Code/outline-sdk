@@ -35,7 +35,7 @@ export class InfoPopup extends LitElement {
     <div @click="${this.showPopover}" popovertarget="my-popover" popovertargetaction="show">ℹ️</div>
     <div popover="auto" class="popup" id="my-popover">
       <span @click="${this.closePopover}" class="close-button" popovertargetaction="hide">&times;</span>
-      ${unsafeHTML(this.popupText)}
+      <slot></slot>
     </div>
     `;
   }
