@@ -396,6 +396,8 @@ If you are using a different branch of the Outline SDK, make sure to change the 
 
 The built libraries will be at `out/mobileproxy+psiphon.xcframework` and `out/mobileproxy+psiphon.aar`.
 
+Keep in mind that this build doesn't include Psiphon's convenience [Java](https://github.com/Psiphon-Labs/psiphon-tunnel-core/blob/master/MobileLibrary/Android/PsiphonTunnel/PsiphonTunnel.java) and [Objective-C](https://github.com/Psiphon-Labs/psiphon-tunnel-core/blob/master/MobileLibrary/iOS/PsiphonTunnel/PsiphonTunnel/PsiphonTunnel.h) wrappers. You will need to call the Go Mobile-generated code based on their [Go API](https://pkg.go.dev/github.com/Psiphon-Labs/psiphon-tunnel-core/MobileLibrary/psi).
+
 ## Clean up
 
 ```bash

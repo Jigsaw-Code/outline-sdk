@@ -15,7 +15,7 @@ require (
 	filippo.io/bigmod v0.0.1 // indirect
 	filippo.io/keygen v0.0.0-20230306160926-5201437acf8e // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
-	github.com/Jigsaw-Code/outline-sdk v0.0.11 // indirect
+	github.com/Jigsaw-Code/outline-sdk v0.0.13-0.20240212211908-de32e39b12e5 // indirect
 	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/Psiphon-Labs/bolt v0.0.0-20200624191537-23cedaef7ad7 // indirect
 	github.com/Psiphon-Labs/goptlib v0.0.0-20200406165125-c0e32a7a3464 // indirect

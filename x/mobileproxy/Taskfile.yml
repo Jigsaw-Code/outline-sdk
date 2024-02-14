@@ -31,7 +31,13 @@ tasks:
     cmds:
       - |-
         PATH="{{.OUT_DIR}}:$PATH" gomobile bind \
-            -tags PSIPHON_DISABLE_QUIC -ldflags='-s -w' \
+            -tags PSIPHON_DISABLE_QUIC \
+            -ldflags="-s -w
+                -X github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/buildinfo.buildRepo=github.com/Jigsaw-Code/outline-sdk
+                -X github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/buildinfo.buildDate={{now | date "2006-01-02T15:04:05-07:00"}}
+                -X github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/buildinfo.buildRev=$(git rev-parse --short HEAD)
+                -X github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/buildinfo.goVersion=$(go version | cut -d " " -f 3)
+            " \
             -target=ios -iosversion=11.0 \
             -o "{{.OUT_DIR}}/mobileproxy+psiphon.xcframework" \
             github.com/Jigsaw-Code/outline-sdk/x/mobileproxy github.com/Psiphon-Labs/psiphon-tunnel-core/MobileLibrary/psi
@@ -49,12 +55,19 @@ tasks:
 
   android+psiphon:
     desc: "Builds the Android mobileproxy.aar library with Psiphon"
+    # See https://github.com/Psiphon-Labs/psiphon-tunnel-core/blob/master/MobileLibrary/Android/make.bash
     deps: [gomobile]
     dir: "mobileproxy+psiphon"
     cmds:
       - |-
         PATH="{{.OUT_DIR}}:$PATH" gomobile bind \
-            -tags PSIPHON_DISABLE_QUIC -ldflags='-s -w' \
+            -tags PSIPHON_DISABLE_QUIC \
+            -ldflags="-s -w
+                -X github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/buildinfo.buildRepo=github.com/Jigsaw-Code/outline-sdk
+                -X github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/buildinfo.buildDate={{now | date "2006-01-02T15:04:05-07:00"}}
+                -X github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/buildinfo.buildRev=$(git rev-parse --short HEAD)
+                -X github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/buildinfo.goVersion=$(go version | cut -d " " -f 3)
+            " \
             -target=android -androidapi=21 \
             -o "{{.OUT_DIR}}/mobileproxy+psiphon.aar" \
             github.com/Jigsaw-Code/outline-sdk/x/mobileproxy github.com/Psiphon-Labs/psiphon-tunnel-core/MobileLibrary/psi
