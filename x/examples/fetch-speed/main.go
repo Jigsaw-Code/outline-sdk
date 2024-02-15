@@ -1,4 +1,4 @@
-// Copyright 2023 Jigsaw Operations LLC
+// Copyright 2024 Jigsaw Operations LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -105,23 +104,19 @@ func main() {
 	}
 	defer resp.Body.Close()
 
-	// Use a buffer to read the response body
-	buf := new(bytes.Buffer)
-
-	written, err := io.Copy(buf, resp.Body)
+	written, err := io.Copy(io.Discard, resp.Body)
 	fmt.Println()
 	if err != nil {
 		log.Fatalf("Read of page body failed: %v\n", err)
 	}
 
 	// Calculate the download speed
-	endTime := time.Now()
-	duration := endTime.Sub(startTime).Seconds()
-	downloadSpeed := float64(written) / duration
+	durationSeconds := time.Since(startTime).Seconds()
+	downloadSpeed := float64(written) / durationSeconds
 
 	writtenMB := float64(written) / 1048576
 
-	fmt.Printf("\nDownloaded %.2f MB in %.2fs\n", writtenMB, duration)
+	fmt.Printf("\nDownloaded %.2f MiB in %.2fs\n", writtenMB, durationSeconds)
 	fmt.Printf("\nDownloaded Speed: %.2f MB/s\n", downloadSpeed/1048576)
 
 	if *verboseFlag {
