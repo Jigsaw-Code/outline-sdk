@@ -98,7 +98,7 @@ To integrate the SDK into a mobile app, follow these steps:
 
 > **Note**: You must use `gomobile bind` on the package you create, not directly on the SDK packages.
 
-An easy way to integrate with the SDK in a mobile app is by using the [`x/mobileproxy` library](./x/mobileproxy/) 
+An easy way to integrate with the SDK in a mobile app is by using the [`x/mobileproxy` library](./x/mobileproxy/)
 to run a local web proxy that you can use to configure your app's networking libraries.
 
 ### Side Service
@@ -163,7 +163,7 @@ The [`fetch` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examp
 a URL, similar to `curl`. The example below would bypass blocking of `meduza.io` in Russia:
 
 ```console
-$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch@latest -transport "override:host=cloudflare.net|tlsfrag:1" -method HEAD -v https://meduza.io/ 
+$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch@latest -transport "override:host=cloudflare.net|tlsfrag:1" -method HEAD -v https://meduza.io/
 [DEBUG] 2023/12/28 18:44:56.490836 main.go:105: Cf-Ray: [83cdac8ecdccc40e-EWR]
 [DEBUG] 2023/12/28 18:44:56.491231 main.go:105: Alt-Svc: [h3=":443"; ma=86400]
 [DEBUG] 2023/12/28 18:44:56.491237 main.go:105: Date: [Thu, 28 Dec 2023 23:44:56 GMT]
@@ -196,7 +196,7 @@ Using the proxy with `curl`:
 $ curl -p -x http://localhost:8080 https://meduza.io --head
 HTTP/1.1 200 Connection established
 
-HTTP/2 200 
+HTTP/2 200
 date: Thu, 28 Dec 2023 23:51:01 GMT
 content-type: text/html; charset=utf-8
 strict-transport-security: max-age=31536000; includeSubDomains; preload
@@ -221,4 +221,17 @@ $ go run github.com/Jigsaw-Code/outline-sdk/x/examples/test-connectivity@latest 
 {"resolver":"[2001:4860:4860::8888]:53","proto":"tcp","time":"2023-12-28T23:57:45Z","duration_ms":31,"error":null}
 {"resolver":"[2001:4860:4860::8888]:53","proto":"udp","time":"2023-12-28T23:57:45Z","duration_ms":16,"error":null}
 success
+```
+
+### Speed Test
+
+The [`fetch-speed` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examples/fetch-speed) fetches
+a URL, similar to `curl` and calculates the download speed. It could be used for troubleshooting.
+
+```console
+$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch@latest -transport ss://[redacted]@[redacted]:80 http://speedtest.ftp.otenet.gr/files/test10Mb.db
+
+Downloaded 10.00 MB in 1.78s
+
+Downloaded Speed: 5.61 MB/s
 ```
