@@ -112,12 +112,13 @@ func main() {
 
 	// Calculate the download speed
 	durationSeconds := time.Since(startTime).Seconds()
-	downloadSpeed := float64(written) / durationSeconds
 
-	writtenMB := float64(written) / 1048576
+	// Convert Downloaded size to MiB
+	writtenMiB := float64(written) / 1048576
+	downloadSpeed := writtenMiB / durationSeconds
 
-	fmt.Printf("\nDownloaded %.2f MiB in %.2fs\n", writtenMB, durationSeconds)
-	fmt.Printf("\nDownloaded Speed: %.2f MB/s\n", downloadSpeed/1048576)
+	fmt.Printf("\nDownloaded %.2f MiB in %.2fs\n", writtenMiB, durationSeconds)
+	fmt.Printf("\nDownloaded Speed: %.2f MiB/s\n", downloadSpeed)
 
 	if *verboseFlag {
 		for k, v := range resp.Header {
