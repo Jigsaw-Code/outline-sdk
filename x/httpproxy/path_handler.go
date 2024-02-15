@@ -33,29 +33,25 @@ type pathHandler struct {
 var _ http.Handler = (*pathHandler)(nil)
 
 func (h *pathHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Request) {
-	pathReqString := strings.TrimPrefix(proxyReq.URL.Path, "/")
-
-	if pathReqString == "" {
+	requestPath := strings.TrimPrefix(proxyReq.URL.Path, "/")
+	if requestPath == "" {
 		http.Error(proxyResp, "Empty path", http.StatusBadRequest)
 		return
 	}
-
-	pathReqUrl, err := url.Parse(pathReqString)
-
+	targetURL, err := url.Parse(requestPath)
 	if err != nil {
-		http.Error(proxyResp, "Invalid path", http.StatusBadRequest)
+		http.Error(proxyResp, "Invalid target URL", http.StatusBadRequest)
 		return
 	}
-
-	// We create a new request that uses a relative path + Host header, instead of the absolute URL in the proxy request.
-	targetReq, err := http.NewRequestWithContext(proxyReq.Context(), proxyReq.Method, pathReqUrl.String(), proxyReq.Body)
+	// We create a new request that uses the path of the proxy request.
+	targetReq, err := http.NewRequestWithContext(proxyReq.Context(), proxyReq.Method, targetURL.String(), proxyReq.Body)
 	if err != nil {
 		http.Error(proxyResp, "Error creating target request", http.StatusInternalServerError)
 		return
 	}
 	for key, values := range proxyReq.Header {
 		for _, value := range values {
-			// host header is set by the http client
+			// Host header is set by the HTTP client in client.Do.
 			targetReq.Header.Add(key, value)
 		}
 	}
@@ -70,6 +66,7 @@ func (h *pathHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Re
 			proxyResp.Header().Add(key, value)
 		}
 	}
+	proxyResp.WriteHeader(targetResp.StatusCode)
 	_, err = io.Copy(proxyResp, targetResp.Body)
 	if err != nil {
 		http.Error(proxyResp, "Failed write response", http.StatusServiceUnavailable)
@@ -77,7 +74,7 @@ func (h *pathHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Re
 	}
 }
 
-// NewPathHandler creates a [http.Handler] that handles absolute HTTP requests using the given [http.Client].
+// NewPathHandler creates a [http.Handler] that resolves the URL path as an absolute URL using the given [http.Client].
 func NewPathHandler(dialer transport.StreamDialer) http.Handler {
 	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
 		if !strings.HasPrefix(network, "tcp") {
