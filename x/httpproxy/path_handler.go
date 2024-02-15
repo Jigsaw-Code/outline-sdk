@@ -33,20 +33,17 @@ type pathHandler struct {
 var _ http.Handler = (*pathHandler)(nil)
 
 func (h *pathHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Request) {
-	pathReqUrl, err := url.Parse(proxyReq.URL.Path[1:])
+	pathReqString := strings.TrimPrefix(proxyReq.URL.Path, "/")
+
+	if pathReqString == "" {
+		http.Error(proxyResp, "Empty path", http.StatusBadRequest)
+		return
+	}
+
+	pathReqUrl, err := url.Parse(pathReqString)
 
 	if err != nil {
-		http.Error(proxyResp, fmt.Sprintf("Invalid URL: %s", err.Error()), http.StatusInternalServerError)
-		return
-	}
-
-	if pathReqUrl.Host == "" {
-		http.Error(proxyResp, "Invalid URL: path must specify a hostname", http.StatusNotFound)
-		return
-	}
-
-	if pathReqUrl.Scheme == "" {
-		http.Error(proxyResp, "Invalid URL: path must contain an absolute request target", http.StatusNotFound)
+		http.Error(proxyResp, "Invalid path", http.StatusBadRequest)
 		return
 	}
 
@@ -58,6 +55,7 @@ func (h *pathHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Re
 	}
 	for key, values := range proxyReq.Header {
 		for _, value := range values {
+			// host header is set by the http client
 			targetReq.Header.Add(key, value)
 		}
 	}

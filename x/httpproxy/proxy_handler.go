@@ -16,7 +16,6 @@ package httpproxy
 
 import (
 	"net/http"
-	"net/url"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
@@ -38,13 +37,7 @@ func (h *proxyHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.R
 		h.forwardHandler.ServeHTTP(proxyResp, proxyReq)
 		return
 	}
-
-	pathReqUrl, err := url.Parse(proxyReq.URL.Path)
-
-	if err != nil && pathReqUrl.Scheme != "" {
-		h.pathHandler.ServeHTTP(proxyResp, proxyReq)
-		return
-	}
+	h.pathHandler.ServeHTTP(proxyResp, proxyReq)
 }
 
 // NewProxyHandler creates a [http.Handler] that works as a web proxy using the given dialer to deach the destination.
