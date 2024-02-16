@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"image/color"
 	"net"
 	"strings"
@@ -72,18 +73,7 @@ func makeAppHeader(title string) *fyne.Container {
 	return container.NewStack(canvas.NewRectangle(bgColor), titleLabel)
 }
 
-func main() {
-	fyneApp := app.New()
-	if meta := fyneApp.Metadata(); meta.Name == "" {
-		// App not packaged, probably from `go run`.
-		meta.Name = "Net Tools"
-		app.SetMetadata(meta)
-	}
-	fyneApp.Settings().SetTheme(&customTheme{theme.DefaultTheme()})
-
-	mainWin := fyneApp.NewWindow(fyneApp.Metadata().Name)
-	mainWin.Resize(fyne.Size{Width: 350})
-
+func NewDnsApp() fyne.CanvasObject {
 	domainEntry := widget.NewEntry()
 	domainEntry.SetPlaceHolder("Enter domain name to lookup")
 	domainEntry.Text = "www.example.com."
@@ -134,23 +124,70 @@ func main() {
 		}
 	}
 
-	content := container.NewVBox(
-		makeAppHeader(fyneApp.Metadata().Name),
-		container.NewPadded(
-			container.NewVBox(
-				widget.NewLabelWithStyle("Domain", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-				container.NewBorder(nil, nil, nil, lookupButton, domainEntry),
-				&widget.Separator{},
-				widget.NewLabelWithStyle("A", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-				aBox,
-				widget.NewLabelWithStyle("AAAA", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-				aaaaBox,
-				widget.NewLabelWithStyle("CNAME", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-				cnameBox,
-			),
+	return container.NewPadded(
+		container.NewVBox(
+			widget.NewLabelWithStyle("Domain", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+			container.NewBorder(nil, nil, nil, lookupButton, domainEntry),
+			&widget.Separator{},
+			widget.NewLabelWithStyle("A", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+			aBox,
+			widget.NewLabelWithStyle("AAAA", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+			aaaaBox,
+			widget.NewLabelWithStyle("CNAME", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+			cnameBox,
 		),
 	)
-	mainWin.SetContent(content)
+}
+
+func NewInterfacesApp() fyne.CanvasObject {
+	box := container.NewVBox()
+	lookupButton := widget.NewButton("Refresh", func() {})
+	lookupButton.Importance = widget.HighImportance
+
+	// This doesn't actually work on Android:
+	// https://github.com/golang/go/issues/40569
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		ifsBox := widget.NewLabel("")
+		ifsBox.Wrapping = fyne.TextWrapWord
+		ifsBox.TextStyle.Monospace = true
+		ifsBox.SetText("❌ " + err.Error())
+		box.Add(ifsBox)
+	} else {
+		for _, iface := range ifaces {
+			addrs, _ := iface.Addrs()
+			box.Add(widget.NewLabelWithStyle(iface.Name, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
+			info := widget.NewLabel(fmt.Sprintf("MTU:%v mac:%v %v\nIPs:%v", iface.MTU, iface.HardwareAddr, iface.Flags, addrs))
+			info.Wrapping = fyne.TextWrapWord
+			info.TextStyle.Monospace = true
+			box.Add(info)
+		}
+	}
+	return container.NewVScroll(container.NewPadded(box))
+}
+
+func main() {
+	fyneApp := app.New()
+	if meta := fyneApp.Metadata(); meta.Name == "" {
+		// App not packaged, probably from `go run`.
+		meta.Name = "Net Tools"
+		app.SetMetadata(meta)
+	}
+	fyneApp.Settings().SetTheme(&customTheme{theme.DefaultTheme()})
+
+	mainWin := fyneApp.NewWindow(fyneApp.Metadata().Name)
+	mainWin.Resize(fyne.Size{Width: 350})
+
+	tabs := container.NewAppTabs(
+		container.NewTabItem("DNS", NewDnsApp()),
+		container.NewTabItem("Interfaces", NewInterfacesApp()),
+	)
+	tabs.SetTabLocation(container.TabLocationBottom)
+	appContent := container.NewVBox(
+		makeAppHeader(fyneApp.Metadata().Name),
+		tabs,
+	)
+	mainWin.SetContent(appContent)
 	mainWin.Show()
 	fyneApp.Run()
 }
