@@ -32,6 +32,17 @@ use GitHub pull requests for this purpose. Consult
 [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
 information on using pull requests.
 
+# Go Documentation
+
+The best way to ensure you got the Go doc formatting right is to visualize it.
+To visualize the Go documentation you wrote, run:
+
+```sh
+go run golang.org/x/pkgsite/cmd/pkgsite@latest
+```
+
+Then open http://localhost:8080 on your browser.
+
 # Cross-platform Development
 
 ## Building
