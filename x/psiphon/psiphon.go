@@ -39,7 +39,7 @@ func (d *PsiphonDialer) Close() {
 	d.cancel()
 }
 
-func NewStreamDialer(configJSON string) (*PsiphonDialer, error) {
+func NewStreamDialer(configJSON []byte) (*PsiphonDialer, error) {
 	config, err := psi.LoadConfig([]byte(configJSON))
 	if err != nil {
 		return nil, err
