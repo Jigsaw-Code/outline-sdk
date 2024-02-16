@@ -16,6 +16,7 @@ package psiphon
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -42,11 +43,15 @@ func (d *PsiphonDialer) Close() {
 func NewStreamDialer(configJSON []byte) (*PsiphonDialer, error) {
 	config, err := psi.LoadConfig([]byte(configJSON))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("config load failed: %w", err)
+	}
+	err = config.Commit(false)
+	if err != nil {
+		return nil, fmt.Errorf("config commit failed: %w", err)
 	}
 	controller, err := psi.NewController(config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("controller creation failed: %w", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	controller.Run(ctx)

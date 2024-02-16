@@ -28,6 +28,10 @@ func LoadConfig(configJSON []byte) (*Config, error) {
 	return nil, errors.New("not available")
 }
 
+func (config *Config) Commit(migrateFromLegacyFields bool) error {
+	return errors.New("not available")
+}
+
 func NewController(config *Config) (controller *Controller, err error) {
 	return nil, errors.New("not available")
 }
