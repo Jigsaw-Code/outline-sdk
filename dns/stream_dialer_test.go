@@ -51,9 +51,20 @@ func TestNewStreamDialer(t *testing.T) {
 		addrs = append(addrs, addr)
 		return nil, errors.New("not implemented")
 	})
-	dialer := NewStreamDialer(resolver, baseDialer)
+	dialer, err := NewStreamDialer(resolver, baseDialer)
+	require.NoError(t, err)
 	conn, err := dialer.DialStream(context.Background(), "localhost:8080")
 	require.Error(t, err)
 	require.Nil(t, conn)
 	require.Equal(t, []string{"[::1]:8080", "127.0.0.1:8080"}, addrs)
+}
+
+func TestNewStreamDialer_NoResolver(t *testing.T) {
+	_, err := NewStreamDialer(nil, &transport.TCPDialer{})
+	require.Error(t, err)
+}
+
+func TestNewStreamDialer_NoDialer(t *testing.T) {
+	_, err := NewStreamDialer(FuncResolver(nil), nil)
+	require.Error(t, err)
 }
