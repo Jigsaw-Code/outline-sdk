@@ -2,6 +2,8 @@ module github.com/Jigsaw-Code/outline-sdk/x
 
 go 1.20
 
+replace github.com/Psiphon-Labs/psiphon-tunnel-core => ./psiphon/stub
+
 require (
 	github.com/Jigsaw-Code/outline-sdk v0.0.15
 	github.com/songgao/water v0.0.0-20190725173103-fd331bda3f4b
