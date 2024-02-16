@@ -54,7 +54,7 @@ func NewStreamDialer(configJSON []byte) (*PsiphonDialer, error) {
 		return nil, fmt.Errorf("controller creation failed: %w", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	controller.Run(ctx)
+	go controller.Run(ctx)
 	return &PsiphonDialer{cancel, controller}, nil
 }
 
