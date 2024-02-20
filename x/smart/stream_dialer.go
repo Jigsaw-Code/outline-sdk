@@ -363,78 +363,89 @@ func newClosedChanel() <-chan struct{} {
 	return ch
 }
 
-func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON) (dns.Resolver, error) {
-	resolvers, err := f.dnsConfigToResolver(dnsConfig)
-	if err != nil {
-		return nil, err
-	}
+// raceTests races will call the test function on each entry until it finds an entry for which the test returns nil.
+// That entry is returned. A test is only started after the previous test finished or maxWait is done, whichever
+// happens first. That way you bound the wait for a test, and they may overlap.
+func raceTests[E any](ctx context.Context, maxWait time.Duration, entries []*E, test func(entry *E) error) (*E, error) {
 	type testResult struct {
-		Resolver *smartResolver
-		Err      error
+		Entry *E
+		Err   error
 	}
 	// Communicates the result of each test.
-	resultChan := make(chan testResult, len(resolvers))
-	// Indicates to tests that the search is done, so they don't get stuck writing to the results channel that will no longer be read.
-	searchCtx, searchDone := context.WithCancel(context.Background())
-	defer searchDone()
-	// Used to space out each test. The initial value is done because there's no wait needed.
+	resultChan := make(chan testResult, len(entries))
 	waitCh := newClosedChanel()
-	nextResolver := 0
-	for resolversToTest := len(resolvers); resolversToTest > 0; {
+
+	next := 0
+	for toTest := len(entries); toTest > 0; {
 		select {
 		// Ready to start testing another resolver.
 		case <-waitCh:
-			resolver := resolvers[nextResolver]
-			nextResolver++
+			entry := entries[next]
+			next++
 
-			waitCtx, waitDone := context.WithTimeout(searchCtx, 250*time.Millisecond)
-			if nextResolver == len(resolvers) {
-				// Done with resolvers. No longer trigger on waitCh.
+			waitCtx, waitDone := context.WithTimeout(ctx, 250*time.Millisecond)
+			if next == len(entries) {
+				// Done with entries. No longer trigger on waitCh.
 				waitCh = nil
 			} else {
 				waitCh = waitCtx.Done()
 			}
 
-			go func(resolver *smartResolver, testDone context.CancelFunc) {
+			go func(entry *E, testDone context.CancelFunc) {
 				defer testDone()
-				for _, testDomain := range testDomains {
-					select {
-					case <-searchCtx.Done():
-						return
-					default:
-					}
-
-					f.log("🏃 run dns: %v (domain: %v)\n", resolver.ID, testDomain)
-					startTime := time.Now()
-					ips, err := f.testDNSResolver(searchCtx, resolver, testDomain)
-					duration := time.Since(startTime)
-
-					status := "ok ✅"
-					if err != nil {
-						status = fmt.Sprintf("%v ❌", err)
-					}
-					f.log("🏁 got dns: %v (domain: %v), duration=%v, ips=%v, status=%v\n", resolver.ID, testDomain, duration, ips, status)
-
-					if err != nil {
-						resultChan <- testResult{Resolver: resolver, Err: err}
-						return
-					}
-				}
-				resultChan <- testResult{Resolver: resolver, Err: nil}
-			}(resolver, waitDone)
+				err := test(entry)
+				resultChan <- testResult{Entry: entry, Err: err}
+			}(entry, waitDone)
 
 		case result := <-resultChan:
-			resolversToTest--
-			// Process the result of a test.
+			toTest--
 			if result.Err != nil {
 				continue
 			}
-			f.log("✅ selected resolver %v\n", result.Resolver.ID)
-			// Tested all domains on this resolver. Unwrap and return.
-			return result.Resolver.Resolver, nil
+			return result.Entry, nil
 		}
 	}
-	return nil, errors.New("could not find working resolver")
+	return nil, errors.New("all tests failed")
+}
+
+func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON) (dns.Resolver, error) {
+	resolvers, err := f.dnsConfigToResolver(dnsConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, searchDone := context.WithCancel(context.Background())
+	defer searchDone()
+	resolver, err := raceTests[smartResolver](ctx, 250*time.Millisecond, resolvers, func(resolver *smartResolver) error {
+		for _, testDomain := range testDomains {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+
+			f.log("🏃 run dns: %v (domain: %v)\n", resolver.ID, testDomain)
+			startTime := time.Now()
+			ips, err := f.testDNSResolver(ctx, resolver, testDomain)
+			duration := time.Since(startTime)
+
+			status := "ok ✅"
+			if err != nil {
+				status = fmt.Sprintf("%v ❌", err)
+			}
+			f.log("🏁 got dns: %v (domain: %v), duration=%v, ips=%v, status=%v\n", resolver.ID, testDomain, duration, ips, status)
+
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not find working resolver: %w", err)
+	}
+	f.log("✅ selected resolver %v\n", resolver.ID)
+	return resolver.Resolver, nil
 }
 
 func (f *StrategyFinder) findTLS(testDomains []string, baseDialer transport.StreamDialer, tlsConfig []string) (transport.StreamDialer, error) {
