@@ -16,6 +16,7 @@ package dns
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/netip"
 
@@ -52,7 +53,13 @@ func resolveIP(ctx context.Context, resolver Resolver, rrType dnsmessage.Type, h
 
 // NewStreamDialer creates a [transport.StreamDialer] that uses Happy Eyeballs v2 to establish a connection.
 // It uses resolver to map host names to IP addresses, and the given dialer to attempt connections.
-func NewStreamDialer(resolver Resolver, dialer transport.StreamDialer) transport.StreamDialer {
+func NewStreamDialer(resolver Resolver, dialer transport.StreamDialer) (transport.StreamDialer, error) {
+	if resolver == nil {
+		return nil, errors.New("resolver must not be nil")
+	}
+	if dialer == nil {
+		return nil, errors.New("dialer must not be nil")
+	}
 	return &transport.HappyEyeballsStreamDialer{
 		Dialer: dialer,
 		Resolve: transport.NewParallelHappyEyeballsResolveFunc(
@@ -63,5 +70,5 @@ func NewStreamDialer(resolver Resolver, dialer transport.StreamDialer) transport
 				return resolveIP(ctx, resolver, dnsmessage.TypeA, hostname)
 			},
 		),
-	}
+	}, nil
 }

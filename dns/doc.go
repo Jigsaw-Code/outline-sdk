@@ -31,11 +31,19 @@ to perform DNS resolution over different transports:
   - [DNS-over-HTTPS] (DoH): uses HTTP exchanges for querying the resolver and communicates over a connection encrypted with TLS. It uses
     port 443. That makes the DoH traffic undistinguishable from web traffic, making it harder to block.
 
+# Establishing Stream Connections
+
+Typically you will want to use custom DNS resolution to establish connections to a destination.
+[NewStreamDialer] will create a [transport.StreamDialer] that uses the given resolver to resolve host names
+and the given dialer to establish connections. The dialer efficiently performs resolutions and connection attempts
+in parallel, as per the [Happy Eyeballs v2] algorithm.
+
 [Domain Name System]: https://datatracker.ietf.org/doc/html/rfc1034
 [commonly used for network-level filtering]: https://datatracker.ietf.org/doc/html/rfc9505#section-5.1.1
 [DNS-over-UDP]: https://datatracker.ietf.org/doc/html/rfc1035#section-4.2.1
 [DNS-over-TCP]: https://datatracker.ietf.org/doc/html/rfc7766
 [DNS-over-TLS]: https://datatracker.ietf.org/doc/html/rfc7858
 [DNS-over-HTTPS]: https://datatracker.ietf.org/doc/html/rfc8484
+[Happy Eyeballs v2]: https://datatracker.ietf.org/doc/html/rfc8305
 */
 package dns
