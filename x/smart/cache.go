@@ -17,6 +17,7 @@ package smart
 import (
 	"context"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/dns"
@@ -41,12 +42,13 @@ type cacheEntry struct {
 	expire time.Time
 }
 
-// cacheResolver is a very simple caching [RoundTripper].
+// cacheResolver is a very simple caching [dns.Resolver].
 // It doesn't use the response TTL and doesn't cache empty answers.
 // It also doesn't dedup duplicate in-flight requests.
 type cacheResolver struct {
 	resolver dns.Resolver
 	cache    []cacheEntry
+	mux      sync.Mutex
 }
 
 var _ dns.Resolver = (*cacheResolver)(nil)
@@ -55,9 +57,11 @@ func newCacheResolver(resolver dns.Resolver, numEntries int) dns.Resolver {
 	return &cacheResolver{resolver: resolver, cache: make([]cacheEntry, numEntries)}
 }
 
-func (r *cacheResolver) removeExpired() {
+func (r *cacheResolver) RemoveExpired() {
 	now := time.Now()
 	last := 0
+	r.mux.Lock()
+	defer r.mux.Unlock()
 	for _, entry := range r.cache {
 		if entry.expire.After(now) {
 			r.cache[last] = entry
@@ -78,7 +82,9 @@ func makeCacheKey(q dnsmessage.Question) string {
 	return strings.Join([]string{domainKey, q.Type.String(), q.Class.String()}, "|")
 }
 
-func (r *cacheResolver) searchCache(key string) *dnsmessage.Message {
+func (r *cacheResolver) SearchCache(key string) *dnsmessage.Message {
+	r.mux.Lock()
+	defer r.mux.Unlock()
 	for ei, entry := range r.cache {
 		if entry.key == key {
 			r.moveToFront(ei)
@@ -90,7 +96,9 @@ func (r *cacheResolver) searchCache(key string) *dnsmessage.Message {
 	return nil
 }
 
-func (r *cacheResolver) addToCache(key string, msg *dnsmessage.Message) {
+func (r *cacheResolver) AddToCache(key string, msg *dnsmessage.Message) {
+	r.mux.Lock()
+	defer r.mux.Unlock()
 	newSize := len(r.cache) + 1
 	if newSize > cap(r.cache) {
 		newSize = cap(r.cache)
@@ -101,17 +109,20 @@ func (r *cacheResolver) addToCache(key string, msg *dnsmessage.Message) {
 	r.cache[0] = cacheEntry{key: key, msg: msg, expire: time.Now().Add(60 * time.Second)}
 }
 
+// Query implements [dns.Resolver].
 func (r *cacheResolver) Query(ctx context.Context, q dnsmessage.Question) (*dnsmessage.Message, error) {
-	r.removeExpired()
+	r.RemoveExpired()
 	cacheKey := makeCacheKey(q)
-	if msg := r.searchCache(cacheKey); msg != nil {
+	if msg := r.SearchCache(cacheKey); msg != nil {
 		return msg, nil
 	}
 	msg, err := r.resolver.Query(ctx, q)
 	if err != nil {
-		// TODO: cache NXDOMAIN. See https://datatracker.ietf.org/doc/html/rfc2308.
+		// TODO: cache server failures. See https://datatracker.ietf.org/doc/html/rfc2308.
 		return nil, err
 	}
-	r.addToCache(cacheKey, msg)
+	if msg.RCode == dnsmessage.RCodeSuccess || msg.RCode == dnsmessage.RCodeNameError {
+		r.AddToCache(cacheKey, msg)
+	}
 	return msg, nil
 }

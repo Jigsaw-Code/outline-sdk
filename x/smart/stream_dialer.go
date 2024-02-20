@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package smart provides utilities to dynamically find serverless strategies for circumvention.
 package smart
 
 import (
@@ -21,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net"
 	"net/url"
@@ -49,79 +49,6 @@ func mixCase(domain string) string {
 		}
 	}
 	return string(mixed)
-}
-
-func getARootNameserver() (string, error) {
-	nsList, err := net.LookupNS(".")
-	if err != nil {
-		return "", fmt.Errorf("could not get list of root nameservers: %v", err)
-	}
-	if len(nsList) == 0 {
-		return "", fmt.Errorf("empty list of root nameservers")
-	}
-	return nsList[0].Host, nil
-}
-
-func fingerprint(pd transport.PacketDialer, sd transport.StreamDialer, testDomain string) {
-	rootNS, err := getARootNameserver()
-	if err != nil {
-		log.Fatalf("Failed to find root nameserver: %v", err)
-	}
-
-	allNSIPs, err := net.LookupIP(rootNS)
-	if err != nil {
-		log.Fatalf("Failed to resolve root nameserver: %v", err)
-	}
-	ips := []net.IP{}
-	for _, ip := range allNSIPs {
-		if ip.To4() != nil {
-			ips = append(ips, ip)
-			break
-		}
-	}
-	for _, ip := range allNSIPs {
-		if ip.To16() != nil {
-			ips = append(ips, ip)
-			break
-		}
-	}
-
-	q, err := dns.NewQuestion(testDomain, dnsmessage.TypeA)
-	if err != nil {
-		log.Fatalf("failed to parse domain name: %v", err)
-	}
-	for _, rootNSIP := range ips {
-		resolvedNS := net.JoinHostPort(rootNSIP.String(), "53")
-		for _, proto := range []string{"udp", "tcp"} {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			var resolver dns.Resolver
-			switch proto {
-			case "tcp":
-				resolver = dns.NewTCPResolver(sd, resolvedNS)
-			default:
-				resolver = dns.NewUDPResolver(pd, resolvedNS)
-			}
-
-			response, err := resolver.Query(ctx, *q)
-			fmt.Printf("%v:%v", proto, resolvedNS)
-			if err != nil {
-				fmt.Printf("; status=error: %v\n", err)
-				continue
-			}
-			if len(response.Answers) > 0 {
-				fmt.Printf("; status=unexpected answer (injected): %v ⚠️\n", response.Answers)
-				// TODO: use RCODE, CNAME and IPs as blocking fingerprint.
-				continue
-			}
-			if response.RCode != dnsmessage.RCodeSuccess {
-				fmt.Printf("; status=unexpected rcode (injected): %v ⚠️\n", response.Answers)
-				// TODO: use RCODE, CNAME and IPs as blocking fingerprint.
-				continue
-			}
-			fmt.Print("; status=ok (no injection) ✓\n")
-		}
-	}
 }
 
 func evaluateNetResolver(ctx context.Context, resolver *net.Resolver, testDomain string) ([]net.IP, error) {
@@ -152,15 +79,9 @@ func evaluateNetResolver(ctx context.Context, resolver *net.Resolver, testDomain
 	return ips, nil
 }
 
-func evaluateAddressResponse(response dnsmessage.Message, requestDomain string) ([]net.IP, error) {
-	if response.RCode != dnsmessage.RCodeSuccess {
-		return nil, fmt.Errorf("rcode is not success: %v", response.RCode)
-	}
+func getIPs(answers []dnsmessage.Resource) []net.IP {
 	var ips []net.IP
-	if len(response.Answers) == 0 {
-		return ips, errors.New("no answers") // -1
-	}
-	for _, answer := range response.Answers {
+	for _, answer := range answers {
 		if answer.Header.Type != dnsmessage.TypeA && answer.Header.Type != dnsmessage.TypeAAAA {
 			continue
 		}
@@ -173,25 +94,38 @@ func evaluateAddressResponse(response dnsmessage.Message, requestDomain string) 
 		default:
 			continue
 		}
-		if ip.IsLoopback() {
-			return nil, fmt.Errorf("localhost ip: %v", ip) // -1
-		}
-		if ip.IsPrivate() {
-			return nil, fmt.Errorf("private ip: %v", ip) // -1
-		}
-		if ip.IsUnspecified() {
-			return nil, fmt.Errorf("zero ip: %v", ip) // -1
-		}
 		ips = append(ips, ip)
 	}
+	return ips
+}
+
+func evaluateAddressResponse(response dnsmessage.Message, requestDomain string) ([]net.IP, error) {
+	if response.RCode != dnsmessage.RCodeSuccess {
+		return nil, fmt.Errorf("rcode is not success: %v", response.RCode)
+	}
+	if len(response.Answers) == 0 {
+		return nil, errors.New("no answers")
+	}
+	ips := getIPs(response.Answers)
 	if len(ips) == 0 {
-		return ips, fmt.Errorf("no ip answer: %v", response.Answers) // -1
+		return ips, fmt.Errorf("no ip answer: %v", response.Answers)
+	}
+	for _, ip := range ips {
+		if ip.IsLoopback() {
+			return nil, fmt.Errorf("localhost ip: %v", ip)
+		}
+		if ip.IsPrivate() {
+			return nil, fmt.Errorf("private ip: %v", ip)
+		}
+		if ip.IsUnspecified() {
+			return nil, fmt.Errorf("zero ip: %v", ip)
+		}
 	}
 	// All popular recursive resolvers we tested maintain the domain case of the request.
 	// Note that this is not the case of authoritative resolvers. Some of them will return
 	// a fully normalized domain name, or normalize part of it.
 	if response.Answers[0].Header.Name.String() != requestDomain {
-		return ips, fmt.Errorf("domain mismatch: got %v, expected %v", response.Answers[0].Header.Name, requestDomain) // -0.5 or +0.5 if match
+		return ips, fmt.Errorf("domain mismatch: got %v, expected %v", response.Answers[0].Header.Name, requestDomain)
 	}
 	return ips, nil
 }
@@ -246,9 +180,9 @@ func (f *StrategyFinder) log(format string, a ...any) {
 	}
 }
 
-func (f *StrategyFinder) testDNSResolver(baseCtx context.Context, resolver dns.Resolver, testDomain string) ([]net.IP, error) {
+func (f *StrategyFinder) testDNSResolver(baseCtx context.Context, resolver *smartResolver, testDomain string) ([]net.IP, error) {
 	// We special case the system resolver, since we can't get a dns.RoundTripper.
-	if resolver == nil {
+	if resolver.Resolver == nil {
 		ctx, cancel := context.WithTimeout(baseCtx, f.TestTimeout)
 		defer cancel()
 		return evaluateNetResolver(ctx, new(net.Resolver), testDomain)
@@ -266,12 +200,22 @@ func (f *StrategyFinder) testDNSResolver(baseCtx context.Context, resolver dns.R
 	if err != nil {
 		return nil, fmt.Errorf("request for A query failed: %w", err)
 	}
+
+	if resolver.Secure {
+		// For secure DNS, we just need to check if we can communicate with it.
+		// No need to analyze content, since it is protected by TLS.
+		return getIPs(response.Answers), nil
+	}
+
 	ips, err := evaluateAddressResponse(*response, requestDomain)
 	if err != nil {
 		return ips, fmt.Errorf("failed A test: %w", err)
 	}
+
 	// TODO(fortuna): Consider testing whether we can establish a TCP connection to ip:443.
 
+	// Run CNAME test, which helps in case the resolver returns a public IP, as is the
+	// case in China.
 	q, err = dns.NewQuestion(requestDomain, dnsmessage.TypeCNAME)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create question: %v", err)
@@ -290,20 +234,26 @@ func (f *StrategyFinder) testDNSResolver(baseCtx context.Context, resolver dns.R
 }
 
 type httpsEntryJSON struct {
-	Name    string `json:"name,omitempty"`
+	// Domain name of the host.
+	Name string `json:"name,omitempty"`
+	// Host:port. Defaults to Name:443.
 	Address string `json:"address,omitempty"`
 }
 
 type tlsEntryJSON struct {
-	Name    string `json:"name,omitempty"`
+	// Domain name of the host.
+	Name string `json:"name,omitempty"`
+	// Host:port. Defaults to Name:853.
 	Address string `json:"address,omitempty"`
 }
 
 type udpEntryJSON struct {
+	// Host:port.
 	Address string `json:"address,omitempty"`
 }
 
 type tcpEntryJSON struct {
+	// Host:port.
 	Address string `json:"address,omitempty"`
 }
 
@@ -320,12 +270,14 @@ type configJSON struct {
 	TLS []string       `json:"tls,omitempty"`
 }
 
-func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryJSON) (dns.Resolver, error) {
+// newDNSResolverFromEntry creates a [dns.Resolver] based on the config, returning the resolver
+// a boolean indicating whether the resolver is secure (TLS, HTTPS) and a possible error.
+func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryJSON) (dns.Resolver, bool, error) {
 	if entry.System != nil {
-		return nil, nil
+		return nil, false, nil
 	} else if cfg := entry.HTTPS; cfg != nil {
 		if cfg.Name == "" {
-			return nil, fmt.Errorf("https entry has empty server name")
+			return nil, true, fmt.Errorf("https entry has empty server name")
 		}
 		serverAddr := cfg.Address
 		if serverAddr == "" {
@@ -337,10 +289,10 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryJSON) (dns.Resolv
 			port = "443"
 		}
 		dohURL := url.URL{Scheme: "https", Host: net.JoinHostPort(cfg.Name, port), Path: "/dns-query"}
-		return dns.NewHTTPSResolver(f.StreamDialer, serverAddr, dohURL.String()), nil
+		return dns.NewHTTPSResolver(f.StreamDialer, serverAddr, dohURL.String()), true, nil
 	} else if cfg := entry.TLS; cfg != nil {
 		if cfg.Name == "" {
-			return nil, fmt.Errorf("tls entry has empty server name")
+			return nil, true, fmt.Errorf("tls entry has empty server name")
 		}
 		serverAddr := cfg.Address
 		if serverAddr == "" {
@@ -350,10 +302,10 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryJSON) (dns.Resolv
 		if err != nil {
 			serverAddr = net.JoinHostPort(serverAddr, "853")
 		}
-		return dns.NewTLSResolver(f.StreamDialer, serverAddr, cfg.Name), nil
+		return dns.NewTLSResolver(f.StreamDialer, serverAddr, cfg.Name), true, nil
 	} else if cfg := entry.TCP; cfg != nil {
 		if cfg.Address == "" {
-			return nil, fmt.Errorf("tcp entry has empty server address")
+			return nil, false, fmt.Errorf("tcp entry has empty server address")
 		}
 		host, port, err := net.SplitHostPort(cfg.Address)
 		if err != nil {
@@ -361,10 +313,10 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryJSON) (dns.Resolv
 			port = "53"
 		}
 		serverAddr := net.JoinHostPort(host, port)
-		return dns.NewTCPResolver(f.StreamDialer, serverAddr), nil
+		return dns.NewTCPResolver(f.StreamDialer, serverAddr), false, nil
 	} else if cfg := entry.UDP; cfg != nil {
 		if cfg.Address == "" {
-			return nil, fmt.Errorf("udp entry has empty server address")
+			return nil, false, fmt.Errorf("udp entry has empty server address")
 		}
 		host, port, err := net.SplitHostPort(cfg.Address)
 		if err != nil {
@@ -372,33 +324,34 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryJSON) (dns.Resolv
 			port = "53"
 		}
 		serverAddr := net.JoinHostPort(host, port)
-		return dns.NewUDPResolver(f.PacketDialer, serverAddr), nil
+		return dns.NewUDPResolver(f.PacketDialer, serverAddr), false, nil
 	} else {
-		return nil, errors.New("invalid DNS entry")
+		return nil, false, errors.New("invalid DNS entry")
 	}
 }
 
-type resolverEntry struct {
-	ID       string
-	Resolver dns.Resolver
+type smartResolver struct {
+	dns.Resolver
+	ID     string
+	Secure bool
 }
 
-func (f *StrategyFinder) dnsConfigToRoundTrippers(dnsConfig []dnsEntryJSON) ([]resolverEntry, error) {
+func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryJSON) ([]*smartResolver, error) {
 	if len(dnsConfig) == 0 {
 		return nil, errors.New("no DNS config entry")
 	}
-	rts := make([]resolverEntry, 0, len(dnsConfig))
+	rts := make([]*smartResolver, 0, len(dnsConfig))
 	for ei, entry := range dnsConfig {
 		idBytes, err := json.Marshal(entry)
 		if err != nil {
 			return nil, fmt.Errorf("cannot serialize entry %v: %w", ei, err)
 		}
 		id := string(idBytes)
-		resolver, err := f.newDNSResolverFromEntry(entry)
+		resolver, isSecure, err := f.newDNSResolverFromEntry(entry)
 		if err != nil {
 			return nil, fmt.Errorf("failed to process entry %v: %w", ei, err)
 		}
-		rts = append(rts, resolverEntry{ID: id, Resolver: resolver})
+		rts = append(rts, &smartResolver{Resolver: resolver, ID: id, Secure: isSecure})
 	}
 	return rts, nil
 }
@@ -411,13 +364,12 @@ func newDoneContext() context.Context {
 }
 
 func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON) (dns.Resolver, error) {
-	resolvers, err := f.dnsConfigToRoundTrippers(dnsConfig)
+	resolvers, err := f.dnsConfigToResolver(dnsConfig)
 	if err != nil {
 		return nil, err
 	}
 	type testResult struct {
-		ID       string
-		Resolver dns.Resolver
+		Resolver *smartResolver
 		Err      error
 	}
 	// Communicates the result of each test.
@@ -443,7 +395,7 @@ func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON)
 			nextResolver++
 			var waitDone context.CancelFunc
 			waitCtx, waitDone = context.WithTimeout(searchCtx, 250*time.Millisecond)
-			go func(entry resolverEntry, testDone context.CancelFunc) {
+			go func(resolver *smartResolver, testDone context.CancelFunc) {
 				defer testDone()
 				for _, testDomain := range testDomains {
 					select {
@@ -451,27 +403,27 @@ func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON)
 						return
 					default:
 					}
-					f.log("🏃 run dns: %v (domain: %v)\n", entry.ID, testDomain)
+					f.log("🏃 run dns: %v (domain: %v)\n", resolver.ID, testDomain)
 					startTime := time.Now()
-					ips, err := f.testDNSResolver(searchCtx, entry.Resolver, testDomain)
+					ips, err := f.testDNSResolver(searchCtx, resolver, testDomain)
 					duration := time.Since(startTime)
 					status := "ok ✅"
 					if err != nil {
 						status = fmt.Sprintf("%v ❌", err)
 					}
-					f.log("🏁 got dns: %v (domain: %v), duration=%v, ips=%v, status=%v\n", entry.ID, testDomain, duration, ips, status)
+					f.log("🏁 got dns: %v (domain: %v), duration=%v, ips=%v, status=%v\n", resolver.ID, testDomain, duration, ips, status)
 					if err != nil {
 						select {
 						case <-searchCtx.Done():
 							return
-						case resultChan <- testResult{ID: entry.ID, Resolver: entry.Resolver, Err: err}:
+						case resultChan <- testResult{Resolver: resolver, Err: err}:
 							return
 						}
 					}
 				}
 				select {
 				case <-searchCtx.Done():
-				case resultChan <- testResult{ID: entry.ID, Resolver: entry.Resolver, Err: nil}:
+				case resultChan <- testResult{Resolver: resolver, Err: nil}:
 				}
 			}(entry, waitDone)
 
@@ -481,13 +433,9 @@ func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON)
 			if result.Err != nil {
 				continue
 			}
-			f.log("✅ selected resolver %v\n", result.ID)
-			// Tested all domains on this resolver. Return
-			if result.Resolver != nil {
-				return result.Resolver, nil
-			} else {
-				return nil, nil
-			}
+			f.log("✅ selected resolver %v\n", result.Resolver.ID)
+			// Tested all domains on this resolver. Unwrap and return.
+			return result.Resolver.Resolver, nil
 		}
 	}
 	return nil, errors.New("could not find working resolver")
@@ -572,19 +520,22 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 		testDomains[di] = makeFullyQualified(domain)
 	}
 
-	dnsRT, err := f.findDNS(testDomains, parsedConfig.DNS)
+	resolver, err := f.findDNS(testDomains, parsedConfig.DNS)
 	if err != nil {
 		return nil, err
 	}
 	var dnsDialer transport.StreamDialer
-	if dnsRT == nil {
+	if resolver == nil {
 		if _, ok := f.StreamDialer.(*transport.TCPDialer); !ok {
 			return nil, fmt.Errorf("cannot use system resolver with base dialer of type %T", f.StreamDialer)
 		}
 		dnsDialer = f.StreamDialer
 	} else {
-		dnsRT = newCacheResolver(dnsRT, 100)
-		dnsDialer = dns.NewStreamDialer(dnsRT, f.StreamDialer)
+		resolver = newCacheResolver(resolver, 100)
+		dnsDialer, err = dns.NewStreamDialer(resolver, f.StreamDialer)
+		if err != nil {
+			return nil, fmt.Errorf("dns.NewStreamDialer failed: %w", err)
+		}
 	}
 
 	if len(parsedConfig.TLS) == 0 {
