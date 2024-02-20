@@ -356,11 +356,11 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryJSON) ([]*smart
 	return rts, nil
 }
 
-// Returns a [context.Context] that is already done.
-func newDoneContext() context.Context {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	return ctx
+// Returns a read channel that is already closed.
+func newClosedChanel() <-chan struct{} {
+	ch := make(chan struct{})
+	close(ch)
+	return ch
 }
 
 func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON) (dns.Resolver, error) {
@@ -373,28 +373,28 @@ func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON)
 		Err      error
 	}
 	// Communicates the result of each test.
-	resultChan := make(chan testResult)
+	resultChan := make(chan testResult, len(resolvers))
 	// Indicates to tests that the search is done, so they don't get stuck writing to the results channel that will no longer be read.
 	searchCtx, searchDone := context.WithCancel(context.Background())
 	defer searchDone()
 	// Used to space out each test. The initial value is done because there's no wait needed.
-	waitCtx := newDoneContext()
-	// Next entry to start testing.
+	waitCh := newClosedChanel()
 	nextResolver := 0
-	// How many test entries are not done.
-	resolversToTest := len(resolvers)
-	for resolversToTest > 0 {
-		if nextResolver == len(resolvers) {
-			// No more tests to start. Make sure the select doesn't trigger on waitCtx.
-			waitCtx = searchCtx
-		}
+	for resolversToTest := len(resolvers); resolversToTest > 0; {
 		select {
-		case <-waitCtx.Done():
-			// Start a new test.
-			entry := resolvers[nextResolver]
+		// Ready to start testing another resolver.
+		case <-waitCh:
+			resolver := resolvers[nextResolver]
 			nextResolver++
-			var waitDone context.CancelFunc
-			waitCtx, waitDone = context.WithTimeout(searchCtx, 250*time.Millisecond)
+
+			waitCtx, waitDone := context.WithTimeout(searchCtx, 250*time.Millisecond)
+			if nextResolver == len(resolvers) {
+				// Done with resolvers. No longer trigger on waitCh.
+				waitCh = nil
+			} else {
+				waitCh = waitCtx.Done()
+			}
+
 			go func(resolver *smartResolver, testDone context.CancelFunc) {
 				defer testDone()
 				for _, testDomain := range testDomains {
@@ -403,29 +403,25 @@ func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON)
 						return
 					default:
 					}
+
 					f.log("🏃 run dns: %v (domain: %v)\n", resolver.ID, testDomain)
 					startTime := time.Now()
 					ips, err := f.testDNSResolver(searchCtx, resolver, testDomain)
 					duration := time.Since(startTime)
+
 					status := "ok ✅"
 					if err != nil {
 						status = fmt.Sprintf("%v ❌", err)
 					}
 					f.log("🏁 got dns: %v (domain: %v), duration=%v, ips=%v, status=%v\n", resolver.ID, testDomain, duration, ips, status)
+
 					if err != nil {
-						select {
-						case <-searchCtx.Done():
-							return
-						case resultChan <- testResult{Resolver: resolver, Err: err}:
-							return
-						}
+						resultChan <- testResult{Resolver: resolver, Err: err}
+						return
 					}
 				}
-				select {
-				case <-searchCtx.Done():
-				case resultChan <- testResult{Resolver: resolver, Err: nil}:
-				}
-			}(entry, waitDone)
+				resultChan <- testResult{Resolver: resolver, Err: nil}
+			}(resolver, waitDone)
 
 		case result := <-resultChan:
 			resolversToTest--
