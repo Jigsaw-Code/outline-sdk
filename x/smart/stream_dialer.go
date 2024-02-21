@@ -182,7 +182,7 @@ func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON)
 	ctx, searchDone := context.WithCancel(context.Background())
 	defer searchDone()
 	raceStart := time.Now()
-	resolver, err := raceTests[*smartResolver](ctx, 250*time.Millisecond, resolvers, func(resolver *smartResolver) (*smartResolver, error) {
+	resolver, err := raceTests(ctx, 250*time.Millisecond, resolvers, func(resolver *smartResolver) (*smartResolver, error) {
 		for _, testDomain := range testDomains {
 			select {
 			case <-ctx.Done():
