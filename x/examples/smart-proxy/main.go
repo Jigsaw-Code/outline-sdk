@@ -93,6 +93,7 @@ func main() {
 		log.Fatalf("Could not create stream dialer: %v", err)
 	}
 	if !supportsHappyEyeballs(streamDialer) {
+		fmt.Println("⚠️ Warning: base transport is not compatible with Happy Eyeballs. Disabling IPv6.")
 		innerDialer := streamDialer
 		// Disable IPv6 if the dialer doesn't support HappyEyballs.
 		streamDialer = transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
