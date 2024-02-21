@@ -210,7 +210,7 @@ func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON)
 	if err != nil {
 		return nil, fmt.Errorf("could not find working resolver: %w", err)
 	}
-	f.log("🏆 selected DNS resolver %v in %0.2f\n", resolver.ID, time.Since(raceStart).Seconds())
+	f.log("🏆 selected DNS resolver %v in %0.2fs\n", resolver.ID, time.Since(raceStart).Seconds())
 	return resolver.Resolver, nil
 }
 
