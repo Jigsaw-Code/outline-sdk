@@ -35,7 +35,7 @@ var _ http.Handler = (*pathHandler)(nil)
 func (h *pathHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Request) {
 	requestURL := strings.TrimPrefix(proxyReq.URL.Path, "/")
 	if requestURL == "" {
-		http.Error(proxyResp, "Empty path", http.StatusBadRequest)
+		http.Error(proxyResp, "Empty URL", http.StatusBadRequest)
 		return
 	}
 	if proxyReq.URL.RawQuery != "" {
