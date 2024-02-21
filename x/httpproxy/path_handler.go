@@ -33,12 +33,15 @@ type pathHandler struct {
 var _ http.Handler = (*pathHandler)(nil)
 
 func (h *pathHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Request) {
-	requestPath := strings.TrimPrefix(proxyReq.URL.Path, "/") + "?" + proxyReq.URL.RawQuery
-	if requestPath == "" {
+	requestURL := strings.TrimPrefix(proxyReq.URL.Path, "/")
+	if requestURL == "" {
 		http.Error(proxyResp, "Empty path", http.StatusBadRequest)
 		return
 	}
-	targetURL, err := url.Parse(requestPath)
+	if proxyReq.URL.RawQuery != "" {
+		requestURL += "?" + proxyReq.URL.RawQuery
+	}
+	targetURL, err := url.Parse(requestURL)
 	if err != nil {
 		http.Error(proxyResp, "Invalid target URL", http.StatusBadRequest)
 		return
