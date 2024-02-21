@@ -199,7 +199,12 @@ func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON)
 			if err != nil {
 				status = fmt.Sprintf("%v ❌", err)
 			}
-			f.log("🏁 got DNS: %v (domain: %v), duration=%v, ips=%v, status=%v\n", resolver.ID, testDomain, duration, ips, status)
+			select {
+			case <-ctx.Done():
+			default:
+				// Only output log if the search is not done yet.
+				f.log("🏁 got DNS: %v (domain: %v), duration=%v, ips=%v, status=%v\n", resolver.ID, testDomain, duration, ips, status)
+			}
 
 			if err != nil {
 				return nil, err
