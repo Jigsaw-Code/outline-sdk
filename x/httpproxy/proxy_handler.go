@@ -20,13 +20,14 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
-type proxyHandler struct {
-	connectHandler http.Handler
-	forwardHandler http.Handler
+type ProxyHandler struct {
+	connectHandler  http.Handler
+	forwardHandler  http.Handler
+	FallbackHandler http.Handler
 }
 
 // ServeHTTP implements [http.Handler].ServeHTTP for CONNECT and absolute URL requests, using the internal [transport.StreamDialer].
-func (h *proxyHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Request) {
+func (h *ProxyHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Request) {
 	// TODO(fortuna): For public services (not local), we need authentication and drain on failures to avoid fingerprinting.
 	if proxyReq.Method == http.MethodConnect {
 		h.connectHandler.ServeHTTP(proxyResp, proxyReq)
@@ -36,12 +37,16 @@ func (h *proxyHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.R
 		h.forwardHandler.ServeHTTP(proxyResp, proxyReq)
 		return
 	}
-	http.Error(proxyResp, "Not Found", http.StatusNotFound)
+	if h.FallbackHandler != nil {
+		h.FallbackHandler.ServeHTTP(proxyResp, proxyReq)
+		return
+	}
+	http.NotFound(proxyResp, proxyReq)
 }
 
 // NewProxyHandler creates a [http.Handler] that works as a web proxy using the given dialer to deach the destination.
-func NewProxyHandler(dialer transport.StreamDialer) http.Handler {
-	return &proxyHandler{
+func NewProxyHandler(dialer transport.StreamDialer) *ProxyHandler {
+	return &ProxyHandler{
 		connectHandler: NewConnectHandler(dialer),
 		forwardHandler: NewForwardHandler(dialer),
 	}
