@@ -22,7 +22,6 @@ import (
 
 type proxyHandler struct {
 	connectHandler http.Handler
-	pathHandler    http.Handler
 	forwardHandler http.Handler
 }
 
@@ -37,14 +36,13 @@ func (h *proxyHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.R
 		h.forwardHandler.ServeHTTP(proxyResp, proxyReq)
 		return
 	}
-	h.pathHandler.ServeHTTP(proxyResp, proxyReq)
+	http.Error(proxyResp, "Not Found", http.StatusNotFound)
 }
 
 // NewProxyHandler creates a [http.Handler] that works as a web proxy using the given dialer to deach the destination.
 func NewProxyHandler(dialer transport.StreamDialer) http.Handler {
 	return &proxyHandler{
 		connectHandler: NewConnectHandler(dialer),
-		pathHandler:    NewPathHandler(dialer),
 		forwardHandler: NewForwardHandler(dialer),
 	}
 }
