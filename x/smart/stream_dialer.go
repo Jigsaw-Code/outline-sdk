@@ -215,7 +215,7 @@ func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON)
 	if err != nil {
 		return nil, fmt.Errorf("could not find working resolver: %w", err)
 	}
-	f.log("🏆 selected DNS resolver %v in %0.2fs\n", resolver.ID, time.Since(raceStart).Seconds())
+	f.log("🏆 selected DNS resolver %v in %0.2fs\n\n", resolver.ID, time.Since(raceStart).Seconds())
 	return resolver.Resolver, nil
 }
 
@@ -254,7 +254,7 @@ func (f *StrategyFinder) findTLS(testDomains []string, baseDialer transport.Stre
 			}
 			f.log("🏁 got TLS: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
 		}
-		f.log("🏆 selected TLS strategy '%v' in %0.2fs\n", transportCfg, time.Since(raceStart).Seconds())
+		f.log("🏆 selected TLS strategy '%v' in %0.2fs\n\n", transportCfg, time.Since(raceStart).Seconds())
 		return tlsDialer, nil
 	})
 	if err != nil {
