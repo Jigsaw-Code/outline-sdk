@@ -161,12 +161,12 @@ func NewSmartStreamDialer(testDomains *StringList, searchConfig string, logWrite
 	testDomainsSlice := append(make([]string, 0, len(testDomains.list)), testDomains.list...)
 	dialer, err := finder.NewDialer(context.Background(), testDomainsSlice, []byte(searchConfig))
 	if err != nil {
-		return nil, fmt.Errorf("failed to find dialer: %v", err)
+		return nil, fmt.Errorf("failed to find dialer: %w", err)
 	}
 	return &StreamDialer{dialer}, nil
 }
 
-// StringList allows us to pass a list of strings to the Go Mobile functions, since Go Mobiule doesn't
+// StringList allows us to pass a list of strings to the Go Mobile functions, since Go Mobile doesn't
 // support slices as parameters.
 type StringList struct {
 	list []string

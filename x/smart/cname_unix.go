@@ -30,6 +30,10 @@ import (
 	"unsafe"
 )
 
+// lookupCNAME provides functionality equivalent to net.DefaultResolver.LookupCNAME. However,
+// net.DefaultResolver.LookupCNAME uses libresolv on unix, and, on Android and iOS, it tries
+// to connect to [::1]:53 (probably from /etc/resolv.conf) and the connection is refused.
+// Instead, we use getaddrinfo to get the canonical name.
 func lookupCNAME(ctx context.Context, domain string) (string, error) {
 	type result struct {
 		cname string

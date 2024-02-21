@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -44,6 +43,19 @@ func (v *stringArrayFlagValue) String() string {
 func (v *stringArrayFlagValue) Set(value string) error {
 	*v = append(*v, value)
 	return nil
+}
+
+func supportsHappyEyeballs(dialer transport.StreamDialer) bool {
+	// Some proxy protocols, most notably Shadowsocks, can't communicate connection success.
+	// Our shadowsocks.StreamDialer will return a connection successfully as long as it can
+	// connect to the proxy server, regardless of whether it can connect to the target.
+	// This breaks HappyEyeballs.
+	conn, err := dialer.DialStream(context.Background(), "invalid:0")
+	if conn != nil {
+		conn.Close()
+	}
+	// If the dialer returns success on an invalid address, it doesn't support Happy Eyeballs.
+	return err != nil
 }
 
 func main() {
@@ -80,9 +92,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not create stream dialer: %v", err)
 	}
-	if strings.HasPrefix(*transportFlag, "ss:") {
+	if !supportsHappyEyeballs(streamDialer) {
 		innerDialer := streamDialer
-		// Hack to disable IPv6 with Shadowsocks, since it doesn't communicate connection success.
+		// Disable IPv6 if the dialer doesn't support HappyEyballs.
 		streamDialer = transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
 			host, _, err := net.SplitHostPort(addr)
 			if err != nil {
@@ -137,7 +149,7 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 	<-sig
-	fmt.Print("Shutting down")
+	fmt.Println("Shutting down")
 	// Gracefully shut down the server, with a 5s timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
