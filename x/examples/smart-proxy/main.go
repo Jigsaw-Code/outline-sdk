@@ -102,10 +102,12 @@ func main() {
 	}
 
 	fmt.Println("Finding strategy")
+	startTime := time.Now()
 	dialer, err := finder.NewDialer(context.Background(), domainsFlag, finderConfig)
 	if err != nil {
 		log.Fatalf("Failed to find dialer: %v", err)
 	}
+	fmt.Printf("Found strategy in %0.2fs\n", time.Since(startTime).Seconds())
 	logDialer := transport.FuncStreamDialer(func(ctx context.Context, address string) (transport.StreamConn, error) {
 		conn, err := dialer.DialStream(ctx, address)
 		if err != nil {

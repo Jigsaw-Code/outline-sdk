@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package smart provides utilities to dynamically find serverless strategies for circumvention.
 package smart
 
 import (
@@ -22,147 +21,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"net/url"
 	"sync"
 	"time"
-	"unicode"
 
 	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
-	"golang.org/x/net/dns/dnsmessage"
 )
 
 // To test one strategy:
 // go run ./x/examples/smart-proxy -v -localAddr=localhost:1080 --transport="" --domain www.rferl.org  --config=<(echo '{"dns": [{"https": {"name": "doh.sb"}}]}')
-
-// mixCase randomizes the case of the domain letters.
-func mixCase(domain string) string {
-	var mixed []rune
-	for _, r := range domain {
-		if rand.Intn(2) == 0 {
-			mixed = append(mixed, unicode.ToLower(r))
-		} else {
-			mixed = append(mixed, unicode.ToUpper(r))
-		}
-	}
-	return string(mixed)
-}
-
-func evaluateNetResolver(ctx context.Context, resolver *net.Resolver, testDomain string) ([]net.IP, error) {
-	requestDomain := mixCase(testDomain)
-	_, err := lookupCNAME(ctx, requestDomain)
-	if err != nil {
-		return nil, fmt.Errorf("could not get cname: %w", err)
-	}
-	ips, err := resolver.LookupIP(ctx, "ip", requestDomain)
-	if err != nil {
-		return nil, fmt.Errorf("failed to lookup IPs: %w", err)
-	}
-	if len(ips) == 0 {
-		return nil, fmt.Errorf("no ip answer")
-	}
-	for _, ip := range ips {
-		if ip.IsLoopback() {
-			return nil, fmt.Errorf("localhost ip: %v", ip) // -1
-		}
-		if ip.IsPrivate() {
-			return nil, fmt.Errorf("private ip: %v", ip) // -1
-		}
-		if ip.IsUnspecified() {
-			return nil, fmt.Errorf("zero ip: %v", ip) // -1
-		}
-		// TODO: consider validating the IPs: fingerprint, hardcoded ground truth, trusted response, TLS connection.
-	}
-	return ips, nil
-}
-
-func getIPs(answers []dnsmessage.Resource) []net.IP {
-	var ips []net.IP
-	for _, answer := range answers {
-		if answer.Header.Type != dnsmessage.TypeA && answer.Header.Type != dnsmessage.TypeAAAA {
-			continue
-		}
-		var ip net.IP
-		switch rr := answer.Body.(type) {
-		case *dnsmessage.AResource:
-			ip = net.IP(rr.A[:])
-		case *dnsmessage.AAAAResource:
-			ip = net.IP(rr.AAAA[:])
-		default:
-			continue
-		}
-		ips = append(ips, ip)
-	}
-	return ips
-}
-
-func evaluateAddressResponse(response dnsmessage.Message, requestDomain string) ([]net.IP, error) {
-	if response.RCode != dnsmessage.RCodeSuccess {
-		return nil, fmt.Errorf("rcode is not success: %v", response.RCode)
-	}
-	if len(response.Answers) == 0 {
-		return nil, errors.New("no answers")
-	}
-	ips := getIPs(response.Answers)
-	if len(ips) == 0 {
-		return ips, fmt.Errorf("no ip answer: %v", response.Answers)
-	}
-	for _, ip := range ips {
-		if ip.IsLoopback() {
-			return nil, fmt.Errorf("localhost ip: %v", ip)
-		}
-		if ip.IsPrivate() {
-			return nil, fmt.Errorf("private ip: %v", ip)
-		}
-		if ip.IsUnspecified() {
-			return nil, fmt.Errorf("zero ip: %v", ip)
-		}
-	}
-	// All popular recursive resolvers we tested maintain the domain case of the request.
-	// Note that this is not the case of authoritative resolvers. Some of them will return
-	// a fully normalized domain name, or normalize part of it.
-	if response.Answers[0].Header.Name.String() != requestDomain {
-		return ips, fmt.Errorf("domain mismatch: got %v, expected %v", response.Answers[0].Header.Name, requestDomain)
-	}
-	return ips, nil
-}
-
-func evaluateCNAMEResponse(response dnsmessage.Message, requestDomain string) error {
-	if response.RCode != dnsmessage.RCodeSuccess {
-		return fmt.Errorf("rcode is not success: %v", response.RCode)
-	}
-	if len(response.Answers) == 0 {
-		var numSOA int
-		for _, answer := range response.Authorities {
-			if _, ok := answer.Body.(*dnsmessage.SOAResource); ok {
-				numSOA++
-			}
-		}
-		if numSOA != 1 {
-			return fmt.Errorf("SOA records is %v, expected 1", numSOA)
-		}
-		return nil
-	}
-	var cname string
-	for _, answer := range response.Answers {
-		if answer.Header.Type != dnsmessage.TypeCNAME {
-			return fmt.Errorf("bad answer type: %v", answer.Header.Type)
-		}
-		if rr, ok := answer.Body.(*dnsmessage.CNAMEResource); ok {
-			if cname != "" {
-				return fmt.Errorf("found too many CNAMEs: %v %v", cname, rr.CNAME)
-			}
-			cname = rr.CNAME.String()
-		}
-	}
-	if cname == "" {
-		return fmt.Errorf("no CNAME in answers")
-	}
-	return nil
-}
 
 type StrategyFinder struct {
 	TestTimeout  time.Duration
@@ -178,59 +48,6 @@ func (f *StrategyFinder) log(format string, a ...any) {
 		defer f.logMu.Unlock()
 		fmt.Fprintf(f.LogWriter, format, a...)
 	}
-}
-
-func (f *StrategyFinder) testDNSResolver(baseCtx context.Context, resolver *smartResolver, testDomain string) ([]net.IP, error) {
-	// We special case the system resolver, since we can't get a dns.RoundTripper.
-	if resolver.Resolver == nil {
-		ctx, cancel := context.WithTimeout(baseCtx, f.TestTimeout)
-		defer cancel()
-		return evaluateNetResolver(ctx, new(net.Resolver), testDomain)
-	}
-
-	requestDomain := mixCase(testDomain)
-
-	q, err := dns.NewQuestion(requestDomain, dnsmessage.TypeA)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create question: %v", err)
-	}
-	ctxA, cancelA := context.WithTimeout(baseCtx, f.TestTimeout)
-	defer cancelA()
-	response, err := resolver.Query(ctxA, *q)
-	if err != nil {
-		return nil, fmt.Errorf("request for A query failed: %w", err)
-	}
-
-	if resolver.Secure {
-		// For secure DNS, we just need to check if we can communicate with it.
-		// No need to analyze content, since it is protected by TLS.
-		return getIPs(response.Answers), nil
-	}
-
-	ips, err := evaluateAddressResponse(*response, requestDomain)
-	if err != nil {
-		return ips, fmt.Errorf("failed A test: %w", err)
-	}
-
-	// TODO(fortuna): Consider testing whether we can establish a TCP connection to ip:443.
-
-	// Run CNAME test, which helps in case the resolver returns a public IP, as is the
-	// case in China.
-	q, err = dns.NewQuestion(requestDomain, dnsmessage.TypeCNAME)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create question: %v", err)
-	}
-	ctxCNAME, cancelCNAME := context.WithTimeout(baseCtx, f.TestTimeout)
-	defer cancelCNAME()
-	response, err = resolver.Query(ctxCNAME, *q)
-	if err != nil {
-		return nil, fmt.Errorf("request for CNAME query failed: %w", err)
-	}
-	err = evaluateCNAMEResponse(*response, requestDomain)
-	if err != nil {
-		return nil, fmt.Errorf("failed CNAME test: %w", err)
-	}
-	return ips, nil
 }
 
 type httpsEntryJSON struct {
@@ -356,65 +173,6 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryJSON) ([]*smart
 	return rts, nil
 }
 
-// Returns a read channel that is already closed.
-func newClosedChanel() <-chan struct{} {
-	ch := make(chan struct{})
-	close(ch)
-	return ch
-}
-
-// raceTests races will call the test function on each entry until it finds an entry for which the test returns nil.
-// That entry is returned. A test is only started after the previous test finished or maxWait is done, whichever
-// happens first. That way you bound the wait for a test, and they may overlap.
-func raceTests[E any, R any](ctx context.Context, maxWait time.Duration, entries []E, test func(entry E) (R, error)) (R, error) {
-	type testResult struct {
-		Result R
-		Err    error
-	}
-	// Communicates the result of each test.
-	resultChan := make(chan testResult, len(entries))
-	waitCh := newClosedChanel()
-
-	next := 0
-	for toTest := len(entries); toTest > 0; {
-		select {
-		// Search cancelled, quit.
-		case <-ctx.Done():
-			var empty R
-			return empty, ctx.Err()
-
-		// Ready to start testing another resolver.
-		case <-waitCh:
-			entry := entries[next]
-			next++
-
-			waitCtx, waitDone := context.WithTimeout(ctx, 250*time.Millisecond)
-			if next == len(entries) {
-				// Done with entries. No longer trigger on waitCh.
-				waitCh = nil
-			} else {
-				waitCh = waitCtx.Done()
-			}
-
-			go func(entry E, testDone context.CancelFunc) {
-				defer testDone()
-				result, err := test(entry)
-				resultChan <- testResult{Result: result, Err: err}
-			}(entry, waitDone)
-
-		// Got a test result.
-		case result := <-resultChan:
-			toTest--
-			if result.Err != nil {
-				continue
-			}
-			return result.Result, nil
-		}
-	}
-	var empty R
-	return empty, errors.New("all tests failed")
-}
-
 func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON) (dns.Resolver, error) {
 	resolvers, err := f.dnsConfigToResolver(dnsConfig)
 	if err != nil {
@@ -423,6 +181,7 @@ func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON)
 
 	ctx, searchDone := context.WithCancel(context.Background())
 	defer searchDone()
+	raceStart := time.Now()
 	resolver, err := raceTests[*smartResolver](ctx, 250*time.Millisecond, resolvers, func(resolver *smartResolver) (*smartResolver, error) {
 		for _, testDomain := range testDomains {
 			select {
@@ -433,7 +192,7 @@ func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON)
 
 			f.log("🏃 run DNS: %v (domain: %v)\n", resolver.ID, testDomain)
 			startTime := time.Now()
-			ips, err := f.testDNSResolver(ctx, resolver, testDomain)
+			ips, err := testDNSResolver(ctx, f.TestTimeout, resolver, testDomain)
 			duration := time.Since(startTime)
 
 			status := "ok ✅"
@@ -451,7 +210,7 @@ func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON)
 	if err != nil {
 		return nil, fmt.Errorf("could not find working resolver: %w", err)
 	}
-	f.log("🏆 selected DNS resolver %v\n", resolver.ID)
+	f.log("🏆 selected DNS resolver %v in %0.2f\n", resolver.ID, time.Since(raceStart).Seconds())
 	return resolver.Resolver, nil
 }
 
@@ -462,6 +221,7 @@ func (f *StrategyFinder) findTLS(testDomains []string, baseDialer transport.Stre
 
 	ctx, searchDone := context.WithCancel(context.Background())
 	defer searchDone()
+	raceStart := time.Now()
 	tlsDialer, err := raceTests(ctx, 250*time.Millisecond, tlsConfig, func(transportCfg string) (transport.StreamDialer, error) {
 		tlsDialer, err := config.WrapStreamDialer(baseDialer, transportCfg)
 		if err != nil {
@@ -489,7 +249,7 @@ func (f *StrategyFinder) findTLS(testDomains []string, baseDialer transport.Stre
 			}
 			f.log("🏁 got TLS: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
 		}
-		f.log("🏆 selected TLS strategy '%v'\n", transportCfg)
+		f.log("🏆 selected TLS strategy '%v' in %0.2fs\n", transportCfg, time.Since(raceStart).Seconds())
 		return tlsDialer, nil
 	})
 	if err != nil {
@@ -512,17 +272,7 @@ func (f *StrategyFinder) findTLS(testDomains []string, baseDialer transport.Stre
 	}), nil
 }
 
-// makeFullyQualified makes the domain fully-qualified, ending on a dot (".").
-// This is useful in domain resolution to avoid ambiguity with local domains
-// and domain search.
-func makeFullyQualified(domain string) string {
-	if len(domain) > 0 && domain[len(domain)-1] == '.' {
-		return domain
-	}
-	return domain + "."
-}
-
-// NewDialer uses the config in configBytes to search for a strategy that unblocks all of the testDomains, returning a dialer with the found strategy.
+// NewDialer uses the config in configBytes to search for a strategy that unblocks DNS and TLS for all of the testDomains, returning a dialer with the found strategy.
 // It returns an error if no strategy was found that unblocks the testDomains.
 // The testDomains must be domains with a TLS service running on port 443.
 func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, configBytes []byte) (transport.StreamDialer, error) {
