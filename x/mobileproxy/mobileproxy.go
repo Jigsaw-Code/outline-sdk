@@ -144,9 +144,9 @@ func toWriter(logWriter LogWriter) io.Writer {
 	return &bytestoStringWriter{logWriter}
 }
 
-// NewSmartStreamDialer automatically selects a DNS and TLS strategy to use, and return a [StreamDialer]
+// NewSmartStreamDialer automatically selects a DNS and TLS strategy to use, and returns a [StreamDialer]
 // that will use the selected strategy.
-// It uses testDomain to find a strategy that works when accessing those domains.
+// It uses testDomains to find a strategy that works when accessing those domains.
 // The strategies to search are given in the searchConfig. An example can be found in
 // https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.json
 func NewSmartStreamDialer(testDomains *StringList, searchConfig string, logWriter LogWriter) (*StreamDialer, error) {

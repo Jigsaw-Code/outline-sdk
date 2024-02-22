@@ -61,7 +61,7 @@ func evaluateNetResolver(ctx context.Context, resolver *net.Resolver, testDomain
 		return nil, fmt.Errorf("failed to lookup IPs: %w", err)
 	}
 	if len(ips) == 0 {
-		return nil, fmt.Errorf("no ip answer")
+		return nil, errors.New("no ip answer")
 	}
 	for _, ip := range ips {
 		if ip.IsLoopback() {
@@ -158,7 +158,7 @@ func evaluateCNAMEResponse(response dnsmessage.Message, requestDomain string) er
 		}
 	}
 	if cname == "" {
-		return fmt.Errorf("no CNAME in answers")
+		return errors.New("no CNAME in answers")
 	}
 	return nil
 }
@@ -201,7 +201,7 @@ func testDNSResolver(baseCtx context.Context, oneTestTimeout time.Duration, reso
 	// case in China.
 	q, err = dns.NewQuestion(requestDomain, dnsmessage.TypeCNAME)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create question: %v", err)
+		return nil, fmt.Errorf("failed to create question: %w", err)
 	}
 	ctxCNAME, cancelCNAME := context.WithTimeout(baseCtx, oneTestTimeout)
 	defer cancelCNAME()

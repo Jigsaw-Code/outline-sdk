@@ -486,7 +486,7 @@ On Android, the Kotlin code would look like this:
 // Use port zero to let the system pick an open port for you.
 val testDomains = Mobileproxy.newListFromLines("www.youtube.com\ni.ytimg.com")
 val strategiesConfig = "..."  // Config JSON.
-val dialer = Mobileproxy.newSmartStreamDialer(testDomains, strategies, Mobileproxy.newStderrLogWriter())
+val dialer = Mobileproxy.newSmartStreamDialer(testDomains, strategiesConfig, Mobileproxy.newStderrLogWriter())
 
 val proxy = Mobileproxy.runProxy("localhost:0", dialer)
 // Configure your networking library using proxy.host() and proxy.port() or proxy.address().

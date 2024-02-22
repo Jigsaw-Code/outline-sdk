@@ -87,14 +87,14 @@ type configJSON struct {
 	TLS []string       `json:"tls,omitempty"`
 }
 
-// newDNSResolverFromEntry creates a [dns.Resolver] based on the config, returning the resolver
+// newDNSResolverFromEntry creates a [dns.Resolver] based on the config, returning the resolver and
 // a boolean indicating whether the resolver is secure (TLS, HTTPS) and a possible error.
 func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryJSON) (dns.Resolver, bool, error) {
 	if entry.System != nil {
 		return nil, false, nil
 	} else if cfg := entry.HTTPS; cfg != nil {
 		if cfg.Name == "" {
-			return nil, true, fmt.Errorf("https entry has empty server name")
+			return nil, true, errors.New("https entry has empty server name")
 		}
 		serverAddr := cfg.Address
 		if serverAddr == "" {
@@ -109,7 +109,7 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryJSON) (dns.Resolv
 		return dns.NewHTTPSResolver(f.StreamDialer, serverAddr, dohURL.String()), true, nil
 	} else if cfg := entry.TLS; cfg != nil {
 		if cfg.Name == "" {
-			return nil, true, fmt.Errorf("tls entry has empty server name")
+			return nil, true, errors.New("tls entry has empty server name")
 		}
 		serverAddr := cfg.Address
 		if serverAddr == "" {
@@ -122,7 +122,7 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryJSON) (dns.Resolv
 		return dns.NewTLSResolver(f.StreamDialer, serverAddr, cfg.Name), true, nil
 	} else if cfg := entry.TCP; cfg != nil {
 		if cfg.Address == "" {
-			return nil, false, fmt.Errorf("tcp entry has empty server address")
+			return nil, false, errors.New("tcp entry has empty server address")
 		}
 		host, port, err := net.SplitHostPort(cfg.Address)
 		if err != nil {
@@ -133,7 +133,7 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryJSON) (dns.Resolv
 		return dns.NewTCPResolver(f.StreamDialer, serverAddr), false, nil
 	} else if cfg := entry.UDP; cfg != nil {
 		if cfg.Address == "" {
-			return nil, false, fmt.Errorf("udp entry has empty server address")
+			return nil, false, errors.New("udp entry has empty server address")
 		}
 		host, port, err := net.SplitHostPort(cfg.Address)
 		if err != nil {
