@@ -315,6 +315,8 @@ func ExampleNewParallelHappyEyeballsResolveFunc() {
 	dialer := HappyEyeballsStreamDialer{
 		Dialer: FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
 			ips = append(ips, netip.MustParseAddrPort(addr).Addr())
+			// Add a slight delay to simulate a more real life ordering.
+			time.Sleep(1 * time.Millisecond)
 			return nil, errors.New("not implemented")
 		}),
 		Resolve: NewParallelHappyEyeballsResolveFunc(
