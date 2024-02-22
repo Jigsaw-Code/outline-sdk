@@ -65,15 +65,15 @@ func evaluateNetResolver(ctx context.Context, resolver *net.Resolver, testDomain
 	}
 	for _, ip := range ips {
 		if ip.IsLoopback() {
-			return nil, fmt.Errorf("localhost ip: %v", ip) // -1
+			return nil, fmt.Errorf("localhost ip: %v", ip)
 		}
 		if ip.IsPrivate() {
-			return nil, fmt.Errorf("private ip: %v", ip) // -1
+			return nil, fmt.Errorf("private ip: %v", ip)
 		}
 		if ip.IsUnspecified() {
-			return nil, fmt.Errorf("zero ip: %v", ip) // -1
+			return nil, fmt.Errorf("zero ip: %v", ip)
 		}
-		// TODO: consider validating the IPs: fingerprint, hardcoded ground truth, trusted response, TLS connection.
+		// TODO: consider validating the IPs: fingerprint, TCP connection, hardcoded ground truth, trusted response, TLS connection.
 	}
 	return ips, nil
 }

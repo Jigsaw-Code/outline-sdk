@@ -304,7 +304,7 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 		}
 		dnsDialer = f.StreamDialer
 	} else {
-		resolver = newCacheResolver(resolver, 100)
+		resolver = newSimpleLRUCacheResolver(resolver, 100)
 		dnsDialer, err = dns.NewStreamDialer(resolver, f.StreamDialer)
 		if err != nil {
 			return nil, fmt.Errorf("dns.NewStreamDialer failed: %w", err)

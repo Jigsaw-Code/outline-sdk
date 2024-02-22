@@ -30,6 +30,7 @@ func newClosedChanel() <-chan struct{} {
 // raceTests will call the test function on each entry until it finds an entry for which the test returns nil error.
 // That entry is returned. A test is only started after the previous test finished or maxWait is done, whichever
 // happens first. That way you bound the wait for a test, and they may overlap.
+// The test function should make use of the context to stop doing work when the race is done and it is no longer needed.
 func raceTests[E any, R any](ctx context.Context, maxWait time.Duration, entries []E, test func(entry E) (R, error)) (R, error) {
 	type testResult struct {
 		Result R

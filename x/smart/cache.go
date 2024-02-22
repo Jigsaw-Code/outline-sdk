@@ -42,22 +42,22 @@ type cacheEntry struct {
 	expire time.Time
 }
 
-// cacheResolver is a very simple caching [dns.Resolver].
-// It doesn't use the response TTL and doesn't cache empty answers.
+// simpleLRUCacheResolver is a very simple caching [dns.Resolver].
+// It doesn't use the response TTL.
 // It also doesn't dedup duplicate in-flight requests.
-type cacheResolver struct {
+type simpleLRUCacheResolver struct {
 	resolver dns.Resolver
 	cache    []cacheEntry
 	mux      sync.Mutex
 }
 
-var _ dns.Resolver = (*cacheResolver)(nil)
+var _ dns.Resolver = (*simpleLRUCacheResolver)(nil)
 
-func newCacheResolver(resolver dns.Resolver, numEntries int) dns.Resolver {
-	return &cacheResolver{resolver: resolver, cache: make([]cacheEntry, numEntries)}
+func newSimpleLRUCacheResolver(resolver dns.Resolver, numEntries int) dns.Resolver {
+	return &simpleLRUCacheResolver{resolver: resolver, cache: make([]cacheEntry, numEntries)}
 }
 
-func (r *cacheResolver) RemoveExpired() {
+func (r *simpleLRUCacheResolver) RemoveExpired() {
 	now := time.Now()
 	last := 0
 	r.mux.Lock()
@@ -71,7 +71,7 @@ func (r *cacheResolver) RemoveExpired() {
 	r.cache = r.cache[:last]
 }
 
-func (r *cacheResolver) moveToFront(index int) {
+func (r *simpleLRUCacheResolver) moveToFront(index int) {
 	entry := r.cache[index]
 	copy(r.cache[1:], r.cache[:index])
 	r.cache[0] = entry
@@ -82,7 +82,7 @@ func makeCacheKey(q dnsmessage.Question) string {
 	return strings.Join([]string{domainKey, q.Type.String(), q.Class.String()}, "|")
 }
 
-func (r *cacheResolver) SearchCache(key string) *dnsmessage.Message {
+func (r *simpleLRUCacheResolver) SearchCache(key string) *dnsmessage.Message {
 	r.mux.Lock()
 	defer r.mux.Unlock()
 	for ei, entry := range r.cache {
@@ -96,7 +96,7 @@ func (r *cacheResolver) SearchCache(key string) *dnsmessage.Message {
 	return nil
 }
 
-func (r *cacheResolver) AddToCache(key string, msg *dnsmessage.Message) {
+func (r *simpleLRUCacheResolver) AddToCache(key string, msg *dnsmessage.Message) {
 	r.mux.Lock()
 	defer r.mux.Unlock()
 	newSize := len(r.cache) + 1
@@ -110,7 +110,7 @@ func (r *cacheResolver) AddToCache(key string, msg *dnsmessage.Message) {
 }
 
 // Query implements [dns.Resolver].
-func (r *cacheResolver) Query(ctx context.Context, q dnsmessage.Question) (*dnsmessage.Message, error) {
+func (r *simpleLRUCacheResolver) Query(ctx context.Context, q dnsmessage.Question) (*dnsmessage.Message, error) {
 	r.RemoveExpired()
 	cacheKey := makeCacheKey(q)
 	if msg := r.SearchCache(cacheKey); msg != nil {

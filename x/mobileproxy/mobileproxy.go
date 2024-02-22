@@ -158,8 +158,7 @@ func NewSmartStreamDialer(testDomains *StringList, searchConfig string, logWrite
 		StreamDialer: &transport.TCPDialer{},
 		PacketDialer: &transport.UDPDialer{},
 	}
-	testDomainsSlice := append(make([]string, 0, len(testDomains.list)), testDomains.list...)
-	dialer, err := finder.NewDialer(context.Background(), testDomainsSlice, []byte(searchConfig))
+	dialer, err := finder.NewDialer(context.Background(), testDomains.list, []byte(searchConfig))
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dialer: %w", err)
 	}
