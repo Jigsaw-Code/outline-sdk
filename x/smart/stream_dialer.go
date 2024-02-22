@@ -50,6 +50,18 @@ func (f *StrategyFinder) log(format string, a ...any) {
 	}
 }
 
+// Only log if context is not done
+func (f *StrategyFinder) logCtx(ctx context.Context, format string, a ...any) {
+	if ctx != nil {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+	}
+	f.log(format, a...)
+}
+
 type httpsEntryJSON struct {
 	// Domain name of the host.
 	Name string `json:"name,omitempty"`
@@ -173,13 +185,13 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryJSON) ([]*smart
 	return rts, nil
 }
 
-func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON) (dns.Resolver, error) {
+func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsConfig []dnsEntryJSON) (dns.Resolver, error) {
 	resolvers, err := f.dnsConfigToResolver(dnsConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	ctx, searchDone := context.WithCancel(context.Background())
+	ctx, searchDone := context.WithCancel(ctx)
 	defer searchDone()
 	raceStart := time.Now()
 	resolver, err := raceTests(ctx, 250*time.Millisecond, resolvers, func(resolver *smartResolver) (*smartResolver, error) {
@@ -190,7 +202,7 @@ func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON)
 			default:
 			}
 
-			f.log("🏃 run DNS: %v (domain: %v)\n", resolver.ID, testDomain)
+			f.logCtx(ctx, "🏃 run DNS: %v (domain: %v)\n", resolver.ID, testDomain)
 			startTime := time.Now()
 			ips, err := testDNSResolver(ctx, f.TestTimeout, resolver, testDomain)
 			duration := time.Since(startTime)
@@ -199,12 +211,8 @@ func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON)
 			if err != nil {
 				status = fmt.Sprintf("%v ❌", err)
 			}
-			select {
-			case <-ctx.Done():
-			default:
-				// Only output log if the search is not done yet.
-				f.log("🏁 got DNS: %v (domain: %v), duration=%v, ips=%v, status=%v\n", resolver.ID, testDomain, duration, ips, status)
-			}
+			// Only output log if the search is not done yet.
+			f.logCtx(ctx, "🏁 got DNS: %v (domain: %v), duration=%v, ips=%v, status=%v\n", resolver.ID, testDomain, duration, ips, status)
 
 			if err != nil {
 				return nil, err
@@ -219,15 +227,19 @@ func (f *StrategyFinder) findDNS(testDomains []string, dnsConfig []dnsEntryJSON)
 	return resolver.Resolver, nil
 }
 
-func (f *StrategyFinder) findTLS(testDomains []string, baseDialer transport.StreamDialer, tlsConfig []string) (transport.StreamDialer, error) {
+func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, baseDialer transport.StreamDialer, tlsConfig []string) (transport.StreamDialer, error) {
 	if len(tlsConfig) == 0 {
 		return nil, errors.New("config for TLS is empty. Please specify at least one transport")
 	}
 
-	ctx, searchDone := context.WithCancel(context.Background())
+	ctx, searchDone := context.WithCancel(ctx)
 	defer searchDone()
 	raceStart := time.Now()
-	tlsDialer, err := raceTests(ctx, 250*time.Millisecond, tlsConfig, func(transportCfg string) (transport.StreamDialer, error) {
+	type SearchResult struct {
+		Dialer transport.StreamDialer
+		Config string
+	}
+	result, err := raceTests(ctx, 250*time.Millisecond, tlsConfig, func(transportCfg string) (*SearchResult, error) {
 		tlsDialer, err := config.WrapStreamDialer(baseDialer, transportCfg)
 		if err != nil {
 			return nil, fmt.Errorf("WrapStreamDialer failed: %w", err)
@@ -236,30 +248,31 @@ func (f *StrategyFinder) findTLS(testDomains []string, baseDialer transport.Stre
 			startTime := time.Now()
 
 			testAddr := net.JoinHostPort(testDomain, "443")
-			f.log("🏃 run TLS: '%v' (domain: %v)\n", transportCfg, testDomain)
+			f.logCtx(ctx, "🏃 run TLS: '%v' (domain: %v)\n", transportCfg, testDomain)
 
-			ctx, cancel := context.WithTimeout(context.Background(), f.TestTimeout)
+			ctx, cancel := context.WithTimeout(ctx, f.TestTimeout)
 			defer cancel()
 			testConn, err := tlsDialer.DialStream(ctx, testAddr)
 			if err != nil {
-				f.log("🏁 got TLS: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+				f.logCtx(ctx, "🏁 got TLS: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 				return nil, err
 			}
 			tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
 			err = tlsConn.HandshakeContext(ctx)
 			tlsConn.Close()
 			if err != nil {
-				f.log("🏁 got TLS: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+				f.logCtx(ctx, "🏁 got TLS: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 				return nil, err
 			}
-			f.log("🏁 got TLS: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
+			f.logCtx(ctx, "🏁 got TLS: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
 		}
-		f.log("🏆 selected TLS strategy '%v' in %0.2fs\n\n", transportCfg, time.Since(raceStart).Seconds())
-		return tlsDialer, nil
+		return &SearchResult{tlsDialer, transportCfg}, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not find TLS strategy: %w", err)
 	}
+	f.log("🏆 selected TLS strategy '%v' in %0.2fs\n\n", result.Config, time.Since(raceStart).Seconds())
+	tlsDialer := result.Dialer
 	return transport.FuncStreamDialer(func(ctx context.Context, raddr string) (transport.StreamConn, error) {
 		_, portStr, err := net.SplitHostPort(raddr)
 		if err != nil {
@@ -293,7 +306,7 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 		testDomains[di] = makeFullyQualified(domain)
 	}
 
-	resolver, err := f.findDNS(testDomains, parsedConfig.DNS)
+	resolver, err := f.findDNS(ctx, testDomains, parsedConfig.DNS)
 	if err != nil {
 		return nil, err
 	}
@@ -314,5 +327,5 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 	if len(parsedConfig.TLS) == 0 {
 		return dnsDialer, nil
 	}
-	return f.findTLS(testDomains, dnsDialer, parsedConfig.TLS)
+	return f.findTLS(ctx, testDomains, dnsDialer, parsedConfig.TLS)
 }
