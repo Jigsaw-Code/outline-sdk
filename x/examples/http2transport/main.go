@@ -31,6 +31,7 @@ import (
 func main() {
 	transportFlag := flag.String("transport", "", "Transport config")
 	addrFlag := flag.String("localAddr", "localhost:1080", "Local proxy address")
+	urlProxyPrefixFlag := flag.String("urlProxyPrefix", "/proxy", "Path where to run the URL proxy. Set to empty (\"\") to disable it.")
 	flag.Parse()
 
 	dialer, err := config.NewStreamDialer(*transportFlag)
@@ -45,9 +46,11 @@ func main() {
 	defer listener.Close()
 	log.Printf("Proxy listening on %v", listener.Addr().String())
 
-	handler := httpproxy.NewProxyHandler(dialer)
-	handler.FallbackHandler = httpproxy.NewPathHandler(dialer)
-	server := http.Server{Handler: handler}
+	proxyHandler := httpproxy.NewProxyHandler(dialer)
+	if *urlProxyPrefixFlag != "" {
+		proxyHandler.FallbackHandler = http.StripPrefix(*urlProxyPrefixFlag, httpproxy.NewPathHandler(dialer))
+	}
+	server := http.Server{Handler: proxyHandler}
 	go func() {
 		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Error running web server: %v", err)

@@ -38,9 +38,10 @@ import (
 
 // Proxy enables you to get the actual address bound by the server and stop the service when no longer needed.
 type Proxy struct {
-	host   string
-	port   int
-	server *http.Server
+	host         string
+	port         int
+	proxyHandler *httpproxy.ProxyHandler
+	server       *http.Server
 }
 
 // Address returns the IP and port the server is bound to.
@@ -56,6 +57,30 @@ func (p *Proxy) Host() string {
 // Port returns the port the server is bound to.
 func (p *Proxy) Port() int {
 	return p.port
+}
+
+// AddURLProxy sets up a URL-based proxy handler that activates when an incoming HTTP request matches
+// the specified path prefix. The pattern must represent a path segment, which is checked against
+// the path of the incoming request.
+//
+// This function is particularly useful for libraries or components that accept URLs but do not support proxy
+// configuration directly. By leveraging AddURLProxy, such components can route requests through a proxy by
+// constructing URLs in the format "http://${HOST}:${PORT}/${PATH}/${URL}", where "${URL}" is the target resource.
+// For instance, using "http://localhost:8080/proxy/https://example.com" routes the request for "https://example.com"
+// through a proxy at "http://localhost:8080/proxy".
+//
+// The path should start with a forward slash ('/') for clarity, but one will be added if missing.
+//
+// The function associates the given 'dialer' with the specified 'path', allowing different dialers to be used for
+// different path-based proxies within the same application in the future. currently we only support one URL proxy.
+func (p *Proxy) AddURLProxy(path string, dialer *StreamDialer) {
+	if len(path) == 0 || path[0] != '/' {
+		path = "/" + path
+	}
+	// TODO(fortuna): Add support for multiple paths. I tried http.ServeMux, but it does request sanitization,
+	// which breaks the URL extraction: https://pkg.go.dev/net/http#hdr-Request_sanitizing.
+	// We can consider forking http.StripPrefix to provide a fallback instead of NotFound, and chaing them.
+	p.proxyHandler.FallbackHandler = http.StripPrefix(path, httpproxy.NewPathHandler(dialer.StreamDialer))
 }
 
 // Stop gracefully stops the proxy service, waiting for at most timeout seconds before forcefully closing it.
@@ -77,7 +102,9 @@ func RunProxy(localAddress string, dialer *StreamDialer) (*Proxy, error) {
 		return nil, fmt.Errorf("could not listen on address %v: %v", localAddress, err)
 	}
 
-	server := &http.Server{Handler: httpproxy.NewProxyHandler(dialer)}
+	proxyHandler := httpproxy.NewProxyHandler(dialer)
+	proxyHandler.FallbackHandler = http.NotFoundHandler()
+	server := &http.Server{Handler: proxyHandler}
 	go server.Serve(listener)
 
 	host, portStr, err := net.SplitHostPort(listener.Addr().String())
@@ -88,7 +115,12 @@ func RunProxy(localAddress string, dialer *StreamDialer) (*Proxy, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not parse proxy port '%v': %v", portStr, err)
 	}
-	return &Proxy{host: host, port: port, server: server}, nil
+	return &Proxy{
+		host:         host,
+		port:         port,
+		server:       server,
+		proxyHandler: proxyHandler,
+	}, nil
 }
 
 // StreamDialer encapsulates the logic to create stream connections (like TCP).
