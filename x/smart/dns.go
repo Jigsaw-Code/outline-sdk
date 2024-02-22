@@ -175,7 +175,7 @@ func testDNSResolver(baseCtx context.Context, oneTestTimeout time.Duration, reso
 
 	q, err := dns.NewQuestion(requestDomain, dnsmessage.TypeA)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create question: %v", err)
+		return nil, fmt.Errorf("failed to create question: %w", err)
 	}
 	ctxA, cancelA := context.WithTimeout(baseCtx, oneTestTimeout)
 	defer cancelA()
