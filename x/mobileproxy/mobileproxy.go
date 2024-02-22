@@ -60,7 +60,7 @@ func (p *Proxy) Port() int {
 }
 
 // AddURLProxy sets up a URL-based proxy handler that activates when an incoming HTTP request matches
-// the specified pattern. The pattern should generally represent a path segment, which is checked against
+// the specified path prefix. The pattern must represent a path segment, which is checked against
 // the path of the incoming request.
 //
 // This function is particularly useful for libraries or components that accept URLs but do not support proxy
@@ -69,18 +69,16 @@ func (p *Proxy) Port() int {
 // For instance, using "http://localhost:8080/proxy/https://example.com" routes the request for "https://example.com"
 // through a proxy at "http://localhost:8080/proxy".
 //
-// The 'pattern' parameter for the HTTP handler should follow the format "[METHOD ][HOST]/[PATH]", where "METHOD" is an
-// optional HTTP method (e.g., "GET"), "HOST" is an optional hostname, and "PATH" is the required path prefix.
-// Detailed pattern syntax is documented at https://pkg.go.dev/net/http#hdr-Patterns. Note that the pattern must
-// start with a forward slash ('/') indicating a path, such as "/proxy", and may optionally include an HTTP method prefix,
-// e.g., "GET /proxy". Specifying a "HOST" in the pattern is supported but typically not necessary for the intended use
-// cases of this function.
+// The path should start with a forward slash ('/') for clarity, but one will be added if missing.
 //
-// The function associates the given 'dialer' with the specified 'pattern', allowing different dialers to be used for
+// The function associates the given 'dialer' with the specified 'path', allowing different dialers to be used for
 // different path-based proxies within the same application.
-func (p *Proxy) AddURLProxy(pattern string, dialer *StreamDialer) {
+func (p *Proxy) AddURLProxy(path string, dialer *StreamDialer) {
 	pathHandler := httpproxy.NewPathHandler(dialer.StreamDialer)
-	p.fallbackHandler.Handle(pattern, http.StripPrefix(pattern, pathHandler))
+	if len(path) == 0 || path[0] != '/' {
+		path = "/" + path
+	}
+	p.fallbackHandler.Handle(path, http.StripPrefix(path, pathHandler))
 }
 
 // Stop gracefully stops the proxy service, waiting for at most timeout seconds before forcefully closing it.
