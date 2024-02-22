@@ -48,7 +48,7 @@ func main() {
 
 	proxyHandler := httpproxy.NewProxyHandler(dialer)
 	if *urlProxyPrefixFlag != "" {
-		proxyHandler.FallbackHandler = http.StripPrefix("/proxy", httpproxy.NewPathHandler(dialer))
+		proxyHandler.FallbackHandler = http.StripPrefix(*urlProxyPrefixFlag, httpproxy.NewPathHandler(dialer))
 	}
 	server := http.Server{Handler: proxyHandler}
 	go func() {
