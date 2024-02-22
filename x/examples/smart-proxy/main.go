@@ -50,7 +50,9 @@ func supportsHappyEyeballs(dialer transport.StreamDialer) bool {
 	// Our shadowsocks.StreamDialer will return a connection successfully as long as it can
 	// connect to the proxy server, regardless of whether it can connect to the target.
 	// This breaks HappyEyeballs.
-	conn, err := dialer.DialStream(context.Background(), "invalid:0")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	conn, err := dialer.DialStream(ctx, "invalid:0")
+	cancel()
 	if conn != nil {
 		conn.Close()
 	}
