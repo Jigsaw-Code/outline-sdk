@@ -129,8 +129,6 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		return nil, fmt.Errorf("failed to read connect server response: %w", err)
 	}
 
-	fmt.Printf("Connect response: %v", connectResponse)
-
 	if connectResponse[0] != 5 {
 		return nil, fmt.Errorf("invalid protocol version %v. Expected 5", connectResponse[0])
 	}
