@@ -21,7 +21,6 @@
 package tools
 
 import (
-	_ "github.com/go-task/task/v3/cmd/task"
-	_ "golang.org/x/mobile/cmd/gobind"
-	_ "golang.org/x/mobile/cmd/gomobile"
+	_ "github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
+	_ "github.com/Psiphon-Labs/psiphon-tunnel-core/MobileLibrary/psi"
 )

@@ -1,0 +1,79 @@
+version: '3'
+
+run: when_changed
+
+vars:
+  OUT_DIR: "{{.USER_WORKING_DIR}}/out"
+
+tasks:
+  gomobile:
+    cmds:
+      - mkdir -p "{{.OUT_DIR}}"
+      - go build -o "{{.OUT_DIR}}" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
+    sources: ["go.mod"]
+    generates: ["out/gomobile", "out/gobind"]
+
+  ios:
+    desc: "Builds the iOS mobileproxy.xcframework library"
+    deps: [gomobile]
+    cmds:
+      - |-
+        PATH="{{.OUT_DIR}}:$PATH" gomobile bind \
+            -ldflags='-s -w' \
+            -target=ios -iosversion=11.0 \
+            -o "{{.OUT_DIR}}/mobileproxy.xcframework" \
+            github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+
+  ios+psiphon:
+    desc: "Builds the iOS mobileproxy.xcframework library with Psiphon"
+    # See https://github.com/Psiphon-Labs/psiphon-tunnel-core/blob/master/MobileLibrary/iOS/build-psiphon-framework.sh
+    deps: [gomobile]
+    dir: "mobileproxy+psiphon"
+    cmds:
+      - |-
+        PATH="{{.OUT_DIR}}:$PATH" gomobile bind \
+            -tags PSIPHON_DISABLE_QUIC \
+            -ldflags="-s -w
+                -X github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/buildinfo.buildRepo=github.com/Jigsaw-Code/outline-sdk
+                -X github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/buildinfo.buildDate={{now | date "2006-01-02T15:04:05-07:00"}}
+                -X github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/buildinfo.buildRev=$(git rev-parse --short HEAD)
+                -X github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/buildinfo.goVersion=$(go version | cut -d " " -f 3)
+            " \
+            -target=ios -iosversion=11.0 \
+            -o "{{.OUT_DIR}}/mobileproxy+psiphon.xcframework" \
+            github.com/Jigsaw-Code/outline-sdk/x/mobileproxy github.com/Psiphon-Labs/psiphon-tunnel-core/MobileLibrary/psi
+
+  android:
+    desc: "Builds the Android mobileproxy.aar library"
+    deps: [gomobile]
+    cmds:
+      - |-
+        PATH="{{.OUT_DIR}}:$PATH" gomobile bind \
+            -ldflags='-s -w' \
+            -target=android -androidapi=21 \
+            -o "{{.OUT_DIR}}/mobileproxy.aar" \
+            github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+
+  android+psiphon:
+    desc: "Builds the Android mobileproxy.aar library with Psiphon"
+    # See https://github.com/Psiphon-Labs/psiphon-tunnel-core/blob/master/MobileLibrary/Android/make.bash
+    deps: [gomobile]
+    dir: "mobileproxy+psiphon"
+    cmds:
+      - |-
+        PATH="{{.OUT_DIR}}:$PATH" gomobile bind \
+            -tags PSIPHON_DISABLE_QUIC \
+            -ldflags="-s -w
+                -X github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/buildinfo.buildRepo=github.com/Jigsaw-Code/outline-sdk
+                -X github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/buildinfo.buildDate={{now | date "2006-01-02T15:04:05-07:00"}}
+                -X github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/buildinfo.buildRev=$(git rev-parse --short HEAD)
+                -X github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/buildinfo.goVersion=$(go version | cut -d " " -f 3)
+            " \
+            -target=android -androidapi=21 \
+            -o "{{.OUT_DIR}}/mobileproxy+psiphon.aar" \
+            github.com/Jigsaw-Code/outline-sdk/x/mobileproxy github.com/Psiphon-Labs/psiphon-tunnel-core/MobileLibrary/psi
+
+  clean:
+    desc: "Cleans output directory"
+    cmds:
+      - rm -rf {{.OUT_DIR}}

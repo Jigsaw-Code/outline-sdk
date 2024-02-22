@@ -1,10 +1,10 @@
-// Copyright 2023 Jigsaw Operations LLC
+// Copyright 2024 Jigsaw Operations LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//     https://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build tools
-// +build tools
+//go:build !unix
 
-// See https://github.com/golang/go/wiki/Modules#how-can-i-track-tool-dependencies-for-a-module
-// and https://github.com/go-modules-by-example/index/blob/master/010_tools/README.md
-
-package tools
+package smart
 
 import (
-	_ "github.com/go-task/task/v3/cmd/task"
-	_ "golang.org/x/mobile/cmd/gobind"
-	_ "golang.org/x/mobile/cmd/gomobile"
+	"context"
+	"net"
 )
+
+func lookupCNAME(ctx context.Context, domain string) (string, error) {
+	return net.DefaultResolver.LookupCNAME(ctx, domain)
+}
