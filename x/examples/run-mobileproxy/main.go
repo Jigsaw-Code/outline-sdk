@@ -26,7 +26,7 @@ import (
 func main() {
 	transportFlag := flag.String("transport", "", "Transport config")
 	addrFlag := flag.String("localAddr", "localhost:8080", "Local proxy address")
-	urlProxyPrefixFlag := flag.String("urlProxyPrefix", "/proxy", "Path where to run the URL proxy. Set to empty (\"\") to disable it.")
+	urlProxyPrefixFlag := flag.String("proxyPath", "/proxy", "Path where to run the URL proxy. Set to empty (\"\") to disable it.")
 	flag.Parse()
 
 	dialer, err := mobileproxy.NewStreamDialerFromConfig(*transportFlag)
@@ -37,7 +37,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("RunProxy failed: %v", err)
 	}
-	proxy.AddURLProxy(*urlProxyPrefixFlag, dialer)
+	if *urlProxyPrefixFlag != "" {
+		proxy.AddURLProxy(*urlProxyPrefixFlag, dialer)
+	}
 	log.Printf("Proxy listening on %v", proxy.Address())
 
 	// Wait for interrupt signal to stop the proxy.

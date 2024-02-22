@@ -38,10 +38,10 @@ import (
 
 // Proxy enables you to get the actual address bound by the server and stop the service when no longer needed.
 type Proxy struct {
-	host            string
-	port            int
-	fallbackHandler *http.ServeMux
-	server          *http.Server
+	host         string
+	port         int
+	proxyHandler *httpproxy.ProxyHandler
+	server       *http.Server
 }
 
 // Address returns the IP and port the server is bound to.
@@ -72,13 +72,15 @@ func (p *Proxy) Port() int {
 // The path should start with a forward slash ('/') for clarity, but one will be added if missing.
 //
 // The function associates the given 'dialer' with the specified 'path', allowing different dialers to be used for
-// different path-based proxies within the same application.
+// different path-based proxies within the same application in the future. currently we only support one URL proxy.
 func (p *Proxy) AddURLProxy(path string, dialer *StreamDialer) {
-	pathHandler := httpproxy.NewPathHandler(dialer.StreamDialer)
 	if len(path) == 0 || path[0] != '/' {
 		path = "/" + path
 	}
-	p.fallbackHandler.Handle(path, http.StripPrefix(path, pathHandler))
+	// TODO(fortuna): Add support for multiple paths. I tried http.ServeMux, but it does request sanitization,
+	// which breaks the URL extraction: https://pkg.go.dev/net/http#hdr-Request_sanitizing.
+	// We can consider forking http.StripPrefix to provide a fallback instead of NotFound, and chaing them.
+	p.proxyHandler.FallbackHandler = http.StripPrefix(path, httpproxy.NewPathHandler(dialer.StreamDialer))
 }
 
 // Stop gracefully stops the proxy service, waiting for at most timeout seconds before forcefully closing it.
@@ -101,8 +103,7 @@ func RunProxy(localAddress string, dialer *StreamDialer) (*Proxy, error) {
 	}
 
 	proxyHandler := httpproxy.NewProxyHandler(dialer)
-	fallbackHandler := &http.ServeMux{}
-	proxyHandler.FallbackHandler = fallbackHandler
+	proxyHandler.FallbackHandler = http.NotFoundHandler()
 	server := &http.Server{Handler: proxyHandler}
 	go server.Serve(listener)
 
@@ -115,10 +116,10 @@ func RunProxy(localAddress string, dialer *StreamDialer) (*Proxy, error) {
 		return nil, fmt.Errorf("could not parse proxy port '%v': %v", portStr, err)
 	}
 	return &Proxy{
-		host:            host,
-		port:            port,
-		server:          server,
-		fallbackHandler: fallbackHandler,
+		host:         host,
+		port:         port,
+		server:       server,
+		proxyHandler: proxyHandler,
 	}, nil
 }
 
