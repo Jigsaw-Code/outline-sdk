@@ -2,6 +2,8 @@ module github.com/Jigsaw-Code/outline-sdk/x/psiphon
 
 go 1.20
 
+// Use our non-functional stub implementation, instead of the official GPL one.
+// Actual users will have to depend on the official GPL code instead.
 replace github.com/Psiphon-Labs/psiphon-tunnel-core => ./stub
 
 require (
