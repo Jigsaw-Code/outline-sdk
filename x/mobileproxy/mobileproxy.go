@@ -21,14 +21,19 @@ package mobileproxy
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
+	"github.com/Jigsaw-Code/outline-sdk/x/smart"
 )
 
 // Proxy enables you to get the actual address bound by the server and stop the service when no longer needed.
@@ -64,14 +69,9 @@ func (p *Proxy) Stop(timeoutSeconds int) {
 	}
 }
 
-// RunProxy runs a local web proxy that listens on localAddress, and uses the transportConfig to
-// create a [transport.StreamDialer] that is used to connect to the requested destination.
-func RunProxy(localAddress string, transportConfig string) (*Proxy, error) {
-	dialer, err := config.NewStreamDialer(transportConfig)
-	if err != nil {
-		return nil, fmt.Errorf("could not create dialer: %w", err)
-	}
-
+// RunProxy runs a local web proxy that listens on localAddress, and handles proxy requests by
+// establishing connections to requested destination using the [StreamDialer].
+func RunProxy(localAddress string, dialer *StreamDialer) (*Proxy, error) {
 	listener, err := net.Listen("tcp", localAddress)
 	if err != nil {
 		return nil, fmt.Errorf("could not listen on address %v: %v", localAddress, err)
@@ -89,4 +89,94 @@ func RunProxy(localAddress string, transportConfig string) (*Proxy, error) {
 		return nil, fmt.Errorf("could not parse proxy port '%v': %v", portStr, err)
 	}
 	return &Proxy{host: host, port: port, server: server}, nil
+}
+
+// StreamDialer encapsulates the logic to create stream connections (like TCP).
+type StreamDialer struct {
+	transport.StreamDialer
+}
+
+// NewStreamDialerFromConfig creates a [StreamDialer] based on the given config.
+// The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config#hdr-Config_Format.
+func NewStreamDialerFromConfig(transportConfig string) (*StreamDialer, error) {
+	dialer, err := config.NewStreamDialer(transportConfig)
+	if err != nil {
+		return nil, err
+	}
+	return &StreamDialer{dialer}, nil
+}
+
+// LogWriter is used as a sink for logging.
+type LogWriter io.StringWriter
+
+// Adaptor to convert an [io.StringWriter] to a [io.Writer].
+type stringToBytesWriter struct {
+	w io.Writer
+}
+
+// WriteString implements [io.StringWriter].
+func (w *stringToBytesWriter) WriteString(logText string) (int, error) {
+	return io.WriteString(w.w, logText)
+}
+
+// NewStderrLogWriter creates a [LogWriter] that writes to the standard error output.
+func NewStderrLogWriter() LogWriter {
+	return &stringToBytesWriter{os.Stderr}
+}
+
+// Adaptor to convert an [io.Writer] to a [io.StringWriter].
+type bytestoStringWriter struct {
+	sw io.StringWriter
+}
+
+// Write implements [io.Writer].
+func (w *bytestoStringWriter) Write(b []byte) (int, error) {
+	return w.sw.WriteString(string(b))
+}
+
+func toWriter(logWriter LogWriter) io.Writer {
+	if logWriter == nil {
+		return nil
+	}
+	if w, ok := logWriter.(io.Writer); ok {
+		return w
+	}
+	return &bytestoStringWriter{logWriter}
+}
+
+// NewSmartStreamDialer automatically selects a DNS and TLS strategy to use, and returns a [StreamDialer]
+// that will use the selected strategy.
+// It uses testDomains to find a strategy that works when accessing those domains.
+// The strategies to search are given in the searchConfig. An example can be found in
+// https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.json
+func NewSmartStreamDialer(testDomains *StringList, searchConfig string, logWriter LogWriter) (*StreamDialer, error) {
+	logBytesWriter := toWriter(logWriter)
+	// TODO: inject the base dialer for tests.
+	finder := smart.StrategyFinder{
+		LogWriter:    logBytesWriter,
+		TestTimeout:  5 * time.Second,
+		StreamDialer: &transport.TCPDialer{},
+		PacketDialer: &transport.UDPDialer{},
+	}
+	dialer, err := finder.NewDialer(context.Background(), testDomains.list, []byte(searchConfig))
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dialer: %w", err)
+	}
+	return &StreamDialer{dialer}, nil
+}
+
+// StringList allows us to pass a list of strings to the Go Mobile functions, since Go Mobile doesn't
+// support slices as parameters.
+type StringList struct {
+	list []string
+}
+
+// Append adds the string value to the end of the list.
+func (l *StringList) Append(value string) {
+	l.list = append(l.list, value)
+}
+
+// NewListFromLines creates a StringList by splitting the input string on new lines.
+func NewListFromLines(lines string) *StringList {
+	return &StringList{list: strings.Split(lines, "\n")}
 }

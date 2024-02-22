@@ -1,0 +1,19 @@
+{
+    "dns": [
+        {"udp": {"address": "china.cn"}},
+        {"udp": {"address": "ns1.tic.ir"}},
+        {"tcp": {"address": "ns1.tic.ir"}},
+        {"udp": {"address": "tmcell.tm"}},
+        {"udp": {"address": "dns1.transtelecom.net."}},
+        {"tls": {"name": "captive-portal.badssl.com", "address": "captive-portal.badssl.com:443"}},
+        {"https": {"name": "mitm-software.badssl.com"}}
+    ],
+
+    "tls": [
+        "",
+        "split:1",
+        "split:2",
+        "split:5",
+        "tlsfrag:1"
+    ]
+}
