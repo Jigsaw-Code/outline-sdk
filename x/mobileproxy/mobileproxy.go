@@ -89,8 +89,8 @@ func (p *Proxy) Port() int {
 //
 // The function associates the given 'dialer' with the specified 'pattern', allowing different dialers to be used for
 // different path-based proxies within the same application.
-func (p *Proxy) AddURLProxy(pattern string, dialer StreamDialer) {
-	pathHandler := httpproxy.NewPathHandler(dialer)
+func (p *Proxy) AddURLProxy(pattern string, dialer *StreamDialer) {
+	pathHandler := httpproxy.NewPathHandler(dialer.StreamDialer)
 	p.fallbackHandler.Handle(pattern, http.StripPrefix(pattern, pathHandler))
 }
 
