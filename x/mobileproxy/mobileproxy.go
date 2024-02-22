@@ -59,17 +59,6 @@ func (p *Proxy) Port() int {
 	return p.port
 }
 
-// AddURLProxy enables a URL proxy that will trigger on the given pattern and use the given dialer. The pattern
-// is typically a path, and it matched agains the incoming HTTP request.
-//
-// Libraries that take a URL, but can't be configured with a proxy, can use then use the URL proxy with a URL
-// like "http://${HOST}:${PORT}/${PATH}/${URL}"". For example, "http://localhost:8080/proxy/https://example.com".
-// You can have different dialers on different paths.
-//
-// The HTTP handler pattern looks like "[METHOD ][HOST]/[PATH]" and is described in https://pkg.go.dev/net/http#hdr-Patterns.
-// It must start with a "/" for a path, as in "/proxy", with an optional METHOD before, as in "GET /proxy".
-// It's possible to restrict to a HOST, but that is not very useful in the context of Mobileproxy.
-
 // AddURLProxy sets up a URL-based proxy handler that activates when an incoming HTTP request matches
 // the specified pattern. The pattern should generally represent a path segment, which is checked against
 // the path of the incoming request.
