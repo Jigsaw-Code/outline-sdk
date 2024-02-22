@@ -43,13 +43,3 @@ func (controller *Controller) Run(ctx context.Context) {}
 func (controller *Controller) Dial(remoteAddr string, downstreamConn net.Conn) (conn net.Conn, err error) {
 	return nil, errors.New("not available")
 }
-
-func GetNotice(notice []byte) (noticeType string, payload map[string]interface{}, err error) {
-	return "", nil, errors.New("not available")
-}
-
-type NoticeReceiver struct{}
-
-func NewNoticeReceiver(callback func([]byte)) *NoticeReceiver {
-	return nil
-}
