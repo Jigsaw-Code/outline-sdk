@@ -42,6 +42,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("RunProxy failed: %v", err)
 	}
+	proxy.EnableUrlProxy("/proxy")
 
 	httpClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(&url.URL{Scheme: "http", Host: proxy.Address()})}}
 

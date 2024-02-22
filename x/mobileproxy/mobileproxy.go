@@ -38,9 +38,10 @@ import (
 
 // Proxy enables you to get the actual address bound by the server and stop the service when no longer needed.
 type Proxy struct {
-	host   string
-	port   int
-	server *http.Server
+	host            string
+	port            int
+	fallbackHandler *http.ServeMux
+	server          *http.Server
 }
 
 // Address returns the IP and port the server is bound to.
@@ -56,6 +57,41 @@ func (p *Proxy) Host() string {
 // Port returns the port the server is bound to.
 func (p *Proxy) Port() int {
 	return p.port
+}
+
+// AddURLProxy enables a URL proxy that will trigger on the given pattern and use the given dialer. The pattern
+// is typically a path, and it matched agains the incoming HTTP request.
+//
+// Libraries that take a URL, but can't be configured with a proxy, can use then use the URL proxy with a URL
+// like "http://${HOST}:${PORT}/${PATH}/${URL}"". For example, "http://localhost:8080/proxy/https://example.com".
+// You can have different dialers on different paths.
+//
+// The HTTP handler pattern looks like "[METHOD ][HOST]/[PATH]" and is described in https://pkg.go.dev/net/http#hdr-Patterns.
+// It must start with a "/" for a path, as in "/proxy", with an optional METHOD before, as in "GET /proxy".
+// It's possible to restrict to a HOST, but that is not very useful in the context of Mobileproxy.
+
+// AddURLProxy sets up a URL-based proxy handler that activates when an incoming HTTP request matches
+// the specified pattern. The pattern should generally represent a path segment, which is checked against
+// the path of the incoming request.
+//
+// This function is particularly useful for libraries or components that accept URLs but do not support proxy
+// configuration directly. By leveraging AddURLProxy, such components can route requests through a proxy by
+// constructing URLs in the format "http://${HOST}:${PORT}/${PATH}/${URL}", where "${URL}" is the target resource.
+// For instance, using "http://localhost:8080/proxy/https://example.com" routes the request for "https://example.com"
+// through a proxy at "http://localhost:8080/proxy".
+//
+// The 'pattern' parameter for the HTTP handler should follow the format "[METHOD ][HOST]/[PATH]", where "METHOD" is an
+// optional HTTP method (e.g., "GET"), "HOST" is an optional hostname, and "PATH" is the required path prefix.
+// Detailed pattern syntax is documented at https://pkg.go.dev/net/http#hdr-Patterns. Note that the pattern must
+// start with a forward slash ('/') indicating a path, such as "/proxy", and may optionally include an HTTP method prefix,
+// e.g., "GET /proxy". Specifying a "HOST" in the pattern is supported but typically not necessary for the intended use
+// cases of this function.
+//
+// The function associates the given 'dialer' with the specified 'pattern', allowing different dialers to be used for
+// different path-based proxies within the same application.
+func (p *Proxy) AddURLProxy(pattern string, dialer StreamDialer) {
+	pathHandler := httpproxy.NewPathHandler(dialer)
+	p.fallbackHandler.Handle(pattern, http.StripPrefix(pattern, pathHandler))
 }
 
 // Stop gracefully stops the proxy service, waiting for at most timeout seconds before forcefully closing it.
@@ -77,7 +113,10 @@ func RunProxy(localAddress string, dialer *StreamDialer) (*Proxy, error) {
 		return nil, fmt.Errorf("could not listen on address %v: %v", localAddress, err)
 	}
 
-	server := &http.Server{Handler: httpproxy.NewProxyHandler(dialer)}
+	proxyHandler := httpproxy.NewProxyHandler(dialer)
+	fallbackHandler := &http.ServeMux{}
+	proxyHandler.FallbackHandler = fallbackHandler
+	server := &http.Server{Handler: proxyHandler}
 	go server.Serve(listener)
 
 	host, portStr, err := net.SplitHostPort(listener.Addr().String())
@@ -88,7 +127,12 @@ func RunProxy(localAddress string, dialer *StreamDialer) (*Proxy, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not parse proxy port '%v': %v", portStr, err)
 	}
-	return &Proxy{host: host, port: port, server: server}, nil
+	return &Proxy{
+		host:            host,
+		port:            port,
+		server:          server,
+		fallbackHandler: fallbackHandler,
+	}, nil
 }
 
 // StreamDialer encapsulates the logic to create stream connections (like TCP).
