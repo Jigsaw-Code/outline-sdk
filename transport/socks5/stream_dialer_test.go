@@ -25,6 +25,7 @@ import (
 	"testing/iotest"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/armon/go-socks5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -163,4 +164,49 @@ func testExchange(tb testing.TB, listener *net.TCPListener, destAddr string, req
 	}()
 
 	running.Wait()
+}
+
+func TestConnectWithoutAuth(t *testing.T) {
+	// Create a SOCKS5 server
+	conf := &socks5.Config{}
+	server, err := socks5.New(conf)
+	require.NoError(t, err)
+
+	// Create SOCKS5 proxy on localhost port 8000
+	err = server.ListenAndServe("tcp", "127.0.0.1:8000")
+	require.NoError(t, err)
+
+	// Create a SOCKS5 client
+	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.1:8000"}, Credentials{})
+	require.NotNil(t, dialer)
+	require.NoError(t, err)
+	_, err = dialer.DialStream(context.Background(), "127.0.0.1:8000")
+	require.Error(t, err)
+}
+
+func TestConnectWithAuth(t *testing.T) {
+	// Create a SOCKS5 server
+	creds := socks5.StaticCredentials{
+		"testusername": "testpassword",
+	}
+
+	cator := socks5.UserPassAuthenticator{Credentials: creds}
+	conf := &socks5.Config{
+		AuthMethods: []socks5.Authenticator{cator},
+	}
+
+	// Create SOCKS5 proxy on localhost port 8000
+	server, err := socks5.New(conf)
+	require.NoError(t, err)
+
+	err = server.ListenAndServe("tcp", "127.0.0.1:8000")
+	require.NoError(t, err)
+
+	// Create a SOCKS5 client
+	c := Credentials{Username: "testusername", Password: "testpassword"}
+	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.1:8000"}, c)
+	require.NotNil(t, dialer)
+	require.NoError(t, err)
+	_, err = dialer.DialStream(context.Background(), "127.0.0.1:8000")
+	require.Error(t, err)
 }
