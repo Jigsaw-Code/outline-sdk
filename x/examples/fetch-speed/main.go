@@ -42,23 +42,13 @@ func init() {
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
 	transportFlag := flag.String("transport", "", "Transport config")
-	addressFlag := flag.String("address", "", "Address to connect to. If empty, use the URL authority")
 	methodFlag := flag.String("method", "GET", "The HTTP method to use")
+	timeoutFlag := flag.Duration("timeout", 10 * time.Second, "The HTTP timeout value")
 
 	flag.Parse()
 
 	if *verboseFlag {
 		debugLog = *log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
-	}
-	var overrideHost, overridePort string
-	if *addressFlag != "" {
-		var err error
-		overrideHost, overridePort, err = net.SplitHostPort(*addressFlag)
-		if err != nil {
-			// Fail to parse. Assume the flag is host only.
-			overrideHost = *addressFlag
-			overridePort = ""
-		}
 	}
 
 	url := flag.Arg(0)
@@ -77,18 +67,12 @@ func main() {
 		if err != nil {
 			return nil, fmt.Errorf("invalid address: %w", err)
 		}
-		if overrideHost != "" {
-			host = overrideHost
-		}
-		if overridePort != "" {
-			port = overridePort
-		}
 		if !strings.HasPrefix(network, "tcp") {
 			return nil, fmt.Errorf("protocol not supported: %v", network)
 		}
 		return dialer.DialStream(ctx, net.JoinHostPort(host, port))
 	}
-	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: 5 * time.Second}
+	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: *timeoutFlag}
 
 	req, err := http.NewRequest(*methodFlag, url, nil)
 	if err != nil {
