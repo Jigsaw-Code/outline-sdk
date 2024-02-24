@@ -24,6 +24,12 @@ import (
 func newSocks5StreamDialerFromURL(innerDialer transport.StreamDialer, url *url.URL) (transport.StreamDialer, error) {
 	endpoint := transport.StreamDialerEndpoint{Dialer: innerDialer, Address: url.Host}
 	password, _ := url.User.Password()
-	cred := socks5.Credentials{Username: url.User.Username(), Password: password}
-	return socks5.NewStreamDialer(&endpoint, cred)
+	cred := socks5.Credentials{}
+	if err := cred.SetUsername(url.User.Username()); err != nil {
+		return nil, err
+	}
+	if err := cred.SetPassword(password); err != nil {
+		return nil, err
+	}
+	return socks5.NewStreamDialer(&endpoint, &cred)
 }
