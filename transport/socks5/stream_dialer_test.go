@@ -203,11 +203,11 @@ func TestConnectWithAuth(t *testing.T) {
 		AuthMethods: []socks5.Authenticator{cator},
 	}
 
-	// Create SOCKS5 proxy on localhost port 8000
+	// Create SOCKS5 proxy with configured credentials
 	server, err := socks5.New(conf)
 	require.NoError(t, err)
 
-	// Create SOCKS5 proxy on localhost port 8000
+	// Create SOCKS5 proxy on localhost port 8001
 	go func() {
 		err := server.ListenAndServe("tcp", "127.0.0.1:8001")
 		require.NoError(t, err)
