@@ -16,45 +16,36 @@ package main
 
 import (
 	"flag"
-	"io"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
+	"os/signal"
 
 	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
 )
 
 func main() {
 	transportFlag := flag.String("transport", "", "Transport config")
+	addrFlag := flag.String("localAddr", "localhost:8080", "Local proxy address")
+	urlProxyPrefixFlag := flag.String("proxyPath", "/proxy", "Path where to run the URL proxy. Set to empty (\"\") to disable it.")
 	flag.Parse()
-
-	urlToFetch := flag.Arg(0)
-	if urlToFetch == "" {
-		log.Fatal("Need to pass the URL to fetch in the command-line")
-	}
 
 	dialer, err := mobileproxy.NewStreamDialerFromConfig(*transportFlag)
 	if err != nil {
 		log.Fatalf("NewStreamDialerFromConfig failed: %v", err)
 	}
-	proxy, err := mobileproxy.RunProxy("localhost:0", dialer)
+	proxy, err := mobileproxy.RunProxy(*addrFlag, dialer)
 	if err != nil {
 		log.Fatalf("RunProxy failed: %v", err)
 	}
-
-	httpClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(&url.URL{Scheme: "http", Host: proxy.Address()})}}
-
-	resp, err := httpClient.Get(urlToFetch)
-	if err != nil {
-		log.Fatalf("URL GET failed: %v", err)
+	if *urlProxyPrefixFlag != "" {
+		proxy.AddURLProxy(*urlProxyPrefixFlag, dialer)
 	}
-	defer resp.Body.Close()
+	log.Printf("Proxy listening on %v", proxy.Address())
 
-	_, err = io.Copy(os.Stdout, resp.Body)
-	if err != nil {
-		log.Fatalf("Read of page body failed: %v", err)
-	}
-
-	proxy.Stop(5)
+	// Wait for interrupt signal to stop the proxy.
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt)
+	<-sig
+	log.Print("Shutting down")
+	proxy.Stop(2)
 }
