@@ -23,6 +23,7 @@ import (
 	"sync"
 	"testing"
 	"testing/iotest"
+	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/armon/go-socks5"
@@ -31,13 +32,13 @@ import (
 )
 
 func TestSOCKS5Dialer_NewStreamDialerNil(t *testing.T) {
-	dialer, err := NewStreamDialer(nil)
+	dialer, err := NewStreamDialer(nil, nil)
 	require.Nil(t, dialer)
 	require.Error(t, err)
 }
 
 func TestSOCKS5Dialer_BadConnection(t *testing.T) {
-	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.0:0"})
+	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.0:0"}, nil)
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
 	_, err = dialer.DialStream(context.Background(), "example.com:443")
@@ -49,7 +50,7 @@ func TestSOCKS5Dialer_BadAddress(t *testing.T) {
 	require.NoError(t, err, "Failed to create TCP listener: %v", err)
 	defer listener.Close()
 
-	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String()})
+	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String()}, nil)
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
 
@@ -96,7 +97,7 @@ func testExchange(tb testing.TB, listener *net.TCPListener, destAddr string, req
 	// Client
 	go func() {
 		defer running.Done()
-		dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String()})
+		dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String()}, nil)
 		require.NoError(tb, err)
 		serverConn, err := dialer.DialStream(context.Background(), destAddr)
 		if replyCode != 0 {
@@ -172,16 +173,23 @@ func TestConnectWithoutAuth(t *testing.T) {
 	server, err := socks5.New(conf)
 	require.NoError(t, err)
 
+	fmt.Println("server created")
+
 	// Create SOCKS5 proxy on localhost port 8000
-	err = server.ListenAndServe("tcp", "127.0.0.1:8000")
-	require.NoError(t, err)
+	go func() {
+		err := server.ListenAndServe("tcp", "127.0.0.1:8000")
+		require.NoError(t, err)
+		fmt.Println("server is listening")
+	}()
+	// wait for server to start
+	time.Sleep(10 * time.Millisecond)
 
 	// Create a SOCKS5 client
-	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.1:8000"}, Credentials{})
+	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.1:8000"}, nil)
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
 	_, err = dialer.DialStream(context.Background(), "127.0.0.1:8000")
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 func TestConnectWithAuth(t *testing.T) {
@@ -199,14 +207,24 @@ func TestConnectWithAuth(t *testing.T) {
 	server, err := socks5.New(conf)
 	require.NoError(t, err)
 
-	err = server.ListenAndServe("tcp", "127.0.0.1:8000")
-	require.NoError(t, err)
+	// Create SOCKS5 proxy on localhost port 8000
+	go func() {
+		err := server.ListenAndServe("tcp", "127.0.0.1:8001")
+		require.NoError(t, err)
+		fmt.Println("server is listening")
+	}()
+	// wait for server to start
+	time.Sleep(10 * time.Millisecond)
 
 	// Create a SOCKS5 client
-	c := Credentials{Username: "testusername", Password: "testpassword"}
-	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.1:8000"}, c)
+	c := Credentials{}
+	err = c.SetUsername("testusername")
+	require.NoError(t, err)
+	err = c.SetPassword("testpassword")
+	require.NoError(t, err)
+	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.1:8001"}, &c)
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
-	_, err = dialer.DialStream(context.Background(), "127.0.0.1:8000")
-	require.Error(t, err)
+	_, err = dialer.DialStream(context.Background(), "127.0.0.1:8001")
+	require.NoError(t, err)
 }
