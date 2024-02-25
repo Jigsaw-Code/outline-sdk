@@ -3,6 +3,7 @@ module github.com/Jigsaw-Code/outline-sdk
 go 1.20
 
 require (
+	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/eycorsican/go-tun2socks v1.16.11
 	github.com/google/gopacket v1.1.19
 	github.com/shadowsocks/go-shadowsocks2 v0.1.5
