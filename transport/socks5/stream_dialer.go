@@ -23,6 +23,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
+// https://datatracker.ietf.org/doc/html/rfc1929
 type Credentials struct {
 	username []byte
 	password []byte
