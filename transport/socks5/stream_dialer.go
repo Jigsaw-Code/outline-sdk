@@ -23,23 +23,53 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
+type Credentials struct {
+	username []byte
+	password []byte
+}
+
+// SetUsername sets the username field, ensuring it doesn't exceed 255 bytes in length and is at least 1 byte.
+func (c *Credentials) SetUsername(username string) error {
+	if len([]byte(username)) > 255 {
+		return errors.New("username exceeds 255 bytes")
+	}
+	if len([]byte(username)) < 1 {
+		return errors.New("username must be at least 1 byte")
+	}
+	c.username = []byte(username)
+	return nil
+}
+
+// SetPassword sets the password field, ensuring it doesn't exceed 255 bytes in length and is at least 1 byte.
+func (c *Credentials) SetPassword(password string) error {
+	if len([]byte(password)) > 255 {
+		return errors.New("password exceeds 255 bytes")
+	}
+	if len([]byte(password)) < 1 {
+		return errors.New("password must be at least 1 byte")
+	}
+	c.password = []byte(password)
+	return nil
+}
+
 // NewStreamDialer creates a [transport.StreamDialer] that routes connections to a SOCKS5
 // proxy listening at the given [transport.StreamEndpoint].
-func NewStreamDialer(endpoint transport.StreamEndpoint) (transport.StreamDialer, error) {
+func NewStreamDialer(endpoint transport.StreamEndpoint, cred *Credentials) (transport.StreamDialer, error) {
 	if endpoint == nil {
 		return nil, errors.New("argument endpoint must not be nil")
 	}
-	return &streamDialer{proxyEndpoint: endpoint}, nil
+	return &streamDialer{proxyEndpoint: endpoint, credentials: cred}, nil
 }
 
 type streamDialer struct {
 	proxyEndpoint transport.StreamEndpoint
+	credentials   *Credentials
 }
 
 var _ transport.StreamDialer = (*streamDialer)(nil)
 
 // DialStream implements [transport.StreamDialer].DialStream using SOCKS5.
-// It will send the method and the connect requests in one packet, to avoid an unnecessary roundtrip.
+// It will send the auth method, sub-negotiation, and the connect requests in one packet, to avoid an unnecessary roundtrip.
 // The returned [error] will be of type [ReplyCode] if the server sends a SOCKS error reply code, which
 // you can check against the error constants in this package using [errors.Is].
 func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
@@ -55,78 +85,144 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	}()
 
 	// For protocol details, see https://datatracker.ietf.org/doc/html/rfc1928#section-3
+	// Creating a single buffer for method selection, authentication, and connection request
+	// Buffer large enough for method, auth, and connect requests with a domain name address.
 
-	// Buffer large enough for method and connect requests with a domain name address.
-	header := [3 + 4 + 256 + 2]byte{}
+	var buffer []byte
 
-	// Method request:
-	// VER = 5, NMETHODS = 1, METHODS = 0 (no auth)
-	b := append(header[:0], 5, 1, 0)
+	if c.credentials == nil {
+		// Method selection part: VER = 5, NMETHODS = 1, METHODS = 0 (no auth)
+		// +----+----------+----------+
+		// |VER | NMETHODS | METHODS  |
+		// +----+----------+----------+
+		// | 1  |    1     | 1 to 255 |
+		// +----+----------+----------+
+		header := [3 + 3 + 256 + 2]byte{}
+		buffer = append(header[:0], 5, 1, 0)
+	} else {
+		// https://datatracker.ietf.org/doc/html/rfc1929
+		// Method selection part: VER = 5, NMETHODS = 1, METHODS = 2 (username/password)
+		header := [3 + 3 + 255 + 255 + 3 + 256 + 2]byte{}
+		buffer = append(header[:0], 5, 1, 2)
 
-	// Connect request:
-	// VER = 5, CMD = 1 (connect), RSV = 0
-	b = append(b, 5, 1, 0)
-	// Destination address Address (ATYP, DST.ADDR, DST.PORT)
-	b, err = appendSOCKS5Address(b, remoteAddr)
+		// Authentication part: VER = 1, ULEN, UNAME, PLEN, PASSWD
+		// +----+------+----------+------+----------+
+		// |VER | ULEN |  UNAME   | PLEN |  PASSWD  |
+		// +----+------+----------+------+----------+
+		// | 1  |  1   | 1 to 255 |  1   | 1 to 255 |
+		// +----+------+----------+------+----------+
+		buffer = append(buffer, 1) // Auth version
+		buffer = append(buffer, byte(len(c.credentials.username)))
+		buffer = append(buffer, c.credentials.username...)
+		buffer = append(buffer, byte(len(c.credentials.password)))
+		buffer = append(buffer, c.credentials.password...)
+	}
+
+	// Connect request part: VER = 5, CMD = 1 (connect), RSV = 0, DST.ADDR, DST.PORT
+	// +----+-----+-------+------+----------+----------+
+	// |VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
+	// +----+-----+-------+------+----------+----------+
+	// | 1  |  1  | X'00' |  1   | Variable |    2     |
+	// +----+-----+-------+------+----------+----------+
+	connectRequest, err := appendSOCKS5Address([]byte{5, 1, 0}, remoteAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SOCKS5 address: %w", err)
 	}
+	buffer = append(buffer, connectRequest...)
 
-	// We merge the method and connect requests because we send a single authentication
-	// method, so there's no point in waiting for the response. This eliminates a roundtrip.
-	_, err = proxyConn.Write(b)
+	// Sending the combined request
+	_, err = proxyConn.Write(buffer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to write SOCKS5 request: %w", err)
+		return nil, fmt.Errorf("failed to write combined SOCKS5 request: %w", err)
 	}
 
-	// Read method response (VER, METHOD).
-	if _, err = io.ReadFull(proxyConn, header[:2]); err != nil {
+	// Read several response parts in one go, to avoid an unnecessary roundtrip.
+	// 1. Read method response (VER, METHOD).
+	// +----+--------+
+	// |VER | METHOD |
+	// +----+--------+
+	// | 1  |   1    |
+	// +----+--------+
+	var methodResponse [2]byte
+	if _, err = io.ReadFull(proxyConn, methodResponse[:]); err != nil {
 		return nil, fmt.Errorf("failed to read method server response")
 	}
-	if header[0] != 5 {
-		return nil, fmt.Errorf("invalid protocol version %v. Expected 5", header[0])
+	if methodResponse[0] != 5 {
+		return nil, fmt.Errorf("invalid protocol version %v. Expected 5", methodResponse[0])
 	}
-	if header[1] != 0 {
-		return nil, fmt.Errorf("unsupported SOCKS authentication method %v. Expected 0 (no auth)", header[1])
+	if methodResponse[1] == 2 {
+		// 2. Read sub-negotiation version and status
+		// VER = 1, STATUS = 0
+		// +----+--------+
+		// |VER | STATUS |
+		// +----+--------+
+		// | 1  |   1    |
+		// +----+--------+
+		var subNegotiation [2]byte
+		if _, err = io.ReadFull(proxyConn, subNegotiation[:]); err != nil {
+			return nil, fmt.Errorf("failed to read sub-negotiation version and status: %w", err)
+		}
+		if subNegotiation[0] != 1 {
+			return nil, fmt.Errorf("unkown sub-negotioation version")
+		}
+		if subNegotiation[1] != 0 {
+			return nil, fmt.Errorf("authentication failed: %v", subNegotiation[1])
+		}
 	}
-
-	// Read connect response (VER, REP, RSV, ATYP, BND.ADDR, BND.PORT).
+	// Check if the server supports the authentication method we sent.
+	// 0 is no auth, 2 is username/password
+	if methodResponse[1] != 0 && methodResponse[1] != 2 {
+		return nil, fmt.Errorf("unsupported SOCKS authentication method %v. Expected 2", methodResponse[1])
+	}
+	// 3. Read connect response (VER, REP, RSV, ATYP, BND.ADDR, BND.PORT).
 	// See https://datatracker.ietf.org/doc/html/rfc1928#section-6.
-	if _, err = io.ReadFull(proxyConn, header[:4]); err != nil {
-		return nil, fmt.Errorf("failed to read connect server response")
-	}
-	if header[0] != 5 {
-		return nil, fmt.Errorf("invalid protocol version %v. Expected 5", header[0])
+	// +----+-----+-------+------+----------+----------+
+	// |VER | REP |  RSV  | ATYP | BND.ADDR | BND.PORT |
+	// +----+-----+-------+------+----------+----------+
+	// | 1  |  1  | X'00' |  1   | Variable |    2     |
+	// +----+-----+-------+------+----------+----------+
+	var connectResponse [4]byte
+	if _, err = io.ReadFull(proxyConn, connectResponse[:]); err != nil {
+		fmt.Printf("failed to read connect server response: %v", err)
+		return nil, fmt.Errorf("failed to read connect server response: %w", err)
 	}
 
-	// Check reply code (REP)
-	if header[1] != 0 {
-		return nil, ReplyCode(header[1])
+	if connectResponse[0] != 5 {
+		return nil, fmt.Errorf("invalid protocol version %v. Expected 5", connectResponse[0])
 	}
 
-	toRead := 0
-	switch header[3] {
+	if connectResponse[1] != 0 {
+		return nil, ReplyCode(connectResponse[1])
+	}
+
+	// 4. Read and ignore the BND.ADDR and BND.PORT
+	var bndAddrLen int
+	switch connectResponse[3] {
 	case addrTypeIPv4:
-		toRead = 4
+		bndAddrLen = 4
 	case addrTypeIPv6:
-		toRead = 16
+		bndAddrLen = 16
 	case addrTypeDomainName:
-		_, err := io.ReadFull(proxyConn, header[:1])
+		var lengthByte [1]byte
+		_, err := io.ReadFull(proxyConn, lengthByte[:])
 		if err != nil {
 			return nil, fmt.Errorf("failed to read address length in connect response: %w", err)
 		}
-		toRead = int(header[0])
+		bndAddrLen = int(lengthByte[0])
+	default:
+		return nil, fmt.Errorf("invalid address type %v", connectResponse[3])
 	}
-	// Reads the bound address and port, but we currently ignore them.
+	// 5. Reads the bound address and port, but we currently ignore them.
 	// TODO(fortuna): Should we expose the remote bound address as the net.Conn.LocalAddr()?
-	_, err = io.ReadFull(proxyConn, header[:toRead])
-	if err != nil {
-		return nil, fmt.Errorf("failed to read address in connect response: %w", err)
+	bndAddr := make([]byte, bndAddrLen)
+	if _, err = io.ReadFull(proxyConn, bndAddr); err != nil {
+		return nil, fmt.Errorf("failed to read bound address: %w", err)
 	}
 	// We also ignore the remote bound port number.
-	_, err = io.ReadFull(proxyConn, header[:2])
-	if err != nil {
-		return nil, fmt.Errorf("failed to read port number in connect response: %w", err)
+	// Read the port (2 bytes)
+	var bndPort [2]byte
+	if _, err = io.ReadFull(proxyConn, bndPort[:]); err != nil {
+		return nil, fmt.Errorf("failed to read bound port: %w", err)
 	}
 
 	dialSuccess = true
