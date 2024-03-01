@@ -1,3 +1,17 @@
+// Copyright 2024 Jigsaw Operations LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //go:build linux
 
 package sysproxy
@@ -7,18 +21,26 @@ import (
 	"os/exec"
 )
 
+type ProxyType string
+
+const (
+	httpProxyType  ProxyType = "http"
+	httpsProxyType ProxyType = "https"
+	ftpProxyType   ProxyType = "ftp"
+)
+
 func SetProxy(ip string, port string) error {
 	// Execute Linux specific commands to set proxy
 	if err := setManualMode(); err != nil {
 		return err
 	}
-	if err := setHttpProxy(ip, port); err != nil {
+	if err := setWebProxy(httpProxyType, ip, port); err != nil {
 		return err
 	}
-	if err := setHttpsProxy(ip, port); err != nil {
+	if err := setWebProxy(httpsProxyType, ip, port); err != nil {
 		return err
 	}
-	if err := setFtpProxy(ip, port); err != nil {
+	if err := setWebProxy(ftpProxyType, ip, port); err != nil {
 		return err
 	}
 	return nil
@@ -28,31 +50,12 @@ func setManualMode() error {
 	return execCommand("gsettings", "set", "org.gnome.system.proxy", "mode", "manual")
 }
 
-func setHttpProxy(ip string, port string) error {
-	if err := execCommand("gsettings", "set", "org.gnome.system.proxy.http", "host", ip); err != nil {
+func setWebProxy(pType ProxyType, ip string, port string) error {
+	p := fmt.Sprintf("org.gnome.system.proxy.%s", pType)
+	if err := execCommand("gsettings", "set", p, "host", ip); err != nil {
 		return err
 	}
-	if err := execCommand("gsettings", "set", "org.gnome.system.proxy.http", "port", port); err != nil {
-		return err
-	}
-	return nil
-}
-
-func setHttpsProxy(ip string, port string) error {
-	if err := execCommand("gsettings", "set", "org.gnome.system.proxy.https", "host", ip); err != nil {
-		return err
-	}
-	if err := execCommand("gsettings", "set", "org.gnome.system.proxy.https", "port", port); err != nil {
-		return err
-	}
-	return nil
-}
-
-func setFtpProxy(ip string, port string) error {
-	if err := execCommand("gsettings", "set", "org.gnome.system.proxy.ftp", "host", ip); err != nil {
-		return err
-	}
-	if err := execCommand("gsettings", "set", "org.gnome.system.proxy.ftp", "port", port); err != nil {
+	if err := execCommand("gsettings", "set", p, "port", port); err != nil {
 		return err
 	}
 	return nil
