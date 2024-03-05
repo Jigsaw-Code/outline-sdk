@@ -1,0 +1,8 @@
+framework module "Fullstack_app" {
+	header "ref.h"
+    header "Fullstack_app.objc.h"
+    header "Universe.objc.h"
+    header "Fullstack_app.h"
+
+    export *
+}

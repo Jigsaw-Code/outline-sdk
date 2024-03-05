@@ -1,0 +1,118 @@
+package fullstack_app
+
+templ serverView() {
+  <html>
+    <head>
+      <style>
+        body, main, main * {
+          all: initial;
+          font-family: system-ui;
+          box-sizing: border-box;
+        }
+        main {
+          width: 100vw;
+          min-height: 100svh;
+          display: flex;
+          flex-direction: column;
+        }
+
+        header {
+          width: 100%;
+          background-color: hsl(170, 45%, 15%);
+          padding: 1rem 0;
+          flex-shrink: 0;
+        }
+
+        h1 {
+          display: block;
+          color: white;
+          font-size: 2rem;
+          text-align: center;
+          width: 100%;
+        }
+
+        article {
+          background-color: hsl(170, 3%, 95%);
+          flex-grow: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        button {
+          cursor: pointer;
+          border: 0.5rem dashed hsl(170, 5%, 45%);
+          background-color: hsl(170, 8%, 85%);
+          width: clamp(240px, 33vw, 480px);
+          height: clamp(240px, 33vw, 480px);
+          border-radius: 100%;
+          color: hsl(170, 5%, 45%);
+          text-align: center;
+          font-size: 1.5rem;
+          font-weight: bold;
+          transition: border-color 140ms ease, color 140ms ease;
+        }
+
+        button:hover {
+          border-color: hsl(170, 40%, 55%);
+          color: hsl(170, 40%, 55%);
+        }
+
+        footer {
+          flex-shrink: 0;
+          background-color: hsl(170, 15%, 85%);
+          border-top: 1px solid hsl(170, 5%, 45%);
+          padding: 1rem;
+          display: flex;
+          align-items: center;
+        }
+
+        h2, h3 {
+          display: block;
+        }
+
+        h2 {
+          font-weight: bold;
+        }
+
+        .info {
+          flex-grow: 1;
+        }
+
+        .caret {
+          flex-shrink: 0;
+          font-size: 1,5rem;
+          padding: 0 0.5rem;
+        }
+      </style>
+    </head>
+    <body>
+      <main>
+        <header><h1>outline</h1></header>
+        <article>
+          <section>
+            <button>connect</button>
+          </section>
+        </article>
+        <footer>
+          <div class="info">
+          <h2>Server Name</h2>
+          <h3>127.0.0.1:443</h3>
+          </div>
+          <div class="caret">
+            ▼
+          </div>
+        </footer>
+      </main>
+
+      <script type="text/javascript">
+				let conn = new WebSocket("ws://" + document.location.host + "/__reload__");  
+				conn.onclose = function (evt) {  
+					console.log("Connection Closed")  
+					setTimeout(() => location.reload(), 5000);  
+				};
+		  </script>
+
+    </body>
+  </html>
+}
