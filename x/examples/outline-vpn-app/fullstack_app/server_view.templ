@@ -62,15 +62,6 @@ templ serverView() {
           color: hsl(170, 8%, 85%);
         }
 
-        footer {
-          flex-shrink: 0;
-          background-color: hsl(170, 15%, 85%);
-          border-top: 1px solid hsl(170, 5%, 45%);
-          padding: 1rem;
-          display: flex;
-          align-items: center;
-        }
-
         h2, h3 {
           display: block;
         }
@@ -99,15 +90,6 @@ templ serverView() {
             @connectionButton()
           </section>
         </article>
-        <footer>
-          <div class="info">
-          <h2>Server Name</h2>
-          <h3>127.0.0.1:443</h3>
-          </div>
-          <div class="caret">
-            ▼
-          </div>
-        </footer>
       </main>
 
       <script type="text/javascript">
