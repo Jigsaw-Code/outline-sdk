@@ -81,9 +81,6 @@ func getActiveNetworkInterface() (string, error) {
 // https://keith.github.io/xcode-man-pages/networksetup.8.html#getsecurewebproxy
 func setProxyCommand(ptype ProxyType, interfaceName string, ip string, port string) error {
 	cmdStr := fmt.Sprintf("networksetup -set%sproxy \"%s\" %s %s", ptype, interfaceName, ip, port)
-	cmd := exec.Command("bash", "-c", cmdStr)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
 
 	return runCommand(cmdStr)
 }
