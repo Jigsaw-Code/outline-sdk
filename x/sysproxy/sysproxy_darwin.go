@@ -30,7 +30,7 @@ const (
 	httpsProxyType ProxyType = "secureweb"
 )
 
-func SetProxy(ip string, port string) error {
+func SetProxy(host string, port string) error {
 	// Get the active network interface
 	activeInterface, err := getActiveNetworkInterface()
 	if err != nil {
