@@ -79,7 +79,7 @@ func SetProxy(ip string, port string) error {
 		"MigrateProxy":  1,
 		"ProxyEnable":   1,
 		"ProxyHttp1.1":  0,
-		"ProxyServer":   fmt.Sprintf("%s:%s", ip, port),
+		"ProxyServer":   net.JoinHostPort(host, port),
 		"ProxyOverride": "*.local;<local>",
 	}
 
