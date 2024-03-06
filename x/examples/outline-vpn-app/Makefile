@@ -1,6 +1,8 @@
-BUILDDIR=$(CURDIR)/output/build
 
-GOBIN=$(CURDIR)/output/bin
+OUTDIR=$(CURDIR)/output
+BUILDDIR=$(OUTDIR)/build
+
+GOBIN=$(OUTDIR)/bin
 GOMOBILE=$(GOBIN)/gomobile
 GOBIND=env PATH="$(GOBIN):$(PATH)" "$(GOMOBILE)" bind
 
@@ -9,8 +11,12 @@ IMPORT_PATH=$(IMPORT_HOST)/outline_prototype
 
 ROOT_GO_PKG=fullstack_app
 
-.PHONY: android apple all
+.PHONY: android apple watch all
 all: android apple
+watch:
+	mkdir -p ${OUTDIR}
+	templ generate -watch &
+	go run github.com/cosmtrek/air
 
 android: $(BUILDDIR)/android/fullstack_app.aar
 
@@ -28,7 +34,7 @@ $(BUILDDIR)/apple/fullstack_app.xcframework: $(GOMOBILE) fullstack_app/*_templ.g
 		-iosversion=13.1 \
 		./fullstack_app
 
-fullstack_app/*_templ.go:
+fullstack_app/*_templ.go: fullstack_app/*.templ
 	templ generate
 
 $(GOMOBILE): go.mod

@@ -50,12 +50,16 @@ templ serverView() {
           text-align: center;
           font-size: 1.5rem;
           font-weight: bold;
-          transition: border-color 140ms ease, color 140ms ease;
+          transition-duration: 1000ms;
+          transition-property: background-color, color, border;
+          transition-timing-function: ease;
         }
 
-        button:hover {
+        button.connected {
+          border-style: solid;
           border-color: hsl(170, 40%, 55%);
-          color: hsl(170, 40%, 55%);
+          background: hsl(170, 40%, 55%);
+          color: hsl(170, 8%, 85%);
         }
 
         footer {
@@ -85,13 +89,14 @@ templ serverView() {
           padding: 0 0.5rem;
         }
       </style>
+      <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
     </head>
     <body>
       <main>
         <header><h1>outline</h1></header>
         <article>
           <section>
-            <button>connect</button>
+            @connectionButton()
           </section>
         </article>
         <footer>
@@ -115,4 +120,12 @@ templ serverView() {
 
     </body>
   </html>
+}
+
+templ connectionButton() {
+  <button id="connection-button" hx-get="/connection" hx-swap="outerHTML">connect</button>
+}
+
+templ disconnectionButton() {
+  <button id="connection-button" hx-get="/disconnection" hx-swap="outerHTML" class="connected">disconnect</button>
 }

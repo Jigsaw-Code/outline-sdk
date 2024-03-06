@@ -14,6 +14,8 @@ func EchoServer(ws *websocket.Conn) {
 
 func Start() {
 	http.Handle("/", templ.Handler(serverView()))
+	http.Handle("/connection", templ.Handler(disconnectionButton()))
+	http.Handle("/disconnection", templ.Handler(connectionButton()))
 	http.Handle("/__reload__", websocket.Handler(EchoServer))
 
 	http.ListenAndServe(":8080", nil)
