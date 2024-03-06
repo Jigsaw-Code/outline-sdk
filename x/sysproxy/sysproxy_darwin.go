@@ -89,9 +89,6 @@ func setProxyCommand(ptype ProxyType, interfaceName string, ip string, port stri
 // https://keith.github.io/xcode-man-pages/networksetup.8.html#setwebproxystate
 func removeProxyCommand(ptype ProxyType, interfaceName string) error {
 	cmdStr := fmt.Sprintf("networksetup -set%sproxystate \"%s\" off", ptype, interfaceName)
-	cmd := exec.Command("bash", "-c", cmdStr)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
 
 	return runCommand(cmdStr)
 }
