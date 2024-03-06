@@ -95,12 +95,7 @@ func SetProxy(ip string, port string) error {
 	}
 
 	// Refresh the settings
-	err = resetWininetProxySettings()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return resetWininetProxySettings()
 }
 
 func UnsetProxy() error {
