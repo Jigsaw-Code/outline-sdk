@@ -62,7 +62,6 @@ func resetWininetProxySettings() error {
 		fmt.Println("Operation successful")
 		return nil
 	} else {
-		fmt.Println("Operation failed")
 		return errors.New("Wininet setting change operation failed")
 	}
 }
