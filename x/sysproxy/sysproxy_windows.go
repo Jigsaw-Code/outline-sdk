@@ -54,7 +54,6 @@ func internetSetOption(hInternet uintptr, dwOption int, lpBuffer uintptr, dwBuff
 }
 
 func resetWininetProxySettings() error {
-
 	result1 := internetSetOption(0, INTERNET_OPTION_SETTINGS_CHANGED, 0, 0)
 	result2 := internetSetOption(0, INTERNET_OPTION_REFRESH, 0, 0)
 
