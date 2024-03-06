@@ -43,14 +43,17 @@ const (
 
 // https://learn.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetsetoptionw
 // internetSetOption sets an Internet option.
-func internetSetOption(hInternet uintptr, dwOption int, lpBuffer uintptr, dwBufferLength uint32) bool {
-	ret, _, _ := procInternetSetOption.Call(
+func internetSetOption(hInternet uintptr, dwOption int, lpBuffer uintptr, dwBufferLength uint32) error {
+	ret, _, lastErr := procInternetSetOption.Call(
 		hInternet,
 		uintptr(dwOption),
 		lpBuffer,
 		uintptr(dwBufferLength),
 	)
-	return ret != 0
+	if ret != 0 {
+		return lastErr
+	}
+	return nil
 }
 
 func notifyWinInetProxySettingsChanged() error {
