@@ -53,7 +53,7 @@ func internetSetOption(hInternet uintptr, dwOption int, lpBuffer uintptr, dwBuff
 	return ret != 0
 }
 
-func resetWininetProxySettings() error {
+func notifyWinInetProxySettingsChanged() error {
 	result1 := internetSetOption(0, INTERNET_OPTION_SETTINGS_CHANGED, 0, 0)
 	result2 := internetSetOption(0, INTERNET_OPTION_REFRESH, 0, 0)
 
