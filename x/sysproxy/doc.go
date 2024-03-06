@@ -31,6 +31,6 @@ To ensure that the system-wide proxy settings are unset upon program termination
 
 	defer UnsetProxy()
 
-when the application starts.
+after the `SetProxy` call.
 */
 package sysproxy
