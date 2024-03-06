@@ -121,10 +121,5 @@ func UnsetProxy() error {
 	}
 
 	// Refresh the settings
-	err = resetWininetProxySettings()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return resetWininetProxySettings()
 }
