@@ -63,7 +63,7 @@ func setWebProxy(pType ProxyType, ip string, port string) error {
 
 func UnsetProxy() error {
 	// Execute Linux specific commands to unset proxy
-	return execCommand("gsettings", "set", "org.gnome.system.proxy", "mode", "none")
+	return exec.Command("gsettings", "set", "org.gnome.system.proxy", "mode", "none").Run()
 }
 
 func execCommand(name string, arg ...string) error {
