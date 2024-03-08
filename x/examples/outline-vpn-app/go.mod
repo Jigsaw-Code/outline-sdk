@@ -6,6 +6,8 @@ require github.com/a-h/templ v0.2.590
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
+	github.com/Jigsaw-Code/outline-sdk v0.0.14-0.20240216220040-f741c57bf854 // indirect
+	github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20240223000159-142376ee10ea // indirect
 	github.com/bep/godartsass v1.2.0 // indirect
 	github.com/bep/godartsass/v2 v2.0.0 // indirect
 	github.com/bep/golibsass v1.1.1 // indirect
@@ -21,9 +23,11 @@ require (
 	github.com/mitchellh/hashstructure v1.1.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.1 // indirect
+	github.com/shadowsocks/go-shadowsocks2 v0.1.5 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
 	github.com/tdewolff/parse/v2 v2.7.12 // indirect
+	golang.org/x/crypto v0.19.0 // indirect
 	golang.org/x/mobile v0.0.0-20240213143359-d1f7d3436075 // indirect
 	golang.org/x/mod v0.15.0 // indirect
 	golang.org/x/net v0.21.0 // indirect
