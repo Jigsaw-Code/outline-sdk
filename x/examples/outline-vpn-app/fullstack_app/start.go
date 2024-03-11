@@ -77,7 +77,8 @@ func (vpn *VPNController) handleDisconnectionEndpoint(responseWriter http.Respon
 	http.NewRequest("DELETE", SYSTEM_TUNNEL_ENDPOINT, vpn.tunnel)
 
 	vpn.proxy.Stop(PROXY_DISCONNECT_TIMEOUT)
-
+	vpn.proxy = nil
+	vpn.tunnel.Close()
 	writeTemplate(connectionButton, responseWriter)
 }
 
