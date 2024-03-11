@@ -38,6 +38,11 @@ type VPNController struct {
 }
 
 func (vpn *VPNController) handleConnectionEndpoint(responseWriter http.ResponseWriter, request *http.Request) {
+	if vpn.proxy != nil {
+		http.Error(responseWriter, "already connected", http.StatusConflict)
+		return
+	}
+
 	endpoint, encryptionKey := parseStaticShadowsocksAccessKey(request.URL.Path)
 
 	proxyDialer, err := shadowsocks.NewStreamDialer(endpoint, encryptionKey)
