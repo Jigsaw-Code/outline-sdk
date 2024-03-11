@@ -112,11 +112,13 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		// +----+------+----------+------+----------+
 		// | 1  |  1   | 1 to 255 |  1   | 1 to 255 |
 		// +----+------+----------+------+----------+
-		buffer = append(buffer, 1) // Auth version
-		buffer = append(buffer, byte(len(c.credentials.username)))
-		buffer = append(buffer, c.credentials.username...)
-		buffer = append(buffer, byte(len(c.credentials.password)))
-		buffer = append(buffer, c.credentials.password...)
+		buffer = append(buffer,
+			1,
+			byte(len(c.credentials.username)),
+			c.credentials.username...,
+			byte(len(c.credentials.password)),
+			c.credentials.password...
+		)
 	}
 
 	// Connect request part: VER = 5, CMD = 1 (connect), RSV = 0, DST.ADDR, DST.PORT
