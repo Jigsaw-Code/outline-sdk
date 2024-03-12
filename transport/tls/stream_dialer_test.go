@@ -124,3 +124,40 @@ func TestWithALPN(t *testing.T) {
 	WithALPN([]string{"h2", "http/1.1"})("", &cfg)
 	require.Equal(t, []string{"h2", "http/1.1"}, cfg.NextProtos)
 }
+
+// Make sure there are no connection leakage in DialStream
+func TestDialStreamCloseInnerConnOnError(t *testing.T) {
+	inner := &connCounterDialer{base: &transport.TCPDialer{}}
+	sd, err := NewStreamDialer(inner)
+	require.NoError(t, err)
+	conn, err := sd.DialStream(context.Background(), "invalid-address?987654321")
+	require.Error(t, err)
+	require.Nil(t, conn)
+	require.Zero(t, inner.activeConns)
+}
+
+// Private test helpers
+
+// connCounterDialer is a StreamDialer that counts the number of active StreamConns.
+type connCounterDialer struct {
+	base        transport.StreamDialer
+	activeConns int
+}
+
+type countedStreamConn struct {
+	transport.StreamConn
+	counter *connCounterDialer
+}
+
+func (d *connCounterDialer) DialStream(ctx context.Context, raddr string) (transport.StreamConn, error) {
+	conn, err := d.base.DialStream(ctx, raddr)
+	if conn != nil {
+		d.activeConns++
+	}
+	return countedStreamConn{conn, d}, err
+}
+
+func (c countedStreamConn) Close() error {
+	c.counter.activeConns--
+	return c.StreamConn.Close()
+}

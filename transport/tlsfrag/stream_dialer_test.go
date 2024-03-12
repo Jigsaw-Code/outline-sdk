@@ -176,6 +176,16 @@ func TestNestedFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 	require.Equal(t, expected, inner.bufs)
 }
 
+// Make sure there are no connection leakage in DialStream
+func TestDialStreamCloseInnerConnOnError(t *testing.T) {
+	inner := &collectStreamDialer{}
+	d := &tlsFragDialer{inner, nil}
+	conn, err := d.DialStream(context.Background(), "127.0.0.1:8888")
+	require.Error(t, err)
+	require.Nil(t, conn)
+	require.Zero(t, inner.activeConns)
+}
+
 // test assertions
 
 func assertCanDialFragFunc(t *testing.T, inner transport.StreamDialer, raddr string, frag FragFunc) transport.StreamConn {
@@ -228,10 +238,12 @@ func constructTLSRecord(t *testing.T, typ layers.TLSType, ver layers.TLSVersion,
 
 // collectStreamDialer collects all writes to this stream dialer and append it to bufs
 type collectStreamDialer struct {
-	bufs net.Buffers
+	bufs        net.Buffers
+	activeConns int
 }
 
 func (d *collectStreamDialer) DialStream(ctx context.Context, raddr string) (transport.StreamConn, error) {
+	d.activeConns++
 	return d, nil
 }
 
@@ -241,7 +253,7 @@ func (c *collectStreamDialer) Write(p []byte) (int, error) {
 }
 
 func (c *collectStreamDialer) Read(p []byte) (int, error)         { return 0, errors.New("not supported") }
-func (c *collectStreamDialer) Close() error                       { return nil }
+func (c *collectStreamDialer) Close() error                       { c.activeConns--; return nil }
 func (c *collectStreamDialer) CloseRead() error                   { return nil }
 func (c *collectStreamDialer) CloseWrite() error                  { return nil }
 func (c *collectStreamDialer) LocalAddr() net.Addr                { return nil }

@@ -64,13 +64,13 @@ func (c streamConn) CloseRead() error {
 
 // DialStream implements [transport.StreamDialer].DialStream.
 func (d *StreamDialer) DialStream(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
-	innerConn, err := d.dialer.DialStream(ctx, remoteAddr)
-	if err != nil {
-		return nil, err
-	}
 	host, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid address: %w", err)
+	}
+	innerConn, err := d.dialer.DialStream(ctx, remoteAddr)
+	if err != nil {
+		return nil, err
 	}
 	conn, err := WrapConn(ctx, innerConn, host, d.options...)
 	if err != nil {
