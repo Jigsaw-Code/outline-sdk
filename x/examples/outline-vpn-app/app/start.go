@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -11,7 +12,6 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
 	"github.com/a-h/templ"
-	"github.com/labstack/gommon/bytes"
 )
 
 var appAddress = "[::1]:8080"
@@ -19,7 +19,7 @@ var proxyAddress = "[::1]:8181"
 var systemAddress = "[::1]:8282"
 
 var proxyDisconnectTimeoutSecond = 5
-var systemTunnelEndpoint = "/vpn/"
+var systemTunnelEndpoint = fmt.Sprintf("%s/vpn/", systemAddress)
 
 type VPNController struct {
 	ID     string

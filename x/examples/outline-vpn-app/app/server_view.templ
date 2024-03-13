@@ -35,19 +35,41 @@ templ serverView() {
           background-color: hsl(170, 3%, 95%);
           flex-grow: 1;
           display: flex;
+          flex-direction: column;
           align-items: center;
           justify-content: center;
         }
 
+        section {
+          width: 100%;
+          max-width: 540px;
+          padding: 1rem;
+        }
+
+        textarea {
+          background-color: hsl(170, 8%, 85%);
+          padding: 1rem;
+          width: 100%;
+          border: 2px solid hsl(170, 5%, 45%);
+          border-radius: 0.5rem;
+          min-height: 350px;
+          font-family: monospace;
+          word-wrap: break-word;
+        }
+
+        textarea:focus {
+          outline: none;
+          border-color: hsl(170, 40%, 55%);
+        }
+
         button {
           cursor: pointer;
-          border: 0.5rem dashed hsl(170, 5%, 45%);
           background-color: hsl(170, 8%, 85%);
-          width: clamp(240px, 33vw, 480px);
-          height: clamp(240px, 33vw, 480px);
-          border-radius: 100%;
+          border-radius: 0.5rem;
           color: hsl(170, 5%, 45%);
           text-align: center;
+          width: 100%;
+          height: 5rem;
           font-size: 1.5rem;
           font-weight: bold;
           transition-duration: 1000ms;
@@ -86,6 +108,10 @@ templ serverView() {
       <main>
         <header><h1>outline</h1></header>
         <article>
+          <section>
+            <textarea placeholder="paste your access key here">
+            </textarea>
+          </section>
           <section>
             @connectionButton()
           </section>
