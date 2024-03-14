@@ -43,7 +43,7 @@ happens on the client side, as is the case of VPN apps.
 
 # Security Considerations
 
-Shadowsocks uses strong authenticated encrypion (AEAD), standardized by the IETF. For privacy and security, this package does not support the legacy and unsafe [stream ciphers].
+Shadowsocks uses strong authenticated encryption (AEAD), standardized by the IETF. For privacy and security, this package does not support the legacy and unsafe [stream ciphers].
 
 Shadowsocks does not provide forward-secrecy. That can be accomplished by generating a new,
 completely random secret for every session, and delivering it to the client in a forward-secret way.
