@@ -25,7 +25,7 @@ Shadowsocks is a a combination of two protocols:
 When using Shadowsocks, you will need a server. There are many ways to run Shadowsocks servers. We recommend:
 
   - [Outline Manager app]: The easiest way to create and manage Shadowsocks servers in the cloud.
-  - [outline-ss-server]: A command-line tool for advanced users offering greater configuration flexibility
+  - [outline-ss-server]: A command-line tool for advanced users offering greater configuration flexibility.
 
 # IPv6 Limitations
 
