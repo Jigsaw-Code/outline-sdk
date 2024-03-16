@@ -19,10 +19,19 @@ package sysproxy
 import (
 	"errors"
 	"fmt"
+	"net"
 
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )
+
+// WebProxySettings holds the backup of the web proxy settings
+type WebProxySettings struct {
+	ProxyServer   string
+	ProxyOverride string
+}
+
+var backup *WebProxySettings
 
 var (
 	modwininet            = windows.NewLazySystemDLL("wininet.dll")
@@ -41,6 +50,85 @@ const (
 	INTERNET_OPTION_REFRESH          = 37
 )
 
+func SetProxy(host string, port string) error {
+	var err error
+
+	//backupWebProxySettings makes a copy of the current proxy settings
+	if backup, err = backupWebProxySettings(); err != nil {
+		return err
+	}
+
+	settings := &WebProxySettings{
+		ProxyServer:   net.JoinHostPort(host, port),
+		ProxyOverride: "*.local;<local>",
+	}
+
+	if err = setProxySettings(settings); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func setProxySettings(settings *WebProxySettings) error {
+	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.SET_VALUE)
+	if err != nil {
+		return err
+	}
+	defer key.Close()
+
+	if err = key.SetStringValue("ProxyServer", settings.ProxyServer); err != nil {
+		return err
+	}
+	if err = key.SetStringValue("ProxyOverride", settings.ProxyOverride); err != nil {
+		return err
+	}
+	// Finally, enable the proxy
+	if err = key.SetDWordValue("ProxyEnable", uint32(1)); err != nil {
+		return err
+	}
+
+	// Refresh the settings
+	return notifyWinInetProxySettingsChanged()
+}
+
+func UnsetProxy() error {
+	// revert to the backup settings
+	if backup != nil {
+		if err := setProxySettings(backup); err != nil {
+			return err
+		}
+	}
+
+	err := disableProxy()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func disableProxy() error {
+	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.SET_VALUE)
+	if err != nil {
+		return err
+	}
+	defer key.Close()
+
+	// Set ProxyEnable to 0
+	err = key.SetDWordValue("ProxyEnable", 0)
+	if err != nil {
+		return err
+	}
+	// TEST THIS
+	// err = key.SetStringValue("ProxyServer", "")
+	// if err != nil {
+	// 	return err
+	// }
+
+	// Refresh the settings
+	return notifyWinInetProxySettingsChanged()
+}
+
 // https://learn.microsoft.com/en-us/windows/win32/api/wininet/nf-wininet-internetsetoptionw
 // internetSetOption sets an Internet option.
 func internetSetOption(hInternet uintptr, dwOption int, lpBuffer uintptr, dwBufferLength uint32) error {
@@ -57,67 +145,45 @@ func internetSetOption(hInternet uintptr, dwOption int, lpBuffer uintptr, dwBuff
 }
 
 func notifyWinInetProxySettingsChanged() error {
-	result1 := internetSetOption(0, INTERNET_OPTION_SETTINGS_CHANGED, 0, 0)
-	result2 := internetSetOption(0, INTERNET_OPTION_REFRESH, 0, 0)
-
-	if result1 && result2 {
-		fmt.Println("Operation successful")
-		return nil
-	} else {
-		return errors.New("Wininet setting change operation failed")
+	if err := internetSetOption(0, INTERNET_OPTION_SETTINGS_CHANGED, 0, 0); err != nil {
+		return fmt.Errorf("failed to notify the system that the registry settings have been changed: %w", err)
 	}
+
+	if err := internetSetOption(0, INTERNET_OPTION_REFRESH, 0, 0); err != nil {
+		return fmt.Errorf("failed to refresh the proxy data from the registry: %w", err)
+	}
+
+	return nil
 }
 
-func SetProxy(ip string, port string) error {
-	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.SET_VALUE)
+// backupWebProxySettings reads and backs up the current proxy settings
+func backupWebProxySettings() (*WebProxySettings, error) {
+	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.QUERY_VALUE)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer key.Close()
 
-	values := map[string]interface{}{
-		"MigrateProxy":  1,
-		"ProxyEnable":   1,
-		"ProxyHttp1.1":  0,
-		"ProxyServer":   net.JoinHostPort(host, port),
-		"ProxyOverride": "*.local;<local>",
+	// Read the current settings
+	backup := &WebProxySettings{}
+	backup.ProxyServer, _, err = key.GetStringValue("ProxyServer")
+	if err != nil {
+		return nil, err
+	}
+	backup.ProxyOverride, _, err = key.GetStringValue("ProxyOverride")
+	if err != nil {
+		return nil, err
 	}
 
-	for name, value := range values {
-		switch v := value.(type) {
-		case int:
-			err = key.SetDWordValue(name, uint32(v))
-		case string:
-			err = key.SetStringValue(name, v)
-		default:
-			return fmt.Errorf("unsupported value type")
-		}
-		if err != nil {
-			return err
-		}
-	}
-
-	// Refresh the settings
-	return resetWininetProxySettings()
+	return backup, nil
 }
 
-func UnsetProxy() error {
-	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.SET_VALUE)
-	if err != nil {
-		return err
-	}
-	defer key.Close()
+// SetProxy does nothing on windows platforms.
+func SetSOCKSProxy(ip string, port string) error {
+	return errors.New("system-wide socks proxy is not unsupported on windows")
+}
 
-	// Set ProxyEnable to 0 and ProxyServer to an empty string
-	err = key.SetDWordValue("ProxyEnable", 0)
-	if err != nil {
-		return err
-	}
-	err = key.SetStringValue("ProxyServer", "")
-	if err != nil {
-		return err
-	}
-
-	// Refresh the settings
-	return resetWininetProxySettings()
+// SetProxy does nothing on windows platforms.
+func UnsetSOCKSProxy() error {
+	return errors.New("system-wide socks proxy is not unsupported on windows")
 }
