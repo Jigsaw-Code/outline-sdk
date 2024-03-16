@@ -12,65 +12,160 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux
+//go:build linux && !android
 
 package sysproxy
 
 import (
-	"fmt"
 	"os/exec"
 )
 
 type ProxyType string
 
 const (
-	httpProxyType  ProxyType = "http"
-	httpsProxyType ProxyType = "https"
-	ftpProxyType   ProxyType = "ftp"
+	proxyTypeHTTP  ProxyType = "http"
+	proxyTypeHTTPS ProxyType = "https"
+	proxyTypeSOCKS ProxyType = "socks"
 )
 
-func SetProxy(ip string, port string) error {
-	// Execute Linux specific commands to set proxy
+var (
+	backupHTTPSettings  *ProxySettings
+	backupHTTPSSettings *ProxySettings
+	backupSOCKSSettings *ProxySettings
+)
+
+type ProxySettings struct {
+	host string
+	port string
+}
+
+func SetWebProxy(host string, port string) error {
+	var err error
+	// Backup existing settings
+	backupHTTPSettings, err = backupProxySettings(proxyTypeHTTP)
+	if err != nil {
+		return err
+	}
+	backupHTTPSSettings, err = backupProxySettings(proxyTypeHTTPS)
+	if err != nil {
+		return err
+	}
+
+	if err := setProxySettings(proxyTypeHTTP, host, port); err != nil {
+		return err
+	}
+	if err := setProxySettings(proxyTypeHTTPS, host, port); err != nil {
+		return err
+	}
 	if err := setManualMode(); err != nil {
 		return err
 	}
-	if err := setWebProxy(httpProxyType, ip, port); err != nil {
+	return nil
+}
+
+func UnsetWebProxy() error {
+	// restore previous settings
+	if backupHTTPSettings != nil {
+		if err := setProxySettings(proxyTypeHTTP, backupHTTPSettings.host, backupHTTPSettings.port); err != nil {
+			return err
+		}
+	}
+	if backupHTTPSSettings != nil {
+		if err := setProxySettings(proxyTypeHTTPS, backupHTTPSSettings.host, backupHTTPSSettings.port); err != nil {
+			return err
+		}
+	}
+	// Execute Linux specific commands to unset proxy
+	return gnomeSettingsSetString("org.gnome.system.proxy", "mode", "none")
+}
+
+func SetSocksProxy(host string, port string) error {
+	var err error
+	// Backup existing settings
+	backupSOCKSSettings, err = backupProxySettings(proxyTypeSOCKS)
+	if err != nil {
 		return err
 	}
-	if err := setWebProxy(httpsProxyType, ip, port); err != nil {
+	if err := setProxySettings(proxyTypeSOCKS, host, port); err != nil {
 		return err
 	}
-	if err := setWebProxy(ftpProxyType, ip, port); err != nil {
+	if err := setManualMode(); err != nil {
 		return err
 	}
 	return nil
 }
 
 func setManualMode() error {
-	return execCommand("gsettings", "set", "org.gnome.system.proxy", "mode", "manual")
+	return gnomeSettingsSetString("org.gnome.system.proxy", "mode", "manual")
 }
 
-func setWebProxy(pType ProxyType, ip string, port string) error {
-	p := fmt.Sprintf("org.gnome.system.proxy.%s", pType)
-	if err := execCommand("gsettings", "set", p, "host", ip); err != nil {
-		return err
-	}
-	if err := execCommand("gsettings", "set", p, "port", port); err != nil {
-		return err
+func setProxySettings(p ProxyType, host string, port string) error {
+	switch p {
+	case proxyTypeHTTP:
+		if err := gnomeSettingsSetString("org.gnome.system.proxy.http", "host", host); err != nil {
+			return err
+		}
+		if err := gnomeSettingsSetString("org.gnome.system.proxy.http", "port", port); err != nil {
+			return err
+		}
+	case proxyTypeHTTPS:
+		if err := gnomeSettingsSetString("org.gnome.system.proxy.https", "host", host); err != nil {
+			return err
+		}
+		if err := gnomeSettingsSetString("org.gnome.system.proxy.https", "port", port); err != nil {
+			return err
+		}
+	case proxyTypeSOCKS:
+		if err := gnomeSettingsSetString("org.gnome.system.proxy.socks", "host", host); err != nil {
+			return err
+		}
+		if err := gnomeSettingsSetString("org.gnome.system.proxy.socks", "port", port); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func UnsetProxy() error {
-	// Execute Linux specific commands to unset proxy
-	return exec.Command("gsettings", "set", "org.gnome.system.proxy", "mode", "none").Run()
+func backupProxySettings(p ProxyType) (*ProxySettings, error) {
+	settings := &ProxySettings{}
+	var err error
+	switch p {
+	case proxyTypeHTTP:
+		settings.host, err = gnomeSettingsGetString("org.gnome.system.proxy.http", "host")
+		if err != nil {
+			return nil, err
+		}
+		settings.port, err = gnomeSettingsGetString("org.gnome.system.proxy.http", "port")
+		if err != nil {
+			return nil, err
+		}
+	case proxyTypeHTTPS:
+		settings.host, err = gnomeSettingsGetString("org.gnome.system.proxy.https", "host")
+		if err != nil {
+			return nil, err
+		}
+		settings.port, err = gnomeSettingsGetString("org.gnome.system.proxy.https", "port")
+		if err != nil {
+			return nil, err
+		}
+	case proxyTypeSOCKS:
+		settings.host, err = gnomeSettingsGetString("org.gnome.system.proxy.socks", "host")
+		if err != nil {
+			return nil, err
+		}
+		settings.port, err = gnomeSettingsGetString("org.gnome.system.proxy.socks", "port")
+		if err != nil {
+			return nil, err
+		}
+	}
+	return settings, nil
 }
 
-func execCommand(name string, arg ...string) error {
-	cmd := exec.Command(name, arg...)
-	err := cmd.Run()
-	if err != nil {
-		return fmt.Errorf("failed to execute command: %w", err)
-	}
-	return nil
+func gnomeSettingsSetString(settings, key, value string) error {
+	return exec.Command("gsettings", "set", settings, key, value).Run()
+}
+
+func gnomeSettingsGetString(settings, key string) (string, error) {
+	out, err := exec.Command("gsettings", "get", settings, key).Output()
+	return string(out), err
 }
