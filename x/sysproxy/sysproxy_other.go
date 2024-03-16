@@ -19,11 +19,21 @@ package sysproxy
 import "errors"
 
 // SetProxy does nothing on unsupported platforms.
-func SetProxy(ip string, port string) error {
+func SetWebProxy(ip string, port string) error {
 	return errors.New("unsupported platform")
 }
 
 // SetProxy does nothing on unsupported platforms.
-func UnsetProxy() error {
+func UnsetWebProxy() error {
+	return errors.New("unsupported platform")
+}
+
+// SetProxy does nothing on unsupported platforms.
+func SetSOCKSProxy(ip string, port string) error {
+	return errors.New("unsupported platform")
+}
+
+// SetProxy does nothing on unsupported platforms.
+func UnsetSOCKSProxy() error {
 	return errors.New("unsupported platform")
 }
