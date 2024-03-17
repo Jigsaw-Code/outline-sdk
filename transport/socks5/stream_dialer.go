@@ -98,12 +98,17 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		// +----+----------+----------+
 		// | 1  |    1     | 1 to 255 |
 		// +----+----------+----------+
-		header := [3 + 3 + 256 + 2]byte{}
+		// Method selection part: VER = 5, NMETHODS = 1, METHODS = 0 (no auth)
+		header := [3]byte{}
 		buffer = append(header[:0], 5, 1, 0)
 	} else {
+		// header array is allocated to the maximum size of the buffer
+		// The maximum size of the buffer is
+		// 3 (1 socks version + 1 method selection + 1 methods)
+		// + 1 (auth version) + 1 (username length) + 255 (username) + 1 (password length) + 255 (password)
+		header := [3 + 1 + 1 + 255 + 1 + 255]byte{}
 		// https://datatracker.ietf.org/doc/html/rfc1929
 		// Method selection part: VER = 5, NMETHODS = 1, METHODS = 2 (username/password)
-		header := [3 + 3 + 255 + 255 + 3 + 256 + 2]byte{}
 		buffer = append(header[:0], 5, 1, 2)
 
 		// Authentication part: VER = 1, ULEN, UNAME, PLEN, PASSWD
@@ -112,13 +117,12 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		// +----+------+----------+------+----------+
 		// | 1  |  1   | 1 to 255 |  1   | 1 to 255 |
 		// +----+------+----------+------+----------+
-		buffer = append(buffer,
-			1,
-			byte(len(c.credentials.username)),
-			c.credentials.username...,
-			byte(len(c.credentials.password)),
-			c.credentials.password...
-		)
+		// Authentication part: VER = 1, ULEN, UNAME, PLEN, PASSWD
+		buffer = append(buffer, 1) // Auth version
+		buffer = append(buffer, byte(len(c.credentials.username)))
+		buffer = append(buffer, c.credentials.username...)
+		buffer = append(buffer, byte(len(c.credentials.password)))
+		buffer = append(buffer, c.credentials.password...)
 	}
 
 	// Connect request part: VER = 5, CMD = 1 (connect), RSV = 0, DST.ADDR, DST.PORT
