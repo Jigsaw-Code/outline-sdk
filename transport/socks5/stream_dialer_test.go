@@ -218,10 +218,8 @@ func TestConnectWithAuth(t *testing.T) {
 	c := Credentials{}
 
 	// Try to connect with correct credentials
-	err = c.SetUsername("testusername")
-	require.NoError(t, err)
-	err = c.SetPassword("testpassword")
-	require.NoError(t, err)
+	c, err = NewCredentials("testusername", "testpassword")
+
 	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.1:8001"}, &c)
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
@@ -229,7 +227,7 @@ func TestConnectWithAuth(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try to connect with incorrect credentials
-	err = c.SetPassword("wrongpassword")
+	c, err = NewCredentials("testusername", "wrongpassword")
 	require.NoError(t, err)
 	dialer, err = NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.1:8001"}, &c)
 	require.NotNil(t, dialer)
