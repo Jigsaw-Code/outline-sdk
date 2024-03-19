@@ -24,19 +24,19 @@ import (
 )
 
 const (
-	maxCredentialLength = 255
-	minCredentialLength = 0x01
-	socksProtocolVer    = 0x05
-	noAuthMethod        = 0
-	userPassAuthMethod  = 2
-	numberOfAuthMethods = 1
-	authVersion         = 1
-	connectCommand      = 1
-	rsv                 = 0
-	authSuccess         = 0
-	addrLengthIPv4      = 4
-	addrLengthIPv6      = 16
-	bufferSize          = 3 + 1 + 1 + 255 + 1 + 255
+	maxCredentialLength     = 255
+	minCredentialLength     = 0x01
+	socksProtocolVer        = 0x05
+	noAuthMethod            = 0x00
+	userPassAuthMethod      = 0x02
+	numberOfAuthMethods     = 0x01
+	authVersion             = 0x01
+	connectCommand          = 0x01
+	rsv                     = 0x00
+	authSuccess             = 0x00
+	addrLengthIPv4      int = 4
+	addrLengthIPv6      int = 16
+	bufferSize          int = 3 + 1 + 1 + 255 + 1 + 255
 )
 
 // https://datatracker.ietf.org/doc/html/rfc1929
@@ -124,6 +124,7 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	// + 1 (auth version) + 1 (username length) + 255 (username) + 1 (password length) + 255 (password)
 
 	var buffer [bufferSize]byte
+	var offset int
 
 	if c.credentials == nil {
 		// Method selection part: VER = 5, NMETHODS = 1, METHODS = 0 (no auth)
@@ -135,16 +136,17 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		buffer[0] = socksProtocolVer
 		buffer[1] = numberOfAuthMethods
 		buffer[2] = noAuthMethod
-		if _, err := proxyConn.Write(buffer[:3]); err != nil {
-			return nil, fmt.Errorf("failed to write method selection: %w", err)
-		}
+		offset = 3
+		// if _, err := proxyConn.Write(buffer[:3]); err != nil {
+		// 	return nil, fmt.Errorf("failed to write method selection: %w", err)
+		// }
 	} else {
 		// https://datatracker.ietf.org/doc/html/rfc1929
 		// Method selection part: VER = 5, NMETHODS = 1, METHODS = 2 (username/password)
 		buffer[0] = socksProtocolVer
 		buffer[1] = numberOfAuthMethods
 		buffer[2] = userPassAuthMethod
-		offset := 3
+		offset = 3
 
 		// Authentication part: VER = 1, ULEN, UNAME, PLEN, PASSWD
 		// +----+------+----------+------+----------+
@@ -164,9 +166,9 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		copy(buffer[offset:], c.credentials.password)
 		offset += len(c.credentials.password)
 
-		if _, err := proxyConn.Write(buffer[:offset]); err != nil {
-			return nil, fmt.Errorf("failed to write method selection and authentication: %w", err)
-		}
+		// if _, err := proxyConn.Write(buffer[:offset]); err != nil {
+		// 	return nil, fmt.Errorf("failed to write method selection and authentication: %w", err)
+		// }
 	}
 
 	// Connect request:
@@ -176,10 +178,14 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	// +----+-----+-------+------+----------+----------+
 	// | 1  |  1  | X'00' |  1   | Variable |    2     |
 	// +----+-----+-------+------+----------+----------+
-	buffer[0] = socksProtocolVer
-	buffer[1] = connectCommand
-	buffer[2] = rsv
-	connectRequest, err := appendSOCKS5Address(buffer[:3], remoteAddr)
+	buffer[offset] = socksProtocolVer
+	offset++
+	buffer[offset] = connectCommand
+	offset++
+	buffer[offset] = rsv
+	offset++
+	// Probably more memory efficient if remoteAddr is added to the buffer directly.:
+	connectRequest, err := appendSOCKS5Address(buffer[:offset], remoteAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SOCKS5 address: %w", err)
 	}
@@ -199,6 +205,8 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	// +----+--------+
 	// | 1  |   1    |
 	// +----+--------+
+	// Reuse buffer for better performance.
+	// buffer[0]: VER, buffer[1]: METHOD
 	if _, err = io.ReadFull(proxyConn, buffer[:2]); err != nil {
 		return nil, fmt.Errorf("failed to read method server response")
 	}
@@ -214,7 +222,7 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		// | 1  |   1    |
 		// +----+--------+
 		// VER = 1 means the server should be expecting username/password authentication.
-		// var subNegotiation [2]byte
+		// buffer[2]: VER, buffer[3]: STATUS
 		if _, err = io.ReadFull(proxyConn, buffer[2:4]); err != nil {
 			return nil, fmt.Errorf("failed to read sub-negotiation version and status: %w", err)
 		}
@@ -237,7 +245,7 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	// +----+-----+-------+------+----------+----------+
 	// | 1  |  1  | X'00' |  1   | Variable |    2     |
 	// +----+-----+-------+------+----------+----------+
-	//var connectResponse [4]byte
+	// buffer[4]: VER, buffer[5]: REP, buffer[6]: RSV, buffer[7]: ATYP
 	if _, err = io.ReadFull(proxyConn, buffer[4:8]); err != nil {
 		fmt.Printf("failed to read connect server response: %v", err)
 		return nil, fmt.Errorf("failed to read connect server response: %w", err)
@@ -251,7 +259,7 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		return nil, ReplyCode(buffer[5])
 	}
 
-	// 4. Read and ignore the BND.ADDR and BND.PORT
+	// 4. Read address and length
 	var bndAddrLen int
 	switch buffer[7] {
 	case addrTypeIPv4:
@@ -259,12 +267,12 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	case addrTypeIPv6:
 		bndAddrLen = addrLengthIPv6
 	case addrTypeDomainName:
-		//var lengthByte [1]byte
-		_, err := io.ReadFull(proxyConn, buffer[9:10])
+		// buffer[8]: length of the domain name
+		_, err := io.ReadFull(proxyConn, buffer[8:9])
 		if err != nil {
 			return nil, fmt.Errorf("failed to read address length in connect response: %w", err)
 		}
-		bndAddrLen = int(buffer[9])
+		bndAddrLen = int(buffer[8])
 	default:
 		return nil, fmt.Errorf("invalid address type %v", buffer[7])
 	}
@@ -274,7 +282,7 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	if _, err = io.ReadFull(proxyConn, buffer[8:8+bndAddrLen]); err != nil {
 		return nil, fmt.Errorf("failed to read bound address: %w", err)
 	}
-	// We also ignore the remote bound port number.
+	// We read but ignore the remote bound port number: BND.PORT
 	// Read the port (2 bytes)
 	//var bndPort [2]byte
 	if _, err = io.ReadFull(proxyConn, buffer[9+bndAddrLen:11+bndAddrLen]); err != nil {
