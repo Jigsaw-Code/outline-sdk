@@ -40,7 +40,7 @@ const (
 	connectSuccess      = 0x00
 	addrLengthIPv4      = 4
 	addrLengthIPv6      = 16
-	bufferSize          = (1 + 1 + 1) + (1 + 1 + 255 + 1 + 255)
+	bufferSize          = (1 + 1 + 1) + (1 + 1 + 255 + 1 + 255) + 256
 )
 
 // https://datatracker.ietf.org/doc/html/rfc1929
@@ -161,7 +161,7 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	// +----+-----+-------+------+----------+----------+
 	b = append(b, socksProtocolVer, connectCommand, rsv)
 	// TODO: Probably more memory efficient if remoteAddr is added to the buffer directly.
-	connectRequest, err := appendSOCKS5Address(b, remoteAddr)
+	b, err = appendSOCKS5Address(b, remoteAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SOCKS5 address: %w", err)
 	}
@@ -169,7 +169,7 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	// We merge the method and connect requests and only perform one write
 	// because we send a single authentication method, so there's no point
 	// in waiting for the response. This eliminates a roundtrip.
-	_, err = proxyConn.Write(connectRequest)
+	_, err = proxyConn.Write(b)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write combined SOCKS5 request: %w", err)
 	}
