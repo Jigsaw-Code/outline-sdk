@@ -27,20 +27,20 @@ import (
 // 3 (1 socks version + 1 method selection + 1 methods)
 // + 1 (auth version) + 1 (username length) + 255 (username) + 1 (password length) + 255 (password)
 const (
-	maxCredentialLength     = 255
-	minCredentialLength     = 0x01
-	socksProtocolVer        = 0x05
-	noAuthMethod            = 0x00
-	userPassAuthMethod      = 0x02
-	numberOfAuthMethods     = 0x01
-	authVersion             = 0x01
-	connectCommand          = 0x01
-	rsv                     = 0x00
-	authSuccess             = 0x00
-	connectSuccess          = 0x00
-	addrLengthIPv4      int = 4
-	addrLengthIPv6      int = 16
-	bufferSize          int = 3 + 1 + 1 + 255 + 1 + 255
+	maxCredentialLength = 255
+	minCredentialLength = 1
+	socksProtocolVer    = 0x05
+	noAuthMethod        = 0x00
+	userPassAuthMethod  = 0x02
+	numberOfAuthMethods = 0x01
+	authVersion         = 0x01
+	connectCommand      = 0x01
+	rsv                 = 0x00
+	authSuccess         = 0x00
+	connectSuccess      = 0x00
+	addrLengthIPv4      = 4
+	addrLengthIPv6      = 16
+	bufferSize          = (1 + 1 + 1) + (1 + 1 + 255 + 1 + 255)
 )
 
 // https://datatracker.ietf.org/doc/html/rfc1929
