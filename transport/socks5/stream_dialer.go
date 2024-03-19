@@ -23,6 +23,9 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
+// bufferSize: The maximum buffer size is
+// 3 (1 socks version + 1 method selection + 1 methods)
+// + 1 (auth version) + 1 (username length) + 255 (username) + 1 (password length) + 255 (password)
 const (
 	maxCredentialLength     = 255
 	minCredentialLength     = 0x01
@@ -119,10 +122,6 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	// For protocol details, see https://datatracker.ietf.org/doc/html/rfc1928#section-3
 	// Creating a single buffer for method selection, authentication, and connection request
 	// Buffer large enough for method, auth, and connect requests with a domain name address.
-	// The maximum size of the buffer is
-	// 3 (1 socks version + 1 method selection + 1 methods)
-	// + 1 (auth version) + 1 (username length) + 255 (username) + 1 (password length) + 255 (password)
-
 	var buffer [bufferSize]byte
 	var offset int
 
@@ -137,9 +136,6 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		buffer[1] = numberOfAuthMethods
 		buffer[2] = noAuthMethod
 		offset = 3
-		// if _, err := proxyConn.Write(buffer[:3]); err != nil {
-		// 	return nil, fmt.Errorf("failed to write method selection: %w", err)
-		// }
 	} else {
 		// https://datatracker.ietf.org/doc/html/rfc1929
 		// Method selection part: VER = 5, NMETHODS = 1, METHODS = 2 (username/password)
@@ -148,13 +144,12 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		buffer[2] = userPassAuthMethod
 		offset = 3
 
-		// Authentication part: VER = 1, ULEN, UNAME, PLEN, PASSWD
+		// Authentication part: VER = 1, ULEN = 1, UNAME = 1~255, PLEN = 1, PASSWD = 1~255
 		// +----+------+----------+------+----------+
 		// |VER | ULEN |  UNAME   | PLEN |  PASSWD  |
 		// +----+------+----------+------+----------+
 		// | 1  |  1   | 1 to 255 |  1   | 1 to 255 |
 		// +----+------+----------+------+----------+
-		// Authentication part: VER = 1, ULEN, UNAME, PLEN, PASSWD
 		buffer[offset] = authVersion
 		offset++
 		buffer[offset] = byte(len(c.credentials.username))
@@ -166,9 +161,6 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		copy(buffer[offset:], c.credentials.password)
 		offset += len(c.credentials.password)
 
-		// if _, err := proxyConn.Write(buffer[:offset]); err != nil {
-		// 	return nil, fmt.Errorf("failed to write method selection and authentication: %w", err)
-		// }
 	}
 
 	// Connect request:
@@ -184,7 +176,7 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	offset++
 	buffer[offset] = rsv
 	offset++
-	// Probably more memory efficient if remoteAddr is added to the buffer directly.:
+	// TODO: Probably more memory efficient if remoteAddr is added to the buffer directly.
 	connectRequest, err := appendSOCKS5Address(buffer[:offset], remoteAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SOCKS5 address: %w", err)
@@ -205,15 +197,19 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	// +----+--------+
 	// | 1  |   1    |
 	// +----+--------+
-	// Reuse buffer for better performance.
 	// buffer[0]: VER, buffer[1]: METHOD
+	// Reuse buffer for better performance.
 	if _, err = io.ReadFull(proxyConn, buffer[:2]); err != nil {
 		return nil, fmt.Errorf("failed to read method server response")
 	}
 	if buffer[0] != socksProtocolVer {
 		return nil, fmt.Errorf("invalid protocol version %v. Expected 5", buffer[0])
 	}
-	if buffer[1] == userPassAuthMethod {
+
+	switch buffer[1] {
+	case noAuthMethod:
+		// No authentication required.
+	case userPassAuthMethod:
 		// 2. Read authentication version and status
 		// VER = 1, STATUS = 0
 		// +----+--------+
@@ -224,7 +220,7 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		// VER = 1 means the server should be expecting username/password authentication.
 		// buffer[2]: VER, buffer[3]: STATUS
 		if _, err = io.ReadFull(proxyConn, buffer[2:4]); err != nil {
-			return nil, fmt.Errorf("failed to read sub-negotiation version and status: %w", err)
+			return nil, fmt.Errorf("failed to read authentication version and status: %w", err)
 		}
 		if buffer[2] != authVersion {
 			return nil, authVersionError(buffer[2])
@@ -232,12 +228,10 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		if buffer[3] != authSuccess {
 			return nil, fmt.Errorf("authentication failed: %v", buffer[3])
 		}
+	default:
+		return nil, fmt.Errorf("unsupported SOCKS authentication method %v. Expected 2", buffer[1])
 	}
-	// Check if the server supports the authentication method we sent.
-	// 0 is no auth, 2 is username/password
-	// if buffer[1] != 0 && buffer[1] != 2 {
-	// 	return nil, fmt.Errorf("unsupported SOCKS authentication method %v. Expected 2", buffer[1])
-	// }
+
 	// 3. Read connect response (VER, REP, RSV, ATYP, BND.ADDR, BND.PORT).
 	// See https://datatracker.ietf.org/doc/html/rfc1928#section-6.
 	// +----+-----+-------+------+----------+----------+
@@ -245,7 +239,10 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	// +----+-----+-------+------+----------+----------+
 	// | 1  |  1  | X'00' |  1   | Variable |    2     |
 	// +----+-----+-------+------+----------+----------+
-	// buffer[4]: VER, buffer[5]: REP, buffer[6]: RSV, buffer[7]: ATYP
+	// buffer[4]: VER
+	// buffer[5]: REP
+	// buffer[6]: RSV
+	// buffer[7]: ATYP
 	if _, err = io.ReadFull(proxyConn, buffer[4:8]); err != nil {
 		fmt.Printf("failed to read connect server response: %v", err)
 		return nil, fmt.Errorf("failed to read connect server response: %w", err)
