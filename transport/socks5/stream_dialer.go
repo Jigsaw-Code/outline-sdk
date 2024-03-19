@@ -207,7 +207,7 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 			return nil, fmt.Errorf("failed to read authentication version and status: %w", err)
 		}
 		if buffer[2] != authVersion {
-			return nil, authVersionError(buffer[2])
+			return nil, fmt.Errorf("invalid authentication version %v. Expected 1", buffer[2])
 		}
 		if buffer[3] != authSuccess {
 			return nil, fmt.Errorf("authentication failed: %v", buffer[3])

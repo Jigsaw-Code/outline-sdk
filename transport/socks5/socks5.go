@@ -117,9 +117,3 @@ func appendSOCKS5Address(b []byte, address string) ([]byte, error) {
 	b = binary.BigEndian.AppendUint16(b, uint16(portNum))
 	return b, nil
 }
-
-type authVersionError byte
-
-func (e authVersionError) Error() string {
-	return fmt.Sprintf("%s: %d. Expected %d", authVersionMismatch, byte(e), authVersion)
-}
