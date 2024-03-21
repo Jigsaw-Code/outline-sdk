@@ -33,13 +33,13 @@ import (
 )
 
 func TestSOCKS5Dialer_NewStreamDialerNil(t *testing.T) {
-	dialer, err := NewStreamDialer(nil, nil)
+	dialer, err := NewStreamDialer(nil)
 	require.Nil(t, dialer)
 	require.Error(t, err)
 }
 
 func TestSOCKS5Dialer_BadConnection(t *testing.T) {
-	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.0:0"}, nil)
+	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.0:0"})
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
 	_, err = dialer.DialStream(context.Background(), "example.com:443")
@@ -51,7 +51,7 @@ func TestSOCKS5Dialer_BadAddress(t *testing.T) {
 	require.NoError(t, err, "Failed to create TCP listener: %v", err)
 	defer listener.Close()
 
-	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String()}, nil)
+	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String()})
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
 
@@ -98,7 +98,7 @@ func testExchange(tb testing.TB, listener *net.TCPListener, destAddr string, req
 	// Client
 	go func() {
 		defer running.Done()
-		dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String()}, nil)
+		dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String()})
 		require.NoError(tb, err)
 		serverConn, err := dialer.DialStream(context.Background(), destAddr)
 		if replyCode != 0 {
@@ -191,7 +191,7 @@ func TestConnectWithoutAuth(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Create a SOCKS5 client
-	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: net.JoinHostPort(host, strconv.Itoa(port))}, nil)
+	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: net.JoinHostPort(host, strconv.Itoa(port))})
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
 
@@ -231,18 +231,20 @@ func TestConnectWithAuth(t *testing.T) {
 
 	address := net.JoinHostPort(host, strconv.Itoa(port))
 
-	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: address}, &c)
+	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: address})
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
+	dialer.Credentials = &c
 	_, err = dialer.DialStream(context.Background(), address)
 	require.NoError(t, err)
 
 	// Try to connect with incorrect credentials
 	c, err = NewCredentials("testusername", "wrongpassword")
 	require.NoError(t, err)
-	dialer, err = NewStreamDialer(&transport.TCPEndpoint{Address: address}, &c)
+	dialer, err = NewStreamDialer(&transport.TCPEndpoint{Address: address})
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
+	dialer.Credentials = &c
 	_, err = dialer.DialStream(context.Background(), address)
 	require.Error(t, err)
 }

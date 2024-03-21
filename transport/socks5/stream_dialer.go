@@ -56,26 +56,26 @@ func NewCredentials(username, password string) (Credentials, error) {
 
 // NewStreamDialer creates a [transport.StreamDialer] that routes connections to a SOCKS5
 // proxy listening at the given [transport.StreamEndpoint].
-func NewStreamDialer(endpoint transport.StreamEndpoint, cred *Credentials) (transport.StreamDialer, error) {
+func NewStreamDialer(endpoint transport.StreamEndpoint) (*StreamDialer, error) {
 	if endpoint == nil {
 		return nil, errors.New("argument endpoint must not be nil")
 	}
-	return &streamDialer{proxyEndpoint: endpoint, credentials: cred}, nil
+	return &StreamDialer{proxyEndpoint: endpoint, Credentials: nil}, nil
 }
 
-type streamDialer struct {
+type StreamDialer struct {
 	proxyEndpoint transport.StreamEndpoint
-	credentials   *Credentials
+	Credentials   *Credentials
 }
 
-var _ transport.StreamDialer = (*streamDialer)(nil)
+var _ transport.StreamDialer = (*StreamDialer)(nil)
 
 // DialStream implements [transport.StreamDialer].DialStream using SOCKS5.
 // It will send the auth method, auth credentials (if auth is chosen), and
 // the connect requests in one packet, to avoid an additional roundtrip.
 // The returned [error] will be of type [ReplyCode] if the server sends a SOCKS error reply code, which
 // you can check against the error constants in this package using [errors.Is].
-func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
+func (c *StreamDialer) DialStream(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
 	proxyConn, err := c.proxyEndpoint.ConnectStream(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to SOCKS5 proxy: %w", err)
@@ -97,7 +97,7 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	var buffer [(1 + 1 + 1) + (1 + 1 + 255 + 1 + 255) + 256]byte
 	var b []byte
 
-	if c.credentials == nil {
+	if c.Credentials == nil {
 		// Method selection part: VER = 5, NMETHODS = 1, METHODS = 0 (no auth)
 		// +----+----------+----------+
 		// |VER | NMETHODS | METHODS  |
@@ -117,10 +117,10 @@ func (c *streamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		// | 1  |  1   | 1 to 255 |  1   | 1 to 255 |
 		// +----+------+----------+------+----------+
 		b = append(b, 1)
-		b = append(b, byte(len(c.credentials.username)))
-		b = append(b, c.credentials.username...)
-		b = append(b, byte(len(c.credentials.password)))
-		b = append(b, c.credentials.password...)
+		b = append(b, byte(len(c.Credentials.username)))
+		b = append(b, c.Credentials.username...)
+		b = append(b, byte(len(c.Credentials.password)))
+		b = append(b, c.Credentials.password...)
 	}
 
 	// Connect request:
