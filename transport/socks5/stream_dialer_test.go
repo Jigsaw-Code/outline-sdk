@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"sync"
 	"testing"
 	"testing/iotest"
@@ -170,21 +171,31 @@ func testExchange(tb testing.TB, listener *net.TCPListener, destAddr string, req
 func TestConnectWithoutAuth(t *testing.T) {
 	// Create a SOCKS5 server
 	server := socks5.NewServer()
+	host := "127.0.0.1"
 
-	// Create SOCKS5 proxy on localhost port 8000
+	// Create SOCKS5 proxy on localhost with a random port
+	listener, err := net.Listen("tcp", net.JoinHostPort(host, "0"))
+	require.NoError(t, err)
+
+	// Get the selected port number
+	port := listener.Addr().(*net.TCPAddr).Port
+
 	go func() {
-		err := server.ListenAndServe("tcp", "127.0.0.1:8000")
+		err := server.Serve(listener)
+		defer listener.Close()
+		fmt.Println("server is listening in the goroutin")
 		require.NoError(t, err)
-		fmt.Println("server is listening")
 	}()
+
 	// wait for server to start
 	time.Sleep(10 * time.Millisecond)
 
 	// Create a SOCKS5 client
-	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.1:8000"}, nil)
+	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: net.JoinHostPort(host, strconv.Itoa(port))}, nil)
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
-	_, err = dialer.DialStream(context.Background(), "127.0.0.1:8000")
+
+	_, err = dialer.DialStream(context.Background(), net.JoinHostPort(host, strconv.Itoa(port)))
 	require.NoError(t, err)
 }
 
@@ -199,34 +210,39 @@ func TestConnectWithAuth(t *testing.T) {
 		socks5.WithAuthMethods([]socks5.Authenticator{cator}),
 	)
 
+	// Create SOCKS5 proxy on localhost with a random port
+	host := "127.0.0.1"
+	listener, err := net.Listen("tcp", net.JoinHostPort(host, "0"))
+	require.NoError(t, err)
+	port := listener.Addr().(*net.TCPAddr).Port
+
 	// Create SOCKS5 proxy on localhost port 8001
 	go func() {
-		err := server.ListenAndServe("tcp", "127.0.0.1:8001")
+		err := server.Serve(listener)
+		defer listener.Close()
 		require.NoError(t, err)
-		fmt.Println("server is listening")
 	}()
 	// wait for server to start
 	time.Sleep(10 * time.Millisecond)
 
-	// Create a SOCKS5 client
-	c := Credentials{}
-
-	// Try to connect with correct credentials
+	// Create a SOCKS5 credentials
 	c, err := NewCredentials("testusername", "testpassword")
 	require.NoError(t, err)
 
-	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.1:8001"}, &c)
+	address := net.JoinHostPort(host, strconv.Itoa(port))
+
+	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: address}, &c)
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
-	_, err = dialer.DialStream(context.Background(), "127.0.0.1:8001")
+	_, err = dialer.DialStream(context.Background(), address)
 	require.NoError(t, err)
 
 	// Try to connect with incorrect credentials
 	c, err = NewCredentials("testusername", "wrongpassword")
 	require.NoError(t, err)
-	dialer, err = NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.1:8001"}, &c)
+	dialer, err = NewStreamDialer(&transport.TCPEndpoint{Address: address}, &c)
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
-	_, err = dialer.DialStream(context.Background(), "127.0.0.1:8001")
+	_, err = dialer.DialStream(context.Background(), address)
 	require.Error(t, err)
 }
