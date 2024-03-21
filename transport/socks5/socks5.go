@@ -38,7 +38,8 @@ const (
 )
 
 const (
-	authVersionMismatch = "unknown authentication version"
+	authMethodNoAuth   = 0x00
+	authMethodUserPass = 0x02
 )
 
 var _ error = (ReplyCode)(0)
