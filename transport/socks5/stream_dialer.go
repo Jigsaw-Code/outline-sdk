@@ -30,45 +30,40 @@ type Credentials struct {
 	password []byte
 }
 
-func NewCredentials(username, password string) (Credentials, error) {
-	var c Credentials
-	usernameBytes := []byte(username)
-	passwordBytes := []byte(password)
-
-	if len(usernameBytes) > 255 {
-		return c, errors.New("username exceeds 255 bytes")
-	}
-	if len(usernameBytes) == 0 {
-		return c, errors.New("username must be at least 1 byte")
-	}
-	c.username = usernameBytes
-
-	if len(passwordBytes) > 255 {
-		return c, errors.New("password exceeds 255 bytes")
-	}
-	if len(passwordBytes) == 0 {
-		return c, errors.New("password must be at least 1 byte")
-	}
-	c.password = passwordBytes
-
-	return c, nil
-}
-
 // NewStreamDialer creates a [transport.StreamDialer] that routes connections to a SOCKS5
 // proxy listening at the given [transport.StreamEndpoint].
 func NewStreamDialer(endpoint transport.StreamEndpoint) (*StreamDialer, error) {
 	if endpoint == nil {
 		return nil, errors.New("argument endpoint must not be nil")
 	}
-	return &StreamDialer{proxyEndpoint: endpoint, Credentials: nil}, nil
+	return &StreamDialer{proxyEndpoint: endpoint, credentials: nil}, nil
 }
 
 type StreamDialer struct {
 	proxyEndpoint transport.StreamEndpoint
-	Credentials   *Credentials
+	credentials   *Credentials
 }
 
 var _ transport.StreamDialer = (*StreamDialer)(nil)
+
+func (c *StreamDialer) SetCredentials(username, password []byte) error {
+	if len(username) > 255 {
+		return errors.New("username exceeds 255 bytes")
+	}
+	if len(username) == 0 {
+		return errors.New("username must be at least 1 byte")
+	}
+
+	if len(password) > 255 {
+		return errors.New("password exceeds 255 bytes")
+	}
+	if len(password) == 0 {
+		return errors.New("password must be at least 1 byte")
+	}
+
+	c.credentials = &Credentials{username: username, password: password}
+	return nil
+}
 
 // DialStream implements [transport.StreamDialer].DialStream using SOCKS5.
 // It will send the auth method, auth credentials (if auth is chosen), and
@@ -97,7 +92,7 @@ func (c *StreamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	var buffer [(1 + 1 + 1) + (1 + 1 + 255 + 1 + 255) + 256]byte
 	var b []byte
 
-	if c.Credentials == nil {
+	if c.credentials == nil {
 		// Method selection part: VER = 5, NMETHODS = 1, METHODS = 0 (no auth)
 		// +----+----------+----------+
 		// |VER | NMETHODS | METHODS  |
@@ -117,10 +112,10 @@ func (c *StreamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		// | 1  |  1   | 1 to 255 |  1   | 1 to 255 |
 		// +----+------+----------+------+----------+
 		b = append(b, 1)
-		b = append(b, byte(len(c.Credentials.username)))
-		b = append(b, c.Credentials.username...)
-		b = append(b, byte(len(c.Credentials.password)))
-		b = append(b, c.Credentials.password...)
+		b = append(b, byte(len(c.credentials.username)))
+		b = append(b, c.credentials.username...)
+		b = append(b, byte(len(c.credentials.password)))
+		b = append(b, c.credentials.password...)
 	}
 
 	// Connect request:

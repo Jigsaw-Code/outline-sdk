@@ -221,21 +221,17 @@ func TestConnectWithAuth(t *testing.T) {
 	// wait for server to start
 	time.Sleep(10 * time.Millisecond)
 
-	// Create a SOCKS5 credentials
-	c, err := NewCredentials("testusername", "testpassword")
-	require.NoError(t, err)
-
 	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: address})
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
-	dialer.Credentials = &c
+	err = dialer.SetCredentials([]byte("testusername"), []byte("testpassword"))
+	require.NoError(t, err)
 	_, err = dialer.DialStream(context.Background(), address)
 	require.NoError(t, err)
 
 	// Try to connect with incorrect credentials
-	c, err = NewCredentials("testusername", "wrongpassword")
+	err = dialer.SetCredentials([]byte("testusername"), []byte("wrongpassword"))
 	require.NoError(t, err)
-	dialer.Credentials = &c
 	_, err = dialer.DialStream(context.Background(), address)
 	require.Error(t, err)
 }
