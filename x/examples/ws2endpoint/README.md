@@ -41,3 +41,18 @@ Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
   "readme": "https://ipinfo.io/missingauth"
 }
 ```
+
+You can expose your WebSockets on Cloudflare with [clourdflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/). For example:
+
+```console
+% cloudflared tunnel --url http://localhost:8080
+
+2024-03-22T22:06:27Z INF Thank you for trying Cloudflare Tunnel. Doing so, without a Cloudflare account, is a quick way to experiment and try it out. However, be aware that these account-less Tunnels have no uptime guarantee. If you intend to use Tunnels in production you should use a pre-created named tunnel by following: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps
+2024-03-22T22:06:27Z INF Requesting new quick Tunnel on trycloudflare.com...
+2024-03-22T22:06:28Z INF +--------------------------------------------------------------------------------------------+
+2024-03-22T22:06:28Z INF |  Your quick Tunnel has been created! Visit it at (it may take some time to be reachable):  |
+2024-03-22T22:06:28Z INF |  https://recorders-uganda-starring-stopping.trycloudflare.com                              |
+2024-03-22T22:06:28Z INF +--------------------------------------------------------------------------------------------+
+```
+
+In this case, use `wss://recorders-uganda-starring-stopping.trycloudflare.com` as the WebSocket url.
