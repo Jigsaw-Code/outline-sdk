@@ -37,6 +37,7 @@ const (
 	ErrAddressTypeNotSupported       = ReplyCode(0x08)
 )
 
+// SOCKS5 authentication methods, as specified in https://datatracker.ietf.org/doc/html/rfc1928#section-3
 const (
 	authMethodNoAuth   = 0x00
 	authMethodUserPass = 0x02
