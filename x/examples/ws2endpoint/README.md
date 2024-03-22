@@ -1,6 +1,6 @@
-# Websocket Reverse Proxy
+# WebSocket Reverse Proxy
 
-This package contains a command-line tool to expose a Websocket endpoint that connects to
+This package contains a command-line tool to expose a WebSocket endpoint that connects to
 any endpoint over a transport.
 
 ```sh
