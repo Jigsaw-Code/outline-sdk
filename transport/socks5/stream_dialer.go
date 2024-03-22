@@ -25,7 +25,7 @@ import (
 
 // https://datatracker.ietf.org/doc/html/rfc1929
 // Credentials can be nil, and that means no authentication.
-type Credentials struct {
+type credentials struct {
 	username []byte
 	password []byte
 }
@@ -36,12 +36,12 @@ func NewStreamDialer(endpoint transport.StreamEndpoint) (*StreamDialer, error) {
 	if endpoint == nil {
 		return nil, errors.New("argument endpoint must not be nil")
 	}
-	return &StreamDialer{proxyEndpoint: endpoint, credentials: nil}, nil
+	return &StreamDialer{proxyEndpoint: endpoint, cred: nil}, nil
 }
 
 type StreamDialer struct {
 	proxyEndpoint transport.StreamEndpoint
-	credentials   *Credentials
+	cred          *credentials
 }
 
 var _ transport.StreamDialer = (*StreamDialer)(nil)
@@ -61,7 +61,7 @@ func (c *StreamDialer) SetCredentials(username, password []byte) error {
 		return errors.New("password must be at least 1 byte")
 	}
 
-	c.credentials = &Credentials{username: username, password: password}
+	c.cred = &credentials{username: username, password: password}
 	return nil
 }
 
@@ -92,7 +92,7 @@ func (c *StreamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	var buffer [(1 + 1 + 1) + (1 + 1 + 255 + 1 + 255) + 256]byte
 	var b []byte
 
-	if c.credentials == nil {
+	if c.cred == nil {
 		// Method selection part: VER = 5, NMETHODS = 1, METHODS = 0 (no auth)
 		// +----+----------+----------+
 		// |VER | NMETHODS | METHODS  |
@@ -112,10 +112,10 @@ func (c *StreamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		// | 1  |  1   | 1 to 255 |  1   | 1 to 255 |
 		// +----+------+----------+------+----------+
 		b = append(b, 1)
-		b = append(b, byte(len(c.credentials.username)))
-		b = append(b, c.credentials.username...)
-		b = append(b, byte(len(c.credentials.password)))
-		b = append(b, c.credentials.password...)
+		b = append(b, byte(len(c.cred.username)))
+		b = append(b, c.cred.username...)
+		b = append(b, byte(len(c.cred.password)))
+		b = append(b, c.cred.password...)
 	}
 
 	// Connect request:
