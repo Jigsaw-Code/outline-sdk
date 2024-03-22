@@ -195,7 +195,7 @@ func TestConnectWithoutAuth(t *testing.T) {
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
 
-	_, err = dialer.DialStream(context.Background(), net.JoinHostPort(host, strconv.Itoa(port)))
+	_, err = dialer.DialStream(context.Background(), listener.Addr().String())
 	require.NoError(t, err)
 }
 
