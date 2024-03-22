@@ -178,7 +178,7 @@ func TestConnectWithoutAuth(t *testing.T) {
 	go func() {
 		err := server.Serve(listener)
 		defer listener.Close()
-		fmt.Println("server is listening in the goroutin")
+		t.Log("server is listening...")
 		require.NoError(t, err)
 	}()
 
