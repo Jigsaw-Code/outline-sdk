@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strconv"
 	"sync"
 	"testing"
 	"testing/iotest"
@@ -171,7 +170,6 @@ func testExchange(tb testing.TB, listener *net.TCPListener, destAddr string, req
 func TestConnectWithoutAuth(t *testing.T) {
 	// Create a SOCKS5 server
 	server := socks5.NewServer()
-	host := "127.0.0.1"
 
 	// Create SOCKS5 proxy on localhost with a random port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -187,12 +185,14 @@ func TestConnectWithoutAuth(t *testing.T) {
 	// wait for server to start
 	time.Sleep(10 * time.Millisecond)
 
+	address := listener.Addr().String()
+
 	// Create a SOCKS5 client
-	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String())
+	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: address})
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
 
-	_, err = dialer.DialStream(context.Background(), listener.Addr().String())
+	_, err = dialer.DialStream(context.Background(), address)
 	require.NoError(t, err)
 }
 
@@ -208,10 +208,9 @@ func TestConnectWithAuth(t *testing.T) {
 	)
 
 	// Create SOCKS5 proxy on localhost with a random port
-	host := "127.0.0.1"
-	listener, err := net.Listen("tcp", net.JoinHostPort(host, "0"))
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	port := listener.Addr().(*net.TCPAddr).Port
+	address := listener.Addr().String()
 
 	// Create SOCKS5 proxy on localhost port 8001
 	go func() {
@@ -226,8 +225,6 @@ func TestConnectWithAuth(t *testing.T) {
 	c, err := NewCredentials("testusername", "testpassword")
 	require.NoError(t, err)
 
-	address := net.JoinHostPort(host, strconv.Itoa(port))
-
 	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: address})
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
@@ -237,9 +234,6 @@ func TestConnectWithAuth(t *testing.T) {
 
 	// Try to connect with incorrect credentials
 	c, err = NewCredentials("testusername", "wrongpassword")
-	require.NoError(t, err)
-	dialer, err = NewStreamDialer(&transport.TCPEndpoint{Address: address})
-	require.NotNil(t, dialer)
 	require.NoError(t, err)
 	dialer.Credentials = &c
 	_, err = dialer.DialStream(context.Background(), address)
