@@ -177,9 +177,6 @@ func TestConnectWithoutAuth(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
-	// Get the selected port number
-	port := listener.Addr().(*net.TCPAddr).Port
-
 	go func() {
 		err := server.Serve(listener)
 		defer listener.Close()
