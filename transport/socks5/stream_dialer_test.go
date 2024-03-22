@@ -191,7 +191,7 @@ func TestConnectWithoutAuth(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Create a SOCKS5 client
-	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: net.JoinHostPort(host, strconv.Itoa(port))})
+	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String())
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
 
