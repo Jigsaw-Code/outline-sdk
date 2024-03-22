@@ -23,10 +23,12 @@ import (
 	"sync"
 	"testing"
 	"testing/iotest"
+	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/things-go/go-socks5"
 )
 
 func TestSOCKS5Dialer_NewStreamDialerNil(t *testing.T) {
@@ -163,4 +165,73 @@ func testExchange(tb testing.TB, listener *net.TCPListener, destAddr string, req
 	}()
 
 	running.Wait()
+}
+
+func TestConnectWithoutAuth(t *testing.T) {
+	// Create a SOCKS5 server
+	server := socks5.NewServer()
+
+	// Create SOCKS5 proxy on localhost with a random port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	go func() {
+		err := server.Serve(listener)
+		defer listener.Close()
+		t.Log("server is listening...")
+		require.NoError(t, err)
+	}()
+
+	// wait for server to start
+	time.Sleep(10 * time.Millisecond)
+
+	address := listener.Addr().String()
+
+	// Create a SOCKS5 client
+	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: address})
+	require.NotNil(t, dialer)
+	require.NoError(t, err)
+
+	_, err = dialer.DialStream(context.Background(), address)
+	require.NoError(t, err)
+}
+
+func TestConnectWithAuth(t *testing.T) {
+	// Create a SOCKS5 server
+	cator := socks5.UserPassAuthenticator{
+		Credentials: socks5.StaticCredentials{
+			"testusername": "testpassword",
+		},
+	}
+	server := socks5.NewServer(
+		socks5.WithAuthMethods([]socks5.Authenticator{cator}),
+	)
+
+	// Create SOCKS5 proxy on localhost with a random port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	address := listener.Addr().String()
+
+	// Create SOCKS5 proxy on localhost port 8001
+	go func() {
+		err := server.Serve(listener)
+		defer listener.Close()
+		require.NoError(t, err)
+	}()
+	// wait for server to start
+	time.Sleep(10 * time.Millisecond)
+
+	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: address})
+	require.NotNil(t, dialer)
+	require.NoError(t, err)
+	err = dialer.SetCredentials([]byte("testusername"), []byte("testpassword"))
+	require.NoError(t, err)
+	_, err = dialer.DialStream(context.Background(), address)
+	require.NoError(t, err)
+
+	// Try to connect with incorrect credentials
+	err = dialer.SetCredentials([]byte("testusername"), []byte("wrongpassword"))
+	require.NoError(t, err)
+	_, err = dialer.DialStream(context.Background(), address)
+	require.Error(t, err)
 }
