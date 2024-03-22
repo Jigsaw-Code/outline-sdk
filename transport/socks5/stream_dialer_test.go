@@ -174,7 +174,7 @@ func TestConnectWithoutAuth(t *testing.T) {
 	host := "127.0.0.1"
 
 	// Create SOCKS5 proxy on localhost with a random port
-	listener, err := net.Listen("tcp", net.JoinHostPort(host, "0"))
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
 	// Get the selected port number
