@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"net/url"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -18,7 +17,6 @@ func newSOCKS5StreamDialerFromURL(innerDialer transport.StreamDialer, configURL 
 	if userInfo != nil {
 		username := userInfo.Username()
 		password, _ := userInfo.Password()
-		fmt.Printf("username: %s, password: %s\n", username, password)
 		err := dialer.SetCredentials([]byte(username), []byte(password))
 		if err != nil {
 			return nil, err
