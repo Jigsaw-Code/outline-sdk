@@ -15,6 +15,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 )
@@ -44,7 +45,7 @@ func restoreSystemDNSServer() {
 }
 
 func backupAndWriteFile(original, backup string, data []byte) error {
-	if err := os.Rename(original, backup); err != nil {
+	if err := os.Rename(original, backup); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("failed to backup DNS config file '%s' to '%s': %w", original, backup, err)
 	}
 	if err := os.WriteFile(original, data, 0644); err != nil {
