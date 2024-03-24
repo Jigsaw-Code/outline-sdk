@@ -207,3 +207,22 @@ func disableProxy(p ProxyType, interfaceName string) error {
 		return fmt.Errorf("unsupported proxy type: %s", p)
 	}
 }
+
+func getProxySettings(p ProxyType, interfaceName string) (*ProxySettings, error) {
+	var output []byte
+	var err error
+	switch p {
+	case proxyTypeHTTP:
+		output, err = exec.Command("networksetup", "-getwebproxy", interfaceName).Output()
+	case proxyTypeHTTPS:
+		output, err = exec.Command("networksetup", "-getsecurewebproxy", interfaceName).Output()
+	case proxyTypeSOCKS:
+		output, err = exec.Command("networksetup", "-getsocksfirewallproxy", interfaceName).Output()
+	default:
+		err = fmt.Errorf("unsupported proxy type: %s", p)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return getHostandPort(string(output))
+}
