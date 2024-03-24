@@ -31,29 +31,9 @@ const (
 	proxyTypeSOCKS ProxyType = "socks"
 )
 
-var (
-	backupHTTPSettings  *ProxySettings
-	backupHTTPSSettings *ProxySettings
-	backupSOCKSSettings *ProxySettings
-)
-
-type ProxySettings struct {
-	host string
-	port string
-}
-
 func SetWebProxy(host string, port string) error {
 	// Get the active network interface
 	activeInterface, err := getActiveNetworkInterface()
-	if err != nil {
-		return err
-	}
-	backupHTTPSettings, err = getProxySettings(proxyTypeHTTP, activeInterface)
-	if err != nil {
-		return err
-	}
-
-	backupHTTPSSettings, err = getProxySettings(proxyTypeHTTPS, activeInterface)
 	if err != nil {
 		return err
 	}
@@ -70,23 +50,19 @@ func SetWebProxy(host string, port string) error {
 	return nil
 }
 
-func UnsetWebProxy() error {
+func ClearWebProxy() error {
 	// Get the active network interface
 	activeInterface, err := getActiveNetworkInterface()
 	if err != nil {
 		return err
 	}
-	// Restore the previous settings before disabling the proxy
-	if backupHTTPSettings != nil {
-		if err := setProxySettings(proxyTypeHTTP, activeInterface, backupHTTPSettings.host, backupHTTPSettings.port); err != nil {
-			return err
-		}
-	}
 
-	if backupHTTPSSettings != nil {
-		if err := setProxySettings(proxyTypeHTTPS, activeInterface, backupHTTPSSettings.host, backupHTTPSSettings.port); err != nil {
-			return err
-		}
+	// Clear proxy settings
+	if err := setProxySettings(proxyTypeHTTP, activeInterface, "127.0.0.1", "0"); err != nil {
+		return err
+	}
+	if err := setProxySettings(proxyTypeHTTPS, activeInterface, "127.0.0.1", "0"); err != nil {
+		return err
 	}
 
 	// Unset the web proxy and secure web proxy
@@ -107,12 +83,6 @@ func SetSOCKSProxy(host string, port string) error {
 		return err
 	}
 
-	// Backup the previous previous proxy settings before setting the new proxy settings
-	backupSOCKSSettings, err = getProxySettings(proxyTypeHTTP, activeInterface)
-	if err != nil {
-		return err
-	}
-
 	// Set the SOCKS proxy
 	if err := setProxySettings(proxyTypeSOCKS, activeInterface, host, port); err != nil {
 		return err
@@ -121,20 +91,20 @@ func SetSOCKSProxy(host string, port string) error {
 	return nil
 }
 
-func UnsetSOCKSProxy() error {
+func ClearSOCKSProxy() error {
 	// Get the active network interface
 	activeInterface, err := getActiveNetworkInterface()
 	if err != nil {
 		return err
 	}
 
-	// Revert to previous the SOCKS proxy
-	if err := setProxySettings(proxyTypeSOCKS, activeInterface, backupSOCKSSettings.host, backupSOCKSSettings.port); err != nil {
+	// Unset the SOCKS proxy
+	if err := disableProxy(proxyTypeSOCKS, activeInterface); err != nil {
 		return err
 	}
 
-	// Unset the SOCKS proxy
-	if err := disableProxy(proxyTypeSOCKS, activeInterface); err != nil {
+	// Revert to previous the SOCKS proxy
+	if err := setProxySettings(proxyTypeSOCKS, activeInterface, "127.0.0.1", "0"); err != nil {
 		return err
 	}
 
@@ -208,7 +178,7 @@ func getNetworkServiceName(output, hardwarePort string) (string, error) {
 	return "", fmt.Errorf("failed to find network service name for hardware port %s", hardwarePort)
 }
 
-// setProxyCommand sets the specified type of proxy on the given network interface.
+// setProxySettings sets the specified type of proxy on the given network interface.
 // https://keith.github.io/xcode-man-pages/networksetup.8.html#getsecurewebproxy
 func setProxySettings(p ProxyType, interfaceName string, host string, port string) error {
 	switch p {
@@ -223,47 +193,7 @@ func setProxySettings(p ProxyType, interfaceName string, host string, port strin
 	}
 }
 
-func getProxySettings(p ProxyType, interfaceName string) (*ProxySettings, error) {
-	var output []byte
-	var err error
-	switch p {
-	case proxyTypeHTTP:
-		output, err = exec.Command("networksetup", "-getwebproxy", interfaceName).Output()
-	case proxyTypeHTTPS:
-		output, err = exec.Command("networksetup", "-getsecurewebproxy", interfaceName).Output()
-	case proxyTypeSOCKS:
-		output, err = exec.Command("networksetup", "-getsocksfirewallproxy", interfaceName).Output()
-	default:
-		err = fmt.Errorf("unsupported proxy type: %s", p)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return getHostandPort(string(output))
-}
-func getHostandPort(commandOutput string) (*ProxySettings, error) {
-	var host, port string
-	lines := strings.Split(commandOutput, "\n")
-	for _, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), "Server:") {
-			fields := strings.Fields(line)
-			if len(fields) >= 2 {
-				host = fields[1]
-			}
-		} else if strings.HasPrefix(strings.TrimSpace(line), "Port:") {
-			fields := strings.Fields(line)
-			if len(fields) >= 2 {
-				port = fields[1]
-			}
-		}
-	}
-	if host == "" || port == "" {
-		return nil, fmt.Errorf("failed to parse host and port from output")
-	}
-	return &ProxySettings{host: host, port: port}, nil
-}
-
-// removeProxyCommand unsets the specified type of proxy from the given network interface.
+// disableProxy turns off the specified type of proxy on the given network interface.
 // https://keith.github.io/xcode-man-pages/networksetup.8.html#setwebproxystate
 func disableProxy(p ProxyType, interfaceName string) error {
 	switch p {
