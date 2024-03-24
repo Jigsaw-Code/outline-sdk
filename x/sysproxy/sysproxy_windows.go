@@ -17,7 +17,6 @@
 package sysproxy
 
 import (
-	"errors"
 	"fmt"
 	"net"
 
@@ -25,13 +24,10 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-// WebProxySettings holds the backup of the web proxy settings
 type WebProxySettings struct {
 	ProxyServer   string
 	ProxyOverride string
 }
-
-var backup *WebProxySettings
 
 var (
 	modwininet            = windows.NewLazySystemDLL("wininet.dll")
@@ -50,23 +46,35 @@ const (
 	INTERNET_OPTION_REFRESH          = 37
 )
 
-func SetProxy(host string, port string) error {
-	var err error
-
-	//backupWebProxySettings makes a copy of the current proxy settings
-	if backup, err = backupWebProxySettings(); err != nil {
-		return err
-	}
+func SetWebProxy(host string, port string) error {
 
 	settings := &WebProxySettings{
 		ProxyServer:   net.JoinHostPort(host, port),
 		ProxyOverride: "*.local;<local>",
 	}
 
-	if err = setProxySettings(settings); err != nil {
+	if err := setProxySettings(settings); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+func ClearWebProxy() error {
+	// clear proxy settings
+	settings := &WebProxySettings{
+		ProxyServer:   "127.0.0.1:0",
+		ProxyOverride: "*.local;<local>",
+	}
+
+	if err := setProxySettings(settings); err != nil {
+		return err
+	}
+
+	err := disableProxy()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -90,21 +98,6 @@ func setProxySettings(settings *WebProxySettings) error {
 
 	// Refresh the settings
 	return notifyWinInetProxySettingsChanged()
-}
-
-func UnsetProxy() error {
-	// revert to the backup settings
-	if backup != nil {
-		if err := setProxySettings(backup); err != nil {
-			return err
-		}
-	}
-
-	err := disableProxy()
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func disableProxy() error {
@@ -179,11 +172,21 @@ func backupWebProxySettings() (*WebProxySettings, error) {
 }
 
 // SetProxy does nothing on windows platforms.
-func SetSOCKSProxy(ip string, port string) error {
-	return errors.New("system-wide socks proxy is not unsupported on windows")
+func SetSOCKSProxy(host string, port string) error {
+	endpoint := fmt.Sprintf("socks=%s", net.JoinHostPort(host, port))
+	settings := &WebProxySettings{
+		ProxyServer:   endpoint,
+		ProxyOverride: "*.local;<local>",
+	}
+
+	if err := setProxySettings(settings); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // SetProxy does nothing on windows platforms.
-func UnsetSOCKSProxy() error {
-	return errors.New("system-wide socks proxy is not unsupported on windows")
+func ClearSOCKSProxy() error {
+	return ClearWebProxy()
 }
