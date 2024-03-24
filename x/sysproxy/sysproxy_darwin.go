@@ -226,3 +226,25 @@ func getProxySettings(p ProxyType, interfaceName string) (*ProxySettings, error)
 	}
 	return getHostandPort(string(output))
 }
+
+func getHostandPort(commandOutput string) (*ProxySettings, error) {
+	var host, port string
+	lines := strings.Split(commandOutput, "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "Server:") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				host = fields[1]
+			}
+		} else if strings.HasPrefix(strings.TrimSpace(line), "Port:") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				port = fields[1]
+			}
+		}
+	}
+	if host == "" || port == "" {
+		return nil, fmt.Errorf("failed to parse host and port from output")
+	}
+	return &ProxySettings{host: host, port: port}, nil
+}
