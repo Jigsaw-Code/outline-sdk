@@ -149,28 +149,6 @@ func notifyWinInetProxySettingsChanged() error {
 	return nil
 }
 
-// backupWebProxySettings reads and backs up the current proxy settings
-func backupWebProxySettings() (*WebProxySettings, error) {
-	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.QUERY_VALUE)
-	if err != nil {
-		return nil, err
-	}
-	defer key.Close()
-
-	// Read the current settings
-	backup := &WebProxySettings{}
-	backup.ProxyServer, _, err = key.GetStringValue("ProxyServer")
-	if err != nil {
-		return nil, err
-	}
-	backup.ProxyOverride, _, err = key.GetStringValue("ProxyOverride")
-	if err != nil {
-		return nil, err
-	}
-
-	return backup, nil
-}
-
 // SetProxy does nothing on windows platforms.
 func SetSOCKSProxy(host string, port string) error {
 	endpoint := fmt.Sprintf("socks=%s", net.JoinHostPort(host, port))
