@@ -131,7 +131,7 @@ func internetSetOption(hInternet uintptr, dwOption int, lpBuffer uintptr, dwBuff
 		lpBuffer,
 		uintptr(dwBufferLength),
 	)
-	if ret != 0 {
+	if ret == 0 {
 		return lastErr
 	}
 	return nil
