@@ -31,6 +31,11 @@ const (
 	proxyTypeSOCKS ProxyType = "socks"
 )
 
+type ProxySettings struct {
+	host string
+	port string
+}
+
 func SetWebProxy(host string, port string) error {
 	// Get the active network interface
 	activeInterface, err := getActiveNetworkInterface()
