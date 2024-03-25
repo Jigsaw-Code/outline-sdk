@@ -31,7 +31,7 @@ const (
 	proxyTypeSOCKS ProxyType = "socks"
 )
 
-type ProxySettings struct {
+type proxySettings struct {
 	host string
 	port string
 }
@@ -212,7 +212,7 @@ func disableProxy(p ProxyType, interfaceName string) error {
 	}
 }
 
-func getProxySettings(p ProxyType, interfaceName string) (*ProxySettings, error) {
+func getProxySettings(p ProxyType, interfaceName string) (*proxySettings, error) {
 	var output []byte
 	var err error
 	switch p {
@@ -231,7 +231,7 @@ func getProxySettings(p ProxyType, interfaceName string) (*ProxySettings, error)
 	return getHostandPort(string(output))
 }
 
-func getHostandPort(commandOutput string) (*ProxySettings, error) {
+func getHostandPort(commandOutput string) (*proxySettings, error) {
 	var host, port string
 	lines := strings.Split(commandOutput, "\n")
 	for _, line := range lines {
@@ -250,7 +250,7 @@ func getHostandPort(commandOutput string) (*ProxySettings, error) {
 	if host == "" || port == "" {
 		return nil, fmt.Errorf("failed to parse host and port from output")
 	}
-	return &ProxySettings{host: host, port: port}, nil
+	return &proxySettings{host: host, port: port}, nil
 }
 
 func getWebProxy() (host string, port string, err error) {
