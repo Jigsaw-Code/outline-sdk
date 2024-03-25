@@ -56,14 +56,21 @@ to setup proxy settings. For more information, you can checkout the documentatio
 
 # Usage
 
-To set up system-wide proxy settings, use the [SetProxy] function. This function takes two arguments: the IP address and the port of the proxy server.
+To set up system-wide proxy settings, use the [SetWebProxy] or [SetSOCKSProxy] methods to connect to a Web (HTTP & HTTPS) or SOCKS proxy.
+This function takes two arguments: the IP address / hostname and the port of the proxy server.
 
-To unset system-wide proxy settings, use the [UnsetProxy] function.
+To clear system-wide proxy settings, use the [ClearWebProxy] or [ClearSOCKSProxy] function.
+This will set the address and port to "127.0.0.1:0" and disable the proxy.
+
 To ensure that the system-wide proxy settings are unset upon program termination, it is recommended to call:
 
-	defer UnsetProxy()
+	defer ClearWebProxy()
 
-after the SetProxy call.
+	// or
+
+	defer ClearSOCKSProxy()
+
+after the setting the proxy.
 
 [here]: https://keith.github.io/xcode-man-pages/networksetup.8.html
 [gsettings]: https://github.com/GNOME/gsettings-desktop-schemas/blob/master/schemas/org.gnome.system.proxy.gschema.xml.in

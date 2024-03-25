@@ -17,6 +17,8 @@ However, if only HTTPS proxy is setup, both HTTP and HTTPS requests go through t
 
 If SOCKS is setup, both HTTP and HTTPS requests go through the proxy since it is performed at the TCP layer. SOCKS does not support UDP.
 
+On Windows, The client only supports SOCKS4 spec and cannot connecto SOCKS5 proxy.
+
 Support for FTP Proxy setting was not included due lack of adoption and usage. Username and password authentication was not included due to potential unreliability and untestd behavior. Please note that in SOCKS and HTTP proxy, credentials are communicated in plain text.
 
 If you have a need for any of those, feel free to open an issue and let me know about the use case.
