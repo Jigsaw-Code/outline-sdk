@@ -1,3 +1,4 @@
+// go:build (linux && !android) || windows || darwin
 package sysproxy
 
 import (
