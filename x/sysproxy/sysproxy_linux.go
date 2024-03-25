@@ -17,6 +17,7 @@
 package sysproxy
 
 import (
+	"errors"
 	"os/exec"
 )
 
@@ -27,6 +28,11 @@ const (
 	proxyTypeHTTPS ProxyType = "https"
 	proxyTypeSOCKS ProxyType = "socks"
 )
+
+type ProxySettings struct {
+	host string
+	port string
+}
 
 func SetWebProxy(host string, port string) error {
 	// Set HTTP and HTTPS proxy settings
@@ -98,4 +104,50 @@ func setProxySettings(p ProxyType, host string, port string) error {
 
 func gnomeSettingsSetString(settings, key, value string) error {
 	return exec.Command("gsettings", "set", settings, key, value).Run()
+}
+
+func getWebProxy() (host string, port string, err error) {
+
+	httpHost, err := gnomeSettingsGetString("org.gnome.system.proxy.http", "host")
+	if err != nil {
+		return "", "", err
+	}
+	httpPort, err := gnomeSettingsGetString("org.gnome.system.proxy.http", "port")
+	if err != nil {
+		return "", "", err
+	}
+
+	httpsHost, err := gnomeSettingsGetString("org.gnome.system.proxy.https", "host")
+	if err != nil {
+		return "", "", err
+	}
+	httpsPort, err := gnomeSettingsGetString("org.gnome.system.proxy.https", "port")
+	if err != nil {
+		return "", "", err
+	}
+
+	if httpHost != httpsHost || httpPort != httpsPort {
+		return "", "", errors.New("HTTP and HTTPS proxies are different")
+	}
+
+	return httpHost, httpPort, nil
+}
+
+func getSOCKSProxy() (host string, port string, err error) {
+
+	socksHost, err := gnomeSettingsGetString("org.gnome.system.proxy.socks", "host")
+	if err != nil {
+		return "", "", err
+	}
+	socksPort, err := gnomeSettingsGetString("org.gnome.system.proxy.socks", "port")
+	if err != nil {
+		return "", "", err
+	}
+
+	return socksHost, socksPort, nil
+}
+
+func gnomeSettingsGetString(settings, key string) (string, error) {
+	out, err := exec.Command("gsettings", "get", settings, key).Output()
+	return string(out), err
 }
