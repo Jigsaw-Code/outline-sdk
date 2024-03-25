@@ -9,7 +9,7 @@ The table below summarizes system-wide support this package offers for various t
 | SOCKS | No | Yes | Yes
 
 
-`SetupWebProxy` implementation in this package setups both HTTP and HTTPS proxy when they distinguished by the platform. `SetupSOCKSProxy` sets up SOCKS proxy that proxies all TCP-based connections. 
+`SetupWebProxy` implementation in this package setups both HTTP and HTTPS proxy when they distinguished by the platform. `SetupSOCKSProxy` sets up SOCKS proxy that proxies all TCP-based connections.
 
 For example, on MacOS, if you have HTTP Proxy setup and visit a website over HTTPS, your traffic does NOT go through the proxy. 
 
