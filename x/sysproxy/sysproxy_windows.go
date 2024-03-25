@@ -25,9 +25,9 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-type ProxySettings struct {
-	ProxyServer   string
-	ProxyOverride string
+type proxySettings struct {
+	proxyServer   string
+	proxyOverride string
 }
 
 var (
@@ -49,9 +49,9 @@ const (
 
 func SetWebProxy(host string, port string) error {
 
-	settings := &ProxySettings{
-		ProxyServer:   net.JoinHostPort(host, port),
-		ProxyOverride: "*.local;<local>",
+	settings := &proxySettings{
+		proxyServer:   net.JoinHostPort(host, port),
+		proxyOverride: "*.local;<local>",
 	}
 
 	if err := setProxySettings(settings); err != nil {
@@ -69,9 +69,9 @@ func ClearWebProxy() error {
 // SetProxy does nothing on windows platforms.
 func SetSOCKSProxy(host string, port string) error {
 	endpoint := fmt.Sprintf("socks=%s", net.JoinHostPort(host, port))
-	settings := &ProxySettings{
-		ProxyServer:   endpoint,
-		ProxyOverride: "*.local;<local>",
+	settings := &proxySettings{
+		proxyServer:   endpoint,
+		proxyOverride: "*.local;<local>",
 	}
 
 	if err := setProxySettings(settings); err != nil {
@@ -87,9 +87,9 @@ func ClearSOCKSProxy() error {
 }
 
 func clearProxy() error {
-	settings := &ProxySettings{
-		ProxyServer:   "127.0.0.1:0",
-		ProxyOverride: "*.local;<local>",
+	settings := &proxySettings{
+		proxyServer:   "127.0.0.1:0",
+		proxyOverride: "*.local;<local>",
 	}
 
 	if err := setProxySettings(settings); err != nil {
@@ -103,17 +103,17 @@ func clearProxy() error {
 	return nil
 }
 
-func setProxySettings(settings *ProxySettings) error {
+func setProxySettings(settings *proxySettings) error {
 	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.SET_VALUE)
 	if err != nil {
 		return err
 	}
 	defer key.Close()
 
-	if err = key.SetStringValue("ProxyServer", settings.ProxyServer); err != nil {
+	if err = key.SetStringValue("ProxyServer", settings.proxyServer); err != nil {
 		return err
 	}
-	if err = key.SetStringValue("ProxyOverride", settings.ProxyOverride); err != nil {
+	if err = key.SetStringValue("ProxyOverride", settings.proxyOverride); err != nil {
 		return err
 	}
 	// Finally, enable the proxy
@@ -176,7 +176,6 @@ func getWebProxy() (host string, port string, err error) {
 	defer key.Close()
 
 	address, _, err := key.GetStringValue("ProxyServer")
-	fmt.Printf("socks address: %s\n", address)
 	if err != nil {
 		return "", "", err
 	}
