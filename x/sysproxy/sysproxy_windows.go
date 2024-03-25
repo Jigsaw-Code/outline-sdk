@@ -24,7 +24,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-type WebProxySettings struct {
+type ProxySettings struct {
 	ProxyServer   string
 	ProxyOverride string
 }
@@ -48,7 +48,7 @@ const (
 
 func SetWebProxy(host string, port string) error {
 
-	settings := &WebProxySettings{
+	settings := &ProxySettings{
 		ProxyServer:   net.JoinHostPort(host, port),
 		ProxyOverride: "*.local;<local>",
 	}
@@ -62,7 +62,31 @@ func SetWebProxy(host string, port string) error {
 
 func ClearWebProxy() error {
 	// clear proxy settings
-	settings := &WebProxySettings{
+	return clearProxy()
+}
+
+// SetProxy does nothing on windows platforms.
+func SetSOCKSProxy(host string, port string) error {
+	endpoint := fmt.Sprintf("socks=%s", net.JoinHostPort(host, port))
+	settings := &ProxySettings{
+		ProxyServer:   endpoint,
+		ProxyOverride: "*.local;<local>",
+	}
+
+	if err := setProxySettings(settings); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// SetProxy does nothing on windows platforms.
+func ClearSOCKSProxy() error {
+	return clearProxy()
+}
+
+func clearProxy() error {
+	settings := &ProxySettings{
 		ProxyServer:   "127.0.0.1:0",
 		ProxyOverride: "*.local;<local>",
 	}
@@ -78,7 +102,7 @@ func ClearWebProxy() error {
 	return nil
 }
 
-func setProxySettings(settings *WebProxySettings) error {
+func setProxySettings(settings *ProxySettings) error {
 	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.SET_VALUE)
 	if err != nil {
 		return err
@@ -112,11 +136,6 @@ func disableProxy() error {
 	if err != nil {
 		return err
 	}
-	// TEST THIS
-	// err = key.SetStringValue("ProxyServer", "")
-	// if err != nil {
-	// 	return err
-	// }
 
 	// Refresh the settings
 	return notifyWinInetProxySettingsChanged()
@@ -148,23 +167,30 @@ func notifyWinInetProxySettingsChanged() error {
 
 	return nil
 }
-
-// SetProxy does nothing on windows platforms.
-func SetSOCKSProxy(host string, port string) error {
-	endpoint := fmt.Sprintf("socks=%s", net.JoinHostPort(host, port))
-	settings := &WebProxySettings{
-		ProxyServer:   endpoint,
-		ProxyOverride: "*.local;<local>",
-	}
-
-	if err := setProxySettings(settings); err != nil {
-		return err
-	}
-
-	return nil
+func getWebProxy() (host string, port string, err error) {
+	return getProxySettings()
 }
 
-// SetProxy does nothing on windows platforms.
-func ClearSOCKSProxy() error {
-	return ClearWebProxy()
+func getSOCKSProxy() (host string, port string, err error) {
+	return getProxySettings()
+}
+
+func getProxySettings() (host string, port string, err error) {
+	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.QUERY_VALUE)
+	if err != nil {
+		return "", "", err
+	}
+	defer key.Close()
+
+	address, _, err := key.GetStringValue("ProxyServer")
+	if err != nil {
+		return "", "", err
+	}
+
+	host, port, err = net.SplitHostPort(address)
+	if err != nil {
+		return "", "", err
+	}
+
+	return host, port, nil
 }
