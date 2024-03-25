@@ -19,6 +19,7 @@ package sysproxy
 import (
 	"errors"
 	"os/exec"
+	"strings"
 )
 
 type ProxyType string
@@ -60,7 +61,7 @@ func ClearWebProxy() error {
 	return gnomeSettingsSetString("org.gnome.system.proxy", "mode", "none")
 }
 
-func SetSocksProxy(host string, port string) error {
+func SetSOCKSProxy(host string, port string) error {
 	// Set SOCKS proxy settings
 	if err := setProxySettings(proxyTypeSOCKS, host, port); err != nil {
 		return err
@@ -69,6 +70,15 @@ func SetSocksProxy(host string, port string) error {
 		return err
 	}
 	return nil
+}
+
+func ClearSOCKSProxy() error {
+	// clear settings
+	if err := setProxySettings(proxyTypeSOCKS, "127.0.0.1", "0"); err != nil {
+		return err
+	}
+
+	return gnomeSettingsSetString("org.gnome.system.proxy", "mode", "none")
 }
 
 func setManualMode() error {
@@ -149,5 +159,6 @@ func getSOCKSProxy() (host string, port string, err error) {
 
 func gnomeSettingsGetString(settings, key string) (string, error) {
 	out, err := exec.Command("gsettings", "get", settings, key).Output()
-	return string(out), err
+	trimmed := strings.TrimSpace(string(out))
+	return strings.Trim(string(trimmed), "'"), err
 }
