@@ -19,6 +19,7 @@ package sysproxy
 import (
 	"fmt"
 	"net"
+	"strings"
 
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
@@ -168,14 +169,6 @@ func notifyWinInetProxySettingsChanged() error {
 	return nil
 }
 func getWebProxy() (host string, port string, err error) {
-	return getProxySettings()
-}
-
-func getSOCKSProxy() (host string, port string, err error) {
-	return getProxySettings()
-}
-
-func getProxySettings() (host string, port string, err error) {
 	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.QUERY_VALUE)
 	if err != nil {
 		return "", "", err
@@ -183,11 +176,30 @@ func getProxySettings() (host string, port string, err error) {
 	defer key.Close()
 
 	address, _, err := key.GetStringValue("ProxyServer")
+	fmt.Printf("socks address: %s\n", address)
 	if err != nil {
 		return "", "", err
 	}
 
 	host, port, err = net.SplitHostPort(address)
+	if err != nil {
+		return "", "", err
+	}
+
+	return host, port, nil
+}
+
+func getSOCKSProxy() (host string, port string, err error) {
+	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.QUERY_VALUE)
+	if err != nil {
+		return "", "", err
+	}
+	defer key.Close()
+
+	address, _, err := key.GetStringValue("ProxyServer")
+	h := strings.TrimPrefix(address, "socks=")
+
+	host, port, err = net.SplitHostPort(h)
 	if err != nil {
 		return "", "", err
 	}
