@@ -2,7 +2,6 @@
 package sysproxy
 
 import (
-	"fmt"
 	"math/rand"
 	"net"
 	"strconv"
@@ -13,7 +12,6 @@ import (
 )
 
 func TestSetWebProxt(t *testing.T) {
-	fmt.Println("TestSetWebProxy")
 	host := net.IPv4(byte(rand.Intn(256)), byte(rand.Intn(256)), byte(rand.Intn(256)), byte(rand.Intn(256)))
 	port := strconv.Itoa(rand.Intn(65536))
 
