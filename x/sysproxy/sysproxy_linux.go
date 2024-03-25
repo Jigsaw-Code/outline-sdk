@@ -30,11 +30,6 @@ const (
 	proxyTypeSOCKS ProxyType = "socks"
 )
 
-type ProxySettings struct {
-	host string
-	port string
-}
-
 func SetWebProxy(host string, port string) error {
 	// Set HTTP and HTTPS proxy settings
 	if err := setProxySettings(proxyTypeHTTP, host, port); err != nil {
