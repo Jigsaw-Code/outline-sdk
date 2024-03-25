@@ -103,13 +103,12 @@ func ClearSOCKSProxy() error {
 		return err
 	}
 
-	// Unset the SOCKS proxy
-	if err := disableProxy(proxyTypeSOCKS, activeInterface); err != nil {
-		return err
-	}
-
 	// Revert to previous the SOCKS proxy
 	if err := setProxySettings(proxyTypeSOCKS, activeInterface, "127.0.0.1", "0"); err != nil {
+		return err
+	}
+	// Unset the SOCKS proxy
+	if err := disableProxy(proxyTypeSOCKS, activeInterface); err != nil {
 		return err
 	}
 
@@ -252,4 +251,45 @@ func getHostandPort(commandOutput string) (*ProxySettings, error) {
 		return nil, fmt.Errorf("failed to parse host and port from output")
 	}
 	return &ProxySettings{host: host, port: port}, nil
+}
+
+func getWebProxy() (host string, port string, err error) {
+	activeInterface, err := getActiveNetworkInterface()
+	if err != nil {
+		return
+	}
+
+	httpSettings, err := getProxySettings(proxyTypeHTTP, activeInterface)
+	if err != nil {
+		return
+	}
+
+	httpsSettings, err := getProxySettings(proxyTypeHTTPS, activeInterface)
+	if err != nil {
+		return
+	}
+
+	if httpSettings.host != httpsSettings.host || httpSettings.port != httpsSettings.port {
+		return "", "", fmt.Errorf("HTTP and HTTPS proxy settings do not match")
+	}
+
+	host = httpSettings.host
+	port = httpSettings.port
+	return
+}
+
+func getSOCKSProxy() (host string, port string, err error) {
+	activeInterface, err := getActiveNetworkInterface()
+	if err != nil {
+		return
+	}
+
+	socksSettings, err := getProxySettings(proxyTypeSOCKS, activeInterface)
+	if err != nil {
+		return
+	}
+
+	host = socksSettings.host
+	port = socksSettings.port
+	return
 }
