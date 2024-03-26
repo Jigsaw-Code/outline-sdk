@@ -40,7 +40,9 @@ Shadowsocks proxy (compatible with Outline's access keys, package [github.com/Ji
 
 SOCKS5 proxy (currently streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/socks5])
 
-	socks5://[HOST]:[PORT]
+	socks5://[USERINFO]@[HOST]:[PORT]
+
+USERINFO field is optional and only required if username and password authentication is used. It is in the format of username:password.
 
 Stream split transport (streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/split])
 

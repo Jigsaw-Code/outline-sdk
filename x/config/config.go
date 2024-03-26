@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/transport/socks5"
 	"github.com/Jigsaw-Code/outline-sdk/transport/split"
 	"github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag"
 )
@@ -80,8 +79,7 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 		return newOverrideStreamDialerFromURL(innerDialer, url)
 
 	case "socks5":
-		endpoint := transport.StreamDialerEndpoint{Dialer: innerDialer, Address: url.Host}
-		return socks5.NewStreamDialer(&endpoint)
+		return newSOCKS5StreamDialerFromURL(innerDialer, url)
 
 	case "split":
 		prefixBytesStr := url.Opaque
