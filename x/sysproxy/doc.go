@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package sysproxy provides a simple interface to set/unset system-wide proxy settings on desktop platforms.
+// Package sysproxy provides a simple interface to set or clear system-wide proxy settings on desktop platforms.
 //
 // The table below summarizes the support for different proxy types on each platform:
 //
