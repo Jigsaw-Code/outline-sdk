@@ -95,7 +95,7 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 		return
 	}
 
-	httpConn, _, err := hijacker.Hijack()
+	httpConn, clientRW, err := hijacker.Hijack()
 	if err != nil {
 		http.Error(proxyResp, "Failed to hijack connection", http.StatusInternalServerError)
 		return
@@ -103,14 +103,16 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 	defer httpConn.Close()
 
 	// Inform the client that the connection has been established.
-	httpConn.Write([]byte("HTTP/1.1 200 Connection established\r\n\r\n"))
+	clientRW.Write([]byte("HTTP/1.1 200 Connection established\r\n\r\n"))
+	clientRW.Flush()
 
 	// Relay data between client and target in both directions.
 	go func() {
-		io.Copy(targetConn, httpConn)
+		io.Copy(targetConn, clientRW)
 		targetConn.CloseWrite()
 	}()
-	io.Copy(httpConn, targetConn)
+	io.Copy(clientRW, targetConn)
+	clientRW.Flush()
 	// httpConn is closed by the defer httpConn.Close() above.
 }
 

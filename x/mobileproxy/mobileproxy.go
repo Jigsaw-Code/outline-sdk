@@ -20,6 +20,7 @@ package mobileproxy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -92,6 +93,7 @@ func (p *Proxy) Stop(timeoutSeconds int) {
 		log.Fatalf("Failed to shutdown gracefully: %v", err)
 		p.server.Close()
 	}
+	p.proxyHandler = nil
 }
 
 // RunProxy runs a local web proxy that listens on localAddress, and handles proxy requests by
@@ -101,10 +103,16 @@ func RunProxy(localAddress string, dialer *StreamDialer) (*Proxy, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not listen on address %v: %v", localAddress, err)
 	}
+	if dialer == nil {
+		return nil, errors.New("dialer must not be nil. Please create and pass a valid StreamDialer")
+	}
 
-	proxyHandler := httpproxy.NewProxyHandler(dialer)
+	stopDialer := &stopStreamDialer{Dialer: dialer}
+	proxyHandler := httpproxy.NewProxyHandler(stopDialer)
 	proxyHandler.FallbackHandler = http.NotFoundHandler()
 	server := &http.Server{Handler: proxyHandler}
+	// Make sure all connections are stopped so they don't linger around.
+	server.RegisterOnShutdown(stopDialer.StopConnections)
 	go server.Serve(listener)
 
 	host, portStr, err := net.SplitHostPort(listener.Addr().String())
