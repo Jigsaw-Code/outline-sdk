@@ -227,6 +227,16 @@ func TestPacketListenerDialer(t *testing.T) {
 	running.Wait()
 }
 
+// Make sure there are no connection leakage in DialPacket
+func TestPacketListenerDialerDialPacketCloseInnerConnOnError(t *testing.T) {
+	inner := &connCounterListener{base: UDPListener{Address: "127.0.0.1:0"}}
+	pd := PacketListenerDialer{inner}
+	conn, err := pd.DialPacket(context.Background(), "invalid-address?987654321")
+	require.Error(t, err)
+	require.Nil(t, conn)
+	require.Zero(t, inner.activeConns)
+}
+
 // PacketConn assertions
 
 func TestPacketConnInvalidArgument(t *testing.T) {
@@ -240,4 +250,30 @@ func TestPacketConnInvalidArgument(t *testing.T) {
 	_, err = serverListener.WriteTo([]byte("PING"), netAddr)
 	// This returns Invalid Argument because netAddr is not a *UDPAddr
 	require.ErrorIs(t, err, syscall.EINVAL)
+}
+
+// Private test helpers
+
+// connCounterListener is a PacketListener that counts the number of active PacketConns.
+type connCounterListener struct {
+	base        PacketListener
+	activeConns int
+}
+
+type countedPacketConn struct {
+	net.PacketConn
+	counter *connCounterListener
+}
+
+func (l *connCounterListener) ListenPacket(ctx context.Context) (net.PacketConn, error) {
+	conn, err := l.base.ListenPacket(ctx)
+	if conn != nil {
+		l.activeConns++
+	}
+	return countedPacketConn{conn, l}, err
+}
+
+func (c countedPacketConn) Close() error {
+	c.counter.activeConns--
+	return c.PacketConn.Close()
 }

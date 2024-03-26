@@ -106,13 +106,13 @@ var _ net.Conn = (*boundPacketConn)(nil)
 // For example, a [net.UDPConn] only supports IP addresses, not domain names.
 // If the host is a domain name, consider pre-resolving it to avoid resolution calls.
 func (e PacketListenerDialer) DialPacket(ctx context.Context, address string) (net.Conn, error) {
-	packetConn, err := e.Listener.ListenPacket(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("could not create PacketConn: %w", err)
-	}
 	netAddr, err := MakeNetAddr("udp", address)
 	if err != nil {
 		return nil, err
+	}
+	packetConn, err := e.Listener.ListenPacket(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("could not create PacketConn: %w", err)
 	}
 	return &boundPacketConn{
 		PacketConn: packetConn,

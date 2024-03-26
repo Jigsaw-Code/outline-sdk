@@ -21,9 +21,11 @@ import (
 )
 
 type ProxyHandler struct {
+	// Handler to fallback to if the request is not a proxy request (CONNECT method of absolute URL).
+	// If FallbackHandler is absent, ProxyHandler returns a 404.
+	FallbackHandler http.Handler
 	connectHandler  http.Handler
 	forwardHandler  http.Handler
-	FallbackHandler http.Handler
 }
 
 // ServeHTTP implements [http.Handler].ServeHTTP for CONNECT and absolute URL requests, using the internal [transport.StreamDialer].
@@ -45,6 +47,7 @@ func (h *ProxyHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.R
 }
 
 // NewProxyHandler creates a [http.Handler] that works as a web proxy using the given dialer to deach the destination.
+// You can use [ProxyHandler].FallbackHandler to specify how to handle non-proxy requests.
 func NewProxyHandler(dialer transport.StreamDialer) *ProxyHandler {
 	return &ProxyHandler{
 		connectHandler: NewConnectHandler(dialer),
