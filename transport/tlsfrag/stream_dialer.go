@@ -17,6 +17,7 @@ package tlsfrag
 import (
 	"context"
 	"errors"
+	"io"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
@@ -33,7 +34,7 @@ var _ transport.StreamDialer = (*tlsFragDialer)(nil)
 
 // FragFunc takes the content of the first [handshake record] in a TLS session as input, and returns an integer that
 // represents the fragmentation point index. The input content excludes the 5-byte record header. The returned integer
-// should be in range 0 to len(record)-1. The record will then be fragmented into two parts: record[:n] and record[n:].
+// should be in range 1 to len(record)-1. The record will then be fragmented into two parts: record[:n] and record[n:].
 // If the returned index is either ≤ 0 or ≥ len(record), no fragmentation will occur.
 //
 // [handshake record]: https://datatracker.ietf.org/doc/html/rfc8446#section-5.1
@@ -44,6 +45,9 @@ type FragFunc func(record []byte) (n int)
 // callback function frag. The dialer then adds appropriate headers to each record and transmits them sequentially
 // using the base dialer. Following the fragmented Client Hello, all subsequent data is passed through directly without
 // modification.
+//
+// If you just want to split the record at a fixed position (e.g., always at the 5th byte or 2nd from the last byte),
+// use [NewFixedLenStreamDialer]. It consumes less resources and is more efficient.
 //
 // [TLS Client Hello]: https://datatracker.ietf.org/doc/html/rfc8446#section-4.1.2
 // [handshake record]: https://datatracker.ietf.org/doc/html/rfc8446#section-5.1
@@ -73,15 +77,26 @@ func (d *tlsFragDialer) DialStream(ctx context.Context, raddr string) (transport
 }
 
 // WrapConnFunc wraps the base [transport.StreamConn] and splits the first TLS Client Hello packet into two records
-// according to the frag function. Subsequent data is forwarded without modification. The Write to the base
-// [transport.StreamConn] will be buffered until we have the full initial Client Hello record. If the first packet
-// isn't a valid Client Hello, WrapConnFunc simply forwards all data through transparently.
+// according to the frag function. After that, all subsequent data is forwarded without modification.
+//
+// If the first packet isn't a valid Client Hello, WrapConnFunc doesn't modify anything.
+//
+// The Write to the base [transport.StreamConn] will be buffered until we have the full initial Client Hello record.
+// If your goal is to simply fragment the Client Hello at a fixed position, [WrapConnFixedLen] is more efficient as it
+// won't allocate any additional buffers.
 func WrapConnFunc(base transport.StreamConn, frag FragFunc) (transport.StreamConn, error) {
 	w, err := newClientHelloFragWriter(base, frag)
 	if err != nil {
 		return nil, err
 	}
 	return transport.WrapConn(base, base, w), nil
+}
+
+// tlsFixedLenFragDialer is a [transport.StreamDialer] that will fragment the first Client Hello record at a fixed
+// position within the record in a TLS session.
+type tlsFixedLenFragDialer struct {
+	dialer   transport.StreamDialer
+	splitLen int
 }
 
 // NewFixedLenStreamDialer is a [transport.StreamDialer] that fragments the [TLS handshake record]. It splits the
@@ -97,11 +112,45 @@ func NewFixedLenStreamDialer(base transport.StreamDialer, splitLen int) (transpo
 	if splitLen == 0 {
 		return base, nil
 	}
-	return NewStreamDialerFunc(base, func(record []byte) int {
-		if splitLen > 0 {
-			// TODO: optimize for the leading bytes split
-			return splitLen
-		}
-		return len(record) + splitLen
-	})
+	return &tlsFixedLenFragDialer{base, splitLen}, nil
+}
+
+// DialStream implements [transport.StreamConn].DialStream. It establishes a connection to raddr in the format
+// "host-or-ip:port".
+// The initial TLS Client Hello record sent through the connection will be fragmented at a fixed position
+// indicated by d.splitLen.
+func (d *tlsFixedLenFragDialer) DialStream(ctx context.Context, raddr string) (transport.StreamConn, error) {
+	baseConn, err := d.dialer.DialStream(ctx, raddr)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := WrapConnFixedLen(baseConn, d.splitLen)
+	if err != nil {
+		baseConn.Close()
+		return nil, err
+	}
+	return conn, nil
+}
+
+// WrapConnFixedLen wraps the base [transport.StreamConn] and splits the first TLS Client Hello record into two records
+// at a fixed position indicated by splitLen. Subsequent data is forwarded without modification.
+//
+// If splitLen is positive, the first fragmented record content will have that length (excluding the 5-byte header);
+// if splitLen is negative, the second fragmented record content will be that length.
+//
+// If the first message isn't a valid Client Hello, WrapConnFixedLen forwards all data without modifying it.
+//
+// This is more efficient than [WrapConnFunc] because it doesn't allocate additional buffers.
+func WrapConnFixedLen(base transport.StreamConn, splitLen int) (conn transport.StreamConn, err error) {
+	var w io.Writer
+	if splitLen > 0 {
+		w, err = NewFixedLenWriter(base, func(recordLen int) int { return splitLen })
+	} else {
+		w, err = NewFixedLenWriter(base, func(recordLen int) int { return recordLen + splitLen })
+	}
+	if err != nil {
+		return
+	}
+	conn = transport.WrapConn(base, base, w)
+	return
 }

@@ -160,7 +160,7 @@ func (w *clientHelloFragWriter) splitHelloBufToRecord() {
 	// splitted: | <= (5) => | <= head => | <= (5) => | <= tail => |
 	//           |  header1  |  payload1  |  header2  |  payload2  |
 	splitted := original[:len(original)+recordHeaderLen]
-	hdr1 := tlsRecordHeaderFromRawBytes(splitted[:recordHeaderLen])
+	hdr1, _ := newTLSHandshakeRecordHeader(splitted[:recordHeaderLen])
 	hdr1.SetPayloadLen(uint16(headLen))
 
 	// Shift tail fragment to make space for record header.
@@ -169,7 +169,7 @@ func (w *clientHelloFragWriter) splitHelloBufToRecord() {
 	copy(payload2, tail)
 
 	// Insert header for second fragment.
-	hdr2 := tlsRecordHeaderFromRawBytes(splitted[recordHeaderLen+headLen : recordHeaderLen*2+headLen])
+	hdr2, _ := newTLSHandshakeRecordHeader(splitted[recordHeaderLen+headLen : recordHeaderLen*2+headLen])
 	copy(hdr2, hdr1)
 	hdr2.SetPayloadLen(uint16(tailLen))
 
