@@ -47,13 +47,14 @@ var _ io.Writer = (*clientHelloFragWriter)(nil)
 var _ io.Writer = (*clientHelloFragReaderFrom)(nil)
 var _ io.ReaderFrom = (*clientHelloFragReaderFrom)(nil)
 
-// newClientHelloFragWriter creates a [io.Writer] that splits the first TLS Client Hello record into two records based
-// on the provided frag function. It then writes these records and all subsequent messages to the base [io.Writer].
+// NewWriter creates a [io.Writer] that splits the first TLS Client Hello record into two records based on the
+// provided [FragFunc] callback.
+// It then writes these records and all subsequent messages to the base [io.Writer].
 // If the first message isn't a Client Hello, no splitting occurs and all messages are written directly to base.
 //
 // The returned [io.Writer] will implement the [io.ReaderFrom] interface for optimized performance if the base
 // [io.Writer] implements [io.ReaderFrom].
-func newClientHelloFragWriter(base io.Writer, frag FragFunc) (io.Writer, error) {
+func NewWriter(base io.Writer, frag FragFunc) (io.Writer, error) {
 	if base == nil {
 		return nil, errors.New("base writer must not be nil")
 	}
@@ -160,7 +161,7 @@ func (w *clientHelloFragWriter) splitHelloBufToRecord() {
 	// splitted: | <= (5) => | <= head => | <= (5) => | <= tail => |
 	//           |  header1  |  payload1  |  header2  |  payload2  |
 	splitted := original[:len(original)+recordHeaderLen]
-	hdr1 := tlsRecordHeaderFromRawBytes(splitted[:recordHeaderLen])
+	hdr1, _ := newTLSHandshakeRecordHeader(splitted[:recordHeaderLen])
 	hdr1.SetPayloadLen(uint16(headLen))
 
 	// Shift tail fragment to make space for record header.
@@ -169,7 +170,7 @@ func (w *clientHelloFragWriter) splitHelloBufToRecord() {
 	copy(payload2, tail)
 
 	// Insert header for second fragment.
-	hdr2 := tlsRecordHeaderFromRawBytes(splitted[recordHeaderLen+headLen : recordHeaderLen*2+headLen])
+	hdr2, _ := newTLSHandshakeRecordHeader(splitted[recordHeaderLen+headLen : recordHeaderLen*2+headLen])
 	copy(hdr2, hdr1)
 	hdr2.SetPayloadLen(uint16(tailLen))
 

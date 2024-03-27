@@ -107,10 +107,11 @@ func TestFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 			original: net.Buffers{hello, cipher, req1, hello, cipher, req1},
 			splitLen: 2,
 			splitted: net.Buffers{
-				// First two fragments will be merged in one single Write
-				append(
-					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00}),
-					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x00, 0x03, 0xaa, 0xbb, 0xcc})...),
+				// Fragmented record header and payload are written as two packets by FixedLenWriter
+				constructTLSRecordWithLen(t, layers.TLSHandshake, 0x0301, 2, []byte{}), // record1's header
+				[]byte{0x01, 0x00}, // record1's payload
+				constructTLSRecordWithLen(t, layers.TLSHandshake, 0x0301, 5, []byte{}), // record2's header
+				[]byte{0x00, 0x03, 0xaa, 0xbb, 0xcc},                                   // record2's payload
 				cipher, req1, hello, cipher, req1,
 			},
 		},
@@ -119,10 +120,11 @@ func TestFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 			original: net.Buffers{hello, cipher, req1, hello, cipher, req1},
 			splitLen: -2,
 			splitted: net.Buffers{
-				// First two fragments will be merged in one single Write
-				append(
-					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00, 0x03, 0xaa}),
-					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0xbb, 0xcc})...),
+				// Fragmented record header and payload are written as two packets by FixedLenWriter
+				constructTLSRecordWithLen(t, layers.TLSHandshake, 0x0301, 5, []byte{}), // record1's header
+				[]byte{0x01, 0x00, 0x00, 0x03, 0xaa},                                   // record1's payload
+				constructTLSRecordWithLen(t, layers.TLSHandshake, 0x0301, 2, []byte{}), // record2's header
+				[]byte{0xbb, 0xcc}, // record2's payload
 				cipher, req1, hello, cipher, req1,
 			},
 		},
@@ -149,10 +151,16 @@ func TestNestedFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 	hello := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{
 		0x01, 0x00, 0x00, 0x03, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11,
 	})
-	frag1 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00})
-	frag2 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x03, 0xaa, 0xbb, 0xcc, 0xdd})
-	frag3 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0xee, 0xff, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44})
-	frag4 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x33, 0x22, 0x11})
+
+	// Fragmented record header and payload are written as two packets by FixedLenWriter
+	frag1Hdr := constructTLSRecordWithLen(t, layers.TLSHandshake, 0x0301, 3, []byte{})
+	frag1Payload := []byte{0x01, 0x00, 0x00}
+	frag2Hdr := constructTLSRecordWithLen(t, layers.TLSHandshake, 0x0301, 5, []byte{})
+	frag2Payload := []byte{0x03, 0xaa, 0xbb, 0xcc, 0xdd}
+	frag3Hdr := constructTLSRecordWithLen(t, layers.TLSHandshake, 0x0301, 8, []byte{})
+	frag3Payload := []byte{0xee, 0xff, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44}
+	frag4Hdr := constructTLSRecordWithLen(t, layers.TLSHandshake, 0x0301, 3, []byte{})
+	frag4Payload := []byte{0x33, 0x22, 0x11}
 
 	cipher := constructTLSRecord(t, layers.TLSChangeCipherSpec, 0x0303, []byte{0x01})
 	req1 := constructTLSRecord(t, layers.TLSApplicationData, 0x0303, []byte{0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88})
@@ -168,9 +176,10 @@ func TestNestedFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 	assertCanWriteAll(t, conn, net.Buffers{hello, cipher, req1, hello, cipher, req1})
 
 	expected := net.Buffers{
-		append(frag1, frag2...), // First two fragments will be merged in one single Write
-		frag3,
-		frag4,
+		frag1Hdr, frag1Payload,
+		frag2Hdr, frag2Payload,
+		frag3Hdr, frag3Payload,
+		frag4Hdr, frag4Payload,
 		cipher, req1, hello, cipher, req1, // Unchanged
 	}
 	require.Equal(t, expected, inner.bufs)
@@ -219,12 +228,16 @@ func assertCanWriteAll(t *testing.T, w io.Writer, buf net.Buffers) {
 // Private test helpers
 
 func constructTLSRecord(t *testing.T, typ layers.TLSType, ver layers.TLSVersion, payload []byte) []byte {
+	return constructTLSRecordWithLen(t, typ, ver, len(payload), payload)
+}
+
+func constructTLSRecordWithLen(t *testing.T, typ layers.TLSType, ver layers.TLSVersion, rLen int, payload []byte) []byte {
 	pkt := layers.TLS{
 		AppData: []layers.TLSAppDataRecord{{
 			TLSRecordHeader: layers.TLSRecordHeader{
 				ContentType: typ,
 				Version:     ver,
-				Length:      uint16(len(payload)),
+				Length:      uint16(rLen),
 			},
 			Payload: payload,
 		}},
