@@ -18,12 +18,13 @@ func TestSetWebProxt(t *testing.T) {
 	SetWebProxy(host.String(), port)
 	// generate a random hostname
 
-	h, p, err := getWebProxy()
+	h, p, e, err := getWebProxy()
 	require.NoError(t, err)
 	require.Equal(t, host.String(), h)
 	require.Equal(t, port, p)
+	require.Equal(t, e, true)
 
-	err = ClearWebProxy()
+	err = DisableWebProxy()
 	require.NoError(t, err)
 }
 
@@ -35,23 +36,25 @@ func TestSetWebProxywithDomain(t *testing.T) {
 	err := SetWebProxy(host, port)
 	require.NoError(t, err)
 
-	h, p, err := getWebProxy()
+	h, p, e, err := getWebProxy()
 	require.NoError(t, err)
 	require.Equal(t, host, h)
 	require.Equal(t, port, p)
+	require.Equal(t, e, true)
 
-	err = ClearWebProxy()
+
+	err = DisableWebProxy()
 	require.NoError(t, err)
 
 }
 func TestClearWebProxy(t *testing.T) {
-	err := ClearWebProxy()
+	err := DisableWebProxy()
 	require.NoError(t, err)
 
-	host, port, err := getWebProxy()
+	_, _, enabled, err := getWebProxy()
 	require.NoError(t, err)
-	require.Equal(t, "127.0.0.1", host)
-	require.Equal(t, "0", port)
+	require.Equal(t, false, enabled)
+
 }
 
 func TestSetSocksProxy(t *testing.T) {
@@ -61,23 +64,23 @@ func TestSetSocksProxy(t *testing.T) {
 	err := SetSOCKSProxy(host.String(), port)
 	require.NoError(t, err)
 
-	h, p, err := getSOCKSProxy()
+	h, p, e, err := getSOCKSProxy()
 	require.NoError(t, err)
 	require.Equal(t, host.String(), h)
 	require.Equal(t, port, p)
+	require.Equal(t, e, true)
 
-	err = ClearSOCKSProxy()
+	err = DisableSOCKSProxy()
 	require.NoError(t, err)
 }
 
 func TestClearSocksProxy(t *testing.T) {
-	err := ClearSOCKSProxy()
+	err := DisableSOCKSProxy()
 	require.NoError(t, err)
 
-	host, port, err := getSOCKSProxy()
+	_, _, enabled, err := getSOCKSProxy()
 	require.NoError(t, err)
-	require.Equal(t, "127.0.0.1", host)
-	require.Equal(t, "0", port)
+	require.Equal(t, false, enabled)
 }
 
 func generateRandomDomain() string {
