@@ -34,6 +34,7 @@ const (
 type proxySettings struct {
 	host string
 	port string
+	enabled bool
 }
 
 func SetWebProxy(host string, port string) error {
@@ -55,22 +56,14 @@ func SetWebProxy(host string, port string) error {
 	return nil
 }
 
-func ClearWebProxy() error {
+func DisableWebProxy() error {
 	// Get the active network interface
 	activeInterface, err := getActiveNetworkInterface()
 	if err != nil {
 		return err
 	}
 
-	// Clear proxy settings
-	if err := setProxySettings(proxyTypeHTTP, activeInterface, "127.0.0.1", "0"); err != nil {
-		return err
-	}
-	if err := setProxySettings(proxyTypeHTTPS, activeInterface, "127.0.0.1", "0"); err != nil {
-		return err
-	}
-
-	// Unset the web proxy and secure web proxy
+	// disable the web proxy and secure web proxy
 	if err := disableProxy(proxyTypeHTTP, activeInterface); err != nil {
 		return err
 	}
@@ -96,18 +89,14 @@ func SetSOCKSProxy(host string, port string) error {
 	return nil
 }
 
-func ClearSOCKSProxy() error {
+func DisableSOCKSProxy() error {
 	// Get the active network interface
 	activeInterface, err := getActiveNetworkInterface()
 	if err != nil {
 		return err
 	}
 
-	// Revert to previous the SOCKS proxy
-	if err := setProxySettings(proxyTypeSOCKS, activeInterface, "127.0.0.1", "0"); err != nil {
-		return err
-	}
-	// Unset the SOCKS proxy
+	// disable the SOCKS proxy
 	if err := disableProxy(proxyTypeSOCKS, activeInterface); err != nil {
 		return err
 	}
@@ -228,32 +217,44 @@ func getProxySettings(p ProxyType, interfaceName string) (*proxySettings, error)
 	if err != nil {
 		return nil, err
 	}
-	return getHostandPort(string(output))
+	return parseProxySettings(string(output))
 }
 
-func getHostandPort(commandOutput string) (*proxySettings, error) {
+func parseProxySettings(commandOutput string) (*proxySettings, error) {
 	var host, port string
+	var enabled bool
 	lines := strings.Split(commandOutput, "\n")
 	for _, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), "Server:") {
+		trimmedLine := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmedLine, "Server:"):
 			fields := strings.Fields(line)
 			if len(fields) >= 2 {
 				host = fields[1]
 			}
-		} else if strings.HasPrefix(strings.TrimSpace(line), "Port:") {
+		case strings.HasPrefix(trimmedLine, "Port:"):
 			fields := strings.Fields(line)
 			if len(fields) >= 2 {
 				port = fields[1]
+			}
+		case strings.HasPrefix(trimmedLine, "Enabled:"):
+			switch {
+			case strings.Contains(trimmedLine, "Yes"):
+				enabled = true
+			case strings.Contains(trimmedLine, "No"):
+				enabled = false
+			default:
+				return nil, fmt.Errorf("failed to parse proxy status from output")
 			}
 		}
 	}
 	if host == "" || port == "" {
 		return nil, fmt.Errorf("failed to parse host and port from output")
 	}
-	return &proxySettings{host: host, port: port}, nil
+	return &proxySettings{host: host, port: port, enabled: enabled}, nil
 }
 
-func getWebProxy() (host string, port string, err error) {
+func getWebProxy() (host string, port string, enabled bool, err error) {
 	activeInterface, err := getActiveNetworkInterface()
 	if err != nil {
 		return
@@ -270,26 +271,29 @@ func getWebProxy() (host string, port string, err error) {
 	}
 
 	if httpSettings.host != httpsSettings.host || httpSettings.port != httpsSettings.port {
-		return "", "", fmt.Errorf("HTTP and HTTPS proxy settings do not match")
+		return "", "", false, fmt.Errorf("HTTP and HTTPS proxy settings do not match")
 	}
 
 	host = httpSettings.host
 	port = httpSettings.port
+	enabled = httpSettings.enabled
+
 	return
 }
 
-func getSOCKSProxy() (host string, port string, err error) {
+func getSOCKSProxy() (host string, port string, enabled bool, err error) {
 	activeInterface, err := getActiveNetworkInterface()
 	if err != nil {
-		return
+		return "", "", false, err
 	}
 
 	socksSettings, err := getProxySettings(proxyTypeSOCKS, activeInterface)
 	if err != nil {
-		return
+		return "", "", false, err
 	}
 
 	host = socksSettings.host
 	port = socksSettings.port
-	return
+	enabled = socksSettings.enabled
+	return host, port, enabled, nil
 }
