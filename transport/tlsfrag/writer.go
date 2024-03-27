@@ -47,13 +47,14 @@ var _ io.Writer = (*clientHelloFragWriter)(nil)
 var _ io.Writer = (*clientHelloFragReaderFrom)(nil)
 var _ io.ReaderFrom = (*clientHelloFragReaderFrom)(nil)
 
-// newClientHelloFragWriter creates a [io.Writer] that splits the first TLS Client Hello record into two records based
-// on the provided frag function. It then writes these records and all subsequent messages to the base [io.Writer].
+// NewWriter creates a [io.Writer] that splits the first TLS Client Hello record into two records based on the
+// provided [FragFunc] callback.
+// It then writes these records and all subsequent messages to the base [io.Writer].
 // If the first message isn't a Client Hello, no splitting occurs and all messages are written directly to base.
 //
 // The returned [io.Writer] will implement the [io.ReaderFrom] interface for optimized performance if the base
 // [io.Writer] implements [io.ReaderFrom].
-func newClientHelloFragWriter(base io.Writer, frag FragFunc) (io.Writer, error) {
+func NewWriter(base io.Writer, frag FragFunc) (io.Writer, error) {
 	if base == nil {
 		return nil, errors.New("base writer must not be nil")
 	}

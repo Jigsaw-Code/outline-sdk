@@ -46,6 +46,13 @@ type fixedLenReaderFrom struct {
 	baseRF io.ReaderFrom
 }
 
+// NewFixedLenWriter creates a [io.Writer] that splits the first TLS Client Hello record into two records based
+// on the provided [FixedLenFragFunc] callback.
+// It then writes these records and all subsequent messages to the base [io.Writer].
+// If the first message isn't a Client Hello, no splitting occurs and all messages are written directly to base.
+//
+// The returned [io.Writer] will implement the [io.ReaderFrom] interface for optimized performance if the base
+// [io.Writer] implements [io.ReaderFrom].
 func NewFixedLenWriter(base io.Writer, frag FixedLenFragFunc) (io.Writer, error) {
 	if base == nil {
 		return nil, errors.New("base writer must not be nil")
@@ -64,6 +71,8 @@ func NewFixedLenWriter(base io.Writer, frag FixedLenFragFunc) (io.Writer, error)
 	return wr, nil
 }
 
+// Write implements io.Writer.Write. It attempts to split the data received in the first one or more Write call(s)
+// into two TLS records if the data corresponds to a TLS Client Hello record without using any additional buffers.
 func (w *fixedLenWriter) Write(p []byte) (n int, err error) {
 	if !w.done {
 		if len(w.hdr) < recordHeaderLen {
@@ -118,6 +127,13 @@ func (w *fixedLenWriter) Write(p []byte) (n int, err error) {
 	}
 }
 
+// ReadFrom implements io.ReaderFrom.ReadFrom. It attempts to split the first packet into two TLS records if the data
+// corresponds to a TLS Client Hello record without using any additional buffers.
+// And then copies the remaining data from r to the base io.Writer until EOF or error.
+//
+// If the first packet is not a valid TLS Client Hello, everything from r gets copied to the base io.Writer as is.
+//
+// It returns the number of bytes read. Any error except EOF encountered during the read is also returned.
 func (w *fixedLenReaderFrom) ReadFrom(r io.Reader) (n int64, err error) {
 	if !w.done {
 		if len(w.hdr) < recordHeaderLen {
@@ -167,6 +183,8 @@ func (w *fixedLenReaderFrom) ReadFrom(r io.Reader) (n int64, err error) {
 	}
 }
 
+// readRecordSizeFrom reads the 5 bytes header from r and updates the fragmented record sizes stored in w.
+// It returns io.EOF or io.ErrUnexpectedEOF if there are not enough bytes to construct a full header.
 func (w *fixedLenWriter) readRecordSizeFrom(r io.Reader) (n int, err error) {
 	n, err = io.ReadFull(r, w.hdr[len(w.hdr):recordHeaderLen])
 	w.hdr = w.hdr[:len(w.hdr)+n]
@@ -194,6 +212,7 @@ func (w *fixedLenWriter) readRecordSizeFrom(r io.Reader) (n int, err error) {
 	return
 }
 
+// writeN writes at most limit bytes from p to dst.
 func writeN(dst io.Writer, p []byte, limit int) (int, error) {
 	if len(p) > limit {
 		p = p[:limit]
@@ -201,6 +220,8 @@ func writeN(dst io.Writer, p []byte, limit int) (int, error) {
 	return dst.Write(p)
 }
 
+// writeBoth writes both p1 and p2 to dst.
+// It leverages writev system call when possible.
 func writeBoth(dst io.Writer, p1 []byte, p2 []byte) (p1n int, p2n int, err error) {
 	var buf io.WriterTo
 	if len(p2) == 0 {
@@ -218,6 +239,8 @@ func writeBoth(dst io.Writer, p1 []byte, p2 []byte) (p1n int, p2n int, err error
 	return p1n, p2n, e
 }
 
+// writeBothN writes at most limit bytes from p1 and p2 to dst.
+// It leverages writev system call when possible.
 func writeBothN(dst io.Writer, p1 []byte, p2 []byte, limit int) (p1n int, p2n int, err error) {
 	if len(p1)+len(p2) > limit {
 		p2 = p2[:limit-len(p1)]
@@ -225,6 +248,7 @@ func writeBothN(dst io.Writer, p1 []byte, p2 []byte, limit int) (p1n int, p2n in
 	return writeBoth(dst, p1, p2)
 }
 
+// readFromBoth lets dst to read bytes from both r1 and r2.
 func readFromBoth(dst io.ReaderFrom, r1 io.Reader, r2 io.Reader) (r1n int64, r2n int64, err error) {
 	r1n, err = dst.ReadFrom(r1)
 	if err == nil {
@@ -233,6 +257,7 @@ func readFromBoth(dst io.ReaderFrom, r1 io.Reader, r2 io.Reader) (r1n int64, r2n
 	return
 }
 
+// readFromBothN lets dst to read at most limit bytes from both r1 and r2.
 func readFromBothN(dst io.ReaderFrom, r1 io.Reader, r2 io.Reader, limit int) (r1n int64, r2n int64, err error) {
 	r1n, err = dst.ReadFrom(io.LimitReader(r1, int64(limit)))
 	if err == nil && r1n < int64(limit) {

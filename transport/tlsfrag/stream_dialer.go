@@ -85,7 +85,7 @@ func (d *tlsFragDialer) DialStream(ctx context.Context, raddr string) (transport
 // If your goal is to simply fragment the Client Hello at a fixed position, [WrapConnFixedLen] is more efficient as it
 // won't allocate any additional buffers.
 func WrapConnFunc(base transport.StreamConn, frag FragFunc) (transport.StreamConn, error) {
-	w, err := newClientHelloFragWriter(base, frag)
+	w, err := NewWriter(base, frag)
 	if err != nil {
 		return nil, err
 	}
