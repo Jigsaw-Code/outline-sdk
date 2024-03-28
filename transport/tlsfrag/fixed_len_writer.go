@@ -31,20 +31,21 @@ import (
 // [handshake record]: https://datatracker.ietf.org/doc/html/rfc8446#section-5.1
 type FixedLenFragFunc func(recordLen int) (splitLen int)
 
+// fixedLenWriter splits the initial TLS Client Hello record into two TLS records based on a fixed length returned by
+// a [FixedLenFragFunc] callback.
+// These fragmented records are then written to the base [io.Writer]. Subsequent packets are not modified and are
+// directly transmitted through the base [io.Writer].
 type fixedLenWriter struct {
 	base io.Writer
 	frag FixedLenFragFunc
-	done bool
+	done bool   // the first fragmented header and payload are flushed (or don't split)
 	hdr  []byte // the 5 bytes header
 
 	// the records' sizes and written bytes (including 5 bytes header)
 	r1Size, r1Written, r2Size int
 }
 
-type fixedLenReaderFrom struct {
-	*fixedLenWriter
-	baseRF io.ReaderFrom
-}
+var _ io.Writer = (*fixedLenWriter)(nil)
 
 // NewFixedLenWriter creates a [io.Writer] that splits the first TLS Client Hello record into two records based
 // on the provided [FixedLenFragFunc] callback.
@@ -127,6 +128,93 @@ func (w *fixedLenWriter) Write(p []byte) (n int, err error) {
 	}
 }
 
+// fixedLenReaderFrom optimizes for fixedLenWriter when the base [io.Writer] implements [io.ReaderFrom].
+type fixedLenReaderFrom struct {
+	*fixedLenWriter
+	baseRF io.ReaderFrom
+}
+
+var _ io.ReaderFrom = (*fixedLenReaderFrom)(nil)
+
+// fixedLenFirstRecordReader reads 5 bytes from r into w.hdr, and calculate the split length.
+// It then copies up to (w.r1Size - w.r1Written) bytes from (w.hdr + r) into Read's buffer.
+// It will update w.r1Written and w.done accordingly.
+// After the first record is fully copied, it will set w.hdr to be the second fragmented record header.
+type fixedLenFirstRecordReader struct {
+	w        *fixedLenWriter
+	r        io.Reader
+	rReadLen int64
+}
+
+// fixedLenRemainingRecordReader flushes the content of w.hdr and all remaining r into Read's buffer.
+type fixedLenRemainingRecordReader struct {
+	w        *fixedLenWriter
+	r        io.Reader
+	rReadLen int64
+}
+
+var _ io.Reader = (*fixedLenFirstRecordReader)(nil)
+var _ io.Reader = (*fixedLenRemainingRecordReader)(nil)
+
+func (r *fixedLenFirstRecordReader) Read(p []byte) (n int, err error) {
+	if !r.w.done {
+		if len(r.w.hdr) < recordHeaderLen {
+			// still constructing the header
+			m, e := r.w.readRecordSizeFrom(r.r)
+			r.rReadLen += int64(m)
+			if e != nil {
+				// r.w.done = invalid TLS = (e != EOF)
+				r.w.done = (e != io.EOF && e != io.ErrUnexpectedEOF)
+				return 0, io.EOF
+			}
+			// update hdr to the first record's header
+			h, _ := newTLSHandshakeRecordHeader(r.w.hdr)
+			h.SetPayloadLen(uint16(r.w.r1Size - recordHeaderLen))
+		}
+
+		if r.w.r1Written < r.w.r1Size {
+			if r.w.r1Written < recordHeaderLen {
+				n = copy(p, r.w.hdr[r.w.r1Written:])
+				r.w.r1Written += n
+				if p = p[n:]; len(p) == 0 {
+					return
+				}
+			}
+			var m int
+			m, err = io.LimitReader(r.r, int64(r.w.r1Size-r.w.r1Written)).Read(p)
+			n += m
+			r.rReadLen += int64(m)
+			if r.w.r1Written += m; r.w.r1Written == r.w.r1Size {
+				// update header to the second record's header
+				h, _ := newTLSHandshakeRecordHeader(r.w.hdr)
+				h.SetPayloadLen(uint16(r.w.r2Size - recordHeaderLen))
+				r.w.done = true
+			}
+		}
+		if err == nil && r.w.r1Written == r.w.r1Size {
+			err = io.EOF
+		}
+		return
+	}
+	return 0, io.EOF
+}
+
+func (r *fixedLenRemainingRecordReader) Read(p []byte) (n int, err error) {
+	if r.w.done {
+		if len(r.w.hdr) > 0 {
+			n = copy(p, r.w.hdr)
+			r.w.hdr = r.w.hdr[n:]
+			if p = p[n:]; len(p) == 0 {
+				return
+			}
+		}
+		m, e := r.r.Read(p)
+		r.rReadLen += int64(m)
+		return n + m, e
+	}
+	return 0, io.EOF
+}
+
 // ReadFrom implements io.ReaderFrom.ReadFrom. It attempts to split the first packet into two TLS records if the data
 // corresponds to a TLS Client Hello record without using any additional buffers.
 // And then copies the remaining data from r to the base io.Writer until EOF or error.
@@ -135,52 +223,15 @@ func (w *fixedLenWriter) Write(p []byte) (n int, err error) {
 //
 // It returns the number of bytes read. Any error except EOF encountered during the read is also returned.
 func (w *fixedLenReaderFrom) ReadFrom(r io.Reader) (n int64, err error) {
-	if !w.done {
-		if len(w.hdr) < recordHeaderLen {
-			m, e := w.readRecordSizeFrom(r)
-			n = int64(m)
-			if err = e; err == io.EOF || err == io.ErrUnexpectedEOF {
-				return n, nil
-			} else if err != nil {
-				w.done = true
-			} else {
-				h, _ := newTLSHandshakeRecordHeader(w.hdr)
-				h.SetPayloadLen(uint16(w.r1Size - recordHeaderLen))
-			}
-		}
-
-		if !w.done && w.r1Written < w.r1Size {
-			var m int64
-			if w.r1Written < recordHeaderLen {
-				var hn int64
-				hn, m, err = readFromBothN(w.baseRF, bytes.NewBuffer(w.hdr[w.r1Written:]), r, w.r1Size-w.r1Written)
-				w.r1Written += int(hn + m)
-			} else {
-				m, err = w.baseRF.ReadFrom(io.LimitReader(r, int64(w.r1Size-w.r1Written)))
-				w.r1Written += int(m)
-			}
-			n += m
-
-			if w.r1Written == w.r1Size {
-				// update header to the second record's header
-				h, _ := newTLSHandshakeRecordHeader(w.hdr)
-				h.SetPayloadLen(uint16(w.r2Size - recordHeaderLen))
-				w.done = true
-			}
-			if err != nil || w.r1Written < w.r1Size {
-				return
-			}
-		}
+	if !w.done || len(w.hdr) > 0 {
+		r1Reader := &fixedLenFirstRecordReader{w: w.fixedLenWriter, r: r}
+		r2Reader := &fixedLenRemainingRecordReader{w: w.fixedLenWriter, r: r}
+		_, err = w.baseRF.ReadFrom(io.MultiReader(r1Reader, r2Reader))
+		// We should return the actual bytes read from r, not the bytes passed to base or baseRF
+		n = r1Reader.rReadLen + r2Reader.rReadLen
+		return
 	}
-
-	if len(w.hdr) > 0 {
-		hn, pn, e := readFromBoth(w.baseRF, bytes.NewBuffer(w.hdr), r)
-		w.hdr = w.hdr[hn:]
-		return n + pn, e
-	} else {
-		m, e := w.baseRF.ReadFrom(r)
-		return n + m, e
-	}
+	return w.baseRF.ReadFrom(r)
 }
 
 // readRecordSizeFrom reads the 5 bytes header from r and updates the fragmented record sizes stored in w.
@@ -246,22 +297,4 @@ func writeBothN(dst io.Writer, p1 []byte, p2 []byte, limit int) (p1n int, p2n in
 		p2 = p2[:limit-len(p1)]
 	}
 	return writeBoth(dst, p1, p2)
-}
-
-// readFromBoth lets dst to read bytes from both r1 and r2.
-func readFromBoth(dst io.ReaderFrom, r1 io.Reader, r2 io.Reader) (r1n int64, r2n int64, err error) {
-	r1n, err = dst.ReadFrom(r1)
-	if err == nil {
-		r2n, err = dst.ReadFrom(r2)
-	}
-	return
-}
-
-// readFromBothN lets dst to read at most limit bytes from both r1 and r2.
-func readFromBothN(dst io.ReaderFrom, r1 io.Reader, r2 io.Reader, limit int) (r1n int64, r2n int64, err error) {
-	r1n, err = dst.ReadFrom(io.LimitReader(r1, int64(limit)))
-	if err == nil && r1n < int64(limit) {
-		r2n, err = dst.ReadFrom(io.LimitReader(r2, int64(limit)-r1n))
-	}
-	return
 }
