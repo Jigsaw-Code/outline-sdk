@@ -61,9 +61,9 @@ func SetWebProxy(host string, port string) error {
 	return nil
 }
 
-func ClearWebProxy() error {
-	// clear proxy settings
-	return clearProxy()
+func DisableWebProxy() error {
+	// disable proxy settings
+	return disableProxy()
 }
 
 // SetProxy does nothing on windows platforms.
@@ -82,25 +82,8 @@ func SetSOCKSProxy(host string, port string) error {
 }
 
 // SetProxy does nothing on windows platforms.
-func ClearSOCKSProxy() error {
-	return clearProxy()
-}
-
-func clearProxy() error {
-	settings := &proxySettings{
-		proxyServer:   "127.0.0.1:0",
-		proxyOverride: "*.local;<local>",
-	}
-
-	if err := setProxySettings(settings); err != nil {
-		return err
-	}
-
-	err := disableProxy()
-	if err != nil {
-		return err
-	}
-	return nil
+func DisableSOCKSProxy() error {
+	return disableProxy()
 }
 
 func setProxySettings(settings *proxySettings) error {
@@ -168,30 +151,36 @@ func notifyWinInetProxySettingsChanged() error {
 
 	return nil
 }
-func getWebProxy() (host string, port string, err error) {
+func getWebProxy() (host string, port string, enabled bool, err error) {
 	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.QUERY_VALUE)
 	if err != nil {
-		return "", "", err
+		return "", "", false, err
 	}
 	defer key.Close()
 
 	address, _, err := key.GetStringValue("ProxyServer")
 	if err != nil {
-		return "", "", err
+		return "", "", false, err
+	}
+
+	// Read back the value of ProxyEnable
+	proxyEnable, _, err := key.GetIntegerValue("ProxyEnable")
+	if err != nil {
+		return "", "", false, err
 	}
 
 	host, port, err = net.SplitHostPort(address)
 	if err != nil {
-		return "", "", err
+		return "", "", false, err
 	}
 
-	return host, port, nil
+	return host, port, proxyEnable==1, nil
 }
 
-func getSOCKSProxy() (host string, port string, err error) {
+func getSOCKSProxy() (host string, port string, enabled bool, err error) {
 	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.QUERY_VALUE)
 	if err != nil {
-		return "", "", err
+		return "", "", false, err
 	}
 	defer key.Close()
 
@@ -200,8 +189,13 @@ func getSOCKSProxy() (host string, port string, err error) {
 
 	host, port, err = net.SplitHostPort(h)
 	if err != nil {
-		return "", "", err
+		return "", "", false, err
+	}
+	// Read back the value of ProxyEnable
+	proxyEnable, _, err := key.GetIntegerValue("ProxyEnable")
+	if err != nil {
+		return "", "", false, err
 	}
 
-	return host, port, nil
+	return host, port, proxyEnable==1, nil
 }
