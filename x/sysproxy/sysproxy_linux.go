@@ -117,7 +117,7 @@ func getWebProxy() (host string, port string, enabled bool, err error) {
 		return "", "", false, err
 	}
 
-	mode, err := gnomeSettingsGetString("org.gnome.system.proxy.http", "mode") 
+	mode, err := gnomeSettingsGetString("org.gnome.system.proxy", "mode")
 	if err != nil {
 		return "", "", false, err
 	}
@@ -125,8 +125,8 @@ func getWebProxy() (host string, port string, enabled bool, err error) {
 	if httpHost != httpsHost || httpPort != httpsPort {
 		return "", "", false, errors.New("HTTP and HTTPS proxy settings are different")
 	}
-  
-	return httpHost, httpPort, mode=="none", nil
+
+	return httpHost, httpPort, mode != "none", nil
 }
 
 func getSOCKSProxy() (host string, port string, enabled bool, err error) {
@@ -145,7 +145,7 @@ func getSOCKSProxy() (host string, port string, enabled bool, err error) {
 		return "", "", false, err
 	}
 
-	return socksHost, socksPort, mode=="none", nil
+	return socksHost, socksPort, mode != "none", nil
 }
 
 func gnomeSettingsGetString(settings, key string) (string, error) {
