@@ -21,10 +21,14 @@ package mobileproxy
 import (
 	"container/list"
 	"context"
+	"errors"
+	"io"
 	"sync"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
+
+var errStopped = errors.New("dialer stopped")
 
 // stopConn is a [transport.StreamConn] that can be stopped and has a close handler.
 type stopConn struct {
@@ -33,6 +37,22 @@ type stopConn struct {
 	closeErr  error
 	// OnClose is called when Close is called. Close must be called only once.
 	OnClose func()
+}
+
+// WriteTo implements [io.WriterTo], to make sure we don't hide the functionality from the
+// underlying connection.
+func (c *stopConn) WriteTo(w io.Writer) (int64, error) {
+	return io.Copy(w, c.StreamConn)
+}
+
+// ReadFrom implements [io.ReaderFrom], to make sure we don't hide the functionality from
+// the underlying connection.
+func (c *stopConn) ReadFrom(r io.Reader) (int64, error) {
+	// Prefer ReadFrom if requested. Otherwise io.Copy prefers WriteTo.
+	if rf, ok := c.StreamConn.(io.ReaderFrom); ok {
+		return rf.ReadFrom(r)
+	}
+	return io.Copy(c.StreamConn, r)
 }
 
 // Close implements [transport.StreamConn].
@@ -51,27 +71,60 @@ func (c *stopConn) Stop() {
 
 // stopStreamDialer is a [transport.StreamDialer] that provides a method to close all open connections.
 type stopStreamDialer struct {
-	Dialer transport.StreamDialer
-	conns  list.List
-	mu     sync.Mutex
+	Dialer       transport.StreamDialer
+	stopped      bool
+	cleanupFuncs list.List
+	mu           sync.Mutex
 }
 
 var _ transport.StreamDialer = (*stopStreamDialer)(nil)
 
 // DialStream implements [transport.StreamDialer].
 func (d *stopStreamDialer) DialStream(ctx context.Context, addr string) (transport.StreamConn, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	// Capture any stop that happened before DialStream.
+	if d.stopped {
+		return nil, errStopped
+	}
+
+	// Register dial cancelation to capture a stop during the DialStream.
+	ctx, cancel := context.WithCancel(ctx)
+	defer func() {
+		if !errors.Is(ctx.Err(), context.Canceled) {
+			cancel()
+		}
+	}()
+	cleanDialEl := d.cleanupFuncs.PushBack(func() {
+		cancel()
+	})
+
+	// We release the lock for the dial because it's a slow operation and to allow for parallel dials.
+	d.mu.Unlock()
 	conn, err := d.Dialer.DialStream(ctx, addr)
+	d.mu.Lock()
+
+	// Clean up dial cancelation.
+	d.cleanupFuncs.Remove(cleanDialEl)
+
 	if err != nil {
 		return nil, err
 	}
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	e := d.conns.PushBack(nil)
+
+	// Dialer may not pay attention to context cancellation, so we check if we are stopped here.
+	if d.stopped {
+		conn.Close()
+		return nil, errStopped
+	}
+
+	// We have a connection. Register cleanup to capture stop during the connection lifetime.
+	e := d.cleanupFuncs.PushBack(nil)
 	sConn := &stopConn{
 		StreamConn: conn,
 		OnClose: func() {
 			d.mu.Lock()
-			d.conns.Remove(e)
+			d.cleanupFuncs.Remove(e)
 			d.mu.Unlock()
 		},
 	}
@@ -83,7 +136,8 @@ func (d *stopStreamDialer) DialStream(ctx context.Context, addr string) (transpo
 func (d *stopStreamDialer) StopConnections() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	for e := d.conns.Front(); e != nil; e = e.Next() {
+	d.stopped = true
+	for e := d.cleanupFuncs.Front(); e != nil; e = e.Next() {
 		e.Value.(func())()
 	}
 }
