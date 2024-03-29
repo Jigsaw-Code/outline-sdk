@@ -56,3 +56,7 @@ You can expose your WebSockets on Cloudflare with [clourdflared](https://develop
 ```
 
 In this case, use `wss://recorders-uganda-starring-stopping.trycloudflare.com` as the WebSocket url.
+
+
+Note that the Cloudflare tunnel does not add any user authentication mechanism. You must implement authentication yourself
+if you would like to prevent unauthorized access to your service.
