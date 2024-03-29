@@ -60,6 +60,7 @@ func main() {
 			if err != nil {
 				log.Printf("Failed to upgrade: %v\n", err)
 				w.WriteHeader(http.StatusBadGateway)
+				return
 			}
 			defer targetConn.Close()
 			go func() {
