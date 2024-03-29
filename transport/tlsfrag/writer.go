@@ -54,6 +54,9 @@ var _ io.ReaderFrom = (*clientHelloFragReaderFrom)(nil)
 //
 // The returned [io.Writer] will implement the [io.ReaderFrom] interface for optimized performance if the base
 // [io.Writer] implements [io.ReaderFrom].
+//
+// If you just want to split the record at a fixed position (e.g., always at the 5th byte or 2nd from the last
+// byte), use [NewFixedLenWriter]. It consumes less resources and is more efficient.
 func NewWriter(base io.Writer, frag FragFunc) (io.Writer, error) {
 	if base == nil {
 		return nil, errors.New("base writer must not be nil")
