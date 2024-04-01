@@ -24,7 +24,7 @@ func SetWebProxy(ip string, port string) error {
 }
 
 // SetProxy does nothing on unsupported platforms.
-func UnsetWebProxy() error {
+func DisableWebProxy() error {
 	return errors.New("unsupported platform")
 }
 
@@ -34,6 +34,6 @@ func SetSOCKSProxy(ip string, port string) error {
 }
 
 // SetProxy does nothing on unsupported platforms.
-func UnsetSOCKSProxy() error {
+func DisableSOCKSProxy() error {
 	return errors.New("unsupported platform")
 }
