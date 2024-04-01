@@ -36,7 +36,7 @@
 //
 // Other notes:
 //
-//  1. if you only setup the system HTTP Proxy settings (for example on MacOS)
+//  1. If you only setup the system HTTP Proxy settings (for example on MacOS)
 //     to point to a remote/local HTTP proxy server, and then visit a website over HTTPS,
 //     your traffic does NOT go through the proxy. In essence, the system proxy
 //     client only route HTTP requests through the proxy.
