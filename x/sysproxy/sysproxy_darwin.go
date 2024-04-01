@@ -17,6 +17,7 @@
 package sysproxy
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -64,14 +65,10 @@ func DisableWebProxy() error {
 	}
 
 	// disable the web proxy and secure web proxy
-	if err := disableProxy(proxyTypeHTTP, activeInterface); err != nil {
-		return err
-	}
-	if err := disableProxy(proxyTypeHTTPS, activeInterface); err != nil {
-		return err
-	}
+	errHTTP := disableProxy(proxyTypeHTTP, activeInterface)
+	errHTTPs := disableProxy(proxyTypeHTTPS, activeInterface)
 
-	return nil
+	return errors.Join(errHTTP, errHTTPs)
 }
 
 func SetSOCKSProxy(host string, port string) error {
@@ -257,28 +254,24 @@ func parseProxySettings(commandOutput string) (*proxySettings, error) {
 func getWebProxy() (host string, port string, enabled bool, err error) {
 	activeInterface, err := getActiveNetworkInterface()
 	if err != nil {
-		return
+		return "", "", false, err
 	}
 
 	httpSettings, err := getProxySettings(proxyTypeHTTP, activeInterface)
 	if err != nil {
-		return
+		return "", "", false, err
 	}
 
 	httpsSettings, err := getProxySettings(proxyTypeHTTPS, activeInterface)
 	if err != nil {
-		return
+		return "", "", false, err
 	}
 
 	if httpSettings.host != httpsSettings.host || httpSettings.port != httpsSettings.port {
 		return "", "", false, fmt.Errorf("HTTP and HTTPS proxy settings do not match")
 	}
 
-	host = httpSettings.host
-	port = httpSettings.port
-	enabled = httpSettings.enabled
-
-	return
+	return httpSettings.host, httpSettings.port, httpSettings.enabled, nil
 }
 
 func getSOCKSProxy() (host string, port string, enabled bool, err error) {
@@ -292,8 +285,5 @@ func getSOCKSProxy() (host string, port string, enabled bool, err error) {
 		return "", "", false, err
 	}
 
-	host = socksSettings.host
-	port = socksSettings.port
-	enabled = socksSettings.enabled
-	return host, port, enabled, nil
+	return socksSettings.host, socksSettings.port, socksSettings.enabled, nil
 }
