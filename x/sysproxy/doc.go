@@ -73,7 +73,7 @@
 //
 //	defer ClearSOCKSProxy()
 //
-// after the setting the proxy.
+// after setting the proxy.
 //
 // The section below provides platform-specific details on how the proxy settings are configured.
 //
