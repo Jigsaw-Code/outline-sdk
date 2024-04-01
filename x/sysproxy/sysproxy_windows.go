@@ -70,11 +70,7 @@ func SetSOCKSProxy(host string, port string) error {
 		proxyOverride: "*.local;<local>",
 	}
 
-	if err := setProxySettings(settings); err != nil {
-		return err
-	}
-
-	return nil
+	return setProxySettings(settings)
 }
 
 // SetProxy does nothing on windows platforms.
