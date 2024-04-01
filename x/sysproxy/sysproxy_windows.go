@@ -54,11 +54,7 @@ func SetWebProxy(host string, port string) error {
 		proxyOverride: "*.local;<local>",
 	}
 
-	if err := setProxySettings(settings); err != nil {
-		return err
-	}
-
-	return nil
+	return setProxySettings(settings)
 }
 
 func DisableWebProxy() error {
