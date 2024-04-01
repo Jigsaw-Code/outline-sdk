@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,15 +26,15 @@ import (
 
 // Make sure NewFixedLenWriter checks parameters.
 func TestNewFixedLenWriterCheckParameters(t *testing.T) {
-	w, err := NewFixedLenWriter(nil, func(_ int) int { return 1 })
+	w, err := NewRecordLenFuncWriter(nil, func(_ int) int { return 1 })
 	require.Error(t, err)
 	require.Nil(t, w)
 
-	w, err = NewFixedLenWriter(io.Discard, nil)
+	w, err = NewRecordLenFuncWriter(io.Discard, nil)
 	require.Error(t, err)
 	require.Nil(t, w)
 
-	w, err = NewFixedLenWriter(io.Discard, func(_ int) int { return 1 })
+	w, err = NewRecordLenFuncWriter(io.Discard, func(_ int) int { return 1 })
 	require.NoError(t, err)
 	require.NotNil(t, w)
 }
@@ -43,7 +44,7 @@ func TestFixedLenWriterWrite(t *testing.T) {
 	cases := []struct {
 		name     string
 		in       [][]byte
-		frag     FixedLenFragFunc
+		frag     RecordLenFragFunc
 		expected [][]byte
 	}{
 		{
@@ -115,7 +116,7 @@ func TestFixedLenWriterWrite(t *testing.T) {
 			},
 		},
 		{
-			name: "NotSplitForZeroByte",
+			name: "NoSplitForZeroByte",
 			in:   [][]byte{{0x16, 0x03, 0x01, 0x00, 0x06, 0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa}},
 			frag: func(_ int) int { return 0 },
 			expected: [][]byte{
@@ -196,10 +197,10 @@ func TestFixedLenWriterWrite(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			inner := &collectWriter{}
-			w, err := NewFixedLenWriter(inner, tc.frag)
+			w, err := NewRecordLenFuncWriter(inner, tc.frag)
 			require.NoError(t, err)
 			require.NotNil(t, w)
-			require.IsType(t, &fixedLenWriter{}, w)
+			require.IsType(t, &recordLenFragWriter{}, w)
 
 			for _, p := range tc.in {
 				n, err := w.Write(p)
@@ -219,7 +220,7 @@ func TestFixedLenWriterReadFrom(t *testing.T) {
 	cases := []struct {
 		name     string
 		in       [][]byte
-		frag     FixedLenFragFunc
+		frag     RecordLenFragFunc
 		bufSize  int
 		expected [][]byte
 	}{
@@ -292,7 +293,7 @@ func TestFixedLenWriterReadFrom(t *testing.T) {
 			},
 		},
 		{
-			name: "NotSplitForZeroByte",
+			name: "NoSplitForZeroByte",
 			in:   [][]byte{{0x16, 0x03, 0x01, 0x00, 0x06, 0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa}},
 			frag: func(_ int) int { return 0 },
 			expected: [][]byte{
@@ -415,7 +416,7 @@ func TestFixedLenWriterReadFrom(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			inner := &collectReaderFrom{bufSize: tc.bufSize}
-			w, err := NewFixedLenWriter(inner, tc.frag)
+			w, err := NewRecordLenFuncWriter(inner, tc.frag)
 			require.NoError(t, err)
 			require.NotNil(t, w)
 			require.IsType(t, &fixedLenReaderFrom{}, w)
@@ -435,7 +436,7 @@ func TestFixedLenWriterReadFrom(t *testing.T) {
 }
 
 // Make sure FixedLenWriter's mixed Write and ReadFrom method can split TLS hello.
-func TestFixedLenWriterMixedWriteAndReadFrom(t *testing.T) {
+func TestFixedLenWriterMixedWriteBeforeReadFrom(t *testing.T) {
 	type subCase struct {
 		wrLenBeforeRF []int // Each int represents the number of bytes Write before ReadFrom
 		expected      [][]byte
@@ -445,7 +446,7 @@ func TestFixedLenWriterMixedWriteAndReadFrom(t *testing.T) {
 	cases := []struct {
 		name     string
 		in       [][]byte
-		frag     FixedLenFragFunc
+		frag     RecordLenFragFunc
 		subCases []subCase
 	}{
 		{
@@ -761,7 +762,7 @@ func TestFixedLenWriterMixedWriteAndReadFrom(t *testing.T) {
 					subCaseName := fmt.Sprintf("Write_%d_BytesThenReadFrom", wrLen)
 					t.Run(subCaseName, func(t *testing.T) {
 						inner := &collectReaderFrom{}
-						w, err := NewFixedLenWriter(inner, tc.frag)
+						w, err := NewRecordLenFuncWriter(inner, tc.frag)
 						require.NoError(t, err)
 						require.NotNil(t, w)
 						require.IsType(t, &fixedLenReaderFrom{}, w)
@@ -776,6 +777,368 @@ func TestFixedLenWriterMixedWriteAndReadFrom(t *testing.T) {
 						nn, err := rf.ReadFrom(src)
 						require.NoError(t, err)
 						require.Equal(t, int64(totalN-wrLen), nn)
+
+						// All buf should come from ReadFrom calls
+						require.Equal(t, subtc.expected, inner.buf)
+						require.Equal(t, subtc.expectWrCnt, inner.wrOps)
+
+						assertWriteAndReadFromDirectlyGoesToBase(t, &inner.collectWriter, w)
+					})
+				}
+			}
+		})
+	}
+}
+
+func TestFixedLenWriterMixedReadFromBeforeWrite(t *testing.T) {
+	type subCase struct {
+		rfLenBeforeWr []int // Each int represents the number of bytes ReadFrom before Write
+		expected      [][]byte
+		expectWrCnt   int
+	}
+	cases := []struct {
+		name     string
+		in       [][]byte
+		frag     RecordLenFragFunc
+		subCases []subCase
+	}{
+		{
+			name: "SplitFullClientHelloRecord",
+			in: [][]byte{
+				{0x16, 0x03, 0x02, 0x00, 0x10,
+					0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00},
+			},
+			frag: func(_ int) int { return 7 },
+			subCases: []subCase{
+				{
+					rfLenBeforeWr: []int{1, 2, 3, 4},
+					expected: [][]byte{
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0x16, 0x03, 0x02, 0x00, 0x07}, {0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99},
+						{0x16, 0x03, 0x02, 0x00, 0x09}, {0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00},
+					},
+					expectWrCnt: 4,
+				},
+				{
+					rfLenBeforeWr: []int{5},
+					expected: [][]byte{
+						{0x16, 0x03, 0x02, 0x00, 0x07},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99},
+						{0x16, 0x03, 0x02, 0x00, 0x09}, {0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00},
+					},
+					expectWrCnt: 3,
+				},
+				{
+					rfLenBeforeWr: []int{8},
+					expected: [][]byte{
+						{0x16, 0x03, 0x02, 0x00, 0x07, 0xff, 0xee, 0xdd},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0xcc, 0xbb, 0xaa, 0x99},
+						{0x16, 0x03, 0x02, 0x00, 0x09}, {0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00},
+					},
+					expectWrCnt: 3,
+				},
+				{
+					rfLenBeforeWr: []int{12},
+					expected: [][]byte{
+						{0x16, 0x03, 0x02, 0x00, 0x07, 0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99},
+						{0x16, 0x03, 0x02, 0x00, 0x09}, {0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00},
+					},
+					expectWrCnt: 1,
+				},
+				{
+					rfLenBeforeWr: []int{13},
+					expected: [][]byte{
+						{0x16, 0x03, 0x02, 0x00, 0x07, 0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99},
+						{0x16, 0x03, 0x02, 0x00, 0x09, 0x88},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00},
+					},
+					expectWrCnt: 1,
+				},
+				{
+					rfLenBeforeWr: []int{20},
+					expected: [][]byte{
+						{0x16, 0x03, 0x02, 0x00, 0x07, 0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99},
+						{0x16, 0x03, 0x02, 0x00, 0x09, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0x00},
+					},
+					expectWrCnt: 1,
+				},
+				{
+					rfLenBeforeWr: []int{21},
+					expected: [][]byte{
+						{0x16, 0x03, 0x02, 0x00, 0x07, 0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99},
+						{0x16, 0x03, 0x02, 0x00, 0x09, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+					},
+					expectWrCnt: 0,
+				},
+			},
+		},
+		{
+			name: "SplitClientHelloSingleByteSeq",
+			in: [][]byte{
+				{0x16}, {0x03}, {0x03}, {0x00}, {0x10},
+				{0xff}, {0xee}, {0xdd}, {0xcc}, {0xbb}, {0xaa}, {0x99}, {0x88}, {0x77}, {0x66}, {0x55}, {0x44}, {0x33}, {0x22}, {0x11}, {0x00},
+			},
+			frag: func(_ int) int { return 7 },
+			subCases: []subCase{
+				{
+					rfLenBeforeWr: []int{1, 2, 3, 4},
+					expected: [][]byte{
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0x16, 0x03, 0x03, 0x00, 0x07},
+						{0xff}, {0xee}, {0xdd}, {0xcc}, {0xbb}, {0xaa}, {0x99},
+						{0x16, 0x03, 0x03, 0x00, 0x09},
+						{0x88}, {0x77}, {0x66}, {0x55}, {0x44}, {0x33}, {0x22}, {0x11}, {0x00},
+					},
+					expectWrCnt: 18,
+				},
+				{
+					rfLenBeforeWr: []int{5},
+					expected: [][]byte{
+						{0x16, 0x03, 0x03, 0x00, 0x07},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0xff}, {0xee}, {0xdd}, {0xcc}, {0xbb}, {0xaa}, {0x99},
+						{0x16, 0x03, 0x03, 0x00, 0x09},
+						{0x88}, {0x77}, {0x66}, {0x55}, {0x44}, {0x33}, {0x22}, {0x11}, {0x00},
+					},
+					expectWrCnt: 17,
+				},
+				{
+					rfLenBeforeWr: []int{8},
+					expected: [][]byte{
+						{0x16, 0x03, 0x03, 0x00, 0x07, 0xff},
+						{0xee}, {0xdd},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0xcc}, {0xbb}, {0xaa}, {0x99},
+						{0x16, 0x03, 0x03, 0x00, 0x09},
+						{0x88}, {0x77}, {0x66}, {0x55}, {0x44}, {0x33}, {0x22}, {0x11}, {0x00},
+					},
+					expectWrCnt: 14,
+				},
+				{
+					rfLenBeforeWr: []int{12},
+					expected: [][]byte{
+						{0x16, 0x03, 0x03, 0x00, 0x07, 0xff},
+						{0xee}, {0xdd}, {0xcc}, {0xbb}, {0xaa}, {0x99},
+						{0x16, 0x03, 0x03, 0x00, 0x09},
+						{0x88}, {0x77}, {0x66}, {0x55}, {0x44}, {0x33}, {0x22}, {0x11}, {0x00},
+					},
+					expectWrCnt: 9,
+				},
+				{
+					rfLenBeforeWr: []int{13},
+					expected: [][]byte{
+						{0x16, 0x03, 0x03, 0x00, 0x07, 0xff},
+						{0xee}, {0xdd}, {0xcc}, {0xbb}, {0xaa}, {0x99},
+						{0x16, 0x03, 0x03, 0x00, 0x09, 0x88},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0x77}, {0x66}, {0x55}, {0x44}, {0x33}, {0x22}, {0x11}, {0x00},
+					},
+					expectWrCnt: 8,
+				},
+				{
+					rfLenBeforeWr: []int{20},
+					expected: [][]byte{
+						{0x16, 0x03, 0x03, 0x00, 0x07, 0xff},
+						{0xee}, {0xdd}, {0xcc}, {0xbb}, {0xaa}, {0x99},
+						{0x16, 0x03, 0x03, 0x00, 0x09, 0x88},
+						{0x77}, {0x66}, {0x55}, {0x44}, {0x33}, {0x22}, {0x11},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0x00},
+					},
+					expectWrCnt: 1,
+				},
+				{
+					rfLenBeforeWr: []int{21},
+					expected: [][]byte{
+						{0x16, 0x03, 0x03, 0x00, 0x07, 0xff},
+						{0xee}, {0xdd}, {0xcc}, {0xbb}, {0xaa}, {0x99},
+						{0x16, 0x03, 0x03, 0x00, 0x09, 0x88},
+						{0x77}, {0x66}, {0x55}, {0x44}, {0x33}, {0x22}, {0x11}, {0x00},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+					},
+					expectWrCnt: 0,
+				},
+			},
+		},
+		{
+			name: "SplitClientHelloWithEmptyWrites",
+			in: [][]byte{
+				{}, {0x16}, {0x03}, {}, {0x03}, {0x00}, {}, {0x10},
+				{}, {0xff}, {0xee}, {}, {0xdd}, {0xcc}, {}, {0xbb}, {0xaa}, {}, {0x99}, {0x88},
+				{}, {0x77}, {0x66}, {}, {0x55}, {0x44}, {}, {0x33}, {0x22}, {}, {0x11}, {0x00},
+			},
+			frag: func(_ int) int { return 7 },
+			subCases: []subCase{
+				{
+					rfLenBeforeWr: []int{1, 2, 3, 4},
+					expected: [][]byte{
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0x16, 0x03, 0x03, 0x00, 0x07},
+						{}, {0xff}, {0xee}, {}, {0xdd}, {0xcc}, {}, {0xbb}, {0xaa}, {}, {0x99},
+						{0x16, 0x03, 0x03, 0x00, 0x09},
+						{0x88}, {}, {0x77}, {0x66}, {}, {0x55}, {0x44}, {}, {0x33}, {0x22}, {}, {0x11}, {0x00},
+					},
+					expectWrCnt: 26,
+				},
+				{
+					rfLenBeforeWr: []int{5},
+					expected: [][]byte{
+						{0x16, 0x03, 0x03, 0x00, 0x07},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{}, {0xff}, {0xee}, {}, {0xdd}, {0xcc}, {}, {0xbb}, {0xaa}, {}, {0x99},
+						{0x16, 0x03, 0x03, 0x00, 0x09},
+						{0x88}, {}, {0x77}, {0x66}, {}, {0x55}, {0x44}, {}, {0x33}, {0x22}, {}, {0x11}, {0x00},
+					},
+					expectWrCnt: 25,
+				},
+				{
+					rfLenBeforeWr: []int{8},
+					expected: [][]byte{
+						{0x16, 0x03, 0x03, 0x00, 0x07},
+						{0xff}, {0xee}, {}, {0xdd},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0xcc}, {}, {0xbb}, {0xaa}, {}, {0x99},
+						{0x16, 0x03, 0x03, 0x00, 0x09},
+						{0x88}, {}, {0x77}, {0x66}, {}, {0x55}, {0x44}, {}, {0x33}, {0x22}, {}, {0x11}, {0x00},
+					},
+					expectWrCnt: 20,
+				},
+				{
+					rfLenBeforeWr: []int{12},
+					expected: [][]byte{
+						{0x16, 0x03, 0x03, 0x00, 0x07},
+						{0xff}, {0xee}, {}, {0xdd}, {0xcc}, {}, {0xbb}, {0xaa}, {}, {0x99},
+						{0x16, 0x03, 0x03, 0x00, 0x09},
+						{0x88}, {}, {0x77}, {0x66}, {}, {0x55}, {0x44}, {}, {0x33}, {0x22}, {}, {0x11}, {0x00},
+					},
+					expectWrCnt: 13,
+				},
+				{
+					rfLenBeforeWr: []int{13},
+					expected: [][]byte{
+						{0x16, 0x03, 0x03, 0x00, 0x07},
+						{0xff}, {0xee}, {}, {0xdd}, {0xcc}, {}, {0xbb}, {0xaa}, {}, {0x99},
+						{0x16, 0x03, 0x03, 0x00, 0x09, 0x88},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{}, {0x77}, {0x66}, {}, {0x55}, {0x44}, {}, {0x33}, {0x22}, {}, {0x11}, {0x00},
+					},
+					expectWrCnt: 12,
+				},
+				{
+					rfLenBeforeWr: []int{20},
+					expected: [][]byte{
+						{0x16, 0x03, 0x03, 0x00, 0x07},
+						{0xff}, {0xee}, {}, {0xdd}, {0xcc}, {}, {0xbb}, {0xaa}, {}, {0x99},
+						{0x16, 0x03, 0x03, 0x00, 0x09, 0x88},
+						{}, {0x77}, {0x66}, {}, {0x55}, {0x44}, {}, {0x33}, {0x22}, {}, {0x11},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0x00},
+					},
+					expectWrCnt: 1,
+				},
+				{
+					rfLenBeforeWr: []int{21},
+					expected: [][]byte{
+						{0x16, 0x03, 0x03, 0x00, 0x07},
+						{0xff}, {0xee}, {}, {0xdd}, {0xcc}, {}, {0xbb}, {0xaa}, {}, {0x99},
+						{0x16, 0x03, 0x03, 0x00, 0x09, 0x88},
+						{}, {0x77}, {0x66}, {}, {0x55}, {0x44}, {}, {0x33}, {0x22}, {}, {0x11}, {0x00},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+					},
+					expectWrCnt: 0,
+				},
+			},
+		},
+		{
+			name: "NoSplitForNonClientHello",
+			// invalid record type
+			in:   [][]byte{{0x17}, {0x03, 0x01}, {0x00, 0x06, 0xff}, {0xee, 0xdd, 0xcc}, {0xbb, 0xaa}},
+			frag: func(_ int) int { return 1 },
+			subCases: []subCase{
+				{
+					rfLenBeforeWr: []int{0, 1, 2, 3, 4},
+					expected: [][]byte{
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0x17, 0x03, 0x01, 0x00, 0x06},
+						{0xff}, {0xee, 0xdd, 0xcc}, {0xbb, 0xaa},
+					},
+					expectWrCnt: 4,
+				},
+				{
+					rfLenBeforeWr: []int{5},
+					expected: [][]byte{
+						{0x17, 0x03, 0x01, 0x00, 0x06},
+						{0xff}, {0xee, 0xdd, 0xcc}, {0xbb, 0xaa},
+					},
+					expectWrCnt: 3,
+				},
+				{
+					rfLenBeforeWr: []int{6},
+					expected: [][]byte{
+						{0x17, 0x03, 0x01, 0x00, 0x06, 0xff},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0xee, 0xdd, 0xcc}, {0xbb, 0xaa},
+					},
+					expectWrCnt: 2,
+				},
+				{
+					rfLenBeforeWr: []int{8},
+					expected: [][]byte{
+						{0x17, 0x03, 0x01, 0x00, 0x06, 0xff}, {0xee, 0xdd},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0xcc}, {0xbb, 0xaa},
+					},
+					expectWrCnt: 2,
+				},
+				{
+					rfLenBeforeWr: []int{10},
+					expected: [][]byte{
+						{0x17, 0x03, 0x01, 0x00, 0x06, 0xff}, {0xee, 0xdd, 0xcc}, {0xbb},
+						{}, // empty Read due to ReadFrom's MultiReader implementation
+						{0xaa},
+					},
+					expectWrCnt: 1,
+				},
+				{
+					rfLenBeforeWr: []int{11},
+					expected: [][]byte{
+						{0x17, 0x03, 0x01, 0x00, 0x06, 0xff}, {0xee, 0xdd, 0xcc}, {0xbb, 0xaa},
+						{}, // empty Read due to MultiReader implementation
+					},
+					expectWrCnt: 0,
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, subtc := range tc.subCases {
+				for _, rfLen := range subtc.rfLenBeforeWr {
+					subCaseName := fmt.Sprintf("ReadFrom_%d_BytesThenWrite", rfLen)
+					t.Run(subCaseName, func(t *testing.T) {
+						inner := &collectReaderFrom{}
+						w, err := NewRecordLenFuncWriter(inner, tc.frag)
+						require.NoError(t, err)
+						require.NotNil(t, w)
+						require.IsType(t, &fixedLenReaderFrom{}, w)
+						rf := w.(io.ReaderFrom)
+
+						src := newSourceReader(tc.in)
+						totalN := src.TotalLen()
+						nn, err := rf.ReadFrom(io.LimitReader(src, int64(rfLen)))
+						require.NoError(t, err)
+						require.Equal(t, int64(rfLen), nn)
+
+						nn, err = src.WriteTo(w)
+						require.NoError(t, err)
+						require.Equal(t, int64(totalN-rfLen), nn)
 
 						// All buf should come from ReadFrom calls
 						require.Equal(t, subtc.expected, inner.buf)
@@ -883,6 +1246,11 @@ func (r *slicesReader) Read(p []byte) (n int, err error) {
 		r.buf = r.buf[1:]
 	}
 	return
+}
+
+func (r *slicesReader) WriteTo(w io.Writer) (n int64, err error) {
+	v := net.Buffers(r.buf)
+	return v.WriteTo(w)
 }
 
 func (r *slicesReader) WriteToLimit(dst io.Writer, limit int) (n int, err error) {

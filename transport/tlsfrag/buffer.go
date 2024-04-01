@@ -94,7 +94,7 @@ func (b *clientHelloBuffer) ReadFrom(r io.Reader) (n int64, err error) {
 				b.validationErr = err
 				return
 			}
-			buf := make([]byte, 0, recordHeaderLen*2+hdr.GetPayloadLen())
+			buf := make([]byte, 0, recordHeaderLen*2+hdr.PayloadLen())
 			b.data = append(buf, b.data...)
 		}
 		if err = e; err != nil {

@@ -70,13 +70,13 @@ func (h tlsHandshakeRecordHeader) Validate() error {
 	if version != versionTLS10 && version != versionTLS11 && version != versionTLS12 && version != versionTLS13 {
 		return errors.New("invalid TLS version")
 	}
-	if len := h.GetPayloadLen(); len == 0 || len > maxRecordPayloadLen {
+	if len := h.PayloadLen(); len == 0 || len > maxRecordPayloadLen {
 		return errors.New("record length out of range")
 	}
 	return nil
 }
 
-func (h tlsHandshakeRecordHeader) GetPayloadLen() uint16 {
+func (h tlsHandshakeRecordHeader) PayloadLen() uint16 {
 	return binary.BigEndian.Uint16(h[3:5])
 }
 

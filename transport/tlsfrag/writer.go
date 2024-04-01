@@ -47,8 +47,8 @@ var _ io.Writer = (*clientHelloFragWriter)(nil)
 var _ io.Writer = (*clientHelloFragReaderFrom)(nil)
 var _ io.ReaderFrom = (*clientHelloFragReaderFrom)(nil)
 
-// NewWriter creates a [io.Writer] that splits the first TLS Client Hello record into two records based on the
-// provided [FragFunc] callback.
+// newClientHelloFragWriter creates a [io.Writer] that splits the first TLS Client Hello record into two records
+// based on the provided [FragFunc] callback.
 // It then writes these records and all subsequent messages to the base [io.Writer].
 // If the first message isn't a Client Hello, no splitting occurs and all messages are written directly to base.
 //
@@ -56,8 +56,8 @@ var _ io.ReaderFrom = (*clientHelloFragReaderFrom)(nil)
 // [io.Writer] implements [io.ReaderFrom].
 //
 // If you just want to split the record at a fixed position (e.g., always at the 5th byte or 2nd from the last
-// byte), use [NewFixedLenWriter]. It consumes less resources and is more efficient.
-func NewWriter(base io.Writer, frag FragFunc) (io.Writer, error) {
+// byte), use [NewRecordLenFuncWriter]. It consumes less resources and is more efficient.
+func newClientHelloFragWriter(base io.Writer, frag FragFunc) (io.Writer, error) {
 	if base == nil {
 		return nil, errors.New("base writer must not be nil")
 	}
