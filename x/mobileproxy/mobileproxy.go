@@ -20,6 +20,7 @@ package mobileproxy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -74,6 +75,11 @@ func (p *Proxy) Port() int {
 // The function associates the given 'dialer' with the specified 'path', allowing different dialers to be used for
 // different path-based proxies within the same application in the future. currently we only support one URL proxy.
 func (p *Proxy) AddURLProxy(path string, dialer *StreamDialer) {
+	if p.proxyHandler == nil {
+		// Called after Stop. Warn and ignore.
+		log.Println("Called Proxy.AddURLProxy after Stop")
+		return
+	}
 	if len(path) == 0 || path[0] != '/' {
 		path = "/" + path
 	}
@@ -92,6 +98,9 @@ func (p *Proxy) Stop(timeoutSeconds int) {
 		log.Fatalf("Failed to shutdown gracefully: %v", err)
 		p.server.Close()
 	}
+	// Allow garbage collection in case the user keeps holding a reference to the Proxy.
+	p.proxyHandler = nil
+	p.server = nil
 }
 
 // RunProxy runs a local web proxy that listens on localAddress, and handles proxy requests by
@@ -101,10 +110,25 @@ func RunProxy(localAddress string, dialer *StreamDialer) (*Proxy, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not listen on address %v: %v", localAddress, err)
 	}
+	if dialer == nil {
+		return nil, errors.New("dialer must not be nil. Please create and pass a valid StreamDialer")
+	}
 
+	// The default http.Server doesn't close hijacked connections or cancel in-flight request contexts during
+	// shutdown. This can lead to lingering connections. We'll create a base context, propagated to requests,
+	// that is cancelled on shutdown. This enables handlers to gracefully terminate requests and close connections.
+	serverCtx, cancelCtx := context.WithCancelCause(context.Background())
 	proxyHandler := httpproxy.NewProxyHandler(dialer)
 	proxyHandler.FallbackHandler = http.NotFoundHandler()
-	server := &http.Server{Handler: proxyHandler}
+	server := &http.Server{
+		Handler: proxyHandler,
+		BaseContext: func(l net.Listener) context.Context {
+			return serverCtx
+		},
+	}
+	server.RegisterOnShutdown(func() {
+		cancelCtx(errors.New("server stopped"))
+	})
 	go server.Serve(listener)
 
 	host, portStr, err := net.SplitHostPort(listener.Addr().String())
