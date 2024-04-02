@@ -114,12 +114,19 @@ func RunProxy(localAddress string, dialer *StreamDialer) (*Proxy, error) {
 		return nil, errors.New("dialer must not be nil. Please create and pass a valid StreamDialer")
 	}
 
-	stopDialer := &stopStreamDialer{Dialer: dialer}
-	proxyHandler := httpproxy.NewProxyHandler(stopDialer)
+	serverCtx, cancelCtx := context.WithCancelCause(context.Background())
+	proxyHandler := httpproxy.NewProxyHandler(dialer)
 	proxyHandler.FallbackHandler = http.NotFoundHandler()
-	server := &http.Server{Handler: proxyHandler}
+	server := &http.Server{
+		Handler: proxyHandler,
+		BaseContext: func(l net.Listener) context.Context {
+			return serverCtx
+		},
+	}
 	// Make sure all connections are stopped so they don't linger around.
-	server.RegisterOnShutdown(stopDialer.StopConnections)
+	server.RegisterOnShutdown(func() {
+		cancelCtx(errors.New("server stopped"))
+	})
 	go server.Serve(listener)
 
 	host, portStr, err := net.SplitHostPort(listener.Addr().String())

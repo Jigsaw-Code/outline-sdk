@@ -100,7 +100,15 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 		http.Error(proxyResp, "Failed to hijack connection", http.StatusInternalServerError)
 		return
 	}
-	defer httpConn.Close()
+	// TODO(fortuna): Use context.AfterFunc after we migrate to Go 1.21.
+	go func() {
+		// We close the hijacked connection when the context is done. This way
+		// we allow the HTTP server to control the request lifetime.
+		// The request context will be cancelled right after ServeHTTP returns,
+		// but it can be cancelled before, if the server uses a custom BaseContext.
+		<-proxyReq.Context().Done()
+		httpConn.Close()
+	}()
 
 	// Inform the client that the connection has been established.
 	clientRW.Write([]byte("HTTP/1.1 200 Connection established\r\n\r\n"))
@@ -113,7 +121,6 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 	}()
 	io.Copy(clientRW, targetConn)
 	clientRW.Flush()
-	// httpConn is closed by the defer httpConn.Close() above.
 }
 
 // NewConnectHandler creates a [http.Handler] that handles CONNECT requests and forwards
