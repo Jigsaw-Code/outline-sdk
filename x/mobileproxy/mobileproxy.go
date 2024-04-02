@@ -114,6 +114,9 @@ func RunProxy(localAddress string, dialer *StreamDialer) (*Proxy, error) {
 		return nil, errors.New("dialer must not be nil. Please create and pass a valid StreamDialer")
 	}
 
+	// The default http.Server doesn't close hijacked connections or cancel in-flight request contexts during
+	// shutdown. This can lead to lingering connections. We'll create a base context, propagated to requests,
+	// that is cancelled on shutdown. This enables handlers to gracefully terminate requests and close connections.
 	serverCtx, cancelCtx := context.WithCancelCause(context.Background())
 	proxyHandler := httpproxy.NewProxyHandler(dialer)
 	proxyHandler.FallbackHandler = http.NotFoundHandler()
@@ -123,7 +126,6 @@ func RunProxy(localAddress string, dialer *StreamDialer) (*Proxy, error) {
 			return serverCtx
 		},
 	}
-	// Make sure all client connections are stopped so they don't linger around.
 	server.RegisterOnShutdown(func() {
 		cancelCtx(errors.New("server stopped"))
 	})
