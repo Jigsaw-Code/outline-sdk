@@ -75,6 +75,11 @@ func (p *Proxy) Port() int {
 // The function associates the given 'dialer' with the specified 'path', allowing different dialers to be used for
 // different path-based proxies within the same application in the future. currently we only support one URL proxy.
 func (p *Proxy) AddURLProxy(path string, dialer *StreamDialer) {
+	if p.proxyHandler == nil {
+		// Called after Stop. Warn and ignore.
+		log.Println("Called Proxy.AddURLProxy after Stop")
+		return
+	}
 	if len(path) == 0 || path[0] != '/' {
 		path = "/" + path
 	}
@@ -93,7 +98,9 @@ func (p *Proxy) Stop(timeoutSeconds int) {
 		log.Fatalf("Failed to shutdown gracefully: %v", err)
 		p.server.Close()
 	}
+	// Allow garbage collection in case the user keeps holding a reference to the Proxy.
 	p.proxyHandler = nil
+	p.server = nil
 }
 
 // RunProxy runs a local web proxy that listens on localAddress, and handles proxy requests by
