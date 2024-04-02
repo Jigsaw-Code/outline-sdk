@@ -123,7 +123,7 @@ func RunProxy(localAddress string, dialer *StreamDialer) (*Proxy, error) {
 			return serverCtx
 		},
 	}
-	// Make sure all connections are stopped so they don't linger around.
+	// Make sure all client connections are stopped so they don't linger around.
 	server.RegisterOnShutdown(func() {
 		cancelCtx(errors.New("server stopped"))
 	})
