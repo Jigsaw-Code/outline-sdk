@@ -152,10 +152,12 @@ type StreamDialer struct {
 	transport.StreamDialer
 }
 
+var configParser = config.NewDefaultConfigParser()
+
 // NewStreamDialerFromConfig creates a [StreamDialer] based on the given config.
 // The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config#hdr-Config_Format.
 func NewStreamDialerFromConfig(transportConfig string) (*StreamDialer, error) {
-	dialer, err := config.NewStreamDialer(transportConfig)
+	dialer, err := configParser.WrapStreamDialer(&transport.TCPDialer{}, transportConfig)
 	if err != nil {
 		return nil, err
 	}

@@ -39,6 +39,8 @@ type OutlineDevice struct {
 	svrIP net.IP
 }
 
+var configParser = config.NewDefaultConfigParser()
+
 func NewOutlineDevice(transportConfig string) (od *OutlineDevice, err error) {
 	ip, err := resolveShadowsocksServerIPFromConfig(transportConfig)
 	if err != nil {
@@ -48,7 +50,7 @@ func NewOutlineDevice(transportConfig string) (od *OutlineDevice, err error) {
 		svrIP: ip,
 	}
 
-	if od.sd, err = config.NewStreamDialer(transportConfig); err != nil {
+	if od.sd, err = configParser.WrapStreamDialer(&transport.TCPDialer{}, transportConfig); err != nil {
 		return nil, fmt.Errorf("failed to create TCP dialer: %w", err)
 	}
 	if od.pp, err = newOutlinePacketProxy(transportConfig); err != nil {

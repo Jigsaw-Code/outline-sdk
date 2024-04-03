@@ -26,6 +26,87 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag"
 )
 
+type WrapStreamDialerFunc func(dialer transport.StreamDialer, wrapConfig *url.URL) (transport.StreamDialer, error)
+
+type WrapPacketDialerFunc func(dialer transport.PacketDialer, wrapConfig *url.URL) (transport.PacketDialer, error)
+
+type ConfigParser struct {
+	sdWrapers  map[string]WrapStreamDialerFunc
+	pdWrappers map[string]WrapPacketDialerFunc
+}
+
+func NewDefaultConfigParser() *ConfigParser {
+	p := new(ConfigParser)
+
+	// Please keep the list in alphabetical order.
+
+	p.AddStreamDialerWrapper("override", wrapStreamDialerWithOverride)
+	p.AddPacketDialerWrapper("override", wrapPacketDialerWithOverride)
+
+	p.AddStreamDialerWrapper("socks5", wrapStreamDialerWithSOCKS5)
+	p.AddPacketDialerWrapper("socks5", func(baseDialer transport.PacketDialer, wrapConfig *url.URL) (transport.PacketDialer, error) {
+		return nil, errors.New("socks5 is not supported for PacketDialers")
+	})
+
+	p.AddStreamDialerWrapper("split", func(baseDialer transport.StreamDialer, wrapConfig *url.URL) (transport.StreamDialer, error) {
+		prefixBytesStr := wrapConfig.Opaque
+		prefixBytes, err := strconv.Atoi(prefixBytesStr)
+		if err != nil {
+			return nil, fmt.Errorf("prefixBytes is not a number: %v. Split config should be in split:<number> format", prefixBytesStr)
+		}
+		return split.NewStreamDialer(baseDialer, int64(prefixBytes))
+	})
+	p.AddPacketDialerWrapper("split", func(baseDialer transport.PacketDialer, wrapConfig *url.URL) (transport.PacketDialer, error) {
+		return nil, errors.New("split is not supported for PacketDialers")
+	})
+
+	p.AddStreamDialerWrapper("ss", wrapStreamDialerWithShadowsocks)
+	p.AddPacketDialerWrapper("ss", wrapPacketDialerWithShadowsocks)
+
+	p.AddStreamDialerWrapper("tls", wrapStreamDialerWithTLS)
+	p.AddPacketDialerWrapper("tls", func(baseDialer transport.PacketDialer, wrapConfig *url.URL) (transport.PacketDialer, error) {
+		return nil, errors.New("tls is not supported for PacketDialers")
+	})
+
+	p.AddStreamDialerWrapper("tlsfrag", func(baseDialer transport.StreamDialer, wrapConfig *url.URL) (transport.StreamDialer, error) {
+		lenStr := wrapConfig.Opaque
+		fixedLen, err := strconv.Atoi(lenStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid tlsfrag option: %v. It should be in tlsfrag:<number> format", lenStr)
+		}
+		return tlsfrag.NewFixedLenStreamDialer(baseDialer, fixedLen)
+	})
+	p.AddPacketDialerWrapper("tlsfrag", func(baseDialer transport.PacketDialer, wrapConfig *url.URL) (transport.PacketDialer, error) {
+		return nil, errors.New("tlsfrag is not supported for PacketDialers")
+	})
+
+	return p
+}
+
+func (p *ConfigParser) AddStreamDialerWrapper(subtype string, wrapper WrapStreamDialerFunc) error {
+	if p.sdWrapers == nil {
+		p.sdWrapers = make(map[string]WrapStreamDialerFunc)
+	}
+
+	if _, found := p.sdWrapers[subtype]; found {
+		return fmt.Errorf("config parser %v added twice", subtype)
+	}
+	p.sdWrapers[subtype] = wrapper
+	return nil
+}
+
+func (p *ConfigParser) AddPacketDialerWrapper(subtype string, wrapper WrapPacketDialerFunc) error {
+	if p.pdWrappers == nil {
+		p.pdWrappers = make(map[string]WrapPacketDialerFunc)
+	}
+
+	if _, found := p.pdWrappers[subtype]; found {
+		return fmt.Errorf("config parser %v added twice", subtype)
+	}
+	p.pdWrappers[subtype] = wrapper
+	return nil
+}
+
 func parseConfigPart(oneDialerConfig string) (*url.URL, error) {
 	oneDialerConfig = strings.TrimSpace(oneDialerConfig)
 	if oneDialerConfig == "" {
@@ -42,14 +123,9 @@ func parseConfigPart(oneDialerConfig string) (*url.URL, error) {
 	return url, nil
 }
 
-// NewStreamDialer creates a new [transport.StreamDialer] according to the given config.
-func NewStreamDialer(transportConfig string) (transport.StreamDialer, error) {
-	return WrapStreamDialer(&transport.TCPDialer{}, transportConfig)
-}
-
-// WrapStreamDialer created a [transport.StreamDialer] according to transportConfig, using dialer as the
+// WrapStreamDialer creates a [transport.StreamDialer] according to transportConfig, using dialer as the
 // base [transport.StreamDialer]. The given dialer must not be nil.
-func WrapStreamDialer(dialer transport.StreamDialer, transportConfig string) (transport.StreamDialer, error) {
+func (p *ConfigParser) WrapStreamDialer(dialer transport.StreamDialer, transportConfig string) (transport.StreamDialer, error) {
 	if dialer == nil {
 		return nil, errors.New("base dialer must not be nil")
 	}
@@ -57,9 +133,16 @@ func WrapStreamDialer(dialer transport.StreamDialer, transportConfig string) (tr
 	if transportConfig == "" {
 		return dialer, nil
 	}
-	var err error
 	for _, part := range strings.Split(transportConfig, "|") {
-		dialer, err = newStreamDialerFromPart(dialer, part)
+		url, err := parseConfigPart(part)
+		if err != nil {
+			return nil, err
+		}
+		w, ok := p.sdWrapers[url.Scheme]
+		if !ok {
+			return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
+		}
+		dialer, err = w(dialer, url)
 		if err != nil {
 			return nil, err
 		}
@@ -67,56 +150,26 @@ func WrapStreamDialer(dialer transport.StreamDialer, transportConfig string) (tr
 	return dialer, nil
 }
 
-func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig string) (transport.StreamDialer, error) {
-	url, err := parseConfigPart(oneDialerConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse config part: %w", err)
+// WrapPacketDialer creates a [transport.PacketDialer] according to transportConfig, using dialer as the
+// base [transport.PacketDialer]. The given dialer must not be nil.
+func (p *ConfigParser) WrapPacketDialer(dialer transport.PacketDialer, transportConfig string) (transport.PacketDialer, error) {
+	if dialer == nil {
+		return nil, errors.New("base dialer must not be nil")
 	}
-
-	// Please keep scheme list sorted.
-	switch strings.ToLower(url.Scheme) {
-	case "override":
-		return newOverrideStreamDialerFromURL(innerDialer, url)
-
-	case "socks5":
-		return newSOCKS5StreamDialerFromURL(innerDialer, url)
-
-	case "split":
-		prefixBytesStr := url.Opaque
-		prefixBytes, err := strconv.Atoi(prefixBytesStr)
-		if err != nil {
-			return nil, fmt.Errorf("prefixBytes is not a number: %v. Split config should be in split:<number> format", prefixBytesStr)
-		}
-		return split.NewStreamDialer(innerDialer, int64(prefixBytes))
-
-	case "ss":
-		return newShadowsocksStreamDialerFromURL(innerDialer, url)
-
-	case "tls":
-		return newTlsStreamDialerFromURL(innerDialer, url)
-
-	case "tlsfrag":
-		lenStr := url.Opaque
-		fixedLen, err := strconv.Atoi(lenStr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid tlsfrag option: %v. It should be in tlsfrag:<number> format", lenStr)
-		}
-		return tlsfrag.NewFixedLenStreamDialer(innerDialer, fixedLen)
-
-	default:
-		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
-	}
-}
-
-// NewPacketDialer creates a new [transport.PacketDialer] according to the given config.
-func NewPacketDialer(transportConfig string) (dialer transport.PacketDialer, err error) {
-	dialer = &transport.UDPDialer{}
 	transportConfig = strings.TrimSpace(transportConfig)
 	if transportConfig == "" {
 		return dialer, nil
 	}
 	for _, part := range strings.Split(transportConfig, "|") {
-		dialer, err = newPacketDialerFromPart(dialer, part)
+		url, err := parseConfigPart(part)
+		if err != nil {
+			return nil, err
+		}
+		w, ok := p.pdWrappers[url.Scheme]
+		if !ok {
+			return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
+		}
+		dialer, err = w(dialer, url)
 		if err != nil {
 			return nil, err
 		}
@@ -124,36 +177,9 @@ func NewPacketDialer(transportConfig string) (dialer transport.PacketDialer, err
 	return dialer, nil
 }
 
-func newPacketDialerFromPart(innerDialer transport.PacketDialer, oneDialerConfig string) (transport.PacketDialer, error) {
-	url, err := parseConfigPart(oneDialerConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse config part: %w", err)
-	}
-
-	// Please keep scheme list sorted.
-	switch strings.ToLower(url.Scheme) {
-	case "override":
-		return newOverridePacketDialerFromURL(innerDialer, url)
-
-	case "socks5":
-		return nil, errors.New("socks5 is not supported for PacketDialers")
-
-	case "split":
-		return nil, errors.New("split is not supported for PacketDialers")
-
-	case "ss":
-		return newShadowsocksPacketDialerFromURL(innerDialer, url)
-
-	case "tls":
-		return nil, errors.New("tls is not yet supported for PacketDialers")
-
-	default:
-		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
-	}
-}
-
 // NewpacketListener creates a new [transport.PacketListener] according to the given config,
 // the config must contain only one "ss://" segment.
+// TODO: make NewPacketListener configurable.
 func NewPacketListener(transportConfig string) (transport.PacketListener, error) {
 	if transportConfig = strings.TrimSpace(transportConfig); transportConfig == "" {
 		return nil, errors.New("config is required")
