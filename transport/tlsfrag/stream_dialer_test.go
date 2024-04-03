@@ -241,12 +241,10 @@ func constructTLSRecordWithLen(t *testing.T, typ layers.TLSType, ver layers.TLSV
 
 // collectStreamDialer collects all writes to this stream dialer and append it to bufs
 type collectStreamDialer struct {
-	bufs        net.Buffers
-	activeConns int
+	bufs net.Buffers
 }
 
 func (d *collectStreamDialer) DialStream(ctx context.Context, raddr string) (transport.StreamConn, error) {
-	d.activeConns++
 	return d, nil
 }
 
@@ -256,7 +254,7 @@ func (c *collectStreamDialer) Write(p []byte) (int, error) {
 }
 
 func (c *collectStreamDialer) Read(p []byte) (int, error)         { return 0, errors.New("not supported") }
-func (c *collectStreamDialer) Close() error                       { c.activeConns--; return nil }
+func (c *collectStreamDialer) Close() error                       { return nil }
 func (c *collectStreamDialer) CloseRead() error                   { return nil }
 func (c *collectStreamDialer) CloseWrite() error                  { return nil }
 func (c *collectStreamDialer) LocalAddr() net.Addr                { return nil }
