@@ -52,6 +52,10 @@ func (dc *duplexConnAdaptor) Write(b []byte) (int, error) {
 	return dc.w.Write(b)
 }
 func (dc *duplexConnAdaptor) ReadFrom(r io.Reader) (int64, error) {
+	// Make sure we prefer ReadFrom. Otherwise io.Copy will try WriteTo first.
+	if rf, ok := r.(io.ReaderFrom); ok {
+		return rf.ReadFrom(r)
+	}
 	return io.Copy(dc.w, r)
 }
 func (dc *duplexConnAdaptor) CloseWrite() error {
