@@ -181,8 +181,6 @@ func main() {
 			if err != nil {
 				log.Printf("Failed to start local proxy server: %v\n", err)
 			}
-			log.Printf("Proxy started on %v\n", proxy.Address)
-			log.Printf("Transport config: %v\n", configEntry.Text)
 			host, port, err := net.SplitHostPort(addressEntry.Text)
 			if err != nil {
 				log.Printf("Failed to parse address: %v\n", err)
@@ -190,13 +188,13 @@ func main() {
 			// Set system-wide proxy settings
 			err = sysproxy.SetWebProxy(host, port)
 			if err != nil {
-				log.Printf("Failed to set web proxy: %v\n", err)
+				log.Printf("Failed to set system wide web proxy settings: %v\n", err)
 			}
 		} else {
 			// Disable system-wide proxy
 			err := sysproxy.DisableWebProxy()
 			if err != nil {
-				log.Printf("Failed to disable web proxy: %v\n", err)
+				log.Printf("Failed to disable system-wide web proxy: %v\n", err)
 			}
 			// Stop proxy
 			proxy.Close()
