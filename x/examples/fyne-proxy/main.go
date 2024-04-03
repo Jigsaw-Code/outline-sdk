@@ -32,6 +32,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
+	"github.com/Jigsaw-Code/outline-sdk/x/sysproxy"
 )
 
 type runningProxy struct {
@@ -126,6 +127,7 @@ func makeAppHeader(title string) *fyne.Container {
 }
 
 func main() {
+	defer sysproxy.DisableWebProxy()
 	fyneApp := app.New()
 	if meta := fyneApp.Metadata(); meta.Name == "" {
 		// App not packaged, probably from `go run`.
@@ -176,7 +178,26 @@ func main() {
 		if proxy == nil {
 			// Start proxy.
 			proxy, err = runServer(addressEntry.Text, configEntry.Text)
+			if err != nil {
+				log.Printf("Failed to start local proxy server: %v\n", err)
+			}
+			log.Printf("Proxy started on %v\n", proxy.Address)
+			log.Printf("Transport config: %v\n", configEntry.Text)
+			host, port, err := net.SplitHostPort(addressEntry.Text)
+			if err != nil {
+				log.Printf("Failed to parse address: %v\n", err)
+			}
+			// Set system-wide proxy settings
+			err = sysproxy.SetWebProxy(host, port)
+			if err != nil {
+				log.Printf("Failed to set web proxy: %v\n", err)
+			}
 		} else {
+			// Disable system-wide proxy
+			err := sysproxy.DisableWebProxy()
+			if err != nil {
+				log.Printf("Failed to disable web proxy: %v\n", err)
+			}
 			// Stop proxy
 			proxy.Close()
 			proxy = nil
