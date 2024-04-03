@@ -45,10 +45,10 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/toml v1.3.2 h1:o7IhLm0Msx3BaB+n3Ag7L8EVlByGnpq14C4YWiu/gL8=
 github.com/BurntSushi/toml v1.3.2/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/Jigsaw-Code/outline-sdk v0.0.16-0.20240403194323-6f484982dd29 h1:6YnKkvRuHqDBZh9XLNpwFFppd9AuQoxPHtrssOjOQtc=
-github.com/Jigsaw-Code/outline-sdk v0.0.16-0.20240403194323-6f484982dd29/go.mod h1:e1oQZbSdLJBBuHgfeQsgEkvkuyIePPwstUeZRGq0KO8=
-github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20240402154916-48d8a48b34a6 h1:KzRqYjYoSPY0AZSpciZIo3fZg4OaAc+5V7M/mT5MsSw=
-github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20240402154916-48d8a48b34a6/go.mod h1:T5tJAyU0t+RIgWBvHkEzxHAgLAkCanEy8N7L4HY9Nhs=
+github.com/Jigsaw-Code/outline-sdk v0.0.15 h1:2OfYum4vllfIgoDa/X9drA2I57knXFPREv4kMZkjTuI=
+github.com/Jigsaw-Code/outline-sdk v0.0.15/go.mod h1:e1oQZbSdLJBBuHgfeQsgEkvkuyIePPwstUeZRGq0KO8=
+github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20240403194323-6f484982dd29 h1:5OBgxtktCAAv3pVl0DmoyqI9YBAl1+6rcu9wR9VFYCQ=
+github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20240403194323-6f484982dd29/go.mod h1:T5tJAyU0t+RIgWBvHkEzxHAgLAkCanEy8N7L4HY9Nhs=
 github.com/akavel/rsrc v0.10.2 h1:Zxm8V5eI1hW4gGaYsJQUhxpjkENuG91ki8B4zCrvEsw=
 github.com/akavel/rsrc v0.10.2/go.mod h1:uLoCtb9J+EyAqh+26kdrTgmzRBFPGOolLWKpdxkKq+c=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=

@@ -4,8 +4,8 @@ go 1.20
 
 require (
 	fyne.io/fyne/v2 v2.4.3
-	github.com/Jigsaw-Code/outline-sdk v0.0.16-0.20240403194323-6f484982dd29
-	github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20240402154916-48d8a48b34a6
+	github.com/Jigsaw-Code/outline-sdk v0.0.15
+	github.com/Jigsaw-Code/outline-sdk/x v0.0.0-20240403194323-6f484982dd29
 )
 
 require (
