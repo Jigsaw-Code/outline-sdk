@@ -26,29 +26,28 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag"
 )
 
-type WrapStreamDialerFunc func(dialer transport.StreamDialer, wrapConfig *url.URL) (transport.StreamDialer, error)
-
-type WrapPacketDialerFunc func(dialer transport.PacketDialer, wrapConfig *url.URL) (transport.PacketDialer, error)
-
+// ConfigParser enables the creation of stream and packet dialers based on a config. The config is
+// extensible by registering wrappers for config subtypes.
 type ConfigParser struct {
 	sdWrapers  map[string]WrapStreamDialerFunc
 	pdWrappers map[string]WrapPacketDialerFunc
 }
 
+// NewDefaultConfigParser creates a [ConfigParser] with a set of default wrappers already registered.
 func NewDefaultConfigParser() *ConfigParser {
 	p := new(ConfigParser)
 
 	// Please keep the list in alphabetical order.
 
-	p.AddStreamDialerWrapper("override", wrapStreamDialerWithOverride)
-	p.AddPacketDialerWrapper("override", wrapPacketDialerWithOverride)
+	p.RegisterStreamDialerWrapper("override", wrapStreamDialerWithOverride)
+	p.RegisterPacketDialerWrapper("override", wrapPacketDialerWithOverride)
 
-	p.AddStreamDialerWrapper("socks5", wrapStreamDialerWithSOCKS5)
-	p.AddPacketDialerWrapper("socks5", func(baseDialer transport.PacketDialer, wrapConfig *url.URL) (transport.PacketDialer, error) {
+	p.RegisterStreamDialerWrapper("socks5", wrapStreamDialerWithSOCKS5)
+	p.RegisterPacketDialerWrapper("socks5", func(baseDialer transport.PacketDialer, wrapConfig *url.URL) (transport.PacketDialer, error) {
 		return nil, errors.New("socks5 is not supported for PacketDialers")
 	})
 
-	p.AddStreamDialerWrapper("split", func(baseDialer transport.StreamDialer, wrapConfig *url.URL) (transport.StreamDialer, error) {
+	p.RegisterStreamDialerWrapper("split", func(baseDialer transport.StreamDialer, wrapConfig *url.URL) (transport.StreamDialer, error) {
 		prefixBytesStr := wrapConfig.Opaque
 		prefixBytes, err := strconv.Atoi(prefixBytesStr)
 		if err != nil {
@@ -56,19 +55,19 @@ func NewDefaultConfigParser() *ConfigParser {
 		}
 		return split.NewStreamDialer(baseDialer, int64(prefixBytes))
 	})
-	p.AddPacketDialerWrapper("split", func(baseDialer transport.PacketDialer, wrapConfig *url.URL) (transport.PacketDialer, error) {
+	p.RegisterPacketDialerWrapper("split", func(baseDialer transport.PacketDialer, wrapConfig *url.URL) (transport.PacketDialer, error) {
 		return nil, errors.New("split is not supported for PacketDialers")
 	})
 
-	p.AddStreamDialerWrapper("ss", wrapStreamDialerWithShadowsocks)
-	p.AddPacketDialerWrapper("ss", wrapPacketDialerWithShadowsocks)
+	p.RegisterStreamDialerWrapper("ss", wrapStreamDialerWithShadowsocks)
+	p.RegisterPacketDialerWrapper("ss", wrapPacketDialerWithShadowsocks)
 
-	p.AddStreamDialerWrapper("tls", wrapStreamDialerWithTLS)
-	p.AddPacketDialerWrapper("tls", func(baseDialer transport.PacketDialer, wrapConfig *url.URL) (transport.PacketDialer, error) {
+	p.RegisterStreamDialerWrapper("tls", wrapStreamDialerWithTLS)
+	p.RegisterPacketDialerWrapper("tls", func(baseDialer transport.PacketDialer, wrapConfig *url.URL) (transport.PacketDialer, error) {
 		return nil, errors.New("tls is not supported for PacketDialers")
 	})
 
-	p.AddStreamDialerWrapper("tlsfrag", func(baseDialer transport.StreamDialer, wrapConfig *url.URL) (transport.StreamDialer, error) {
+	p.RegisterStreamDialerWrapper("tlsfrag", func(baseDialer transport.StreamDialer, wrapConfig *url.URL) (transport.StreamDialer, error) {
 		lenStr := wrapConfig.Opaque
 		fixedLen, err := strconv.Atoi(lenStr)
 		if err != nil {
@@ -76,14 +75,18 @@ func NewDefaultConfigParser() *ConfigParser {
 		}
 		return tlsfrag.NewFixedLenStreamDialer(baseDialer, fixedLen)
 	})
-	p.AddPacketDialerWrapper("tlsfrag", func(baseDialer transport.PacketDialer, wrapConfig *url.URL) (transport.PacketDialer, error) {
+	p.RegisterPacketDialerWrapper("tlsfrag", func(baseDialer transport.PacketDialer, wrapConfig *url.URL) (transport.PacketDialer, error) {
 		return nil, errors.New("tlsfrag is not supported for PacketDialers")
 	})
 
 	return p
 }
 
-func (p *ConfigParser) AddStreamDialerWrapper(subtype string, wrapper WrapStreamDialerFunc) error {
+// WrapStreamDialerFunc wraps a [transport.StreamDialer] based on the wrapConfig.
+type WrapStreamDialerFunc func(dialer transport.StreamDialer, wrapConfig *url.URL) (transport.StreamDialer, error)
+
+// RegisterStreamDialerWrapper will register a wrapper for stream dialers under the given subtype.
+func (p *ConfigParser) RegisterStreamDialerWrapper(subtype string, wrapper WrapStreamDialerFunc) error {
 	if p.sdWrapers == nil {
 		p.sdWrapers = make(map[string]WrapStreamDialerFunc)
 	}
@@ -95,7 +98,11 @@ func (p *ConfigParser) AddStreamDialerWrapper(subtype string, wrapper WrapStream
 	return nil
 }
 
-func (p *ConfigParser) AddPacketDialerWrapper(subtype string, wrapper WrapPacketDialerFunc) error {
+// WrapPacketDialerFunc wraps a [transport.PacketDialer] based on the wrapConfig.
+type WrapPacketDialerFunc func(dialer transport.PacketDialer, wrapConfig *url.URL) (transport.PacketDialer, error)
+
+// RegisterPacketDialerWrapper will register a wrapper for packet dialers under the given subtype.
+func (p *ConfigParser) RegisterPacketDialerWrapper(subtype string, wrapper WrapPacketDialerFunc) error {
 	if p.pdWrappers == nil {
 		p.pdWrappers = make(map[string]WrapPacketDialerFunc)
 	}
