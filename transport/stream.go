@@ -52,6 +52,10 @@ func (dc *duplexConnAdaptor) Write(b []byte) (int, error) {
 	return dc.w.Write(b)
 }
 func (dc *duplexConnAdaptor) ReadFrom(r io.Reader) (int64, error) {
+	if rf, ok := dc.w.(io.ReaderFrom); ok {
+		// prefer dc.w.ReadFrom to r.WriteTo
+		return rf.ReadFrom(r)
+	}
 	return io.Copy(dc.w, r)
 }
 func (dc *duplexConnAdaptor) CloseWrite() error {
@@ -151,4 +155,30 @@ var _ StreamDialer = (*FuncStreamDialer)(nil)
 // DialStream implements the [StreamDialer] interface.
 func (f FuncStreamDialer) DialStream(ctx context.Context, addr string) (StreamConn, error) {
 	return f(ctx, addr)
+}
+
+// WrapConnFuncStreamDialer is a [StreamDialer] that uses the WrapConn function to wrap the [StreamConn]
+// dialed by the Dialer.
+type WrapConnFuncStreamDialer struct {
+	Dialer   StreamDialer
+	WrapConn func(StreamConn) (StreamConn, error)
+}
+
+var _ StreamDialer = (*WrapConnFuncStreamDialer)(nil)
+
+// DialStream implements the [StreamDialer] interface.
+func (wc *WrapConnFuncStreamDialer) DialStream(ctx context.Context, raddr string) (StreamConn, error) {
+	baseConn, err := wc.Dialer.DialStream(ctx, raddr)
+	if err != nil {
+		return nil, err
+	}
+	if wc.WrapConn == nil {
+		return baseConn, err
+	}
+	conn, err := wc.WrapConn(baseConn)
+	if err != nil {
+		baseConn.Close()
+		return nil, err
+	}
+	return conn, nil
 }

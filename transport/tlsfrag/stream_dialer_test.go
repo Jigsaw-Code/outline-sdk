@@ -185,16 +185,6 @@ func TestNestedFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 	require.Equal(t, expected, inner.bufs)
 }
 
-// Make sure there are no connection leakage in DialStream
-func TestDialStreamCloseInnerConnOnError(t *testing.T) {
-	inner := &collectStreamDialer{}
-	d := &tlsFragDialer{inner, nil}
-	conn, err := d.DialStream(context.Background(), "127.0.0.1:8888")
-	require.Error(t, err)
-	require.Nil(t, conn)
-	require.Zero(t, inner.activeConns)
-}
-
 // test assertions
 
 func assertCanDialFragFunc(t *testing.T, inner transport.StreamDialer, raddr string, frag FragFunc) transport.StreamConn {
