@@ -119,7 +119,10 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 		io.Copy(targetConn, clientRW)
 		targetConn.CloseWrite()
 	}()
-	io.Copy(clientRW, targetConn)
+	// We can't use io.Copy here because it doesn't call Flush on writes, so the first
+	// write is never sent and the entire relay gets stuck. bufio.Writer.ReadFrom takes
+	// care of that.
+	clientRW.ReadFrom(targetConn)
 	clientRW.Flush()
 }
 
