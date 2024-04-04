@@ -15,8 +15,10 @@
 package tlsfrag
 
 import (
+	"bytes"
 	"errors"
 	"io"
+	"net"
 )
 
 // RecordLenFragFunc takes the length of the first [handshake record]'s content (without the 5-byte header),
@@ -98,34 +100,39 @@ func (w *recordLenFragWriter) Write(p []byte) (n int, err error) {
 		if !w.done && w.r1Written < w.r1Size {
 			var m int
 			if w.r1Written < recordHeaderLen {
-				// write the first record's header
-				m, err = w.base.Write(w.tlsHdr[w.r1Written:recordHeaderLen])
-				if w.r1Written += m; w.r1Written < recordHeaderLen || err != nil || len(p) == 0 {
-					return
-				}
+				var hn int
+				hn, m, err = writeBothN(w.base, w.tlsHdr[w.r1Written:recordHeaderLen], p, w.r1Size)
+				w.r1Written += hn + m
+			} else {
+				m, err = writeN(w.base, p, w.r1Size-w.r1Written)
+				w.r1Written += m
 			}
-
-			// write the first record's remaining payload
-			m, err = writeN(w.base, p, w.r1Size-w.r1Written)
-			w.r1Written += m
 			n += m
 			p = p[m:]
-
-			if w.r1Written == w.r1Size {
-				// update w.tlsHdr (aliases w.hdr) to the second record's header
-				w.tlsHdr.SetPayloadLen(uint16(w.r2Size - recordHeaderLen))
-				w.done = true
+			if w.r1Written < w.r1Size {
+				return
 			}
-			if w.r1Written < w.r1Size || err != nil {
+
+			// update w.tlsHdr (aliases w.hdr) to the second record's header
+			w.tlsHdr.SetPayloadLen(uint16(w.r2Size - recordHeaderLen))
+			w.done = true
+			if err != nil {
 				return
 			}
 		}
 	}
 
 	if len(w.hdr) > 0 {
-		m, e := w.base.Write(w.hdr)
-		w.hdr = w.hdr[m:]
-		if err = e; err != nil || len(w.hdr) > 0 || len(p) == 0 {
+		// Internally writeBoth might copy p to a temporary buffer, if p is too big
+		// This is wasting CPU and memory, so we limit the maximum buffer size to be 16K
+		// which would be way more enough than a single TLS Client Hello record.
+		const MTU = 1 << 14
+		hn, m, e := writeBothN(w.base, w.hdr, p, MTU)
+
+		w.hdr = w.hdr[hn:]
+		n += m
+		p = p[m:]
+		if err = e; err != nil || len(p) == 0 {
 			return
 		}
 	}
@@ -274,4 +281,50 @@ func writeN(dst io.Writer, p []byte, limit int) (int, error) {
 		p = p[:limit]
 	}
 	return dst.Write(p)
+}
+
+// writeBoth writes both p1 and p2 to dst in a single Write or writev call.
+// It returns the number of bytes that are written from p1 and p2, respectively.
+//
+// Issuing a single Write or writev call to dst is required because otherwise dst
+// will receive two TCP packets, which introduces unwanted TCP split.
+//
+// Performance note, internally we might allocate a temporary buffer and copy the
+// data from p1 and p2 to that buffer, please be careful about the data size.
+func writeBoth(dst io.Writer, p1 []byte, p2 []byte) (int, int, error) {
+	var nn int64
+	var err error
+
+	if _, ok := dst.(*net.TCPConn); ok {
+		// If the underlying writer implements writev system call
+		// UDPConn and IPConn also implement writev, but TLS is TCP so we only care about TCP
+		buf := net.Buffers{p1, p2}
+		nn, err = buf.WriteTo(dst)
+	} else {
+		// We must allocate temporary buffer to hold both content and issue a single Write.
+		// This will add some pressure to GC because the temporary buffer will escape to heap.
+		// Go's proposal of memory arena can be a remedy, but the proposal is on hold indefinitely.
+		buf := bytes.NewBuffer(make([]byte, 0, len(p1)+len(p2)))
+		buf.Write(p1)
+		buf.Write(p2)
+		nn, err = buf.WriteTo(dst)
+	}
+
+	if n := int(nn); n <= len(p1) {
+		return n, 0, err
+	} else {
+		return len(p1), n - len(p1), err
+	}
+}
+
+// writeBothN writes at most limit bytes from p1 and p2 to dst in a single Write orwritev call.
+// It returns the number of bytes that are written from p1 and p2, respectively.
+func writeBothN(dst io.Writer, p1 []byte, p2 []byte, limit int) (int, int, error) {
+	if limit <= len(p1) {
+		n, err := writeN(dst, p1, limit)
+		return n, 0, err
+	} else if len(p1)+len(p2) > limit {
+		p2 = p2[:limit-len(p1)]
+	}
+	return writeBoth(dst, p1, p2)
 }
