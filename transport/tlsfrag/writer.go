@@ -113,6 +113,8 @@ func (w *clientHelloFragWriter) Write(p []byte) (n int, err error) {
 // If the first packet is not a valid TLS Client Hello, everything from r gets copied to the base io.Writer as is.
 //
 // It returns the number of bytes read. Any error except EOF encountered during the read is also returned.
+//
+// ReadFrom will hang indefinitely if r provides fewer than 5 bytes and doesn't return the io.EOF error (e.g., "PING").
 func (w *clientHelloFragReaderFrom) ReadFrom(r io.Reader) (n int64, err error) {
 	if !w.done {
 		// not yet splitted, append to the buffer

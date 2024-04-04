@@ -77,32 +77,32 @@ func (b *clientHelloBuffer) Write(p []byte) (int, error) {
 // If this buffer still requires more data to build a complete TLS Client Hello message, it returns nil error.
 //
 // You can call ReadFrom multiple times if r doesn't provide enough data to build a complete Client Hello packet.
+//
+// ReadFrom will hang indefinitely if r provides fewer than 5 bytes and doesn't return the io.EOF error (e.g., "PING").
 func (b *clientHelloBuffer) ReadFrom(r io.Reader) (n int64, err error) {
 	// Waiting to finish the header of 5 bytes
-	for len(b.data) < recordHeaderLen {
-		m, e := r.Read(b.data[len(b.data):recordHeaderLen])
+	if len(b.data) < recordHeaderLen {
+		m, e := io.ReadFull(r, b.data[len(b.data):recordHeaderLen])
 		b.data = b.data[:len(b.data)+m]
 		n += int64(m)
-
-		if len(b.data) == recordHeaderLen {
-			hdr, e := newTLSHandshakeRecordHeader(b.data)
-			if e != nil {
-				b.validationErr = e
-				return
-			}
-			if err = hdr.Validate(); err != nil {
-				b.validationErr = err
-				return
-			}
-			buf := make([]byte, 0, recordHeaderLen*2+hdr.PayloadLen())
-			b.data = append(buf, b.data...)
-		}
 		if err = e; err != nil {
-			if err == io.EOF {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				err = nil
 			}
 			return
 		}
+
+		hdr, e := newTLSHandshakeRecordHeader(b.data)
+		if err = e; err != nil {
+			b.validationErr = err
+			return
+		}
+		if err = hdr.Validate(); err != nil {
+			b.validationErr = err
+			return
+		}
+		buf := make([]byte, 0, recordHeaderLen*2+hdr.PayloadLen())
+		b.data = append(buf, b.data...)
 	}
 
 	// If the buffer is already invalid
