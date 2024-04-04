@@ -156,29 +156,3 @@ var _ StreamDialer = (*FuncStreamDialer)(nil)
 func (f FuncStreamDialer) DialStream(ctx context.Context, addr string) (StreamConn, error) {
 	return f(ctx, addr)
 }
-
-// WrapConnFuncStreamDialer is a [StreamDialer] that uses the WrapConn function to wrap the [StreamConn]
-// dialed by the Dialer.
-type WrapConnFuncStreamDialer struct {
-	Dialer   StreamDialer
-	WrapConn func(StreamConn) (StreamConn, error)
-}
-
-var _ StreamDialer = (*WrapConnFuncStreamDialer)(nil)
-
-// DialStream implements the [StreamDialer] interface.
-func (wc *WrapConnFuncStreamDialer) DialStream(ctx context.Context, raddr string) (StreamConn, error) {
-	baseConn, err := wc.Dialer.DialStream(ctx, raddr)
-	if err != nil {
-		return nil, err
-	}
-	if wc.WrapConn == nil {
-		return baseConn, err
-	}
-	conn, err := wc.WrapConn(baseConn)
-	if err != nil {
-		baseConn.Close()
-		return nil, err
-	}
-	return conn, nil
-}

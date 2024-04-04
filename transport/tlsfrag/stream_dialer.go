@@ -15,6 +15,7 @@
 package tlsfrag
 
 import (
+	"context"
 	"errors"
 	"io"
 
@@ -47,12 +48,18 @@ func NewStreamDialerFunc(base transport.StreamDialer, frag FragFunc) (transport.
 	if frag == nil {
 		return nil, errors.New("frag function must not be nil")
 	}
-	return &transport.WrapConnFuncStreamDialer{
-		Dialer: base,
-		WrapConn: func(conn transport.StreamConn) (transport.StreamConn, error) {
-			return WrapConnFragFunc(conn, frag)
-		},
-	}, nil
+	return transport.FuncStreamDialer(func(ctx context.Context, raddr string) (transport.StreamConn, error) {
+		baseConn, err := base.DialStream(ctx, raddr)
+		if err != nil {
+			return nil, err
+		}
+		conn, err := WrapConnFragFunc(baseConn, frag)
+		if err != nil {
+			baseConn.Close()
+			return nil, err
+		}
+		return conn, nil
+	}), nil
 }
 
 // WrapConnFragFunc wraps the base [transport.StreamConn] and splits the first TLS Client Hello packet into two records
@@ -84,12 +91,18 @@ func NewFixedLenStreamDialer(base transport.StreamDialer, splitLen int) (transpo
 	if splitLen == 0 {
 		return base, nil
 	}
-	return &transport.WrapConnFuncStreamDialer{
-		Dialer: base,
-		WrapConn: func(conn transport.StreamConn) (transport.StreamConn, error) {
-			return WrapConnFixedLen(conn, splitLen)
-		},
-	}, nil
+	return transport.FuncStreamDialer(func(ctx context.Context, raddr string) (transport.StreamConn, error) {
+		baseConn, err := base.DialStream(ctx, raddr)
+		if err != nil {
+			return nil, err
+		}
+		conn, err := WrapConnFixedLen(baseConn, splitLen)
+		if err != nil {
+			baseConn.Close()
+			return nil, err
+		}
+		return conn, nil
+	}), nil
 }
 
 // WrapConnFixedLen wraps the base [transport.StreamConn] and splits the first TLS Client Hello record into two records
