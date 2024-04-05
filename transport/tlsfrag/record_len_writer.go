@@ -323,7 +323,7 @@ func writeBoth(dst io.Writer, p1 []byte, p2 []byte) (int, int, error) {
 // It returns the number of bytes that are written from p1 and p2, respectively.
 func writeBothN(dst io.Writer, p1 []byte, p2 []byte, limit int) (int, int, error) {
 	if limit <= len(p1) {
-		n, err := writeN(dst, p1, limit)
+		n, err := dst.Write(p1[:limit])
 		return n, 0, err
 	} else if len(p1)+len(p2) > limit {
 		p2 = p2[:limit-len(p1)]
