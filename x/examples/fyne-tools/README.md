@@ -18,24 +18,28 @@ Note: the generated APK is around 85MB.
 
 ## Windows
 
-From macOS, you can build the app for Windows with MinGW.
+If you are on Windows, you can just use the regular `go build` or `go run` command.
 
-First install MinGW:
+Because the app uses cgo, we need to cross-compilation tools to build from other platforms.
+
+If you are on macOS, you can build the Windows app with [MinGW-x64](https://www.mingw-w64.org/).
+
+First install MinGW-w64. MacPorts is the [official channel](https://www.mingw-w64.org/downloads/#macports):
+
+```
+sudo port install x86_64-w64-mingw32-gcc
+```
+
+With Homebrew (unofficial):
 
 ```
 brew install mingw-w64
 ```
 
-Build for 64-bit:
+Build the app (64-bit):
 
 ```
 GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC="x86_64-w64-mingw32-gcc" go build .
-```
-
-32-bit:
-
-```
-GOOS=windows GOARCH=386 CGO_ENABLED=1 CC="i686-w64-mingw32-gcc" go build .
 ```
 
 The first build will take minutes, since there's a lot of platform code to be built.
