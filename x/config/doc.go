@@ -99,6 +99,20 @@ DPI Evasion - To add packet splitting to a Shadowsocks server for enhanced DPI e
 
 	split:2|ss://[USERINFO]@[HOST]:[PORT]
 
+Defining custom transport - You can define your custom transport by implementing and registering the [WrapStreamDialerFunc] and [WrapPacketDialerFunc] functions:
+
+	// create new config parser
+	// p := new(ConfigParser)
+	// or
+	p := NewDefaultConfigParser()
+	// register your custom dialer
+	p.RegisterPacketDialerWrapper("custom", wrapStreamDialerWithCustom)
+	p.RegisterStreamDialerWrapper("custom", wrapPacketDialerWithCustom)
+	// then use it
+	dialer, err := p.WrapStreamDialer(innerDialer, "custom://config")
+
+where wrapStreamDialerWithCustom and wrapPacketDialerWithCustom implement [WrapPacketDialerFunc] and [WrapStreamDialerFunc].
+
 [Onion Routing]: https://en.wikipedia.org/wiki/Onion_routing
 */
 package config
