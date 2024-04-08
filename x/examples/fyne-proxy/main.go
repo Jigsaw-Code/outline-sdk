@@ -15,6 +15,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"image/color"
 	"log"
@@ -126,8 +127,56 @@ func makeAppHeader(title string) *fyne.Container {
 	return container.NewStack(canvas.NewRectangle(theme.HeaderBackgroundColor()), titleLabel)
 }
 
+func setupSystemProxy(address string) error {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		log.Printf("Failed to parse address: %v\n", err)
+	}
+	// setup system-wide proxy settings
+	err = sysproxy.SetWebProxy(host, port)
+	if err != nil {
+		log.Printf("Failed to set system wide web proxy settings: %v\n", err)
+	}
+	return err
+}
+func startProxy(address string, transport string) (*runningProxy, error) {
+	// start local proxy server
+	proxy, err := runServer(address, transport)
+	if err != nil {
+		return nil, err
+	}
+	// Set system-wide proxy settings
+	// TODO: add isSupported check to sysproxy package
+	// skip setting system proxy if not supported
+	err = setupSystemProxy(address)
+	if err != nil {
+		// silently ignore unsupported platform
+		// TODO: add isSupported check to sysproxy package
+		if errors.Is(err, errors.New("unsupported platform")) {
+			return proxy, nil
+		}
+		return proxy, err
+	}
+	return proxy, nil
+}
+
+func stopProxy(proxy *runningProxy) error {
+	// Disabling system proxy first ensures connectivity
+	// is not lost when the local proxy server is stopped
+	err := sysproxy.DisableWebProxy()
+	// close local proxy server
+	if proxy != nil {
+		proxy.Close()
+	}
+	// TODO: add isSupported check to sysproxy package, and don't
+	// run DisableWebProxy() at all if platform is not supported
+	if errors.Is(err, errors.New("unsupported platform")) {
+		return nil
+	}
+	return err
+}
+
 func main() {
-	defer sysproxy.DisableWebProxy()
 	fyneApp := app.New()
 	if meta := fyneApp.Metadata(); meta.Name == "" {
 		// App not packaged, probably from `go run`.
@@ -154,7 +203,7 @@ func main() {
 	startStopButton.Importance = widget.HighImportance
 	setProxyUI := func(proxy *runningProxy, err error) {
 		if proxy != nil {
-			statusBox.SetText("Proxy listening on " + proxy.Address)
+			statusBox.SetText("✅ Proxy listening on " + proxy.Address)
 			addressEntry.Disable()
 			configEntry.Disable()
 			startStopButton.SetText("Stop")
@@ -176,28 +225,17 @@ func main() {
 		log.Println(startStopButton.Text)
 		var err error
 		if proxy == nil {
-			// Start proxy.
-			proxy, err = runServer(addressEntry.Text, configEntry.Text)
+			// start proxy
+			proxy, err = startProxy(addressEntry.Text, configEntry.Text)
 			if err != nil {
-				log.Printf("Failed to start local proxy server: %v\n", err)
-			}
-			host, port, err := net.SplitHostPort(addressEntry.Text)
-			if err != nil {
-				log.Printf("Failed to parse address: %v\n", err)
-			}
-			// Set system-wide proxy settings
-			err = sysproxy.SetWebProxy(host, port)
-			if err != nil {
-				log.Printf("Failed to set system wide web proxy settings: %v\n", err)
+				log.Printf("failed to start proxy: %v\n", err)
 			}
 		} else {
-			// Disable system-wide proxy
-			err := sysproxy.DisableWebProxy()
+			// stop proxy
+			err = stopProxy(proxy)
 			if err != nil {
-				log.Printf("Failed to disable system-wide web proxy: %v\n", err)
+				log.Printf("error occured when stopping proxy: %v\n", err)
 			}
-			// Stop proxy
-			proxy.Close()
 			proxy = nil
 		}
 		setProxyUI(proxy, err)
@@ -218,6 +256,8 @@ func main() {
 			),
 		),
 	)
+	// ensure proxy is stopped when app is closed
+	defer stopProxy(proxy)
 	mainWin.SetContent(content)
 	mainWin.Show()
 	fyneApp.Run()
