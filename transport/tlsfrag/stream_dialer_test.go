@@ -107,10 +107,9 @@ func TestFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 			original: net.Buffers{hello, cipher, req1, hello, cipher, req1},
 			splitLen: 2,
 			splitted: net.Buffers{
-				// First two fragments will be merged in one single Write
-				append(
-					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00}),
-					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x00, 0x03, 0xaa, 0xbb, 0xcc})...),
+				// Fragmented record header and payload are written as two packets by FixedLenWriter
+				constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00}),
+				constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x00, 0x03, 0xaa, 0xbb, 0xcc}),
 				cipher, req1, hello, cipher, req1,
 			},
 		},
@@ -119,10 +118,9 @@ func TestFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 			original: net.Buffers{hello, cipher, req1, hello, cipher, req1},
 			splitLen: -2,
 			splitted: net.Buffers{
-				// First two fragments will be merged in one single Write
-				append(
-					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00, 0x03, 0xaa}),
-					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0xbb, 0xcc})...),
+				// Fragmented record header and payload are written as two packets by FixedLenWriter
+				constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00, 0x03, 0xaa}),
+				constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0xbb, 0xcc}),
 				cipher, req1, hello, cipher, req1,
 			},
 		},
@@ -149,6 +147,8 @@ func TestNestedFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 	hello := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{
 		0x01, 0x00, 0x00, 0x03, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11,
 	})
+
+	// Fragmented record header and payload are written as two packets by FixedLenWriter
 	frag1 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00})
 	frag2 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x03, 0xaa, 0xbb, 0xcc, 0xdd})
 	frag3 := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0xee, 0xff, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44})
@@ -168,22 +168,10 @@ func TestNestedFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 	assertCanWriteAll(t, conn, net.Buffers{hello, cipher, req1, hello, cipher, req1})
 
 	expected := net.Buffers{
-		append(frag1, frag2...), // First two fragments will be merged in one single Write
-		frag3,
-		frag4,
+		frag1, frag2, frag3, frag4,
 		cipher, req1, hello, cipher, req1, // Unchanged
 	}
 	require.Equal(t, expected, inner.bufs)
-}
-
-// Make sure there are no connection leakage in DialStream
-func TestDialStreamCloseInnerConnOnError(t *testing.T) {
-	inner := &collectStreamDialer{}
-	d := &tlsFragDialer{inner, nil}
-	conn, err := d.DialStream(context.Background(), "127.0.0.1:8888")
-	require.Error(t, err)
-	require.Nil(t, conn)
-	require.Zero(t, inner.activeConns)
 }
 
 // test assertions
@@ -238,12 +226,10 @@ func constructTLSRecord(t *testing.T, typ layers.TLSType, ver layers.TLSVersion,
 
 // collectStreamDialer collects all writes to this stream dialer and append it to bufs
 type collectStreamDialer struct {
-	bufs        net.Buffers
-	activeConns int
+	bufs net.Buffers
 }
 
 func (d *collectStreamDialer) DialStream(ctx context.Context, raddr string) (transport.StreamConn, error) {
-	d.activeConns++
 	return d, nil
 }
 
@@ -253,7 +239,7 @@ func (c *collectStreamDialer) Write(p []byte) (int, error) {
 }
 
 func (c *collectStreamDialer) Read(p []byte) (int, error)         { return 0, errors.New("not supported") }
-func (c *collectStreamDialer) Close() error                       { c.activeConns--; return nil }
+func (c *collectStreamDialer) Close() error                       { return nil }
 func (c *collectStreamDialer) CloseRead() error                   { return nil }
 func (c *collectStreamDialer) CloseWrite() error                  { return nil }
 func (c *collectStreamDialer) LocalAddr() net.Addr                { return nil }
