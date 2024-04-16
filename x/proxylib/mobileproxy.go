@@ -19,7 +19,7 @@
 package main
 
 /*
-typedef void* CStreamDialer;
+typedef void* StreamDialer;
 */
 import "C"
 
@@ -164,12 +164,12 @@ type StreamDialer struct {
 // The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config#hdr-Config_Format.
 //
 //export NewStreamDialerFromConfig
-func NewStreamDialerFromConfig(transportConfig *C.char) (C.CStreamDialer, error) {
+func NewStreamDialerFromConfig(transportConfig *C.char) (C.StreamDialer, error) {
 	dialer, err := config.NewStreamDialer(C.GoString(transportConfig))
 	if err != nil {
 		return nil, err
 	}
-	return C.CStreamDialer(&dialer), nil
+	return C.StreamDialer(&dialer), nil
 }
 
 // LogWriter is used as a sink for logging.
