@@ -92,7 +92,7 @@ func (p *ConfigParser) RegisterStreamDialerWrapper(subtype string, wrapper WrapS
 	}
 
 	if _, found := p.sdWrapers[subtype]; found {
-		return fmt.Errorf("config parser %v added twice", subtype)
+		return fmt.Errorf("config parser %v for StreamDialer added twice", subtype)
 	}
 	p.sdWrapers[subtype] = wrapper
 	return nil
@@ -108,7 +108,7 @@ func (p *ConfigParser) RegisterPacketDialerWrapper(subtype string, wrapper WrapP
 	}
 
 	if _, found := p.pdWrappers[subtype]; found {
-		return fmt.Errorf("config parser %v added twice", subtype)
+		return fmt.Errorf("config parser %v for PacketDialer added twice", subtype)
 	}
 	p.pdWrappers[subtype] = wrapper
 	return nil
