@@ -16,30 +16,32 @@ go run fyne.io/fyne/v2/cmd/fyne package -os android && adb install Net_Tools.apk
 Note: the generated APK is around 85MB.
 
 
-## Windows
+## Desktop
 
-If you are on Windows, you can just use the regular `go build` or `go run` command.
+If you are on the target platform (OS and architecture), you can just use the regular `go build` or `go run` command.
 
 Because the app uses cgo, we need to cross-compilation tools to build from other platforms.
 
-If you are on macOS, you can build the Windows app with [MinGW-x64](https://www.mingw-w64.org/).
+The easiest way is to [use zig](https://dev.to/kristoff/zig-makes-go-cross-compilation-just-work-29ho).
 
-First install MinGW-w64. MacPorts is the [official channel](https://www.mingw-w64.org/downloads/#macports):
+[Install zig](https://ziglang.org/learn/getting-started/#installing-zig) and make sure it's in the PATH.
 
-```
-sudo port install x86_64-w64-mingw32-gcc
-```
+You can download the binary tarball, or [use a package manager](https://github.com/ziglang/zig/wiki/Install-Zig-from-a-Package-Manager), like Homebrew:
 
-With Homebrew (unofficial):
-
-```
-brew install mingw-w64
+```sh
+brew install zig 
 ```
 
-Build the app (64-bit):
+To buuild the Windows app:
 
+```sh
+GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC='zig cc -target x86_64-windows' go build .
 ```
-GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC="x86_64-w64-mingw32-gcc" go build .
+
+To build the Linux app:
+
+```sh
+GOOS=linux GOARCH=amd64 CGO_ENABLED=1 CC='zig cc -target x86_64-linux' go build .
 ```
 
 The first build will take minutes, since there's a lot of platform code to be built.
