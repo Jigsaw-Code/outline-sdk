@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/dns"
+	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
 	"github.com/Jigsaw-Code/outline-sdk/x/report"
@@ -47,6 +48,9 @@ type connectivityReport struct {
 	// TODO(fortuna): add sanitized transport config.
 	Transport string `json:"transport"`
 
+	// The address of the selected connection to the proxy server.
+	ConnectionAddress addressJSON `json:"connection_address"`
+
 	// Observations
 	Time       time.Time  `json:"time"`
 	DurationMs int64      `json:"duration_ms"`
@@ -60,6 +64,19 @@ type errorJSON struct {
 	PosixError string `json:"posix_error,omitempty"`
 	// TODO: remove IP addresses
 	Msg string `json:"msg,omitempty"`
+}
+
+type addressJSON struct {
+	Host string `json:"host"`
+	Port string `json:"port"`
+}
+
+func newAddressJSON(address string) (addressJSON, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return addressJSON{}, err
+	}
+	return addressJSON{host, port}, nil
 }
 
 func makeErrorRecord(result *connectivity.ConnectivityError) *errorJSON {
@@ -168,15 +185,30 @@ func main() {
 		for _, proto := range strings.Split(*protoFlag, ",") {
 			proto = strings.TrimSpace(proto)
 			var resolver dns.Resolver
+			var connectionAddress string
 			switch proto {
 			case "tcp":
-				streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
+				baseDialer := transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+					conn, err := (&transport.TCPDialer{}).DialStream(ctx, addr)
+					if conn != nil {
+						connectionAddress = conn.RemoteAddr().String()
+					}
+					return conn, err
+				})
+				streamDialer, err := config.WrapStreamDialer(baseDialer, *transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create StreamDialer: %v", err)
 				}
 				resolver = dns.NewTCPResolver(streamDialer, resolverAddress)
 			case "udp":
-				packetDialer, err := configToDialer.NewPacketDialer(*transportFlag)
+				baseDialer := transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+					conn, err := (&transport.UDPDialer{}).DialPacket(ctx, addr)
+					if conn != nil {
+						connectionAddress = conn.RemoteAddr().String()
+					}
+					return conn, err
+				})
+				packetDialer, err := config.WrapPacketDialer(baseDialer, *transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create PacketDialer: %v", err)
 				}
@@ -198,7 +230,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("Failed to sanitize config: %v", err)
 			}
-			var r report.Report = connectivityReport{
+			r := connectivityReport{
 				Resolver: resolverAddress,
 				Proto:    proto,
 				Time:     startTime.UTC().Truncate(time.Second),
@@ -207,6 +239,11 @@ func main() {
 				DurationMs: testDuration.Milliseconds(),
 				Error:      makeErrorRecord(result),
 			}
+			connectionAddressJSON, err := newAddressJSON(connectionAddress)
+			if err == nil {
+				r.ConnectionAddress = connectionAddressJSON
+			}
+
 			if reportCollector != nil {
 				err = reportCollector.Collect(context.Background(), r)
 				if err != nil {
