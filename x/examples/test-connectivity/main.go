@@ -187,17 +187,15 @@ func main() {
 			startTime := time.Now()
 			switch proto {
 			case "tcp":
-				dialer, err := config.WrapStreamDialer(&transport.TCPDialer{}, *transportFlag)
-				if err != nil {
-					log.Fatalf("Failed to create StreamDialer: %v", err)
+				wrap := func(ctx context.Context, baseDialer transport.StreamDialer) (transport.StreamDialer, error) {
+					return config.WrapStreamDialer(baseDialer, *transportFlag)
 				}
-				testResult, testErr = connectivity.TestStreamConnectivityWithDNS(context.Background(), dialer, resolverAddress, *domainFlag)
+				testResult, testErr = connectivity.TestStreamConnectivityWithDNS(context.Background(), &transport.TCPDialer{}, wrap, resolverAddress, *domainFlag)
 			case "udp":
-				dialer, err := config.WrapPacketDialer(&transport.UDPDialer{}, *transportFlag)
-				if err != nil {
-					log.Fatalf("Failed to create PacketDialer: %v", err)
+				wrap := func(ctx context.Context, baseDialer transport.PacketDialer) (transport.PacketDialer, error) {
+					return config.WrapPacketDialer(baseDialer, *transportFlag)
 				}
-				testResult, testErr = connectivity.TestPacketConnectivityWithDNS(context.Background(), dialer, resolverAddress, *domainFlag)
+				testResult, testErr = connectivity.TestPacketConnectivityWithDNS(context.Background(), &transport.UDPDialer{}, wrap, resolverAddress, *domainFlag)
 			default:
 				log.Fatalf(`Invalid proto %v. Must be "tcp" or "udp"`, proto)
 			}

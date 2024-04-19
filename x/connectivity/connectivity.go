@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"syscall"
 	"time"
@@ -75,18 +74,22 @@ func makeConnectivityError(op string, err error) *ConnectivityError {
 	return &ConnectivityError{Op: op, PosixError: code, Err: err}
 }
 
-func TestStreamConnectivityWithDNS(ctx context.Context, dialer transport.StreamDialer, resolverAddress string, testDomain string) (*ConnectivityResult, error) {
+type WrapStreamDialer func(ctx context.Context, baseDialer transport.StreamDialer) (transport.StreamDialer, error)
+
+func TestStreamConnectivityWithDNS(ctx context.Context, baseDialer transport.StreamDialer, wrap WrapStreamDialer, resolverAddress string, testDomain string) (*ConnectivityResult, error) {
 	result := &ConnectivityResult{}
-	captureDialer := transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
-		conn, err := dialer.DialStream(ctx, addr)
+	interceptDialer := transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+		conn, err := baseDialer.DialStream(ctx, addr)
 		if conn != nil {
 			result.ConnectionAddress = conn.RemoteAddr().String()
-			log.Println("address", result.ConnectionAddress)
 		}
 		return conn, err
 	})
-	resolver := dns.NewTCPResolver(captureDialer, resolverAddress)
-	var err error
+	dialer, err := wrap(ctx, interceptDialer)
+	if err != nil {
+		return nil, err
+	}
+	resolver := dns.NewTCPResolver(dialer, resolverAddress)
 	result.Error, err = TestConnectivityWithResolver(ctx, resolver, testDomain)
 	if err != nil {
 		return nil, err
@@ -94,20 +97,24 @@ func TestStreamConnectivityWithDNS(ctx context.Context, dialer transport.StreamD
 	return result, nil
 }
 
-func TestPacketConnectivityWithDNS(ctx context.Context, dialer transport.PacketDialer, resolverAddress string, testDomain string) (*ConnectivityResult, error) {
+type WrapPacketDialer func(ctx context.Context, baseDialer transport.PacketDialer) (transport.PacketDialer, error)
+
+func TestPacketConnectivityWithDNS(ctx context.Context, baseDialer transport.PacketDialer, wrap WrapPacketDialer, resolverAddress string, testDomain string) (*ConnectivityResult, error) {
 	result := &ConnectivityResult{}
-	captureDialer := transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-		conn, err := dialer.DialPacket(ctx, addr)
+	interceptDialer := transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+		conn, err := baseDialer.DialPacket(ctx, addr)
 		if conn != nil {
 			// This doesn't work with the PacketListenerDialer we use because it returns the address of the target, not the proxy.
 			// TODO(fortuna): make PLD use the first hop address or try something else.
 			result.ConnectionAddress = conn.RemoteAddr().String()
-			log.Println("address", result.ConnectionAddress)
 		}
 		return conn, err
 	})
-	resolver := dns.NewUDPResolver(captureDialer, resolverAddress)
-	var err error
+	dialer, err := wrap(ctx, interceptDialer)
+	if err != nil {
+		return nil, err
+	}
+	resolver := dns.NewUDPResolver(dialer, resolverAddress)
 	result.Error, err = TestConnectivityWithResolver(ctx, resolver, testDomain)
 	if err != nil {
 		return nil, err
