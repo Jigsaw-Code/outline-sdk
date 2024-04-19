@@ -30,7 +30,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
@@ -184,48 +183,33 @@ func main() {
 		resolverAddress := net.JoinHostPort(resolverHost, "53")
 		for _, proto := range strings.Split(*protoFlag, ",") {
 			proto = strings.TrimSpace(proto)
-			var resolver dns.Resolver
-			var connectionAddress string
+			var testResult *connectivity.ConnectivityResult
+			var testErr error
+			startTime := time.Now()
 			switch proto {
 			case "tcp":
-				baseDialer := transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
-					conn, err := (&transport.TCPDialer{}).DialStream(ctx, addr)
-					if conn != nil {
-						connectionAddress = conn.RemoteAddr().String()
-					}
-					return conn, err
-				})
-				streamDialer, err := config.WrapStreamDialer(baseDialer, *transportFlag)
+				dialer, err := config.WrapStreamDialer(&transport.TCPDialer{}, *transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create StreamDialer: %v", err)
 				}
-				resolver = dns.NewTCPResolver(streamDialer, resolverAddress)
+				testResult, testErr = connectivity.TestStreamConnectivityWithDNS(context.Background(), dialer, resolverAddress, *domainFlag)
 			case "udp":
-				baseDialer := transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-					conn, err := (&transport.UDPDialer{}).DialPacket(ctx, addr)
-					if conn != nil {
-						connectionAddress = conn.RemoteAddr().String()
-					}
-					return conn, err
-				})
-				packetDialer, err := config.WrapPacketDialer(baseDialer, *transportFlag)
+				dialer, err := config.WrapPacketDialer(&transport.UDPDialer{}, *transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create PacketDialer: %v", err)
 				}
-				resolver = dns.NewUDPResolver(packetDialer, resolverAddress)
+				testResult, testErr = connectivity.TestPacketConnectivityWithDNS(context.Background(), dialer, resolverAddress, *domainFlag)
 			default:
 				log.Fatalf(`Invalid proto %v. Must be "tcp" or "udp"`, proto)
 			}
-			startTime := time.Now()
-			result, err := connectivity.TestConnectivityWithResolver(context.Background(), resolver, *domainFlag)
-			if err != nil {
-				log.Fatalf("Connectivity test failed to run: %v", err)
+			if testErr != nil {
+				log.Fatalf("Connectivity test failed to run: %v", testErr)
 			}
 			testDuration := time.Since(startTime)
-			if result == nil {
+			if testResult.Error == nil {
 				success = true
 			}
-			debugLog.Printf("Test %v %v result: %v", proto, resolverAddress, result)
+			debugLog.Printf("Test %v %v result: %v", proto, resolverAddress, testResult)
 			sanitizedConfig, err := config.SanitizeConfig(*transportFlag)
 			if err != nil {
 				log.Fatalf("Failed to sanitize config: %v", err)
@@ -237,9 +221,9 @@ func main() {
 				// TODO(fortuna): Add sanitized config:
 				Transport:  sanitizedConfig,
 				DurationMs: testDuration.Milliseconds(),
-				Error:      makeErrorRecord(result),
+				Error:      makeErrorRecord(testResult.Error),
 			}
-			connectionAddressJSON, err := newAddressJSON(connectionAddress)
+			connectionAddressJSON, err := newAddressJSON(testResult.ConnectionAddress)
 			if err == nil {
 				r.ConnectionAddress = connectionAddressJSON
 			}
