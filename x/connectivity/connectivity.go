@@ -78,6 +78,7 @@ type WrapStreamDialer func(baseDialer transport.StreamDialer) (transport.StreamD
 
 // TestStreamConnectivityWithDNS tests weather we can get a response from a DNS resolver at resolverAddress over a stream connection. It sends testDomain as the query.
 // It uses the baseDialer to create a first-hop connection to the proxy, and the wrap to apply the transport.
+// The baseDialer is typically TCPDialer, but it can be replaced for remote measurements.
 func TestStreamConnectivityWithDNS(ctx context.Context, baseDialer transport.StreamDialer, wrap WrapStreamDialer, resolverAddress string, testDomain string) (*ConnectivityResult, error) {
 	result := &ConnectivityResult{}
 	interceptDialer := transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
@@ -103,6 +104,7 @@ type WrapPacketDialer func(baseDialer transport.PacketDialer) (transport.PacketD
 
 // TestPacketConnectivityWithDNS tests weather we can get a response from a DNS resolver at resolverAddress over a packet connection. It sends testDomain as the query.
 // It uses the baseDialer to create a first-hop connection to the proxy, and the wrap to apply the transport.
+// The baseDialer is typically UDPDialer, but it can be replaced for remote measurements.
 func TestPacketConnectivityWithDNS(ctx context.Context, baseDialer transport.PacketDialer, wrap WrapPacketDialer, resolverAddress string, testDomain string) (*ConnectivityResult, error) {
 	result := &ConnectivityResult{}
 	interceptDialer := transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
