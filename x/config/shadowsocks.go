@@ -25,7 +25,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 )
 
-func newShadowsocksStreamDialerFromURL(innerDialer transport.StreamDialer, configURL *url.URL) (transport.StreamDialer, error) {
+func wrapStreamDialerWithShadowsocks(innerDialer transport.StreamDialer, configURL *url.URL) (transport.StreamDialer, error) {
 	config, err := parseShadowsocksURL(configURL)
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func newShadowsocksStreamDialerFromURL(innerDialer transport.StreamDialer, confi
 	return dialer, nil
 }
 
-func newShadowsocksPacketDialerFromURL(innerDialer transport.PacketDialer, configURL *url.URL) (transport.PacketDialer, error) {
+func wrapPacketDialerWithShadowsocks(innerDialer transport.PacketDialer, configURL *url.URL) (transport.PacketDialer, error) {
 	config, err := parseShadowsocksURL(configURL)
 	if err != nil {
 		return nil, err

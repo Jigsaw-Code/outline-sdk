@@ -7,7 +7,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/socks5"
 )
 
-func newSOCKS5StreamDialerFromURL(innerDialer transport.StreamDialer, configURL *url.URL) (transport.StreamDialer, error) {
+func wrapStreamDialerWithSOCKS5(innerDialer transport.StreamDialer, configURL *url.URL) (transport.StreamDialer, error) {
 	endpoint := transport.StreamDialerEndpoint{Dialer: innerDialer, Address: configURL.Host}
 	dialer, err := socks5.NewStreamDialer(&endpoint)
 	if err != nil {

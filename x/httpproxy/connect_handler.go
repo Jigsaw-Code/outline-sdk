@@ -56,6 +56,9 @@ type connectHandler struct {
 
 var _ http.Handler = (*connectHandler)(nil)
 
+// TODO(fortuna): Inject the config parser
+var configParser = config.NewDefaultConfigParser()
+
 func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Request) {
 	if proxyReq.Method != http.MethodConnect {
 		proxyResp.Header().Add("Allow", "CONNECT")
@@ -76,7 +79,7 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 
 	// Dial the target.
 	transportConfig := proxyReq.Header.Get("Transport")
-	dialer, err := config.WrapStreamDialer(h.dialer, transportConfig)
+	dialer, err := configParser.WrapStreamDialer(h.dialer, transportConfig)
 	if err != nil {
 		// Because we sanitize the base dialer error, it's safe to return error details here.
 		http.Error(proxyResp, fmt.Sprintf("Invalid config in Transport header: %v", err), http.StatusBadRequest)
