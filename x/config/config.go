@@ -47,7 +47,7 @@ func NewStreamDialer(transportConfig string) (transport.StreamDialer, error) {
 	return WrapStreamDialer(&transport.TCPDialer{}, transportConfig)
 }
 
-// WrapStreamDialer created a [transport.StreamDialer] according to transportConfig, using dialer as the
+// WrapStreamDialer creates a [transport.StreamDialer] according to transportConfig, using dialer as the
 // base [transport.StreamDialer]. The given dialer must not be nil.
 func WrapStreamDialer(dialer transport.StreamDialer, transportConfig string) (transport.StreamDialer, error) {
 	if dialer == nil {
@@ -110,11 +110,17 @@ func newStreamDialerFromPart(innerDialer transport.StreamDialer, oneDialerConfig
 
 // NewPacketDialer creates a new [transport.PacketDialer] according to the given config.
 func NewPacketDialer(transportConfig string) (dialer transport.PacketDialer, err error) {
-	dialer = &transport.UDPDialer{}
+	return WrapPacketDialer(&transport.UDPDialer{}, transportConfig)
+}
+
+// WrapPacketDialer creates a [transport.PacketDialer] according to transportConfig, using dialer as the
+// base [transport.PacketDialer]. The given dialer must not be nil.
+func WrapPacketDialer(dialer transport.PacketDialer, transportConfig string) (transport.PacketDialer, error) {
 	transportConfig = strings.TrimSpace(transportConfig)
 	if transportConfig == "" {
 		return dialer, nil
 	}
+	var err error
 	for _, part := range strings.Split(transportConfig, "|") {
 		dialer, err = newPacketDialerFromPart(dialer, part)
 		if err != nil {
