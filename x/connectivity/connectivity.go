@@ -74,8 +74,10 @@ func makeConnectivityError(op string, err error) *ConnectivityError {
 	return &ConnectivityError{Op: op, PosixError: code, Err: err}
 }
 
-type WrapStreamDialer func(ctx context.Context, baseDialer transport.StreamDialer) (transport.StreamDialer, error)
+type WrapStreamDialer func(baseDialer transport.StreamDialer) (transport.StreamDialer, error)
 
+// TestStreamConnectivityWithDNS tests weather we can get a response from a DNS resolver at resolverAddress over a stream connection. It sends testDomain as the query.
+// It uses the baseDialer to create a first-hop connection to the proxy, and the wrap to apply the transport.
 func TestStreamConnectivityWithDNS(ctx context.Context, baseDialer transport.StreamDialer, wrap WrapStreamDialer, resolverAddress string, testDomain string) (*ConnectivityResult, error) {
 	result := &ConnectivityResult{}
 	interceptDialer := transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
@@ -85,7 +87,7 @@ func TestStreamConnectivityWithDNS(ctx context.Context, baseDialer transport.Str
 		}
 		return conn, err
 	})
-	dialer, err := wrap(ctx, interceptDialer)
+	dialer, err := wrap(interceptDialer)
 	if err != nil {
 		return nil, err
 	}
@@ -97,20 +99,20 @@ func TestStreamConnectivityWithDNS(ctx context.Context, baseDialer transport.Str
 	return result, nil
 }
 
-type WrapPacketDialer func(ctx context.Context, baseDialer transport.PacketDialer) (transport.PacketDialer, error)
+type WrapPacketDialer func(baseDialer transport.PacketDialer) (transport.PacketDialer, error)
 
+// TestPacketConnectivityWithDNS tests weather we can get a response from a DNS resolver at resolverAddress over a packet connection. It sends testDomain as the query.
+// It uses the baseDialer to create a first-hop connection to the proxy, and the wrap to apply the transport.
 func TestPacketConnectivityWithDNS(ctx context.Context, baseDialer transport.PacketDialer, wrap WrapPacketDialer, resolverAddress string, testDomain string) (*ConnectivityResult, error) {
 	result := &ConnectivityResult{}
 	interceptDialer := transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 		conn, err := baseDialer.DialPacket(ctx, addr)
 		if conn != nil {
-			// This doesn't work with the PacketListenerDialer we use because it returns the address of the target, not the proxy.
-			// TODO(fortuna): make PLD use the first hop address or try something else.
 			result.ConnectionAddress = conn.RemoteAddr().String()
 		}
 		return conn, err
 	})
-	dialer, err := wrap(ctx, interceptDialer)
+	dialer, err := wrap(interceptDialer)
 	if err != nil {
 		return nil, err
 	}

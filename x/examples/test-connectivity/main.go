@@ -187,12 +187,12 @@ func main() {
 			startTime := time.Now()
 			switch proto {
 			case "tcp":
-				wrap := func(ctx context.Context, baseDialer transport.StreamDialer) (transport.StreamDialer, error) {
+				wrap := func(baseDialer transport.StreamDialer) (transport.StreamDialer, error) {
 					return config.WrapStreamDialer(baseDialer, *transportFlag)
 				}
 				testResult, testErr = connectivity.TestStreamConnectivityWithDNS(context.Background(), &transport.TCPDialer{}, wrap, resolverAddress, *domainFlag)
 			case "udp":
-				wrap := func(ctx context.Context, baseDialer transport.PacketDialer) (transport.PacketDialer, error) {
+				wrap := func(baseDialer transport.PacketDialer) (transport.PacketDialer, error) {
 					return config.WrapPacketDialer(baseDialer, *transportFlag)
 				}
 				testResult, testErr = connectivity.TestPacketConnectivityWithDNS(context.Background(), &transport.UDPDialer{}, wrap, resolverAddress, *domainFlag)
