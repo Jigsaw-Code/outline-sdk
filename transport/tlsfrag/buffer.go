@@ -17,7 +17,6 @@ package tlsfrag
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 )
 
@@ -25,9 +24,6 @@ var (
 	// errTLSClientHelloFullyReceived is returned when a full TLS Client Hello has been received and no
 	// more data can be pushed to the buffer.
 	errTLSClientHelloFullyReceived = errors.New("already received a complete TLS Client Hello packet")
-
-	// errInvalidTLSClientHello is the error used when the data received is not a valid TLS Client Hello.
-	errInvalidTLSClientHello = errors.New("not a valid TLS Client Hello packet")
 )
 
 // clientHelloBuffer is a byte buffer used to receive and buffer a TLS Client Hello packet.
@@ -81,28 +77,32 @@ func (b *clientHelloBuffer) Write(p []byte) (int, error) {
 // If this buffer still requires more data to build a complete TLS Client Hello message, it returns nil error.
 //
 // You can call ReadFrom multiple times if r doesn't provide enough data to build a complete Client Hello packet.
+//
+// ReadFrom will hang indefinitely if r provides fewer than 5 bytes and doesn't return the io.EOF error (e.g., "PING").
 func (b *clientHelloBuffer) ReadFrom(r io.Reader) (n int64, err error) {
 	// Waiting to finish the header of 5 bytes
-	for len(b.data) < recordHeaderLen {
-		m, e := r.Read(b.data[len(b.data):recordHeaderLen])
+	if len(b.data) < recordHeaderLen {
+		m, e := io.ReadFull(r, b.data[len(b.data):recordHeaderLen])
 		b.data = b.data[:len(b.data)+m]
 		n += int64(m)
-
-		if len(b.data) == recordHeaderLen {
-			hdr := tlsRecordHeader(b.data)
-			if err = validateTLSClientHello(hdr); err != nil {
-				b.validationErr = err
-				return
-			}
-			buf := make([]byte, 0, recordHeaderLen*2+hdr.PayloadLen())
-			b.data = append(buf, b.data...)
-		}
 		if err = e; err != nil {
-			if err == io.EOF {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				err = nil
 			}
 			return
 		}
+
+		hdr, e := newTLSHandshakeRecordHeader(b.data)
+		if err = e; err != nil {
+			b.validationErr = err
+			return
+		}
+		if err = hdr.Validate(); err != nil {
+			b.validationErr = err
+			return
+		}
+		buf := make([]byte, 0, recordHeaderLen*2+hdr.PayloadLen())
+		b.data = append(buf, b.data...)
 	}
 
 	// If the buffer is already invalid
@@ -131,17 +131,4 @@ func (b *clientHelloBuffer) ReadFrom(r io.Reader) (n int64, err error) {
 
 	err = errTLSClientHelloFullyReceived
 	return
-}
-
-func validateTLSClientHello(hdr tlsRecordHeader) error {
-	if typ := hdr.Type(); typ != recordTypeHandshake {
-		return fmt.Errorf("record type %d is not handshake: %w", typ, errInvalidTLSClientHello)
-	}
-	if ver := hdr.LegacyVersion(); !isValidTLSVersion(ver) {
-		return fmt.Errorf("%#04x is not a valid TLS version: %w", ver, errInvalidTLSClientHello)
-	}
-	if len := hdr.PayloadLen(); !isValidPayloadLenForHandshake(len) {
-		return fmt.Errorf("message length %v out of range: %w", len, errInvalidTLSClientHello)
-	}
-	return nil
 }

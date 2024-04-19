@@ -47,12 +47,16 @@ var _ io.Writer = (*clientHelloFragWriter)(nil)
 var _ io.Writer = (*clientHelloFragReaderFrom)(nil)
 var _ io.ReaderFrom = (*clientHelloFragReaderFrom)(nil)
 
-// newClientHelloFragWriter creates a [io.Writer] that splits the first TLS Client Hello record into two records based
-// on the provided frag function. It then writes these records and all subsequent messages to the base [io.Writer].
+// newClientHelloFragWriter creates a [io.Writer] that splits the first TLS Client Hello record into two records
+// based on the provided [FragFunc] callback.
+// It then writes these records and all subsequent messages to the base [io.Writer].
 // If the first message isn't a Client Hello, no splitting occurs and all messages are written directly to base.
 //
 // The returned [io.Writer] will implement the [io.ReaderFrom] interface for optimized performance if the base
 // [io.Writer] implements [io.ReaderFrom].
+//
+// If you just want to split the record at a fixed position (e.g., always at the 5th byte or 2nd from the last
+// byte), use [NewRecordLenFuncWriter]. It consumes less resources and is more efficient.
 func newClientHelloFragWriter(base io.Writer, frag FragFunc) (io.Writer, error) {
 	if base == nil {
 		return nil, errors.New("base writer must not be nil")
@@ -109,6 +113,8 @@ func (w *clientHelloFragWriter) Write(p []byte) (n int, err error) {
 // If the first packet is not a valid TLS Client Hello, everything from r gets copied to the base io.Writer as is.
 //
 // It returns the number of bytes read. Any error except EOF encountered during the read is also returned.
+//
+// ReadFrom will hang indefinitely if r provides fewer than 5 bytes and doesn't return the io.EOF error (e.g., "PING").
 func (w *clientHelloFragReaderFrom) ReadFrom(r io.Reader) (n int64, err error) {
 	if !w.done {
 		// not yet splitted, append to the buffer
@@ -160,7 +166,7 @@ func (w *clientHelloFragWriter) splitHelloBufToRecord() {
 	// splitted: | <= (5) => | <= head => | <= (5) => | <= tail => |
 	//           |  header1  |  payload1  |  header2  |  payload2  |
 	splitted := original[:len(original)+recordHeaderLen]
-	hdr1 := tlsRecordHeaderFromRawBytes(splitted[:recordHeaderLen])
+	hdr1, _ := newTLSHandshakeRecordHeader(splitted[:recordHeaderLen])
 	hdr1.SetPayloadLen(uint16(headLen))
 
 	// Shift tail fragment to make space for record header.
@@ -169,7 +175,7 @@ func (w *clientHelloFragWriter) splitHelloBufToRecord() {
 	copy(payload2, tail)
 
 	// Insert header for second fragment.
-	hdr2 := tlsRecordHeaderFromRawBytes(splitted[recordHeaderLen+headLen : recordHeaderLen*2+headLen])
+	hdr2, _ := newTLSHandshakeRecordHeader(splitted[recordHeaderLen+headLen : recordHeaderLen*2+headLen])
 	copy(hdr2, hdr1)
 	hdr2.SetPayloadLen(uint16(tailLen))
 
