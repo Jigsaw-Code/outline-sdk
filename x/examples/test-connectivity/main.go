@@ -48,12 +48,18 @@ type connectivityReport struct {
 	Transport string `json:"transport"`
 
 	// The address of the selected connection to the proxy server.
-	ConnectionAddress addressJSON `json:"connection_address"`
+	Connections     []connectionJSON `json:"connections"`
+	SelectedAddress *addressJSON     `json:"selected_address,omitempty"`
 
 	// Observations
 	Time       time.Time  `json:"time"`
 	DurationMs int64      `json:"duration_ms"`
 	Error      *errorJSON `json:"error"`
+}
+
+type connectionJSON struct {
+	Address *addressJSON `json:"address,omitempty"`
+	Error   *errorJSON   `json:"error"`
 }
 
 type errorJSON struct {
@@ -221,9 +227,21 @@ func main() {
 				DurationMs: testDuration.Milliseconds(),
 				Error:      makeErrorRecord(testResult.Error),
 			}
-			connectionAddressJSON, err := newAddressJSON(testResult.ConnectionAddress)
-			if err == nil {
-				r.ConnectionAddress = connectionAddressJSON
+			for _, cr := range testResult.Connections {
+				cj := connectionJSON{
+					Error: makeErrorRecord(cr.Error),
+				}
+				addressJSON, err := newAddressJSON(cr.Address)
+				if err == nil {
+					cj.Address = &addressJSON
+				}
+				r.Connections = append(r.Connections, cj)
+			}
+			if testResult.SelectedAddress != "" {
+				selectedAddressJSON, err := newAddressJSON(testResult.SelectedAddress)
+				if err == nil {
+					r.SelectedAddress = &selectedAddressJSON
+				}
 			}
 
 			if reportCollector != nil {

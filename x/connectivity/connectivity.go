@@ -30,7 +30,16 @@ import (
 // ConnectivityResult captures the observed result of the connectivity test.
 type ConnectivityResult struct {
 	// Address we connected to
-	ConnectionAddress string
+	Connections []ConnectionResult
+	// Address of the connection that was selected
+	SelectedAddress string
+	// Observed error
+	Error *ConnectivityError
+}
+
+type ConnectionResult struct {
+	// Address we connected to
+	Address string
 	// Observed error
 	Error *ConnectivityError
 }
@@ -80,11 +89,28 @@ type WrapStreamDialer func(baseDialer transport.StreamDialer) (transport.StreamD
 // It uses the baseDialer to create a first-hop connection to the proxy, and the wrap to apply the transport.
 // The baseDialer is typically TCPDialer, but it can be replaced for remote measurements.
 func TestStreamConnectivityWithDNS(ctx context.Context, baseDialer transport.StreamDialer, wrap WrapStreamDialer, resolverAddress string, testDomain string) (*ConnectivityResult, error) {
-	result := &ConnectivityResult{}
+	testResult := &ConnectivityResult{
+		Connections: make([]ConnectionResult, 0),
+	}
 	interceptDialer := transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
-		conn, err := baseDialer.DialStream(ctx, addr)
-		if conn != nil {
-			result.ConnectionAddress = conn.RemoteAddr().String()
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+		ips, err := (&net.Resolver{PreferGo: false}).LookupHost(ctx, host)
+		var conn transport.StreamConn
+		for _, ip := range ips {
+			addr := net.JoinHostPort(ip, port)
+			connResult := ConnectionResult{Address: addr}
+			conn, err = baseDialer.DialStream(ctx, addr)
+			if err != nil {
+				connResult.Error = makeConnectivityError("connect", err)
+			}
+			testResult.Connections = append(testResult.Connections, connResult)
+			if err == nil {
+				testResult.SelectedAddress = addr
+				break
+			}
 		}
 		return conn, err
 	})
@@ -93,11 +119,11 @@ func TestStreamConnectivityWithDNS(ctx context.Context, baseDialer transport.Str
 		return nil, err
 	}
 	resolver := dns.NewTCPResolver(dialer, resolverAddress)
-	result.Error, err = TestConnectivityWithResolver(ctx, resolver, testDomain)
+	testResult.Error, err = TestConnectivityWithResolver(ctx, resolver, testDomain)
 	if err != nil {
 		return nil, err
 	}
-	return result, nil
+	return testResult, nil
 }
 
 type WrapPacketDialer func(baseDialer transport.PacketDialer) (transport.PacketDialer, error)
@@ -106,11 +132,26 @@ type WrapPacketDialer func(baseDialer transport.PacketDialer) (transport.PacketD
 // It uses the baseDialer to create a first-hop connection to the proxy, and the wrap to apply the transport.
 // The baseDialer is typically UDPDialer, but it can be replaced for remote measurements.
 func TestPacketConnectivityWithDNS(ctx context.Context, baseDialer transport.PacketDialer, wrap WrapPacketDialer, resolverAddress string, testDomain string) (*ConnectivityResult, error) {
-	result := &ConnectivityResult{}
+	testResult := &ConnectivityResult{}
 	interceptDialer := transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-		conn, err := baseDialer.DialPacket(ctx, addr)
-		if conn != nil {
-			result.ConnectionAddress = conn.RemoteAddr().String()
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+		ips, err := (&net.Resolver{PreferGo: false}).LookupHost(ctx, host)
+		var conn net.Conn
+		for _, ip := range ips {
+			addr := net.JoinHostPort(ip, port)
+			connResult := ConnectionResult{Address: addr}
+			conn, err = baseDialer.DialPacket(ctx, addr)
+			if err != nil {
+				connResult.Error = makeConnectivityError("connect", err)
+			}
+			testResult.Connections = append(testResult.Connections, connResult)
+			if err == nil {
+				testResult.SelectedAddress = addr
+				break
+			}
 		}
 		return conn, err
 	})
@@ -119,11 +160,8 @@ func TestPacketConnectivityWithDNS(ctx context.Context, baseDialer transport.Pac
 		return nil, err
 	}
 	resolver := dns.NewUDPResolver(dialer, resolverAddress)
-	result.Error, err = TestConnectivityWithResolver(ctx, resolver, testDomain)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
+	testResult.Error, err = TestConnectivityWithResolver(ctx, resolver, testDomain)
+	return testResult, err
 }
 
 // TestConnectivityWithResolver tests weather we can get a response from the given [Resolver]. It can be used
