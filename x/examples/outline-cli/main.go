@@ -33,21 +33,34 @@ var logging = &struct {
 
 // ./app -transport "ss://..."
 func main() {
+	// Create tun device
+	// Run copy loops
+	// Assign IP and bring up
+	// Set up routing
 	fmt.Println("OutlineVPN CLI (experimental)")
+	transportFlag := flag.String("transport", "", "Transport config")
+	tunFlag := flag.String("tun", "outline233", "Name of the TUN device")
+	dnsFlag := flag.String("dns", "9.9.9.9", "DNS server to use")
+	flag.Parse()
 
 	app := App{
-		TransportConfig: flag.String("transport", "", "Transport config"),
+		TransportConfig: *transportFlag,
 		RoutingConfig: &RoutingConfig{
-			TunDeviceName:        "outline233",
+			TunDeviceName:        *tunFlag,
 			TunDeviceIP:          "10.233.233.1",
 			TunDeviceMTU:         1500, // todo: read this from netlink
 			TunGatewayCIDR:       "10.233.233.2/32",
 			RoutingTableID:       233,
 			RoutingTablePriority: 23333,
-			DNSServerIP:          "9.9.9.9",
+			DNSServerIP:          *dnsFlag,
 		},
 	}
-	flag.Parse()
+
+	tun, err := newTunDevice(*tunFlag, "10.233.233.1")
+	if err != nil {
+		return fmt.Errorf("failed to create tun device: %w", err)
+	}
+	defer tun.Close()
 
 	if err := app.Run(); err != nil {
 		logging.Err.Printf("%v\n", err)

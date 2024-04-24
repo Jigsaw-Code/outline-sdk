@@ -35,14 +35,14 @@ func (app App) Run() error {
 	}
 	defer tun.Close()
 
-	// disable IPv6 before resolving Shadowsocks server IP
-	prevIPv6, err := enableIPv6(false)
-	if err != nil {
-		return fmt.Errorf("failed to disable IPv6: %w", err)
-	}
-	defer enableIPv6(prevIPv6)
+	// // disable IPv6 before resolving Shadowsocks server IP
+	// prevIPv6, err := enableIPv6(false)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to disable IPv6: %w", err)
+	// }
+	// defer enableIPv6(prevIPv6)
 
-	ss, err := NewOutlineDevice(*app.TransportConfig)
+	ss, err := NewOutlineDevice(app.TransportConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create OutlineDevice: %w", err)
 	}
@@ -68,7 +68,7 @@ func (app App) Run() error {
 	}
 	defer restoreSystemDNSServer()
 
-	if err := startRouting(ss.GetServerIP().String(), app.RoutingConfig); err != nil {
+	if err := startRouting(app.RoutingConfig); err != nil {
 		return fmt.Errorf("failed to configure routing: %w", err)
 	}
 	defer stopRouting(app.RoutingConfig.RoutingTableID)

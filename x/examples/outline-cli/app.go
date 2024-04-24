@@ -15,7 +15,7 @@
 package main
 
 type App struct {
-	TransportConfig *string
+	TransportConfig string
 	RoutingConfig   *RoutingConfig
 }
 

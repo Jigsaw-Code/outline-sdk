@@ -24,19 +24,15 @@ import (
 
 var ipRule *netlink.Rule = nil
 
-func startRouting(proxyIP string, config *RoutingConfig) error {
+func startRouting(config *RoutingConfig) error {
 	if err := setupRoutingTable(config.RoutingTableID, config.TunDeviceName, config.TunGatewayCIDR, config.TunDeviceIP); err != nil {
 		return err
 	}
-	return setupIpRule(proxyIP+"/32", config.RoutingTableID, config.RoutingTablePriority)
 }
 
 func stopRouting(routingTable int) {
 	if err := cleanUpRoutingTable(routingTable); err != nil {
 		logging.Err.Printf("failed to clean up routing table '%v': %v\n", routingTable, err)
-	}
-	if err := cleanUpRule(); err != nil {
-		logging.Err.Printf("failed to clean up IP rule: %v\n", err)
 	}
 }
 
@@ -95,38 +91,4 @@ func cleanUpRoutingTable(routingTable int) error {
 		logging.Info.Printf("routing table '%v' has been cleaned up\n", routingTable)
 	}
 	return rtDelErr
-}
-
-func setupIpRule(svrIp string, routingTable, routingPriority int) error {
-	dst, err := netlink.ParseIPNet(svrIp)
-	if err != nil {
-		return fmt.Errorf("failed to parse server IP CIDR '%s': %w", svrIp, err)
-	}
-
-	// todo: exclude server IP will cause issues when accessing services on the same server,
-	//       use fwmask to protect the shadowsocks socket instead
-	ipRule = netlink.NewRule()
-	ipRule.Priority = routingPriority
-	ipRule.Family = netlink.FAMILY_V4
-	ipRule.Table = routingTable
-	ipRule.Dst = dst
-	ipRule.Invert = true
-
-	if err := netlink.RuleAdd(ipRule); err != nil {
-		return fmt.Errorf("failed to add IP rule (table %v, dst %v): %w", ipRule.Table, ipRule.Dst, err)
-	}
-	logging.Info.Printf("ip rule 'from all not to %v via table %v' created\n", ipRule.Dst, ipRule.Table)
-	return nil
-}
-
-func cleanUpRule() error {
-	if ipRule == nil {
-		return nil
-	}
-	if err := netlink.RuleDel(ipRule); err != nil {
-		return fmt.Errorf("failed to delete IP rule of routing table '%v': %w", ipRule.Table, err)
-	}
-	logging.Info.Printf("ip rule of routing table '%v' deleted\n", ipRule.Table)
-	ipRule = nil
-	return nil
 }
