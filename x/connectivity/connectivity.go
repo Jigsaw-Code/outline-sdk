@@ -102,7 +102,7 @@ func TestStreamConnectivityWithDNS(ctx context.Context, baseDialer transport.Str
 		for _, ip := range ips {
 			addr := net.JoinHostPort(ip, port)
 			connResult := ConnectionResult{Address: addr}
-			deadline := time.Now().Add(1 * time.Second)
+			deadline := time.Now().Add(5 * time.Second)
 			ipCtx, cancel := context.WithDeadline(ctx, deadline)
 			defer cancel()
 			conn, err = baseDialer.DialStream(ipCtx, addr)
