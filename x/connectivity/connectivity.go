@@ -102,7 +102,10 @@ func TestStreamConnectivityWithDNS(ctx context.Context, baseDialer transport.Str
 		for _, ip := range ips {
 			addr := net.JoinHostPort(ip, port)
 			connResult := ConnectionResult{Address: addr}
-			conn, err = baseDialer.DialStream(ctx, addr)
+			deadline := time.Now().Add(1 * time.Second)
+			ipCtx, cancel := context.WithDeadline(ctx, deadline)
+			defer cancel()
+			conn, err = baseDialer.DialStream(ipCtx, addr)
 			if err != nil {
 				connResult.Error = makeConnectivityError("connect", err)
 			}
@@ -118,7 +121,13 @@ func TestStreamConnectivityWithDNS(ctx context.Context, baseDialer transport.Str
 	if err != nil {
 		return nil, err
 	}
-	resolver := dns.NewTCPResolver(dialer, resolverAddress)
+	resolverConn, err := dialer.DialStream(ctx, resolverAddress)
+	if err != nil {
+		return nil, err
+	}
+	resolver := dns.NewTCPResolver(transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+		return resolverConn, nil
+	}), resolverAddress)
 	testResult.Error, err = TestConnectivityWithResolver(ctx, resolver, testDomain)
 	if err != nil {
 		return nil, err
