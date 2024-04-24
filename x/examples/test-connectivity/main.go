@@ -177,6 +177,7 @@ func main() {
 	success := false
 	jsonEncoder := json.NewEncoder(os.Stdout)
 	jsonEncoder.SetEscapeHTML(false)
+	configParser := config.NewDefaultConfigParser()
 	for _, resolverHost := range strings.Split(*resolverFlag, ",") {
 		resolverHost := strings.TrimSpace(resolverHost)
 		resolverAddress := net.JoinHostPort(resolverHost, "53")
@@ -188,12 +189,12 @@ func main() {
 			switch proto {
 			case "tcp":
 				wrap := func(baseDialer transport.StreamDialer) (transport.StreamDialer, error) {
-					return config.WrapStreamDialer(baseDialer, *transportFlag)
+					return configParser.WrapStreamDialer(baseDialer, *transportFlag)
 				}
 				testResult, testErr = connectivity.TestStreamConnectivityWithDNS(context.Background(), &transport.TCPDialer{}, wrap, resolverAddress, *domainFlag)
 			case "udp":
 				wrap := func(baseDialer transport.PacketDialer) (transport.PacketDialer, error) {
-					return config.WrapPacketDialer(baseDialer, *transportFlag)
+					return configParser.WrapPacketDialer(baseDialer, *transportFlag)
 				}
 				testResult, testErr = connectivity.TestPacketConnectivityWithDNS(context.Background(), &transport.UDPDialer{}, wrap, resolverAddress, *domainFlag)
 			default:

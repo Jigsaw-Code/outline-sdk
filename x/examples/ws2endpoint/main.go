@@ -37,7 +37,7 @@ func main() {
 	pathPrefix := flag.String("path", "/", "Path where to run the Websocket forwarder")
 	flag.Parse()
 
-	dialer, err := config.NewStreamDialer(*transportFlag)
+	dialer, err := config.NewDefaultConfigParser().WrapStreamDialer(&transport.TCPDialer{}, *transportFlag)
 	if err != nil {
 		log.Fatalf("Could not create dialer: %v", err)
 	}
