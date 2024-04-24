@@ -47,14 +47,19 @@ type connectivityReport struct {
 	// TODO(fortuna): add sanitized transport config.
 	Transport string `json:"transport"`
 
-	// The address of the selected connection to the proxy server.
-	Connections     []connectionJSON `json:"connections"`
-	SelectedAddress *addressJSON     `json:"selected_address,omitempty"`
+	// The result for the connection.
+	Connect         connectAttemptJSON `json:"connect"`
+	SelectedAddress *addressJSON       `json:"selected_address,omitempty"`
 
 	// Observations
 	Time       time.Time  `json:"time"`
 	DurationMs int64      `json:"duration_ms"`
 	Error      *errorJSON `json:"error"`
+}
+
+type connectAttemptJSON struct {
+	Address  *addressJSON         `json:"address,omitempty"`
+	Attempts []connectAttemptJSON `json:"attempts,omitempty"`
 }
 
 type connectionJSON struct {
