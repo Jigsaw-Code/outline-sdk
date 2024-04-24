@@ -29,19 +29,28 @@ import (
 
 // ConnectivityResult captures the observed result of the connectivity test.
 type ConnectivityResult struct {
-	// Address we connected to
-	Connections []ConnectionResult
+	// The result of the initial connect attempt
+	Connect ConnectResult
 	// Address of the connection that was selected
 	SelectedAddress string
 	// Observed error
 	Error *ConnectivityError
 }
 
-type ConnectionResult struct {
-	// Address we connected to
-	Address string
+type ConnectResult struct {
+	// Address we dialed
+	DialedAddress string
+	// Address we selected
+	SelectedAddress string
+	// Lists each connection attempt
+	Attempts []ConnectionAttempt
 	// Observed error
 	Error *ConnectivityError
+}
+
+type ConnectionAttempt struct {
+	Address string
+	Error   error
 }
 
 // ConnectivityError captures the observed error of the connectivity test.
@@ -89,10 +98,12 @@ type WrapStreamDialer func(baseDialer transport.StreamDialer) (transport.StreamD
 // It uses the baseDialer to create a first-hop connection to the proxy, and the wrap to apply the transport.
 // The baseDialer is typically TCPDialer, but it can be replaced for remote measurements.
 func TestStreamConnectivityWithDNS(ctx context.Context, baseDialer transport.StreamDialer, wrap WrapStreamDialer, resolverAddress string, testDomain string) (*ConnectivityResult, error) {
-	testResult := &ConnectivityResult{
-		Connections: make([]ConnectionResult, 0),
-	}
+	testResult := &ConnectivityResult{}
 	interceptDialer := transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+		connectResult := &testResult.Connect
+		// Captures the address of the first hop, before resolution.
+		connectResult.DialedAddress = addr
+		connectResult.Attempts = make([]ConnectionAttempt, 0)
 		host, port, err := net.SplitHostPort(addr)
 		if err != nil {
 			return nil, err
@@ -101,17 +112,18 @@ func TestStreamConnectivityWithDNS(ctx context.Context, baseDialer transport.Str
 		var conn transport.StreamConn
 		for _, ip := range ips {
 			addr := net.JoinHostPort(ip, port)
-			connResult := ConnectionResult{Address: addr}
+			attemptResult := ConnectionAttempt{Address: addr}
+			// TODO: This is slow. Race and overlap attempts instead.
 			deadline := time.Now().Add(5 * time.Second)
 			ipCtx, cancel := context.WithDeadline(ctx, deadline)
 			defer cancel()
 			conn, err = baseDialer.DialStream(ipCtx, addr)
 			if err != nil {
-				connResult.Error = makeConnectivityError("connect", err)
+				attemptResult.Error = err
 			}
-			testResult.Connections = append(testResult.Connections, connResult)
+			connectResult.Attempts = append(connectResult.Attempts, attemptResult)
 			if err == nil {
-				testResult.SelectedAddress = addr
+				connectResult.SelectedAddress = addr
 				break
 			}
 		}
