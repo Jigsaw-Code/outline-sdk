@@ -3,46 +3,60 @@ package clib
 // #include <stdlib.h>
 import (
 	"C"
-	"unsafe"
+	"runtime/cgo"
 
 	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
 )
 
-type ProxyPtr = unsafe.Pointer
-type StreamDialerPtr = unsafe.Pointer
+type ProxyHandle = cgo.Handle
+type StreamDialerHandle = cgo.Handle
 
-func NewStreamDialerFromConfig(config *C.char) StreamDialerPtr {
+//export NewStreamDialerFromConfig
+func NewStreamDialerFromConfig(config *C.char) StreamDialerHandle {
 	streamDialer, err := mobileproxy.NewStreamDialerFromConfig(C.GoString(config))
 
 	if err != nil {
-		return nil
+		// TODO: print something?
+		return cgo.NewHandle(nil)
 	}
 
-	return unsafe.Pointer(streamDialer)
+	return cgo.NewHandle(streamDialer)
 }
 
-func RunProxy(address *C.char, dialer StreamDialerPtr) ProxyPtr {
-	proxy, err := mobileproxy.RunProxy(C.GoString(address), (*mobileproxy.StreamDialer)(dialer))
+//export RunProxy
+func RunProxy(address *C.char, dialerHandle StreamDialerHandle) ProxyHandle {
+	dialer := dialerHandle.Value().(mobileproxy.StreamDialer)
+
+	proxy, err := mobileproxy.RunProxy(C.GoString(address), &dialer)
 
 	if err != nil {
-		return nil
+		// TODO: print something?
+		return cgo.NewHandle(nil)
 	}
 
-	return unsafe.Pointer(proxy)
+	return cgo.NewHandle(proxy)
 }
 
-func AddURLProxy(proxy ProxyPtr, url *C.char) {
-	(*mobileproxy.Proxy)(proxy).AddURLProxy(C.GoString(url))
+//export AddURLProxy
+func AddURLProxy(proxyHandle ProxyHandle, url *C.char) {
+	proxy := proxyHandle.Value().(mobileproxy.Proxy)
+
+	proxy.AddURLProxy(C.GoString(url))
 }
 
-func StopProxy(proxy ProxyPtr, timeoutSeconds C.int) {
-	(*mobileproxy.Proxy)(proxy).Stop(timeoutSeconds)
+//export StopProxy
+func StopProxy(proxyHandle ProxyHandle, timeoutSeconds C.uint) {
+	proxy := proxyHandle.Value().(mobileproxy.Proxy)
+
+	proxy.Stop(timeoutSeconds)
 }
 
-func DestroyStreamDialer(dialer StreamDialerPtr) {
-	C.free(dialer)
+//export DestroyStreamDialer
+func DestroyStreamDialer(dialer StreamDialerHandle) {
+	dialer.Delete()
 }
 
-func DestroyProxy(proxy ProxyPtr) {
-	C.free(proxy)
+//export DestroyProxy
+func DestroyProxy(proxy ProxyHandle) {
+	proxy.Delete()
 }
