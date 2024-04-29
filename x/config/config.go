@@ -38,6 +38,10 @@ func NewDefaultConfigParser() *ConfigParser {
 	p := new(ConfigParser)
 
 	// Please keep the list in alphabetical order.
+	p.RegisterStreamDialerWrapper("doh", wrapStreamDialerWithDOH)
+	p.RegisterPacketDialerWrapper("doh", func(baseDialer transport.PacketDialer, wrapConfig *url.URL) (transport.PacketDialer, error) {
+		return nil, errors.New("doh is not supported for PacketDialers")
+	})
 
 	p.RegisterStreamDialerWrapper("override", wrapStreamDialerWithOverride)
 	p.RegisterPacketDialerWrapper("override", wrapPacketDialerWithOverride)

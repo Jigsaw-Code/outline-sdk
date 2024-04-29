@@ -45,6 +45,7 @@ func main() {
 	transportFlag := flag.String("transport", "", "Transport config")
 	addressFlag := flag.String("address", "", "Address to connect to. If empty, use the URL authority")
 	methodFlag := flag.String("method", "GET", "The HTTP method to use")
+	timeoutSecFlag := flag.Int("timeout", 5, "Timeout in seconds")
 
 	flag.Parse()
 
@@ -89,7 +90,7 @@ func main() {
 		}
 		return dialer.DialStream(ctx, net.JoinHostPort(host, port))
 	}
-	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: 5 * time.Second}
+	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: time.Duration(*timeoutSecFlag) * time.Second}
 
 	req, err := http.NewRequest(*methodFlag, url, nil)
 	if err != nil {
