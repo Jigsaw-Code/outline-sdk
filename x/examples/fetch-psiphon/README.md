@@ -5,7 +5,7 @@ This fetch tool illustrates how to use Psiphon as a stream dialer.
 Usage:
 
 ```sh
-go run . -config config.json https://ipinfo.io
+go run -tags PSIPHON_DISABLE_QUIC . -config config.json https://ipinfo.io
 ```
 
 You will need a config file of a Psiphon server. You can run one yourself and generate the config as per the
