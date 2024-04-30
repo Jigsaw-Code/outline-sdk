@@ -25,7 +25,7 @@ type (
 	recordType               byte
 	tlsVersion               uint16
 	tlsRecordHeader          []byte
-  tlsHandshakeRecordHeader []byte
+	tlsHandshakeRecordHeader []byte
 )
 
 // TLS record layout from [RFC 8446]:
