@@ -94,7 +94,7 @@ func restoreSystemDNSServer() {
 			// backup not exist - just remove original, because it's created by ourselves
 			if err := os.Remove(backup.original); err != nil {
 				logging.Err.Printf("removing original DNS config file '%s': %v", backup.original, err)
-				return
+				continue
 			}
 			logging.Info.Printf("DNS config removed '%s'\n", backup.original)
 		} else {
