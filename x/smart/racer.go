@@ -53,7 +53,7 @@ func raceTests[E any, R any](ctx context.Context, maxWait time.Duration, entries
 			entry := entries[next]
 			next++
 
-			waitCtx, waitDone := context.WithTimeout(ctx, 250*time.Millisecond)
+			waitCtx, waitDone := context.WithTimeout(ctx, maxWait)
 			if next == len(entries) {
 				// Done with entries. No longer trigger on waitCh.
 				waitCh = nil

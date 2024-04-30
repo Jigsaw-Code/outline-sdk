@@ -66,7 +66,7 @@ func newOverrideFromURL(configURL *url.URL) (func(string) (string, error), error
 	}, nil
 }
 
-func newOverrideStreamDialerFromURL(innerDialer transport.StreamDialer, configURL *url.URL) (transport.StreamDialer, error) {
+func wrapStreamDialerWithOverride(innerDialer transport.StreamDialer, configURL *url.URL) (transport.StreamDialer, error) {
 	override, err := newOverrideFromURL(configURL)
 	if err != nil {
 		return nil, err
@@ -80,7 +80,7 @@ func newOverrideStreamDialerFromURL(innerDialer transport.StreamDialer, configUR
 	}), nil
 }
 
-func newOverridePacketDialerFromURL(innerDialer transport.PacketDialer, configURL *url.URL) (transport.PacketDialer, error) {
+func wrapPacketDialerWithOverride(innerDialer transport.PacketDialer, configURL *url.URL) (transport.PacketDialer, error) {
 	override, err := newOverrideFromURL(configURL)
 	if err != nil {
 		return nil, err

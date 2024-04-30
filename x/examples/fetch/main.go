@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 )
 
@@ -68,7 +69,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	dialer, err := config.NewStreamDialer(*transportFlag)
+	dialer, err := config.NewDefaultConfigParser().WrapStreamDialer(&transport.TCPDialer{}, *transportFlag)
 	if err != nil {
 		log.Fatalf("Could not create dialer: %v\n", err)
 	}

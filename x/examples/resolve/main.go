@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/dns"
+	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"golang.org/x/net/dns/dnsmessage"
 )
@@ -66,14 +67,15 @@ func main() {
 	resolverAddr := *resolverFlag
 
 	var resolver dns.Resolver
+	configParser := config.NewDefaultConfigParser()
 	if *tcpFlag {
-		streamDialer, err := config.NewStreamDialer(*transportFlag)
+		streamDialer, err := configParser.WrapStreamDialer(&transport.TCPDialer{}, *transportFlag)
 		if err != nil {
 			log.Fatalf("Could not create stream dialer: %v", err)
 		}
 		resolver = dns.NewTCPResolver(streamDialer, resolverAddr)
 	} else {
-		packetDialer, err := config.NewPacketDialer(*transportFlag)
+		packetDialer, err := configParser.WrapPacketDialer(&transport.UDPDialer{}, *transportFlag)
 		if err != nil {
 			log.Fatalf("Could not create packet dialer: %v", err)
 		}
