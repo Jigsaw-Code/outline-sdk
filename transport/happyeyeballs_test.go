@@ -134,7 +134,6 @@ func TestHappyEyeballsStreamDialer_DialStream(t *testing.T) {
 				func(ctx context.Context, host string) ([]netip.Addr, error) {
 					time.Sleep(10 * time.Millisecond)
 					return []netip.Addr{netip.MustParseAddr("2001:4860:4860::8888")}, nil
-
 				},
 				func(ctx context.Context, host string) ([]netip.Addr, error) {
 					return nil, errors.New("lookup failed")

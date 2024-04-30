@@ -63,7 +63,7 @@ func (app App) Run() error {
 		logging.Info.Printf("OutlineDevice -> tun stopped: %v %v\n", written, err)
 	}()
 
-	restoreSystemDNSServer, err := setSystemDNSServer(app.RoutingConfig.DNSServerIP)
+	err = setSystemDNSServer(app.RoutingConfig.DNSServerIP)
 	if err != nil {
 		return fmt.Errorf("failed to configure system DNS: %w", err)
 	}

@@ -67,8 +67,7 @@ var packetBufferPool = slicepool.MakePool(dnsUdpMaxMsgLen)
 // dnsTruncateProxy is a network.PacketProxy that create dnsTruncateRequestHandler to handle DNS requests locally.
 //
 // Multiple goroutines may invoke methods on a dnsTruncateProxy simultaneously.
-type dnsTruncateProxy struct {
-}
+type dnsTruncateProxy struct{}
 
 // dnsTruncateRequestHandler is a network.PacketRequestSender that handles DNS requests in UDP protocol locally,
 // without sending the requests to the actual DNS resolver. It sets the TC (truncated) bit in the DNS response header
@@ -81,8 +80,10 @@ type dnsTruncateRequestHandler struct {
 }
 
 // Compilation guard against interface implementation
-var _ network.PacketProxy = (*dnsTruncateProxy)(nil)
-var _ network.PacketRequestSender = (*dnsTruncateRequestHandler)(nil)
+var (
+	_ network.PacketProxy         = (*dnsTruncateProxy)(nil)
+	_ network.PacketRequestSender = (*dnsTruncateRequestHandler)(nil)
+)
 
 // NewPacketProxy creates a new [network.PacketProxy] that can be used to handle DNS requests if the remote proxy
 // doesn't support UDP traffic. It sets the TC (truncated) bit in the DNS response header to tell the caller to resend

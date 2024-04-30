@@ -159,8 +159,7 @@ func (sp *sessionCountPacketProxy) Count() int {
 	return int(sp.cnt.Load())
 }
 
-type noopPacketProxy struct {
-}
+type noopPacketProxy struct{}
 
 func (noopPacketProxy) NewSession(PacketResponseReceiver) (PacketRequestSender, error) {
 	return nil, nil

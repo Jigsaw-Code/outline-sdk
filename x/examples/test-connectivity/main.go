@@ -66,7 +66,7 @@ func makeErrorRecord(result *connectivity.ConnectivityError) *errorJSON {
 	if result == nil {
 		return nil
 	}
-	var record = new(errorJSON)
+	record := new(errorJSON)
 	record.Op = result.Op
 	record.PosixError = result.PosixError
 	record.Msg = unwrapAll(result.Err).Error()

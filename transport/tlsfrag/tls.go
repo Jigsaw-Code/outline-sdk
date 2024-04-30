@@ -20,9 +20,11 @@ import (
 
 // This file contains helper functions and constants for TLS Client Hello message.
 
-type recordType byte
-type tlsVersion uint16
-type tlsRecordHeader []byte
+type (
+	recordType      byte
+	tlsVersion      uint16
+	tlsRecordHeader []byte
+)
 
 // TLS record layout from [RFC 8446]:
 //

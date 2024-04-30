@@ -43,7 +43,7 @@ func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
 	transportFlag := flag.String("transport", "", "Transport config")
 	methodFlag := flag.String("method", "GET", "The HTTP method to use")
-	timeoutFlag := flag.Duration("timeout", 10 * time.Second, "The HTTP timeout value")
+	timeoutFlag := flag.Duration("timeout", 10*time.Second, "The HTTP timeout value")
 
 	flag.Parse()
 

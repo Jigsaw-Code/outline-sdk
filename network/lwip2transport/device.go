@@ -43,8 +43,10 @@ type lwIPDevice struct {
 }
 
 // Singleton instance
-var instMu sync.Mutex
-var inst *lwIPDevice = nil
+var (
+	instMu sync.Mutex
+	inst   *lwIPDevice = nil
+)
 
 // ConfigureDevice configures the singleton LwIP device using the [transport.StreamDialer] to handle TCP streams and
 // the [transport.PacketProxy] to handle UDP packets.

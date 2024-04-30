@@ -40,8 +40,10 @@ type clientHelloBuffer struct {
 	bufrd *bytes.Reader
 }
 
-var _ io.Writer = (*clientHelloBuffer)(nil)
-var _ io.ReaderFrom = (*clientHelloBuffer)(nil)
+var (
+	_ io.Writer     = (*clientHelloBuffer)(nil)
+	_ io.ReaderFrom = (*clientHelloBuffer)(nil)
+)
 
 // newClientHelloBuffer creates and initializes a new buffer to receive a TLS Client Hello packet.
 func newClientHelloBuffer() *clientHelloBuffer {
