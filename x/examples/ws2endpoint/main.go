@@ -1,4 +1,4 @@
-// Copyright 2023 Jigsaw Operations LLC
+// Copyright 2024 Jigsaw Operations LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"flag"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -26,33 +27,52 @@ import (
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
-	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
+	"golang.org/x/net/websocket"
 )
 
 func main() {
+	addrFlag := flag.String("localAddr", "localhost:8080", "Local proxy address")
 	transportFlag := flag.String("transport", "", "Transport config")
-	addrFlag := flag.String("localAddr", "localhost:1080", "Local proxy address")
-	urlProxyPrefixFlag := flag.String("urlProxyPrefix", "/proxy", "Path where to run the URL proxy. Set to empty (\"\") to disable it.")
+	endpointFlag := flag.String("endpoint", "", "Address of the target endpoint")
+	pathPrefix := flag.String("path", "/", "Path where to run the Websocket forwarder")
 	flag.Parse()
 
 	dialer, err := config.NewDefaultConfigParser().WrapStreamDialer(&transport.TCPDialer{}, *transportFlag)
-
 	if err != nil {
 		log.Fatalf("Could not create dialer: %v", err)
 	}
+	if *endpointFlag == "" {
+		log.Fatal("Must specify flag -endpoint")
+	}
+	endpoint := transport.StreamDialerEndpoint{Dialer: dialer, Address: *endpointFlag}
 
 	listener, err := net.Listen("tcp", *addrFlag)
 	if err != nil {
 		log.Fatalf("Could not listen on address %v: %v", *addrFlag, err)
 	}
 	defer listener.Close()
-	log.Printf("Proxy listening on %v", listener.Addr().String())
+	log.Printf("Proxy listening on %v\n", listener.Addr().String())
 
-	proxyHandler := httpproxy.NewProxyHandler(dialer)
-	if *urlProxyPrefixFlag != "" {
-		proxyHandler.FallbackHandler = http.StripPrefix(*urlProxyPrefixFlag, httpproxy.NewPathHandler(dialer))
-	}
-	server := http.Server{Handler: proxyHandler}
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("Got request: %v\n", r)
+		handler := func(wsConn *websocket.Conn) {
+			targetConn, err := endpoint.ConnectStream(r.Context())
+			if err != nil {
+				log.Printf("Failed to upgrade: %v\n", err)
+				w.WriteHeader(http.StatusBadGateway)
+				return
+			}
+			defer targetConn.Close()
+			go func() {
+				io.Copy(targetConn, wsConn)
+				targetConn.CloseWrite()
+			}()
+			io.Copy(wsConn, targetConn)
+			wsConn.Close()
+		}
+		websocket.Server{Handler: handler}.ServeHTTP(w, r)
+	})
+	server := http.Server{Handler: http.StripPrefix(*pathPrefix, handler)}
 	go func() {
 		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Error running web server: %v", err)
@@ -63,7 +83,7 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 	<-sig
-	log.Print("Shutting down")
+	log.Println("Shutting down")
 	// Gracefully shut down the server, with a 5s timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

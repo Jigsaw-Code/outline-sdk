@@ -56,6 +56,9 @@ type connectHandler struct {
 
 var _ http.Handler = (*connectHandler)(nil)
 
+// TODO(fortuna): Inject the config parser
+var configParser = config.NewDefaultConfigParser()
+
 func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Request) {
 	if proxyReq.Method != http.MethodConnect {
 		proxyResp.Header().Add("Allow", "CONNECT")
@@ -76,7 +79,7 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 
 	// Dial the target.
 	transportConfig := proxyReq.Header.Get("Transport")
-	dialer, err := config.WrapStreamDialer(h.dialer, transportConfig)
+	dialer, err := configParser.WrapStreamDialer(h.dialer, transportConfig)
 	if err != nil {
 		// Because we sanitize the base dialer error, it's safe to return error details here.
 		http.Error(proxyResp, fmt.Sprintf("Invalid config in Transport header: %v", err), http.StatusBadRequest)
@@ -95,23 +98,35 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 		return
 	}
 
-	httpConn, _, err := hijacker.Hijack()
+	httpConn, clientRW, err := hijacker.Hijack()
 	if err != nil {
 		http.Error(proxyResp, "Failed to hijack connection", http.StatusInternalServerError)
 		return
 	}
-	defer httpConn.Close()
+	// TODO(fortuna): Use context.AfterFunc after we migrate to Go 1.21.
+	go func() {
+		// We close the hijacked connection when the context is done. This way
+		// we allow the HTTP server to control the request lifetime.
+		// The request context will be cancelled right after ServeHTTP returns,
+		// but it can be cancelled before, if the server uses a custom BaseContext.
+		<-proxyReq.Context().Done()
+		httpConn.Close()
+	}()
 
 	// Inform the client that the connection has been established.
-	httpConn.Write([]byte("HTTP/1.1 200 Connection established\r\n\r\n"))
+	clientRW.Write([]byte("HTTP/1.1 200 Connection established\r\n\r\n"))
+	clientRW.Flush()
 
 	// Relay data between client and target in both directions.
 	go func() {
-		io.Copy(targetConn, httpConn)
+		io.Copy(targetConn, clientRW)
 		targetConn.CloseWrite()
 	}()
-	io.Copy(httpConn, targetConn)
-	// httpConn is closed by the defer httpConn.Close() above.
+	// We can't use io.Copy here because it doesn't call Flush on writes, so the first
+	// write is never sent and the entire relay gets stuck. bufio.Writer.ReadFrom takes
+	// care of that.
+	clientRW.ReadFrom(targetConn)
+	clientRW.Flush()
 }
 
 // NewConnectHandler creates a [http.Handler] that handles CONNECT requests and forwards

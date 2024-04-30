@@ -40,7 +40,9 @@ Shadowsocks proxy (compatible with Outline's access keys, package [github.com/Ji
 
 SOCKS5 proxy (currently streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/socks5])
 
-	socks5://[HOST]:[PORT]
+	socks5://[USERINFO]@[HOST]:[PORT]
+
+USERINFO field is optional and only required if username and password authentication is used. It is in the format of username:password.
 
 Stream split transport (streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/split])
 
@@ -96,6 +98,20 @@ In that case, HOST1 will be your entry node, and HOST3 will be your exit node.
 DPI Evasion - To add packet splitting to a Shadowsocks server for enhanced DPI evasion, use:
 
 	split:2|ss://[USERINFO]@[HOST]:[PORT]
+
+Defining custom transport - You can define your custom transport by implementing and registering the [WrapStreamDialerFunc] and [WrapPacketDialerFunc] functions:
+
+	// create new config parser
+	// p := new(ConfigParser)
+	// or
+	p := NewDefaultConfigParser()
+	// register your custom dialer
+	p.RegisterPacketDialerWrapper("custom", wrapStreamDialerWithCustom)
+	p.RegisterStreamDialerWrapper("custom", wrapPacketDialerWithCustom)
+	// then use it
+	dialer, err := p.WrapStreamDialer(innerDialer, "custom://config")
+
+where wrapStreamDialerWithCustom and wrapPacketDialerWithCustom implement [WrapPacketDialerFunc] and [WrapStreamDialerFunc].
 
 [Onion Routing]: https://en.wikipedia.org/wiki/Onion_routing
 */
