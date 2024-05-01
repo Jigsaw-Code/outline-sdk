@@ -25,7 +25,8 @@ func NewStreamDialerFromConfig(config *C.char) StreamDialerHandle {
 
 //export RunProxy
 func RunProxy(address *C.char, dialerHandle unsafe.Pointer) unsafe.Pointer {
-	dialer := dialerHandle.Value().(mobileproxy.StreamDialer)
+  h := *(*cgo.Handle)(dialerHandle)
+	dialer := h.Value().(mobileproxy.StreamDialer)
 
 	proxy, err := mobileproxy.RunProxy(C.GoString(address), &dialer)
 
