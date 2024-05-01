@@ -44,6 +44,14 @@ SOCKS5 proxy (currently streams only, package [github.com/Jigsaw-Code/outline-sd
 
 USERINFO field is optional and only required if username and password authentication is used. It is in the format of username:password.
 
+DNS-over-HTTPS resolution (streams only, package [github.com/Jigsaw-Code/outline-sdk/dns])
+
+It takes a host name and a host:port address. The name will be used in the SNI and Host header, while the address is used to connect
+to the DoH server. The address is optional, and will default to "[NAME]:443". The resulting dialer will use the input dialer with
+Happy Eyeballs to connect to the destination.
+
+	doh:name=[NAME]&address=[ADDRESS]
+
 Stream split transport (streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/split])
 
 It takes the length of the prefix. The stream will be split when PREFIX_LENGTH bytes are first written.
