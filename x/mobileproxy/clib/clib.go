@@ -34,7 +34,7 @@ func RunProxy(address *C.char, dialerHandle unsafe.Pointer) unsafe.Pointer {
 		return cgo.NewHandle(nil)
 	}
 
-	return cgo.NewHandle(proxy)
+	return unsafe.Pointer(&cgo.NewHandle(proxy))
 }
 
 //export AddURLProxy
