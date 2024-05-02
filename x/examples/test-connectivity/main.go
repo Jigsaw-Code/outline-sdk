@@ -58,8 +58,8 @@ type connectivityReport struct {
 }
 
 type connectAttemptJSON struct {
-	Address  *addressJSON         `json:"address,omitempty"`
-	Attempts []connectAttemptJSON `json:"attempts,omitempty"`
+	Address  *addressJSON     `json:"address,omitempty"`
+	Attempts []connectionJSON `json:"attempts,omitempty"`
 }
 
 type connectionJSON struct {
@@ -212,7 +212,8 @@ func main() {
 				log.Fatalf(`Invalid proto %v. Must be "tcp" or "udp"`, proto)
 			}
 			if testErr != nil {
-				log.Fatalf("Connectivity test failed to run: %v", testErr)
+				//log.Fatalf("Connectivity test failed to run: %v", testErr)
+				debugLog.Printf("Connectivity test failed to run: %v", testErr)
 			}
 			testDuration := time.Since(startTime)
 			if testResult.Error == nil {
@@ -232,16 +233,18 @@ func main() {
 				DurationMs: testDuration.Milliseconds(),
 				Error:      makeErrorRecord(testResult.Error),
 			}
-			for _, cr := range testResult.Connections {
-				cj := connectionJSON{
-					Error: makeErrorRecord(cr.Error),
-				}
+			for _, cr := range testResult.Connect.Attempts {
+				cj := connectionJSON{}
 				addressJSON, err := newAddressJSON(cr.Address)
 				if err == nil {
 					cj.Address = &addressJSON
 				}
-				r.Connections = append(r.Connections, cj)
+				if cr.Error != nil {
+					cj.Error = &errorJSON{Msg: cr.Error.Error()}
+				}
+				r.Connect.Attempts = append(r.Connect.Attempts, cj)
 			}
+			//fmt.Println("setting selected address...")
 			if testResult.SelectedAddress != "" {
 				selectedAddressJSON, err := newAddressJSON(testResult.SelectedAddress)
 				if err == nil {
