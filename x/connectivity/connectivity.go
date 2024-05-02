@@ -99,50 +99,71 @@ type WrapStreamDialer func(baseDialer transport.StreamDialer) (transport.StreamD
 // The baseDialer is typically TCPDialer, but it can be replaced for remote measurements.
 func TestStreamConnectivityWithDNS(ctx context.Context, baseDialer transport.StreamDialer, wrap WrapStreamDialer, resolverAddress string, testDomain string) (*ConnectivityResult, error) {
 	testResult := &ConnectivityResult{}
-	interceptDialer := transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
-		connectResult := &testResult.Connect
-		// Captures the address of the first hop, before resolution.
-		connectResult.DialedAddress = addr
-		connectResult.Attempts = make([]ConnectionAttempt, 0)
-		host, port, err := net.SplitHostPort(addr)
-		if err != nil {
-			return nil, err
-		}
-		ips, err := (&net.Resolver{PreferGo: false}).LookupHost(ctx, host)
-		var conn transport.StreamConn
-		for _, ip := range ips {
-			addr := net.JoinHostPort(ip, port)
-			attemptResult := ConnectionAttempt{Address: addr}
-			// TODO: This is slow. Race and overlap attempts instead.
-			deadline := time.Now().Add(5 * time.Second)
-			ipCtx, cancel := context.WithDeadline(ctx, deadline)
-			defer cancel()
-			conn, err = baseDialer.DialStream(ipCtx, addr)
+	i := 0
+	iterate := true
+	for iterate {
+		interceptDialer := transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+			connectResult := &testResult.Connect
+			// Captures the address of the first hop, before resolution.
+			connectResult.DialedAddress = addr
+			//connectResult.Attempts = make([]ConnectionAttempt, 0)
+			host, port, err := net.SplitHostPort(addr)
 			if err != nil {
-				attemptResult.Error = err
+				return nil, err
 			}
-			connectResult.Attempts = append(connectResult.Attempts, attemptResult)
-			if err == nil {
-				connectResult.SelectedAddress = addr
-				break
+			ips, err := (&net.Resolver{PreferGo: false}).LookupHost(ctx, host)
+			if err != nil {
+				connectResult.Error = makeConnectivityError("resolve", err)
+				return nil, err
 			}
+			var conn transport.StreamConn
+			if i < len(ips) {
+				ip := ips[i]
+				i++
+				fmt.Printf("Trying address %v\n", ip)
+				addr := net.JoinHostPort(ip, port)
+				attemptResult := ConnectionAttempt{Address: addr}
+				// TODO: This is slow. Race and overlap attempts instead.
+				// abort loop as soon as one connection is successful
+				deadline := time.Now().Add(5 * time.Second)
+				ipCtx, cancel := context.WithDeadline(ctx, deadline)
+				defer cancel()
+				conn, err = baseDialer.DialStream(ipCtx, addr)
+				if err != nil {
+					attemptResult.Error = errors.Unwrap(err)
+				}
+				connectResult.Attempts = append(connectResult.Attempts, attemptResult)
+				if err == nil {
+					connectResult.SelectedAddress = addr
+					iterate = false
+				}
+				return conn, err
+			} else {
+				iterate = false
+				return nil, fmt.Errorf("all connect attempts failed. no more addresses to try")
+			}
+		})
+		dialer, err := wrap(interceptDialer)
+		if err != nil {
+			continue
+			//return testResult, err
 		}
-		return conn, err
-	})
-	dialer, err := wrap(interceptDialer)
-	if err != nil {
-		return nil, err
-	}
-	resolverConn, err := dialer.DialStream(ctx, resolverAddress)
-	if err != nil {
-		return nil, err
-	}
-	resolver := dns.NewTCPResolver(transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
-		return resolverConn, nil
-	}), resolverAddress)
-	testResult.Error, err = TestConnectivityWithResolver(ctx, resolver, testDomain)
-	if err != nil {
-		return nil, err
+		deadline := time.Now().Add(5 * time.Second)
+		ipCtx, cancel := context.WithDeadline(ctx, deadline)
+		defer cancel()
+		resolverConn, err := dialer.DialStream(ipCtx, resolverAddress)
+		if err != nil {
+			testResult.Error = makeConnectivityError("connect", err)
+			continue
+		}
+		resolver := dns.NewTCPResolver(transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+			return resolverConn, nil
+		}), resolverAddress)
+		testResult.Error, err = TestConnectivityWithResolver(ctx, resolver, testDomain)
+		if err != nil {
+			continue
+			//return testResult, err
+		}
 	}
 	return testResult, nil
 }
@@ -154,35 +175,60 @@ type WrapPacketDialer func(baseDialer transport.PacketDialer) (transport.PacketD
 // The baseDialer is typically UDPDialer, but it can be replaced for remote measurements.
 func TestPacketConnectivityWithDNS(ctx context.Context, baseDialer transport.PacketDialer, wrap WrapPacketDialer, resolverAddress string, testDomain string) (*ConnectivityResult, error) {
 	testResult := &ConnectivityResult{}
-	interceptDialer := transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-		host, port, err := net.SplitHostPort(addr)
-		if err != nil {
-			return nil, err
-		}
-		ips, err := (&net.Resolver{PreferGo: false}).LookupHost(ctx, host)
-		var conn net.Conn
-		for _, ip := range ips {
-			addr := net.JoinHostPort(ip, port)
-			connResult := ConnectionResult{Address: addr}
-			conn, err = baseDialer.DialPacket(ctx, addr)
+	connectResult := &testResult.Connect
+	i := 0
+	iterate := true
+	for iterate {
+		interceptDialer := transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			// Captures the address of the first hop, before resolution.
+			connectResult.DialedAddress = addr
+			host, port, err := net.SplitHostPort(addr)
 			if err != nil {
-				connResult.Error = makeConnectivityError("connect", err)
+				return nil, err
 			}
-			testResult.Connections = append(testResult.Connections, connResult)
-			if err == nil {
-				testResult.SelectedAddress = addr
-				break
+			ips, err := (&net.Resolver{PreferGo: false}).LookupHost(ctx, host)
+			if err != nil {
+				connectResult.Error = makeConnectivityError("resolve", err)
+				return nil, err
 			}
+			var conn net.Conn
+			if i < len(ips) {
+				ip := ips[i]
+				i++
+				fmt.Printf("Trying address %v\n", ip)
+				addr := net.JoinHostPort(ip, port)
+				attemptResult := ConnectionAttempt{Address: addr}
+				conn, err = baseDialer.DialPacket(ctx, addr)
+				if err != nil {
+					attemptResult.Error = errors.Unwrap(err)
+				}
+				//testResult.Connections = append(testResult.Connections, connResult)
+				connectResult.Attempts = append(connectResult.Attempts, attemptResult)
+				if err == nil {
+					testResult.SelectedAddress = addr
+					//iterate = false
+				}
+				return conn, err
+			} else {
+				iterate = false
+				return nil, fmt.Errorf("all connect attempts failed. no more addresses to try")
+			}
+		})
+		dialer, err := wrap(interceptDialer)
+		if err != nil {
+			testResult.Error = makeConnectivityError("connect", err)
+			continue
+			//return nil, err
 		}
-		return conn, err
-	})
-	dialer, err := wrap(interceptDialer)
-	if err != nil {
-		return nil, err
+		resolver := dns.NewUDPResolver(dialer, resolverAddress)
+		testResult.Error, err = TestConnectivityWithResolver(ctx, resolver, testDomain)
+		if err != nil {
+			continue
+			//return testResult, err
+		}
 	}
-	resolver := dns.NewUDPResolver(dialer, resolverAddress)
-	testResult.Error, err = TestConnectivityWithResolver(ctx, resolver, testDomain)
-	return testResult, err
+	// TODO: error is always being returned as nil; must change this
+	return testResult, nil
 }
 
 // TestConnectivityWithResolver tests weather we can get a response from the given [Resolver]. It can be used
