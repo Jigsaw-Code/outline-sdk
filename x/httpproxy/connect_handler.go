@@ -120,7 +120,7 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 	// Relay data between client and target in both directions.
 	go func() {
 		// io.Copy prefers WriteTo, which clientRW implements. However,
-		// bufio.ReadWriter.ReadFrom issues an empty Write() call, which flushes
+		// bufio.ReadWriter.WriteTo issues an empty Write() call, which flushes
 		// the Shadowsocks IV and connect request, breaking the coalescing with
 		// the initial data. By preferring ReaderFrom, the coalescing of IV,
 		// request and initial data is preserved.
