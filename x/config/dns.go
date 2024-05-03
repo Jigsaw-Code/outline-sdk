@@ -25,12 +25,17 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
-func wrapStreamDialerWithDOH(innerDialer transport.StreamDialer, configURL *url.URL) (transport.StreamDialer, error) {
+func wrapStreamDialerWithDOH(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), configURL *url.URL) (transport.StreamDialer, error) {
 	query := configURL.Opaque
 	values, err := url.ParseQuery(query)
 	if err != nil {
 		return nil, err
 	}
+	sd, err := innerSD()
+	if err != nil {
+		return nil, err
+	}
+
 	var name, address string
 	for key, values := range values {
 		switch strings.ToLower(key) {
@@ -61,6 +66,6 @@ func wrapStreamDialerWithDOH(innerDialer transport.StreamDialer, configURL *url.
 		port = "443"
 	}
 	dohURL := url.URL{Scheme: "https", Host: net.JoinHostPort(name, port), Path: "/dns-query"}
-	resolver := dns.NewHTTPSResolver(innerDialer, address, dohURL.String())
-	return dns.NewStreamDialer(resolver, innerDialer)
+	resolver := dns.NewHTTPSResolver(sd, address, dohURL.String())
+	return dns.NewStreamDialer(resolver, sd)
 }
