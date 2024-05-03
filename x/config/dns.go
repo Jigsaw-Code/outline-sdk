@@ -69,7 +69,7 @@ func wrapStreamDialerWithDO53(innerSD func() (transport.StreamDialer, error), in
 			return nil, err
 		}
 		if !msg.Header.Truncated {
-			return msg, err
+			return msg, nil
 		}
 		return tcpResolver.Query(ctx, q)
 	})
