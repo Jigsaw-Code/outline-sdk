@@ -49,6 +49,7 @@ func NewDefaultConfigToDialer() *ConfigToDialer {
 	p.BasePacketDialer = &transport.UDPDialer{}
 
 	// Please keep the list in alphabetical order.
+	p.RegisterStreamDialerType("do53", wrapStreamDialerWithDO53)
 	p.RegisterStreamDialerType("doh", wrapStreamDialerWithDOH)
 
 	p.RegisterStreamDialerType("override", wrapStreamDialerWithOverride)

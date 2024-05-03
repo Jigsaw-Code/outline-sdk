@@ -15,6 +15,7 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -23,7 +24,57 @@ import (
 
 	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golang.org/x/net/dns/dnsmessage"
 )
+
+func wrapStreamDialerWithDO53(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), configURL *url.URL) (transport.StreamDialer, error) {
+	sd, err := innerSD()
+	if err != nil {
+		return nil, err
+	}
+	pd, err := innerPD()
+	if err != nil {
+		return nil, err
+	}
+	query := configURL.Opaque
+	values, err := url.ParseQuery(query)
+	if err != nil {
+		return nil, err
+	}
+	var address string
+	for key, values := range values {
+		switch strings.ToLower(key) {
+		case "address":
+			if len(values) != 1 {
+				return nil, fmt.Errorf("address option must has one value, found %v", len(values))
+			}
+			address = values[0]
+		default:
+			return nil, fmt.Errorf("unsupported option %v", key)
+
+		}
+	}
+	if address == "" {
+		return nil, errors.New("must set an address")
+	}
+	_, _, err = net.SplitHostPort(address)
+	if err != nil {
+		address = net.JoinHostPort(address, "53")
+	}
+	udpResolver := dns.NewUDPResolver(pd, address)
+	tcpResolver := dns.NewTCPResolver(sd, address)
+	resolver := dns.FuncResolver(func(ctx context.Context, q dnsmessage.Question) (*dnsmessage.Message, error) {
+		msg, err := udpResolver.Query(ctx, q)
+		if err != nil {
+			return nil, err
+		}
+		if !msg.Header.Truncated {
+			return msg, err
+		}
+		return tcpResolver.Query(ctx, q)
+	})
+	return dns.NewStreamDialer(resolver, sd)
+}
 
 func wrapStreamDialerWithDOH(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), configURL *url.URL) (transport.StreamDialer, error) {
 	query := configURL.Opaque
