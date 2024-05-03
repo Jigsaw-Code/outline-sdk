@@ -28,7 +28,9 @@ import (
 // ConfigToDialer enables the creation of stream and packet dialers based on a config. The config is
 // extensible by registering wrappers for config subtypes.
 type ConfigToDialer struct {
+	// Base StreamDialer to create direct stream connections. If you need direct stream connections, this must not be nil.
 	BaseStreamDialer transport.StreamDialer
+	// Base PacketDialer to create direct packet connections. If you need direct packet connections, this must not be nil.
 	BasePacketDialer transport.PacketDialer
 	sdBuilders       map[string]NewStreamDialerFunc
 	pdBuilders       map[string]NewPacketDialerFunc

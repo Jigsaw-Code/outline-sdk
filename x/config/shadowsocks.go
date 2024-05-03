@@ -179,10 +179,19 @@ func parseStringPrefix(utf8Str string) ([]byte, error) {
 }
 
 func sanitizeShadowsocksURL(u *url.URL) (string, error) {
-	const redactedPlaceholder = "REDACTED"
 	config, err := parseShadowsocksURL(u)
 	if err != nil {
-		return "ss://ERROR", err
+		return "", err
 	}
-	return "ss://" + redactedPlaceholder + "@" + config.serverAddress + "?prefix=" + url.PathEscape(string(config.prefix)), nil
+	values := make(url.Values)
+	if prefix := u.Query().Get("prefix"); prefix != "" {
+		values.Add("prefix", prefix)
+	}
+	cleanURL := url.URL{
+		Scheme:   "ss",
+		User:     url.User("REDACTED"),
+		Host:     config.serverAddress,
+		RawQuery: values.Encode(),
+	}
+	return cleanURL.String(), nil
 }
