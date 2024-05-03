@@ -15,8 +15,10 @@
 package transport
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net"
 	"sync"
 	"syscall"
@@ -154,4 +156,32 @@ func TestDialStreamEndpointAddr(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, listener.Addr().String(), conn.RemoteAddr().String())
 	require.Nil(t, conn.Close())
+}
+
+type countWriter struct {
+	writeCalls, readFromCalls int
+}
+
+func (w *countWriter) Write(b []byte) (int, error) {
+	w.writeCalls += 1
+	return len(b), nil
+}
+
+func (w *countWriter) ReadFrom(r io.Reader) (int64, error) {
+	w.readFromCalls += 1
+	return 0, nil
+}
+
+var _ io.Writer = (*countWriter)(nil)
+var _ io.ReaderFrom = (*countWriter)(nil)
+
+func Test_duplexConnAdaptor_PreferReadFrom(t *testing.T) {
+	var w countWriter
+	c := WrapConn(nil, nil, &w)
+	src := bytes.NewBuffer([]byte("data"))
+	n, err := c.(io.ReaderFrom).ReadFrom(src)
+	require.NoError(t, err)
+	require.Equal(t, 1, w.readFromCalls)
+	require.Equal(t, 0, w.writeCalls)
+	require.Equal(t, int64(0), n)
 }
