@@ -237,9 +237,15 @@ func SanitizeConfig(transportConfig string) (string, error) {
 		scheme := strings.ToLower(u.Scheme)
 		switch scheme {
 		case "ss":
-			textParts[i], _ = sanitizeShadowsocksURL(u)
+			textParts[i], err = sanitizeShadowsocksURL(u)
+			if err != nil {
+				return "", err
+			}
 		case "socks5":
-			textParts[i], _ = sanitizeSocks5URL(u)
+			textParts[i], err = sanitizeSocks5URL(u)
+			if err != nil {
+				return "", err
+			}
 		case "override", "split", "tls", "tlsfrag":
 			// No sanitization needed
 			textParts[i] = u.String()
