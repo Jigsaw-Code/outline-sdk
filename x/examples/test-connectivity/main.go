@@ -30,7 +30,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
@@ -48,10 +47,24 @@ type connectivityReport struct {
 	// TODO(fortuna): add sanitized transport config.
 	Transport string `json:"transport"`
 
+	// The result for the connection.
+	Connect         connectAttemptJSON `json:"connect"`
+	SelectedAddress *addressJSON       `json:"selected_address,omitempty"`
+
 	// Observations
 	Time       time.Time  `json:"time"`
 	DurationMs int64      `json:"duration_ms"`
 	Error      *errorJSON `json:"error"`
+}
+
+type connectAttemptJSON struct {
+	Address  *addressJSON         `json:"address,omitempty"`
+	Attempts []connectAttemptJSON `json:"attempts,omitempty"`
+}
+
+type connectionJSON struct {
+	Address *addressJSON `json:"address,omitempty"`
+	Error   *errorJSON   `json:"error"`
 }
 
 type errorJSON struct {
@@ -61,6 +74,19 @@ type errorJSON struct {
 	PosixError string `json:"posix_error,omitempty"`
 	// TODO: remove IP addresses
 	Msg string `json:"msg,omitempty"`
+}
+
+type addressJSON struct {
+	Host string `json:"host"`
+	Port string `json:"port"`
+}
+
+func newAddressJSON(address string) (addressJSON, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return addressJSON{}, err
+	}
+	return addressJSON{host, port}, nil
 }
 
 func makeErrorRecord(result *connectivity.ConnectivityError) *errorJSON {
@@ -168,46 +194,61 @@ func main() {
 		resolverAddress := net.JoinHostPort(resolverHost, "53")
 		for _, proto := range strings.Split(*protoFlag, ",") {
 			proto = strings.TrimSpace(proto)
-			var resolver dns.Resolver
+			var testResult *connectivity.ConnectivityResult
+			var testErr error
+			startTime := time.Now()
 			switch proto {
 			case "tcp":
-				streamDialer, err := configParser.WrapStreamDialer(&transport.TCPDialer{}, *transportFlag)
-				if err != nil {
-					log.Fatalf("Failed to create StreamDialer: %v", err)
+				wrap := func(baseDialer transport.StreamDialer) (transport.StreamDialer, error) {
+					return configParser.WrapStreamDialer(baseDialer, *transportFlag)
 				}
-				resolver = dns.NewTCPResolver(streamDialer, resolverAddress)
+				testResult, testErr = connectivity.TestStreamConnectivityWithDNS(context.Background(), &transport.TCPDialer{}, wrap, resolverAddress, *domainFlag)
 			case "udp":
-				packetDialer, err := configParser.WrapPacketDialer(&transport.UDPDialer{}, *transportFlag)
-				if err != nil {
-					log.Fatalf("Failed to create PacketDialer: %v", err)
+				wrap := func(baseDialer transport.PacketDialer) (transport.PacketDialer, error) {
+					return configParser.WrapPacketDialer(baseDialer, *transportFlag)
 				}
-				resolver = dns.NewUDPResolver(packetDialer, resolverAddress)
+				testResult, testErr = connectivity.TestPacketConnectivityWithDNS(context.Background(), &transport.UDPDialer{}, wrap, resolverAddress, *domainFlag)
 			default:
 				log.Fatalf(`Invalid proto %v. Must be "tcp" or "udp"`, proto)
 			}
-			startTime := time.Now()
-			result, err := connectivity.TestConnectivityWithResolver(context.Background(), resolver, *domainFlag)
-			if err != nil {
-				log.Fatalf("Connectivity test failed to run: %v", err)
+			if testErr != nil {
+				log.Fatalf("Connectivity test failed to run: %v", testErr)
 			}
 			testDuration := time.Since(startTime)
-			if result == nil {
+			if testResult.Error == nil {
 				success = true
 			}
-			debugLog.Printf("Test %v %v result: %v", proto, resolverAddress, result)
+			debugLog.Printf("Test %v %v result: %v", proto, resolverAddress, testResult)
 			sanitizedConfig, err := config.SanitizeConfig(*transportFlag)
 			if err != nil {
 				log.Fatalf("Failed to sanitize config: %v", err)
 			}
-			var r report.Report = connectivityReport{
+			r := connectivityReport{
 				Resolver: resolverAddress,
 				Proto:    proto,
 				Time:     startTime.UTC().Truncate(time.Second),
 				// TODO(fortuna): Add sanitized config:
 				Transport:  sanitizedConfig,
 				DurationMs: testDuration.Milliseconds(),
-				Error:      makeErrorRecord(result),
+				Error:      makeErrorRecord(testResult.Error),
 			}
+			for _, cr := range testResult.Connections {
+				cj := connectionJSON{
+					Error: makeErrorRecord(cr.Error),
+				}
+				addressJSON, err := newAddressJSON(cr.Address)
+				if err == nil {
+					cj.Address = &addressJSON
+				}
+				r.Connections = append(r.Connections, cj)
+			}
+			if testResult.SelectedAddress != "" {
+				selectedAddressJSON, err := newAddressJSON(testResult.SelectedAddress)
+				if err == nil {
+					r.SelectedAddress = &selectedAddressJSON
+				}
+			}
+
 			if reportCollector != nil {
 				err = reportCollector.Collect(context.Background(), r)
 				if err != nil {
