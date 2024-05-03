@@ -71,6 +71,8 @@ func wrapStreamDialerWithDO53(innerSD func() (transport.StreamDialer, error), in
 		if !msg.Header.Truncated {
 			return msg, nil
 		}
+		// If the message is truncated, retry over TCP.
+		// See https://datatracker.ietf.org/doc/html/rfc1123#page-75.
 		return tcpResolver.Query(ctx, q)
 	})
 	return dns.NewStreamDialer(resolver, sd)
