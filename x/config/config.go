@@ -34,10 +34,10 @@ type ConfigToDialer struct {
 	pdBuilders       map[string]NewPacketDialerFunc
 }
 
-// NewStreamDialerFunc wraps a Dialer based on the wrapConfig.
+// NewStreamDialerFunc wraps a Dialer based on the wrapConfig. The innerSD and innerPD functions can provide a base Stream and Packet Dialers if needed.
 type NewStreamDialerFunc func(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), wrapConfig *url.URL) (transport.StreamDialer, error)
 
-// NewPacketDialerFunc wraps a Dialer based on the wrapConfig.
+// NewPacketDialerFunc wraps a Dialer based on the wrapConfig. The innerSD and innerPD functions can provide a base Stream and Packet Dialers if needed.
 type NewPacketDialerFunc func(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), wrapConfig *url.URL) (transport.PacketDialer, error)
 
 // NewDefaultConfigToDialer creates a [ConfigToDialer] with a set of default wrappers already registered.
@@ -47,21 +47,21 @@ func NewDefaultConfigToDialer() *ConfigToDialer {
 	p.BasePacketDialer = &transport.UDPDialer{}
 
 	// Please keep the list in alphabetical order.
-	p.RegisterStreamDialerWrapper("doh", wrapStreamDialerWithDOH)
+	p.RegisterStreamDialerType("doh", wrapStreamDialerWithDOH)
 
-	p.RegisterStreamDialerWrapper("override", wrapStreamDialerWithOverride)
-	p.RegisterPacketDialerWrapper("override", wrapPacketDialerWithOverride)
+	p.RegisterStreamDialerType("override", wrapStreamDialerWithOverride)
+	p.RegisterPacketDialerType("override", wrapPacketDialerWithOverride)
 
-	p.RegisterStreamDialerWrapper("socks5", wrapStreamDialerWithSOCKS5)
+	p.RegisterStreamDialerType("socks5", wrapStreamDialerWithSOCKS5)
 
-	p.RegisterStreamDialerWrapper("split", wrapStreamDialerWithSplit)
+	p.RegisterStreamDialerType("split", wrapStreamDialerWithSplit)
 
-	p.RegisterStreamDialerWrapper("ss", wrapStreamDialerWithShadowsocks)
-	p.RegisterPacketDialerWrapper("ss", wrapPacketDialerWithShadowsocks)
+	p.RegisterStreamDialerType("ss", wrapStreamDialerWithShadowsocks)
+	p.RegisterPacketDialerType("ss", wrapPacketDialerWithShadowsocks)
 
-	p.RegisterStreamDialerWrapper("tls", wrapStreamDialerWithTLS)
+	p.RegisterStreamDialerType("tls", wrapStreamDialerWithTLS)
 
-	p.RegisterStreamDialerWrapper("tlsfrag", func(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), wrapConfig *url.URL) (transport.StreamDialer, error) {
+	p.RegisterStreamDialerType("tlsfrag", func(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), wrapConfig *url.URL) (transport.StreamDialer, error) {
 		sd, err := innerSD()
 		if err != nil {
 			return nil, err
@@ -76,8 +76,8 @@ func NewDefaultConfigToDialer() *ConfigToDialer {
 	return p
 }
 
-// RegisterStreamDialerWrapper will register a wrapper for stream dialers under the given subtype.
-func (p *ConfigToDialer) RegisterStreamDialerWrapper(subtype string, wrapper NewStreamDialerFunc) error {
+// RegisterStreamDialerType will register a wrapper for stream dialers under the given subtype.
+func (p *ConfigToDialer) RegisterStreamDialerType(subtype string, newDialer NewStreamDialerFunc) error {
 	if p.sdBuilders == nil {
 		p.sdBuilders = make(map[string]NewStreamDialerFunc)
 	}
@@ -85,12 +85,12 @@ func (p *ConfigToDialer) RegisterStreamDialerWrapper(subtype string, wrapper New
 	if _, found := p.sdBuilders[subtype]; found {
 		return fmt.Errorf("config parser %v for StreamDialer added twice", subtype)
 	}
-	p.sdBuilders[subtype] = wrapper
+	p.sdBuilders[subtype] = newDialer
 	return nil
 }
 
-// RegisterPacketDialerWrapper will register a wrapper for packet dialers under the given subtype.
-func (p *ConfigToDialer) RegisterPacketDialerWrapper(subtype string, wrapper NewPacketDialerFunc) error {
+// RegisterPacketDialerType will register a wrapper for packet dialers under the given subtype.
+func (p *ConfigToDialer) RegisterPacketDialerType(subtype string, newDialer NewPacketDialerFunc) error {
 	if p.pdBuilders == nil {
 		p.pdBuilders = make(map[string]NewPacketDialerFunc)
 	}
@@ -98,7 +98,7 @@ func (p *ConfigToDialer) RegisterPacketDialerWrapper(subtype string, wrapper New
 	if _, found := p.pdBuilders[subtype]; found {
 		return fmt.Errorf("config parser %v for StreamDialer added twice", subtype)
 	}
-	p.pdBuilders[subtype] = wrapper
+	p.pdBuilders[subtype] = newDialer
 	return nil
 }
 
@@ -126,7 +126,7 @@ func parseConfig(configText string) ([]*url.URL, error) {
 	return urls, nil
 }
 
-// WrapDialer creates a [Dialer] according to transportConfig, using dialer as the
+// NewStreamDialer creates a [Dialer] according to transportConfig, using dialer as the
 // base [Dialer]. The given dialer must not be nil.
 func (p *ConfigToDialer) NewStreamDialer(transportConfig string) (transport.StreamDialer, error) {
 	parts, err := parseConfig(transportConfig)
@@ -136,7 +136,7 @@ func (p *ConfigToDialer) NewStreamDialer(transportConfig string) (transport.Stre
 	return p.newStreamDialer(parts)
 }
 
-// WrapDialer creates a [Dialer] according to transportConfig, using dialer as the
+// NewPacketDialer creates a [Dialer] according to transportConfig, using dialer as the
 // base [Dialer]. The given dialer must not be nil.
 func (p *ConfigToDialer) NewPacketDialer(transportConfig string) (transport.PacketDialer, error) {
 	parts, err := parseConfig(transportConfig)
@@ -155,7 +155,7 @@ func (p *ConfigToDialer) newStreamDialer(configParts []*url.URL) (transport.Stre
 	}
 	thisURL := configParts[len(configParts)-1]
 	innerConfig := configParts[:len(configParts)-1]
-	w, ok := p.sdBuilders[thisURL.Scheme]
+	newDialer, ok := p.sdBuilders[thisURL.Scheme]
 	if !ok {
 		return nil, fmt.Errorf("config scheme '%v' is not supported for Stream Dialers", thisURL.Scheme)
 	}
@@ -165,7 +165,7 @@ func (p *ConfigToDialer) newStreamDialer(configParts []*url.URL) (transport.Stre
 	newPD := func() (transport.PacketDialer, error) {
 		return p.newPacketDialer(innerConfig)
 	}
-	return w(newSD, newPD, thisURL)
+	return newDialer(newSD, newPD, thisURL)
 }
 
 func (p *ConfigToDialer) newPacketDialer(configParts []*url.URL) (transport.PacketDialer, error) {
@@ -177,7 +177,7 @@ func (p *ConfigToDialer) newPacketDialer(configParts []*url.URL) (transport.Pack
 	}
 	thisURL := configParts[len(configParts)-1]
 	innerConfig := configParts[:len(configParts)-1]
-	w, ok := p.pdBuilders[thisURL.Scheme]
+	newDialer, ok := p.pdBuilders[thisURL.Scheme]
 	if !ok {
 		return nil, fmt.Errorf("config scheme '%v' is not supported for Packet Dialers", thisURL.Scheme)
 	}
@@ -187,7 +187,7 @@ func (p *ConfigToDialer) newPacketDialer(configParts []*url.URL) (transport.Pack
 	newPD := func() (transport.PacketDialer, error) {
 		return p.newPacketDialer(innerConfig)
 	}
-	return w(newSD, newPD, thisURL)
+	return newDialer(newSD, newPD, thisURL)
 }
 
 // NewpacketListener creates a new [transport.PacketListener] according to the given config,
