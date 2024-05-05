@@ -48,8 +48,7 @@ type connectivityReport struct {
 	Transport string `json:"transport"`
 
 	// The result for the connection.
-	Connect         connectAttemptJSON `json:"connect"`
-	SelectedAddress *addressJSON       `json:"selected_address,omitempty"`
+	Result connectivityResult `json:"result"`
 
 	// Observations
 	Time       time.Time  `json:"time"`
@@ -57,14 +56,16 @@ type connectivityReport struct {
 	Error      *errorJSON `json:"error"`
 }
 
-type connectAttemptJSON struct {
-	Address  *addressJSON     `json:"address,omitempty"`
-	Attempts []connectionJSON `json:"attempts,omitempty"`
+type connectivityResult struct {
+	Endpoint *addressJSON            `json:"endpoint,omitempty"`
+	Attempts []connectionAttemptJSON `json:"attempts,omitempty"`
 }
 
-type connectionJSON struct {
-	Address *addressJSON `json:"address,omitempty"`
-	Error   *errorJSON   `json:"error"`
+type connectionAttemptJSON struct {
+	Address    *addressJSON `json:"address,omitempty"`
+	Time       time.Time    `json:"time"`
+	DurationMs int64        `json:"duration_ms"`
+	Error      *errorJSON   `json:"error"`
 }
 
 type errorJSON struct {
@@ -233,24 +234,30 @@ func main() {
 				DurationMs: testDuration.Milliseconds(),
 				Error:      makeErrorRecord(testResult.Error),
 			}
-			for _, cr := range testResult.Connect.Attempts {
-				cj := connectionJSON{}
+			addressJSON, err := newAddressJSON(testResult.Endpoint)
+			if err == nil {
+				r.Result.Endpoint = &addressJSON
+			}
+			for _, cr := range testResult.Attempts {
+				cj := connectionAttemptJSON{}
 				addressJSON, err := newAddressJSON(cr.Address)
 				if err == nil {
 					cj.Address = &addressJSON
 				}
+				cj.Time = cr.StartTime.UTC().Truncate(time.Second)
+				cj.DurationMs = cr.Duration.Milliseconds()
 				if cr.Error != nil {
-					cj.Error = &errorJSON{Msg: cr.Error.Error()}
+					cj.Error = makeErrorRecord(cr.Error)
 				}
-				r.Connect.Attempts = append(r.Connect.Attempts, cj)
+				r.Result.Attempts = append(r.Result.Attempts, cj)
 			}
 			//fmt.Println("setting selected address...")
-			if testResult.SelectedAddress != "" {
-				selectedAddressJSON, err := newAddressJSON(testResult.SelectedAddress)
-				if err == nil {
-					r.SelectedAddress = &selectedAddressJSON
-				}
-			}
+			// if testResult.SelectedAddress != "" {
+			// 	selectedAddressJSON, err := newAddressJSON(testResult.SelectedAddress)
+			// 	if err == nil {
+			// 		r.SelectedAddress = &selectedAddressJSON
+			// 	}
+			// }
 
 			if reportCollector != nil {
 				err = reportCollector.Collect(context.Background(), r)
