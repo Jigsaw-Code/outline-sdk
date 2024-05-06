@@ -3,8 +3,12 @@
 This package contains a command-line tool to expose a WebSocket endpoint that connects to
 any endpoint over a transport.
 
+
+## Connecting to an arbitrary endpoint
+
+
 ```sh
-go run ./examples/ws2endpoint --endpoint ipinfo.io:443 --transport tls
+go run ./examples/ws2endpoint --backend ipinfo.io:443 --transport tls
 ```
 
 Then, on a browser console, you can do:
@@ -42,6 +46,8 @@ Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
 }
 ```
 
+## Using Cloudflare
+
 You can expose your WebSockets on Cloudflare with [clourdflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/). For example:
 
 ```console
@@ -57,6 +63,26 @@ You can expose your WebSockets on Cloudflare with [clourdflared](https://develop
 
 In this case, use `wss://recorders-uganda-starring-stopping.trycloudflare.com` as the WebSocket url.
 
-
 Note that the Cloudflare tunnel does not add any user authentication mechanism. You must implement authentication yourself
 if you would like to prevent unauthorized access to your service.
+
+## Shadowsocks over Websocket
+
+Run the reverse proxy, pointing to your Outline Server:
+
+```sh
+go run github.com/Jigsaw-Code/outline-sdk/x/examples/ws2endpoint --backend $HOST:$PORT --listen 127.0.0.1:8080
+```
+
+Expose the endpoint on Cloudflare:
+
+```sh
+cloudflared tunnel --url http://localhost:8080
+```
+
+Connect:
+
+```sh
+go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch -transport "tls|ws:tcp_path=/tcp|ss://${REDACTED}@${SUBDOMAIN}.trycloudflare.com:443" "https://ipinfo.io/"
+```
+
