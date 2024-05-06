@@ -4,29 +4,26 @@ package clib
 import (
 	"C"
 	"runtime/cgo"
+	"unsafe"
 
 	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
 )
 
-type ProxyHandle = cgo.Handle
-type StreamDialerHandle = cgo.Handle
-
 //export NewStreamDialerFromConfig
-func NewStreamDialerFromConfig(config *C.char) StreamDialerHandle {
+func NewStreamDialerFromConfig(config *C.char) unsafe.Pointer {
 	streamDialer, err := mobileproxy.NewStreamDialerFromConfig(C.GoString(config))
 
 	if err != nil {
 		// TODO: print something?
-		return cgo.NewHandle(nil)
+		return unsafe.Pointer(nil)
 	}
 
-	return cgo.NewHandle(streamDialer)
+	return unsafe.Pointer(cgo.NewHandle(streamDialer))
 }
 
 //export RunProxy
-func RunProxy(address *C.char, dialerHandle unsafe.Pointer) unsafe.Pointer {
-  h := *(*cgo.Handle)(dialerHandle)
-	dialer := h.Value().(mobileproxy.StreamDialer)
+func RunProxy(address *C.char, dialerHandlerPtr unsafe.Pointer) unsafe.Pointer {
+	dialer := (*cgo.Handle)(dialerHandlerPtr).Value().(mobileproxy.StreamDialer)
 
 	proxy, err := mobileproxy.RunProxy(C.GoString(address), &dialer)
 
@@ -35,29 +32,30 @@ func RunProxy(address *C.char, dialerHandle unsafe.Pointer) unsafe.Pointer {
 		return unsafe.Pointer(nil)
 	}
 
-	return unsafe.Pointer(&cgo.NewHandle(proxy))
+	return unsafe.Pointer(cgo.NewHandle(proxy))
 }
 
 //export AddURLProxy
-func AddURLProxy(proxyHandle ProxyHandle, url *C.char) {
-	proxy := proxyHandle.Value().(mobileproxy.Proxy)
+func AddURLProxy(proxyHandlerPtr unsafe.Pointer, url *C.char, dialerHandlerPtr unsafe.Pointer) {
+	proxy := (*cgo.Handle)(proxyHandlerPtr).Value().(mobileproxy.Proxy)
+	dialer := (*cgo.Handle)(dialerHandlerPtr).Value().(mobileproxy.StreamDialer)
 
-	proxy.AddURLProxy(C.GoString(url))
+	proxy.AddURLProxy(C.GoString(url), &dialer)
 }
 
 //export StopProxy
-func StopProxy(proxyHandle ProxyHandle, timeoutSeconds C.uint) {
-	proxy := proxyHandle.Value().(mobileproxy.Proxy)
+func StopProxy(proxyHandlerPtr unsafe.Pointer, timeoutSeconds C.uint) {
+	proxy := (*cgo.Handle)(proxyHandlerPtr).Value().(mobileproxy.Proxy)
 
-	proxy.Stop(timeoutSeconds)
+	proxy.Stop(int(timeoutSeconds))
 }
 
-//export DestroyStreamDialer
-func DestroyStreamDialer(dialer StreamDialerHandle) {
-	dialer.Delete()
+//export DeleteStreamDialer
+func DeleteStreamDialer(dialerHandlerPtr unsafe.Pointer) {
+	(*cgo.Handle)(dialerHandlerPtr).Delete()
 }
 
-//export DestroyProxy
-func DestroyProxy(proxy ProxyHandle) {
-	proxy.Delete()
+//export DeleteProxy
+func DeleteProxy(proxyHandlerPtr unsafe.Pointer) {
+	(*cgo.Handle)(proxyHandlerPtr).Delete()
 }
