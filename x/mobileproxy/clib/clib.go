@@ -1,4 +1,4 @@
-package clib
+package main
 
 // #include <stdlib.h>
 import (
@@ -58,4 +58,9 @@ func DeleteStreamDialer(dialerHandlerPtr unsafe.Pointer) {
 //export DeleteProxy
 func DeleteProxy(proxyHandlerPtr unsafe.Pointer) {
 	(*cgo.Handle)(proxyHandlerPtr).Delete()
+}
+
+func main() {
+	// We need the main function to make possible
+	// CGO compiler to compile the package as C shared library
 }
