@@ -32,6 +32,17 @@ import (
 
 var debugLog log.Logger = *log.New(io.Discard, "", 0)
 
+type stringArrayFlagValue []string
+
+func (v *stringArrayFlagValue) String() string {
+	return fmt.Sprint(*v)
+}
+
+func (v *stringArrayFlagValue) Set(value string) error {
+	*v = append(*v, value)
+	return nil
+}
+
 func init() {
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags...] <url>\n", path.Base(os.Args[0]))
@@ -44,6 +55,8 @@ func main() {
 	transportFlag := flag.String("transport", "", "Transport config")
 	addressFlag := flag.String("address", "", "Address to connect to. If empty, use the URL authority")
 	methodFlag := flag.String("method", "GET", "The HTTP method to use")
+	var headersFlag stringArrayFlagValue
+	flag.Var(&headersFlag, "H", "HTTP Header to add.")
 	timeoutSecFlag := flag.Int("timeout", 5, "Timeout in seconds")
 
 	flag.Parse()
@@ -89,11 +102,26 @@ func main() {
 		}
 		return dialer.DialStream(ctx, net.JoinHostPort(host, port))
 	}
-	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: time.Duration(*timeoutSecFlag) * time.Second}
+	httpClient := &http.Client{
+		Transport: &http.Transport{DialContext: dialContext},
+		Timeout:   time.Duration(*timeoutSecFlag) * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 
 	req, err := http.NewRequest(*methodFlag, url, nil)
 	if err != nil {
 		log.Fatalln("Failed to create request:", err)
+	}
+	for _, headerLine := range headersFlag {
+		name, value, _ := strings.Cut(headerLine, ":")
+		name = strings.TrimSpace(name)
+		value = strings.TrimSpace(value)
+		if name == "" || value == "" {
+			log.Fatalf("Invalid header line %q", headerLine)
+		}
+		req.Header.Set(name, value)
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
