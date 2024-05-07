@@ -84,18 +84,21 @@ func wrapStreamDialerWithWebsocket(innerSD func() (transport.StreamDialer, error
 		return nil, errors.New("must specify tcp_path")
 	}
 	return transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
-		tcpConn, err := sd.DialStream(ctx, addr)
+		baseConn, err := sd.DialStream(ctx, addr)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to connect to websocket endpoint: %w", err)
 		}
 		wsURL := url.URL{Scheme: "ws", Host: addr, Path: config.tcp_path}
 		origin := url.URL{Scheme: "http", Host: addr}
 		wsCfg, err := websocket.NewConfig(wsURL.String(), origin.String())
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create websocket config: %w", err)
 		}
-		wsConn, err := websocket.NewClient(wsCfg, tcpConn)
-		return &wsToStreamConn{wsConn}, err
+		wsConn, err := websocket.NewClient(wsCfg, baseConn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create websocket client: %w", err)
+		}
+		return &wsToStreamConn{wsConn}, nil
 	}), nil
 }
 
@@ -112,17 +115,20 @@ func wrapPacketDialerWithWebsocket(innerSD func() (transport.StreamDialer, error
 		return nil, errors.New("must specify udp_path")
 	}
 	return transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-		tcpConn, err := sd.DialStream(ctx, addr)
+		baseConn, err := sd.DialStream(ctx, addr)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to connect to websocket endpoint: %w", err)
 		}
 		wsURL := url.URL{Scheme: "ws", Host: addr, Path: config.udp_path}
 		origin := url.URL{Scheme: "http", Host: addr}
 		wsCfg, err := websocket.NewConfig(wsURL.String(), origin.String())
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create websocket config: %w", err)
 		}
-		wsConn, err := websocket.NewClient(wsCfg, tcpConn)
-		return wsConn, err
+		wsConn, err := websocket.NewClient(wsCfg, baseConn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create websocket client: %w", err)
+		}
+		return wsConn, nil
 	}), nil
 }
