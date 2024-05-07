@@ -18,7 +18,9 @@ func NewStreamDialerFromConfig(config *C.char) unsafe.Pointer {
 		return unsafe.Pointer(nil)
 	}
 
-	return unsafe.Pointer(cgo.NewHandle(streamDialer))
+	handle := cgo.NewHandle(streamDialer)
+
+	return unsafe.Pointer(&handle)
 }
 
 //export RunProxy
@@ -32,7 +34,9 @@ func RunProxy(address *C.char, dialerHandlerPtr unsafe.Pointer) unsafe.Pointer {
 		return unsafe.Pointer(nil)
 	}
 
-	return unsafe.Pointer(cgo.NewHandle(proxy))
+	handle := cgo.NewHandle(proxy)
+
+	return unsafe.Pointer(&handle)
 }
 
 //export AddURLProxy
