@@ -80,9 +80,35 @@ Expose the endpoint on Cloudflare:
 cloudflared tunnel --url http://localhost:8080
 ```
 
-Connect:
+Connect to the Cloudflare domain. For example:
 
 ```sh
-go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch -transport "tls|ws:tcp_path=/tcp|ss://${REDACTED}@${SUBDOMAIN}.trycloudflare.com:443" "https://ipinfo.io/"
+go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch \
+  -transport "tls|ws:tcp_path=/tcp|ss://${REDACTED}@prefix-marion-covered-operators.trycloudflare.com.trycloudflare.com:443" \
+  https://ipinfo.io/
 ```
 
+You can use override to make it easier to insert an Outline key:
+
+```sh
+go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch \
+  -transport "tls|ws:tcp_path=/tcp|override:host=prefix-marion-covered-operators.trycloudflare.com&port=443|$OUTLINE_KEY" \
+  https://ipinfo.io/
+```
+
+It's possible to bypass DNS-based blocking by resolving `cloudflare.net`, and SNI-based blocking by using TLS Record Fragmentation:
+
+```sh
+go run ./examples/fetch \
+  -transport "override:host=cloudflare.net|tlsfrag:1|tls|ws:tcp_path=/tcp|ss://${REDACTED}@prefix-marion-covered-operators.trycloudflare.com:443" \
+  https://ipinfo.io/
+```
+
+The WebSockets transport supports UDP as well:
+
+```sh
+go run ./examples/resolve \
+  -transport "tls|ws:tcp_path=/tcp&udp_path=/udp|ss://${REDACTED}@prefix-marion-covered-operators.trycloudflare.com:443"
+  -resolver 8.8.8.8 \
+  getoutline.org
+```

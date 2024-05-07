@@ -95,7 +95,6 @@ func wrapStreamDialerWithWebsocket(innerSD func() (transport.StreamDialer, error
 			return nil, err
 		}
 		wsConn, err := websocket.NewClient(wsCfg, tcpConn)
-		// TODO: wrap wsConn
 		return &wsToStreamConn{wsConn}, err
 	}), nil
 }
@@ -117,8 +116,9 @@ func wrapPacketDialerWithWebsocket(innerSD func() (transport.StreamDialer, error
 		if err != nil {
 			return nil, err
 		}
-		url := url.URL{Scheme: "http", Host: addr, Path: config.udp_path}
-		wsCfg, err := websocket.NewConfig(url.String(), "")
+		wsURL := url.URL{Scheme: "ws", Host: addr, Path: config.udp_path}
+		origin := url.URL{Scheme: "http", Host: addr}
+		wsCfg, err := websocket.NewConfig(wsURL.String(), origin.String())
 		if err != nil {
 			return nil, err
 		}
