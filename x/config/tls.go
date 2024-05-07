@@ -50,10 +50,14 @@ func parseOptions(configURL *url.URL) ([]tls.ClientOption, error) {
 	return options, nil
 }
 
-func wrapStreamDialerWithTLS(innerDialer transport.StreamDialer, configURL *url.URL) (transport.StreamDialer, error) {
+func wrapStreamDialerWithTLS(innerSD func() (transport.StreamDialer, error), _ func() (transport.PacketDialer, error), configURL *url.URL) (transport.StreamDialer, error) {
+	sd, err := innerSD()
+	if err != nil {
+		return nil, err
+	}
 	options, err := parseOptions(configURL)
 	if err != nil {
 		return nil, err
 	}
-	return tls.NewStreamDialer(innerDialer, options...)
+	return tls.NewStreamDialer(sd, options...)
 }

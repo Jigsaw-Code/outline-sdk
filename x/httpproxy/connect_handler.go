@@ -51,13 +51,11 @@ func (d *sanitizeErrorDialer) DialStream(ctx context.Context, addr string) (tran
 }
 
 type connectHandler struct {
-	dialer *sanitizeErrorDialer
+	dialer       *sanitizeErrorDialer
+	dialerConfig *config.ConfigToDialer
 }
 
 var _ http.Handler = (*connectHandler)(nil)
-
-// TODO(fortuna): Inject the config parser
-var configParser = config.NewDefaultConfigParser()
 
 func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http.Request) {
 	if proxyReq.Method != http.MethodConnect {
@@ -79,7 +77,7 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 
 	// Dial the target.
 	transportConfig := proxyReq.Header.Get("Transport")
-	dialer, err := configParser.WrapStreamDialer(h.dialer, transportConfig)
+	dialer, err := h.dialerConfig.NewStreamDialer(transportConfig)
 	if err != nil {
 		// Because we sanitize the base dialer error, it's safe to return error details here.
 		http.Error(proxyResp, fmt.Sprintf("Invalid config in Transport header: %v", err), http.StatusBadRequest)
@@ -149,5 +147,9 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 func NewConnectHandler(dialer transport.StreamDialer) http.Handler {
 	// We sanitize the errors from the input Dialer because we don't want to leak sensitive details
 	// of the base dialer (e.g. access key credentials) to the user.
-	return &connectHandler{&sanitizeErrorDialer{dialer}}
+	sd := &sanitizeErrorDialer{dialer}
+	// TODO(fortuna): Inject the config parser
+	dialerConfig := config.NewDefaultConfigToDialer()
+	dialerConfig.BaseStreamDialer = sd
+	return &connectHandler{sd, dialerConfig}
 }

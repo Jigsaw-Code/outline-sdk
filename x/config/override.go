@@ -66,7 +66,11 @@ func newOverrideFromURL(configURL *url.URL) (func(string) (string, error), error
 	}, nil
 }
 
-func wrapStreamDialerWithOverride(innerDialer transport.StreamDialer, configURL *url.URL) (transport.StreamDialer, error) {
+func wrapStreamDialerWithOverride(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), configURL *url.URL) (transport.StreamDialer, error) {
+	sd, err := innerSD()
+	if err != nil {
+		return nil, err
+	}
 	override, err := newOverrideFromURL(configURL)
 	if err != nil {
 		return nil, err
@@ -76,11 +80,15 @@ func wrapStreamDialerWithOverride(innerDialer transport.StreamDialer, configURL 
 		if err != nil {
 			return nil, err
 		}
-		return innerDialer.DialStream(ctx, addr)
+		return sd.DialStream(ctx, addr)
 	}), nil
 }
 
-func wrapPacketDialerWithOverride(innerDialer transport.PacketDialer, configURL *url.URL) (transport.PacketDialer, error) {
+func wrapPacketDialerWithOverride(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), configURL *url.URL) (transport.PacketDialer, error) {
+	pd, err := innerPD()
+	if err != nil {
+		return nil, err
+	}
 	override, err := newOverrideFromURL(configURL)
 	if err != nil {
 		return nil, err
@@ -90,6 +98,6 @@ func wrapPacketDialerWithOverride(innerDialer transport.PacketDialer, configURL 
 		if err != nil {
 			return nil, err
 		}
-		return innerDialer.DialPacket(ctx, addr)
+		return pd.DialPacket(ctx, addr)
 	}), nil
 }

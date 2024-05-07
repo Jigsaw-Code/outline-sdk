@@ -227,12 +227,12 @@ func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsC
 	return resolver.Resolver, nil
 }
 
-var configParser = config.NewDefaultConfigParser()
-
 func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, baseDialer transport.StreamDialer, tlsConfig []string) (transport.StreamDialer, error) {
 	if len(tlsConfig) == 0 {
 		return nil, errors.New("config for TLS is empty. Please specify at least one transport")
 	}
+	var configToDialer = config.NewDefaultConfigToDialer()
+	configToDialer.BaseStreamDialer = baseDialer
 
 	ctx, searchDone := context.WithCancel(ctx)
 	defer searchDone()
@@ -242,7 +242,7 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 		Config string
 	}
 	result, err := raceTests(ctx, 250*time.Millisecond, tlsConfig, func(transportCfg string) (*SearchResult, error) {
-		tlsDialer, err := configParser.WrapStreamDialer(baseDialer, transportCfg)
+		tlsDialer, err := configToDialer.NewStreamDialer(transportCfg)
 		if err != nil {
 			return nil, fmt.Errorf("WrapStreamDialer failed: %w", err)
 		}

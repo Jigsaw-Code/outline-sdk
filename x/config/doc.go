@@ -44,6 +44,13 @@ SOCKS5 proxy (currently streams only, package [github.com/Jigsaw-Code/outline-sd
 
 USERINFO field is optional and only required if username and password authentication is used. It is in the format of username:password.
 
+DNS resolution (streams only, package [github.com/Jigsaw-Code/outline-sdk/dns])
+
+It takes a host:port address. If the port is missing, it will use 53. The resulting dialer will use the input dialer with
+Happy Eyeballs to connect to the destination.
+
+	do53:address=[ADDRESS]
+
 DNS-over-HTTPS resolution (streams only, package [github.com/Jigsaw-Code/outline-sdk/dns])
 
 It takes a host name and a host:port address. The name will be used in the SNI and Host header, while the address is used to connect
@@ -107,19 +114,19 @@ DPI Evasion - To add packet splitting to a Shadowsocks server for enhanced DPI e
 
 	split:2|ss://[USERINFO]@[HOST]:[PORT]
 
-Defining custom transport - You can define your custom transport by implementing and registering the [WrapStreamDialerFunc] and [WrapPacketDialerFunc] functions:
+Defining custom transport - You can define your custom transport by implementing and registering the [NewStreamDialerFunc] and [NewPacketDialerFunc] functions:
 
 	// create new config parser
-	// p := new(ConfigParser)
+	// p := new(ConfigToDialer)
 	// or
-	p := NewDefaultConfigParser()
+	p := NewDefaultConfigToDialer()
 	// register your custom dialer
 	p.RegisterPacketDialerWrapper("custom", wrapStreamDialerWithCustom)
 	p.RegisterStreamDialerWrapper("custom", wrapPacketDialerWithCustom)
 	// then use it
-	dialer, err := p.WrapStreamDialer(innerDialer, "custom://config")
+	dialer, err := p.NewStreamDialer(innerDialer, "custom://config")
 
-where wrapStreamDialerWithCustom and wrapPacketDialerWithCustom implement [WrapPacketDialerFunc] and [WrapStreamDialerFunc].
+where wrapStreamDialerWithCustom and wrapPacketDialerWithCustom implement [NewPacketDialerFunc] and [NewStreamDialerFunc].
 
 [Onion Routing]: https://en.wikipedia.org/wiki/Onion_routing
 */
