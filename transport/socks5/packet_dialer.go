@@ -19,33 +19,71 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
-type PacketDialer struct {
-	se   transport.StreamEndpoint
-	pe   transport.PacketEndpoint
-	cred *credentials
+type packetConn struct {
+	dstAddr net.Addr
+	pc      net.Conn
+	sc      transport.StreamConn
 }
 
-var _ transport.PacketDialer = (*PacketDialer)(nil)
+var _ net.Conn = (*packetConn)(nil)
 
-// NewPacketDialer creates a [transport.PacketDialer] that routes connections to a SOCKS5
-// proxy listening at the given endpoint.
-func NewPacketDialer(streamEndpoint transport.StreamEndpoint, packetEndpoint transport.PacketEndpoint) (transport.PacketDialer, error) {
-	if streamEndpoint == nil || packetEndpoint == nil {
-		return nil, errors.New("must specify both endpoints")
-	}
-	return &PacketDialer{se: streamEndpoint, pe: packetEndpoint, cred: nil}, nil
+func (c *packetConn) LocalAddr() net.Addr {
+	// TODO: Is this right?
+	return c.pc.LocalAddr()
+}
+
+func (c *packetConn) RemoteAddr() net.Addr {
+	return c.dstAddr
+}
+
+func (c *packetConn) SetDeadline(t time.Time) error {
+	return c.pc.SetDeadline(t)
+}
+
+func (c *packetConn) SetReadDeadline(t time.Time) error {
+	return c.pc.SetReadDeadline(t)
+}
+
+func (c *packetConn) SetWriteDeadline(t time.Time) error {
+	return c.pc.SetWriteDeadline(t)
+}
+
+func (c *packetConn) Read(b []byte) (int, error) {
+	// TODO: read header
+	return c.pc.Read(b)
+}
+
+func (c *packetConn) Write(b []byte) (int, error) {
+	// TODO: write header
+	return c.pc.Write(b)
+}
+
+func (c *packetConn) Close() error {
+	return errors.Join(c.sc.Close(), c.pc.Close())
 }
 
 // DialPacket creates a packet [net.Conn] via SOCKS5.
-func (pd *PacketDialer) DialPacket(ctx context.Context, remoteAddr string) (net.Conn, error) {
-	sc, err := pd.se.ConnectStream(ctx)
+func (d *Dialer) DialPacket(ctx context.Context, dstAddr string) (net.Conn, error) {
+	netDstAddr, err := transport.MakeNetAddr("udp", dstAddr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to stream endpoint: %w", err)
+		return nil, fmt.Errorf("failed to parse address: %w", err)
 	}
 
-	return nil, errors.ErrUnsupported
+	sc, bindAddr, err := d.request(ctx, CmdUDPAssociate, dstAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	pc, err := d.pd.DialPacket(ctx, bindAddr)
+	if err != nil {
+		sc.Close()
+		return nil, fmt.Errorf("failed to connect to packet endpoint: %w", err)
+	}
+
+	return &packetConn{netDstAddr, pc, sc}, nil
 }

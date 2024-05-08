@@ -32,13 +32,13 @@ import (
 )
 
 func TestSOCKS5Dialer_NewStreamDialerNil(t *testing.T) {
-	dialer, err := NewStreamDialer(nil)
+	dialer, err := NewDialer(nil)
 	require.Nil(t, dialer)
 	require.Error(t, err)
 }
 
 func TestSOCKS5Dialer_BadConnection(t *testing.T) {
-	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: "127.0.0.0:0"})
+	dialer, err := NewDialer(&transport.TCPEndpoint{Address: "127.0.0.0:0"})
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
 	_, err = dialer.DialStream(context.Background(), "example.com:443")
@@ -50,7 +50,7 @@ func TestSOCKS5Dialer_BadAddress(t *testing.T) {
 	require.NoError(t, err, "Failed to create TCP listener: %v", err)
 	defer listener.Close()
 
-	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String()})
+	dialer, err := NewDialer(&transport.TCPEndpoint{Address: listener.Addr().String()})
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
 
@@ -97,7 +97,7 @@ func testExchange(tb testing.TB, listener *net.TCPListener, destAddr string, req
 	// Client
 	go func() {
 		defer running.Done()
-		dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: listener.Addr().String()})
+		dialer, err := NewDialer(&transport.TCPEndpoint{Address: listener.Addr().String()})
 		require.NoError(tb, err)
 		serverConn, err := dialer.DialStream(context.Background(), destAddr)
 		if replyCode != 0 {
@@ -188,7 +188,7 @@ func TestConnectWithoutAuth(t *testing.T) {
 	address := listener.Addr().String()
 
 	// Create a SOCKS5 client
-	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: address})
+	dialer, err := NewDialer(&transport.TCPEndpoint{Address: address})
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
 
@@ -221,7 +221,7 @@ func TestConnectWithAuth(t *testing.T) {
 	// wait for server to start
 	time.Sleep(10 * time.Millisecond)
 
-	dialer, err := NewStreamDialer(&transport.TCPEndpoint{Address: address})
+	dialer, err := NewDialer(&transport.TCPEndpoint{Address: address})
 	require.NotNil(t, dialer)
 	require.NoError(t, err)
 	err = dialer.SetCredentials([]byte("testusername"), []byte("testpassword"))
