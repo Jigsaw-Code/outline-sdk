@@ -27,7 +27,7 @@ func wrapStreamDialerWithSOCKS5(innerSD func() (transport.StreamDialer, error), 
 		return nil, err
 	}
 	endpoint := transport.StreamDialerEndpoint{Dialer: sd, Address: configURL.Host}
-	dialer, err := socks5.NewStreamDialer(&endpoint)
+	dialer, err := socks5.NewDialer(&endpoint)
 	if err != nil {
 		return nil, err
 	}

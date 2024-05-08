@@ -37,6 +37,13 @@ const (
 	ErrAddressTypeNotSupported       = ReplyCode(0x08)
 )
 
+// SOCKS5 commands, from https://datatracker.ietf.org/doc/html/rfc1928#section-4.
+const (
+	CmdConnect      = byte(1)
+	CmdBind         = byte(2)
+	CmdUDPAssociate = byte(1)
+)
+
 // SOCKS5 authentication methods, as specified in https://datatracker.ietf.org/doc/html/rfc1928#section-3
 const (
 	authMethodNoAuth   = 0x00
