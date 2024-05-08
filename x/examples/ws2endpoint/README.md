@@ -66,7 +66,7 @@ In this case, use `wss://recorders-uganda-starring-stopping.trycloudflare.com` a
 Note that the Cloudflare tunnel does not add any user authentication mechanism. You must implement authentication yourself
 if you would like to prevent unauthorized access to your service.
 
-## Shadowsocks over Websocket
+## Shadowsocks over WebSocket
 
 Run the reverse proxy, pointing to your Outline Server:
 

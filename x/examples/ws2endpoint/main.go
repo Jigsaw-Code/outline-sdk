@@ -45,8 +45,8 @@ func main() {
 	listenFlag := flag.String("listen", "localhost:8080", "Local proxy address to listen on")
 	transportFlag := flag.String("transport", "", "Transport config")
 	backendFlag := flag.String("backend", "", "Address of the endpoint to forward traffic to")
-	tcpPathFlag := flag.String("tcp_path", "/tcp", "Path where to run the Websocket TCP forwarder")
-	udpPathFlag := flag.String("udp_path", "/udp", "Path where to run the Websocket UDP forwarder")
+	tcpPathFlag := flag.String("tcp_path", "/tcp", "Path where to run the WebSocket TCP forwarder")
+	udpPathFlag := flag.String("udp_path", "/udp", "Path where to run the WebSocket UDP forwarder")
 	flag.Parse()
 
 	if *backendFlag == "" {

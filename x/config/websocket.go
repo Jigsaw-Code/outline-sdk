@@ -71,7 +71,7 @@ func (c *wsToStreamConn) CloseWrite() error {
 	return c.Close()
 }
 
-func wrapStreamDialerWithWebsocket(innerSD func() (transport.StreamDialer, error), _ func() (transport.PacketDialer, error), configURL *url.URL) (transport.StreamDialer, error) {
+func wrapStreamDialerWithWebSocket(innerSD func() (transport.StreamDialer, error), _ func() (transport.PacketDialer, error), configURL *url.URL) (transport.StreamDialer, error) {
 	sd, err := innerSD()
 	if err != nil {
 		return nil, err
@@ -102,7 +102,7 @@ func wrapStreamDialerWithWebsocket(innerSD func() (transport.StreamDialer, error
 	}), nil
 }
 
-func wrapPacketDialerWithWebsocket(innerSD func() (transport.StreamDialer, error), _ func() (transport.PacketDialer, error), configURL *url.URL) (transport.PacketDialer, error) {
+func wrapPacketDialerWithWebSocket(innerSD func() (transport.StreamDialer, error), _ func() (transport.PacketDialer, error), configURL *url.URL) (transport.PacketDialer, error) {
 	sd, err := innerSD()
 	if err != nil {
 		return nil, err
