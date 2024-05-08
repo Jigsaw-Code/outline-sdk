@@ -15,6 +15,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/textproto"
 	"os"
 	"path"
 	"strings"
@@ -114,14 +116,15 @@ func main() {
 	if err != nil {
 		log.Fatalln("Failed to create request:", err)
 	}
-	for _, headerLine := range headersFlag {
-		name, value, _ := strings.Cut(headerLine, ":")
-		name = strings.TrimSpace(name)
-		value = strings.TrimSpace(value)
-		if name == "" || value == "" {
-			log.Fatalf("Invalid header line %q", headerLine)
+	headerText := strings.Join(headersFlag, "\r\n") + "\r\n\r\n"
+	h, err := textproto.NewReader(bufio.NewReader(strings.NewReader(headerText))).ReadMIMEHeader()
+	if err != nil {
+		log.Fatalf("invalid header line: %v", err)
+	}
+	for name, values := range h {
+		for _, value := range values {
+			req.Header.Add(name, value)
 		}
-		req.Header.Set(name, value)
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
