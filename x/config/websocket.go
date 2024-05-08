@@ -27,8 +27,8 @@ import (
 )
 
 type wsConfig struct {
-	tcp_path string
-	udp_path string
+	tcpPath string
+	udpPath string
 }
 
 func parseWSConfig(configURL *url.URL) (*wsConfig, error) {
@@ -44,12 +44,12 @@ func parseWSConfig(configURL *url.URL) (*wsConfig, error) {
 			if len(values) != 1 {
 				return nil, fmt.Errorf("udp_path option must has one value, found %v", len(values))
 			}
-			cfg.tcp_path = values[0]
+			cfg.tcpPath = values[0]
 		case "udp_path":
 			if len(values) != 1 {
 				return nil, fmt.Errorf("tcp_path option must has one value, found %v", len(values))
 			}
-			cfg.udp_path = values[0]
+			cfg.udpPath = values[0]
 		default:
 			return nil, fmt.Errorf("unsupported option %v", key)
 		}
@@ -80,7 +80,7 @@ func wrapStreamDialerWithWebSocket(innerSD func() (transport.StreamDialer, error
 	if err != nil {
 		return nil, err
 	}
-	if config.tcp_path == "" {
+	if config.tcpPath == "" {
 		return nil, errors.New("must specify tcp_path")
 	}
 	return transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
@@ -88,7 +88,7 @@ func wrapStreamDialerWithWebSocket(innerSD func() (transport.StreamDialer, error
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to websocket endpoint: %w", err)
 		}
-		wsURL := url.URL{Scheme: "ws", Host: addr, Path: config.tcp_path}
+		wsURL := url.URL{Scheme: "ws", Host: addr, Path: config.tcpPath}
 		origin := url.URL{Scheme: "http", Host: addr}
 		wsCfg, err := websocket.NewConfig(wsURL.String(), origin.String())
 		if err != nil {
@@ -111,7 +111,7 @@ func wrapPacketDialerWithWebSocket(innerSD func() (transport.StreamDialer, error
 	if err != nil {
 		return nil, err
 	}
-	if config.udp_path == "" {
+	if config.udpPath == "" {
 		return nil, errors.New("must specify udp_path")
 	}
 	return transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
@@ -119,7 +119,7 @@ func wrapPacketDialerWithWebSocket(innerSD func() (transport.StreamDialer, error
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to websocket endpoint: %w", err)
 		}
-		wsURL := url.URL{Scheme: "ws", Host: addr, Path: config.udp_path}
+		wsURL := url.URL{Scheme: "ws", Host: addr, Path: config.udpPath}
 		origin := url.URL{Scheme: "http", Host: addr}
 		wsCfg, err := websocket.NewConfig(wsURL.String(), origin.String())
 		if err != nil {
