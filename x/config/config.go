@@ -15,14 +15,19 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag"
+	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 )
 
 // ConfigToDialer enables the creation of stream and packet dialers based on a config. The config is
@@ -55,6 +60,51 @@ func NewDefaultConfigToDialer() *ConfigToDialer {
 
 	p.RegisterStreamDialerType("override", wrapStreamDialerWithOverride)
 	p.RegisterPacketDialerType("override", wrapPacketDialerWithOverride)
+
+	p.RegisterStreamDialerType("redial", func(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), wrapConfig *url.URL) (transport.StreamDialer, error) {
+		return transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+			conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", addr)
+			if err != nil {
+				return nil, err
+			}
+			defer func() {
+				if conn != nil {
+					conn.Close()
+				}
+			}()
+			localAddr := conn.LocalAddr()
+			remoteAddr := conn.RemoteAddr()
+			if tc, ok := conn.(*net.TCPConn); ok {
+				tc.SetLinger(0)
+			} else {
+				return nil, fmt.Errorf("not a TCPConn")
+			}
+			ap, err := netip.ParseAddrPort(remoteAddr.String())
+			if err != nil {
+				return nil, fmt.Errorf("invalid address: %w", err)
+			}
+			if ap.Addr().Is4() {
+				ipv4.NewConn(conn).SetTTL(1)
+			} else if ap.Addr().Is6() {
+				ipv6.NewConn(conn).SetHopLimit(1)
+			} else {
+				return nil, fmt.Errorf("invalid IP: %w", err)
+			}
+			conn.Close()
+			conn = nil
+			dialer := net.Dialer{LocalAddr: localAddr}
+			conn, err = dialer.DialContext(ctx, "tcp", remoteAddr.String())
+			if err != nil {
+				return nil, err
+			}
+			if tc, ok := conn.(*net.TCPConn); ok {
+				conn = nil
+				return tc, nil
+			} else {
+				return nil, fmt.Errorf("not a TCPConn")
+			}
+		}), nil
+	})
 
 	p.RegisterStreamDialerType("socks5", wrapStreamDialerWithSOCKS5)
 
