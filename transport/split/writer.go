@@ -15,7 +15,13 @@
 package split
 
 import (
+	"fmt"
 	"io"
+	"net"
+	"net/netip"
+
+	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 )
 
 type splitWriter struct {
@@ -30,7 +36,7 @@ type splitWriterReaderFrom struct {
 	rf io.ReaderFrom
 }
 
-var _ io.ReaderFrom = (*splitWriterReaderFrom)(nil)
+// var _ io.ReaderFrom = (*splitWriterReaderFrom)(nil)
 
 // NewWriter creates a [io.Writer] that ensures the byte sequence is split at prefixBytes.
 // A write will end right after byte index prefixBytes - 1, before a write starting at byte index prefixBytes.
@@ -38,22 +44,51 @@ var _ io.ReaderFrom = (*splitWriterReaderFrom)(nil)
 // If the input writer is a [io.ReaderFrom], the output writer will be too.
 func NewWriter(writer io.Writer, prefixBytes int64) io.Writer {
 	sw := &splitWriter{writer, prefixBytes}
-	if rf, ok := writer.(io.ReaderFrom); ok {
-		return &splitWriterReaderFrom{sw, rf}
-	}
+	// if rf, ok := writer.(io.ReaderFrom); ok {
+	// 	return &splitWriterReaderFrom{sw, rf}
+	// }
 	return sw
 }
 
-func (w *splitWriterReaderFrom) ReadFrom(source io.Reader) (int64, error) {
-	reader := io.MultiReader(io.LimitReader(source, w.prefixBytes), source)
-	written, err := w.rf.ReadFrom(reader)
-	w.prefixBytes -= written
-	return written, err
-}
+// func (w *splitWriterReaderFrom) ReadFrom(source io.Reader) (int64, error) {
+// 	reader := io.MultiReader(io.LimitReader(source, w.prefixBytes), source)
+// 	written, err := w.rf.ReadFrom(reader)
+// 	w.prefixBytes -= written
+// 	return written, err
+// }
 
 func (w *splitWriter) Write(data []byte) (written int, err error) {
 	if 0 < w.prefixBytes && w.prefixBytes < int64(len(data)) {
-		written, err = w.writer.Write(data[:w.prefixBytes])
+		fmt.Println("Split!")
+		var ttl int
+		tc, ok := w.writer.(*net.TCPConn)
+		if !ok {
+			return 0, fmt.Errorf("not tcp")
+		}
+		ap, err := netip.ParseAddrPort(tc.RemoteAddr().String())
+		if err != nil {
+			return 0, fmt.Errorf("invalid address: %w", err)
+		}
+
+		if ap.Addr().Is4() {
+			conn4 := ipv4.NewConn(tc)
+			ttl, _ = conn4.TTL()
+			conn4.SetTTL(1)
+		} else if ap.Addr().Is6() {
+			conn6 := ipv6.NewConn(tc)
+			ttl, _ = conn6.HopLimit()
+			conn6.SetHopLimit(1)
+		} else {
+			return 0, fmt.Errorf("invalid IP: %w", err)
+		}
+		written, err = tc.Write(data[:w.prefixBytes])
+		if ap.Addr().Is4() {
+			conn4 := ipv4.NewConn(tc)
+			conn4.SetTTL(ttl)
+		} else if ap.Addr().Is6() {
+			conn6 := ipv6.NewConn(tc)
+			conn6.SetHopLimit(ttl)
+		}
 		w.prefixBytes -= int64(written)
 		if err != nil {
 			return written, err

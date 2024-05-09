@@ -84,11 +84,18 @@ func NewDefaultConfigToDialer() *ConfigToDialer {
 				return nil, fmt.Errorf("invalid address: %w", err)
 			}
 			if ap.Addr().Is4() {
-				ipv4.NewConn(conn).SetTTL(1)
+				ipv4.NewConn(conn).SetTTL(15)
 			} else if ap.Addr().Is6() {
-				ipv6.NewConn(conn).SetHopLimit(1)
+				ipv6.NewConn(conn).SetHopLimit(15)
 			} else {
 				return nil, fmt.Errorf("invalid IP: %w", err)
+			}
+			conn.(*net.TCPConn).CloseWrite()
+			conn.(*net.TCPConn).CloseRead()
+			conn.Close()
+			conn, err = (&net.Dialer{}).DialContext(ctx, "tcp", addr)
+			if err != nil {
+				return nil, err
 			}
 			conn.Close()
 			conn = nil
