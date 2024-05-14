@@ -78,16 +78,40 @@ type errorJSON struct {
 }
 
 type addressJSON struct {
-	Host string `json:"host"`
-	Port string `json:"port"`
+	Host        string `json:"host"`
+	Port        string `json:"port"`
+	AddressType IPType `json:"ip_type"`
 }
+
+type IPType string
+
+const (
+	IPv4 IPType = "v4"
+	IPv6 IPType = "v6"
+)
 
 func newAddressJSON(address string) (addressJSON, error) {
 	host, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return addressJSON{}, err
 	}
-	return addressJSON{host, port}, nil
+	ipType, err := checkIPVersion(host)
+	if err != nil {
+		return addressJSON{}, err
+	}
+	return addressJSON{host, port, ipType}, nil
+}
+
+func checkIPVersion(ipStr string) (IPType, error) {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return "", fmt.Errorf("invalid ip address: %s", ipStr)
+	}
+	if ip.To4() != nil {
+		return IPv4, nil
+	} else {
+		return IPv6, nil
+	}
 }
 
 func makeErrorRecord(result *connectivity.ConnectivityError) *errorJSON {
