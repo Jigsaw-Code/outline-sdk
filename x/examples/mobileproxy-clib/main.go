@@ -15,58 +15,58 @@
 package main
 
 // #include <stdlib.h>
+// #include <stdint.h>
 import (
 	"C"
 	"runtime/cgo"
-	"unsafe"
 
 	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
 )
 
-type StreamDialerPtr = unsafe.Pointer
-type ProxyPtr = unsafe.Pointer
+type StreamDialerPtr = C.uintptr_t
+type ProxyPtr = C.uintptr_t
 
 //export NewStreamDialerFromConfig
 func NewStreamDialerFromConfig(config *C.char) StreamDialerPtr {
 	streamDialerObject, err := mobileproxy.NewStreamDialerFromConfig(C.GoString(config))
 
 	if err != nil {
-		// TODO: print something?
-		return unsafe.Pointer(nil)
+		// TODO: return error
+		return C.uintptr_t(nil)
 	}
 
 	streamDialerHandle := cgo.NewHandle(streamDialerObject)
 
-	return unsafe.Pointer(&streamDialerHandle)
+	return C.uintptr_t(&streamDialerHandle)
 }
 
 //export RunProxy
 func RunProxy(address *C.char, dialer StreamDialerPtr) ProxyPtr {
-	dialerObject := (*cgo.Handle)(dialer).Value().(mobileproxy.StreamDialer)
+	dialerObject := cgo.Handle(dialer).Value().(mobileproxy.StreamDialer)
 
 	proxyObject, err := mobileproxy.RunProxy(C.GoString(address), &dialerObject)
 
 	if err != nil {
-		// TODO: print something?
-		return unsafe.Pointer(nil)
+		// TODO: return error
+		return C.uintptr_t(nil)
 	}
 
 	handle := cgo.NewHandle(proxyObject)
 
-	return unsafe.Pointer(&handle)
+	return C.uintptr_t(&handle)
 }
 
 //export AddURLProxy
 func AddURLProxy(proxy ProxyPtr, url *C.char, dialer StreamDialerPtr) {
-	proxyObject := (*cgo.Handle)(proxy).Value().(mobileproxy.Proxy)
-	dialerObject := (*cgo.Handle)(dialer).Value().(mobileproxy.StreamDialer)
+	proxyObject := cgo.Handle(proxy).Value().(mobileproxy.Proxy)
+	dialerObject := cgo.Handle(dialer).Value().(mobileproxy.StreamDialer)
 
 	proxyObject.AddURLProxy(C.GoString(url), &dialerObject)
 }
 
 //export StopProxy
 func StopProxy(proxy ProxyPtr, timeoutSeconds C.uint) {
-	proxyObject := (*cgo.Handle)(proxy).Value().(mobileproxy.Proxy)
+	proxyObject := cgo.Handle(proxy).Value().(mobileproxy.Proxy)
 
 	proxyObject.Stop(int(timeoutSeconds))
 }
