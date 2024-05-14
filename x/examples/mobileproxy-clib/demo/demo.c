@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// -- WORK IN PROGRESS --
-
 #include <stdio.h>
-#include <bin/mobileproxy-clib.h>
+#include "mobileproxy-clib.h"
 
 // Is there a way to import these? Or do we need to define them ourselves?
 typedef unsigned int StreamDialerPtr;
@@ -27,16 +25,13 @@ int main()
   ProxyPtr *proxy;
 
   dialer = NewStreamDialerFromConfig("split:3");
-  proxy = RunProxy("127.0.0.1:1234", dialer); // Is this call blocking? Do we need to run it in another thread?
+  proxy = RunProxy("127.0.0.1:1234", dialer);
 
-  // TODO: Wait for terminate key, we may read from console using fgetc
-  // Signal (i.e. Ctrl+C) is a Unix/Linux only API, Windows doesn't use it
-  // So it also depends on whether we need the program to be cross-platform
-  printf("Running proxy on 127.0.0.1:1234. Press <Enter> to terminate: ");
+  printf("Running proxy on 127.0.0.1:1234. Press any key to terminate. ");
+  getc(stdin);
 
   // Stop the proxy and clean up
   StopProxy(proxy, 1000);
-
   DeleteProxy(proxy);
   DeleteStreamDialer(dialer);
 
