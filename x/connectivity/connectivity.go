@@ -93,14 +93,13 @@ func makeConnectivityError(op string, err error) *ConnectivityError {
 
 type WrapStreamDialer func(baseDialer transport.StreamDialer) (transport.StreamDialer, error)
 
-var ErrAllConnectAttemptsFailed = errors.New("all connect attempts failed.")
+var ErrAllConnectAttemptsFailed = errors.New("all connect attempts failed")
 
 // TestStreamConnectivityWithDNS tests weather we can get a response from a DNS resolver at resolverAddress over a stream connection. It sends testDomain as the query.
 // It uses the baseDialer to create a first-hop connection to the proxy, and the wrap to apply the transport.
 // The baseDialer is typically TCPDialer, but it can be replaced for remote measurements.
 func TestStreamConnectivityWithDNS(ctx context.Context, baseDialer transport.StreamDialer, wrap WrapStreamDialer, resolverAddress string, testDomain string) (*ConnectivityResult, error) {
 	testResult := &ConnectivityResult{}
-	testResult.StartTime = time.Now()
 	connectResult := &testResult.Attempts
 	ipIndex := 0
 	done := make(chan bool)
@@ -111,6 +110,7 @@ func TestStreamConnectivityWithDNS(ctx context.Context, baseDialer transport.Str
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	proceed <- true
+	testResult.StartTime = time.Now()
 loop:
 	for {
 		select {
@@ -122,13 +122,11 @@ loop:
 			go func(attempt *ConnectionAttempt) {
 				defer waitGroup.Done()
 				attempt.StartTime = time.Now()
-				//mutex.Lock()
 				interceptDialer := transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
 					// Captures the address of the first hop, before resolution.
 					testResult.Endpoint = addr
 					host, port, err := net.SplitHostPort(addr)
 					if err != nil {
-						//attempt.Duration = time.Since(attempt.StartTime)
 						cancel()
 						done <- true
 						return nil, err
@@ -144,7 +142,7 @@ loop:
 						// proceed to setting up the next test
 						proceed <- true
 						ip := ips[ipIndex]
-						fmt.Printf("Trying address %v\n", ip)
+						//fmt.Printf("Trying address %v\n", ip)
 						ipIndex++
 						addr := net.JoinHostPort(ip, port)
 						attempt.Address = addr
@@ -159,11 +157,9 @@ loop:
 					} else {
 						// stop iterating
 						done <- true
-						//attempt.Duration = time.Since(attempt.StartTime)
 						return nil, ErrAllConnectAttemptsFailed
 					}
 				})
-				//mutex.Unlock()
 				dialer, err := wrap(interceptDialer)
 				if err != nil {
 					*connectResult = append(*connectResult, *attempt)
@@ -171,18 +167,18 @@ loop:
 				}
 				resolverConn, err := dialer.DialStream(ctx, resolverAddress)
 				if err != nil {
-					// do not include cencelled errors in the result
+					// Do not include cencelled errors in the result
 					if errors.Is(err, context.Canceled) {
 						return
 					}
-					// do not include ErrAllConnectAttemptsFailed type error in the attempt result
+					// Do not include ErrAllConnectAttemptsFailed type error in the attempt result
 					if errors.Is(err, ErrAllConnectAttemptsFailed) {
 						return
 					}
 					attempt.Duration = time.Since(attempt.StartTime)
 					attempt.Error = makeConnectivityError("connect", err)
 					*connectResult = append(*connectResult, *attempt)
-					// populate main test result error field with
+					// CHANGE: populate main test result error field with
 					// one of attempt errors if non of the attempts succeeded
 					testResult.Error = attempt.Error
 					return
@@ -190,6 +186,9 @@ loop:
 				resolver := dns.NewTCPResolver(transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
 					return resolverConn, nil
 				}), resolverAddress)
+				// I am igniring the error returned by TestConnectivityWithResolver
+				// because I am already capturing the error in the attempt. Not sure
+				// if this is the right approach.
 				attempt.Error, _ = TestConnectivityWithResolver(ctx, resolver, testDomain)
 				attempt.Duration = time.Since(attempt.StartTime)
 				*connectResult = append(*connectResult, *attempt)
@@ -198,7 +197,7 @@ loop:
 					// test has succeeded; cancel the rest of the goroutines
 					cancel()
 				} else {
-					// populate main test result error field with
+					// CHANGE: populate main test result error field with
 					// one of attempt errors if non of the attempts succeeded
 					testResult.Error = attempt.Error
 				}
