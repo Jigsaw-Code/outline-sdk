@@ -93,7 +93,7 @@ func makeConnectivityError(op string, err error) *ConnectivityError {
 
 type WrapStreamDialer func(baseDialer transport.StreamDialer) (transport.StreamDialer, error)
 
-var ErrAllConnectAttemptsFailed = errors.New("all connect attempts failed")
+var ErrNoMoreIPs = errors.New("no more ips to try")
 
 // TestStreamConnectivityWithDNS tests weather we can get a response from a DNS resolver at resolverAddress over a stream connection. It sends testDomain as the query.
 // It uses the baseDialer to create a first-hop connection to the proxy, and the wrap to apply the transport.
@@ -156,7 +156,7 @@ loop:
 					} else {
 						// stop iterating
 						done <- true
-						return nil, ErrAllConnectAttemptsFailed
+						return nil, ErrNoMoreIPs
 					}
 				})
 				dialer, err := wrap(interceptDialer)
@@ -172,8 +172,8 @@ loop:
 					if errors.Is(err, context.Canceled) {
 						return
 					}
-					// Do not include ErrAllConnectAttemptsFailed type error in the attempt result
-					if errors.Is(err, ErrAllConnectAttemptsFailed) {
+					// Do not include ErrNoMoreIPs type error in the attempt result
+					if errors.Is(err, ErrNoMoreIPs) {
 						return
 					}
 					attempt.Duration = time.Since(attempt.StartTime)
@@ -259,12 +259,9 @@ loop:
 						proceed <- true
 						ip := ips[ipIndex]
 						ipIndex++
-						fmt.Printf("Trying address %v\n", ip)
+						//fmt.Printf("Trying address %v\n", ip)
 						addr = net.JoinHostPort(ip, port)
 						attempt.Address = addr
-						// TODO: pass timeout paramter as argument
-						//ipCtx, cancelWithTimeout := context.WithTimeout(ctx, 5*time.Second)
-						//defer cancelWithTimeout()
 						conn, err = baseDialer.DialPacket(ctx, addr)
 						if err != nil {
 							return nil, err
@@ -273,7 +270,7 @@ loop:
 					} else {
 						// stop iterating
 						done <- true
-						return nil, ErrAllConnectAttemptsFailed
+						return nil, ErrNoMoreIPs
 					}
 				})
 				dialer, err := wrap(interceptDialer)
@@ -285,12 +282,13 @@ loop:
 				resolverConn, err := dialer.DialPacket(ctx, resolverAddress)
 				if err != nil {
 					// Do not include cencelled errors in the result
+					// This never gets triggered in PacketDialer since
+					// connect is not a blocking operation; we can remove it later
 					if errors.Is(err, context.Canceled) {
-						fmt.Println("context is being cancelled...")
 						return
 					}
-					// Do not include ErrAllConnectAttemptsFailed type error in the attempt result
-					if errors.Is(err, ErrAllConnectAttemptsFailed) {
+					// Do not include ErrNoMoreIPs type error in the attempt result
+					if errors.Is(err, ErrNoMoreIPs) {
 						return
 					}
 					attempt.Duration = time.Since(attempt.StartTime)
@@ -307,18 +305,15 @@ loop:
 				//resolver := dns.NewUDPResolver(dialer, resolverAddress)
 				attempt.Error, err = TestConnectivityWithResolver(ctx, resolver, testDomain)
 				if err != nil {
-					fmt.Println("udp test failed...")
+					//fmt.Printf("Test failed: %v\n", err)
+					return
 				}
 				attempt.Duration = time.Since(attempt.StartTime)
 				*connectResult = append(*connectResult, *attempt)
 				if attempt.Error == nil {
 					testResult.Error = nil
 					// test has succeeded; cancel the rest of the goroutines
-					//done <- true
-					fmt.Println("success found aborting all tests...")
 					cancel()
-					//done <- true
-					//return
 				} else {
 					// CHANGE: populate main test result error field with
 					// one of attempt errors if non of the attempts succeeded
@@ -356,13 +351,13 @@ func TestConnectivityWithResolver(ctx context.Context, resolver dns.Resolver, te
 	_, err = resolver.Query(ctx, *q)
 
 	if errors.Is(err, dns.ErrBadRequest) {
+		// maybe change this to include err in report?
 		return nil, err
 	}
-	if errors.Is(err, ErrAllConnectAttemptsFailed) {
-		fmt.Println("all connect attempts failed...")
-	}
-	if errors.Is(err, context.Canceled) {
-		fmt.Println("context cancelled...")
+	// If the connection is force cancelled,
+	// we don't want to report an error.
+	if errors.Is(err, net.ErrClosed) {
+		return nil, err
 	}
 	if errors.Is(err, dns.ErrDial) {
 		return makeConnectivityError("connect", err), nil
