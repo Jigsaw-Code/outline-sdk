@@ -105,7 +105,6 @@ func TestStreamConnectivityWithDNS(ctx context.Context, baseDialer transport.Str
 	done := make(chan bool)
 	proceed := make(chan bool, 1)
 	var waitGroup sync.WaitGroup
-	//var mutex sync.Mutex
 	// Create a new context for canceling goroutines
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -162,6 +161,8 @@ loop:
 				})
 				dialer, err := wrap(interceptDialer)
 				if err != nil {
+					attempt.Duration = time.Since(attempt.StartTime)
+					attempt.Error.Err = err
 					*connectResult = append(*connectResult, *attempt)
 					return
 				}
@@ -186,7 +187,7 @@ loop:
 				resolver := dns.NewTCPResolver(transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
 					return resolverConn, nil
 				}), resolverAddress)
-				// I am igniring the error returned by TestConnectivityWithResolver
+				// I am ignoring the error returned by TestConnectivityWithResolver
 				// because I am already capturing the error in the attempt. Not sure
 				// if this is the right approach.
 				attempt.Error, _ = TestConnectivityWithResolver(ctx, resolver, testDomain)
@@ -201,7 +202,6 @@ loop:
 					// one of attempt errors if non of the attempts succeeded
 					testResult.Error = attempt.Error
 				}
-
 			}(attempt)
 		}
 	}
@@ -218,62 +218,119 @@ type WrapPacketDialer func(baseDialer transport.PacketDialer) (transport.PacketD
 func TestPacketConnectivityWithDNS(ctx context.Context, baseDialer transport.PacketDialer, wrap WrapPacketDialer, resolverAddress string, testDomain string) (*ConnectivityResult, error) {
 	testResult := &ConnectivityResult{}
 	connectResult := &testResult.Attempts
-	i := 0
-	iterate := true
-	//var iterateMutex sync.Mutex
-	for iterate {
-		attempt := &ConnectionAttempt{}
-		interceptDialer := transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-			attempt.StartTime = time.Now()
-			// Captures the address of the first hop, before resolution.
-			testResult.Endpoint = addr
-			host, port, err := net.SplitHostPort(addr)
-			if err != nil {
-				attempt.Duration = time.Since(attempt.StartTime)
-				return nil, err
-			}
-			ips, err := (&net.Resolver{PreferGo: false}).LookupHost(ctx, host)
-			if err != nil {
-				attempt.Duration = time.Since(attempt.StartTime)
-				attempt.Error = makeConnectivityError("resolve", err)
-				return nil, err
-			}
-			var conn net.Conn
-			if i < len(ips) {
-				ip := ips[i]
-				i++
-				fmt.Printf("Trying address %v\n", ip)
-				addr := net.JoinHostPort(ip, port)
-				attempt.Address = addr
-				conn, err = baseDialer.DialPacket(ctx, addr)
+	ipIndex := 0
+	done := make(chan bool)
+	proceed := make(chan bool, 1)
+	var waitGroup sync.WaitGroup
+	// Create a new context for canceling goroutines
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	proceed <- true
+	testResult.StartTime = time.Now()
+loop:
+	for {
+		select {
+		case <-done:
+			break loop
+		case <-proceed:
+			waitGroup.Add(1)
+			attempt := &ConnectionAttempt{}
+			go func(attempt *ConnectionAttempt) {
+				defer waitGroup.Done()
+				attempt.StartTime = time.Now()
+				interceptDialer := transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+					// Captures the address of the first hop, before resolution.
+					testResult.Endpoint = addr
+					host, port, err := net.SplitHostPort(addr)
+					if err != nil {
+						cancel()
+						done <- true
+						return nil, err
+					}
+					ips, err := (&net.Resolver{PreferGo: false}).LookupHost(ctx, host)
+					if err != nil {
+						cancel()
+						done <- true
+						return nil, err
+					}
+					var conn net.Conn
+					if ipIndex < len(ips) {
+						// proceed to setting up the next test
+						proceed <- true
+						ip := ips[ipIndex]
+						ipIndex++
+						fmt.Printf("Trying address %v\n", ip)
+						addr = net.JoinHostPort(ip, port)
+						attempt.Address = addr
+						// TODO: pass timeout paramter as argument
+						//ipCtx, cancelWithTimeout := context.WithTimeout(ctx, 5*time.Second)
+						//defer cancelWithTimeout()
+						conn, err = baseDialer.DialPacket(ctx, addr)
+						if err != nil {
+							return nil, err
+						}
+						return conn, err
+					} else {
+						// stop iterating
+						done <- true
+						return nil, ErrAllConnectAttemptsFailed
+					}
+				})
+				dialer, err := wrap(interceptDialer)
 				if err != nil {
-					attempt.Duration = time.Since(attempt.StartTime)
-					return nil, err
+					fmt.Println("wrap failed...")
+					*connectResult = append(*connectResult, *attempt)
+					return
 				}
-				// if err == nil {
-				// 	testResult.SelectedAddress = addr
-				// 	//iterate = false
-				// }
-				return conn, err
-			} else {
-				iterate = false
-				return nil, ErrAllConnectAttemptsFailed
-			}
-		})
-		dialer, err := wrap(interceptDialer)
-		if err != nil {
-			attempt.Error = makeConnectivityError("wrap", err)
-			*connectResult = append(*connectResult, *attempt)
-			continue
-		}
-		resolver := dns.NewUDPResolver(dialer, resolverAddress)
-		attempt.Error, err = TestConnectivityWithResolver(ctx, resolver, testDomain)
-		*connectResult = append(*connectResult, *attempt)
-		if err != nil {
-			continue
+				resolverConn, err := dialer.DialPacket(ctx, resolverAddress)
+				if err != nil {
+					// Do not include cencelled errors in the result
+					if errors.Is(err, context.Canceled) {
+						fmt.Println("context is being cancelled...")
+						return
+					}
+					// Do not include ErrAllConnectAttemptsFailed type error in the attempt result
+					if errors.Is(err, ErrAllConnectAttemptsFailed) {
+						return
+					}
+					attempt.Duration = time.Since(attempt.StartTime)
+					attempt.Error = makeConnectivityError("connect", err)
+					*connectResult = append(*connectResult, *attempt)
+					// CHANGE: populate main test result error field with
+					// one of attempt errors if non of the attempts succeeded
+					testResult.Error = attempt.Error
+					return
+				}
+				resolver := dns.NewUDPResolver(transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+					return resolverConn, nil
+				}), resolverAddress)
+				//resolver := dns.NewUDPResolver(dialer, resolverAddress)
+				attempt.Error, err = TestConnectivityWithResolver(ctx, resolver, testDomain)
+				if err != nil {
+					fmt.Println("udp test failed...")
+				}
+				attempt.Duration = time.Since(attempt.StartTime)
+				*connectResult = append(*connectResult, *attempt)
+				if attempt.Error == nil {
+					testResult.Error = nil
+					// test has succeeded; cancel the rest of the goroutines
+					//done <- true
+					fmt.Println("success found aborting all tests...")
+					cancel()
+					//done <- true
+					//return
+				} else {
+					// CHANGE: populate main test result error field with
+					// one of attempt errors if non of the attempts succeeded
+					testResult.Error = attempt.Error
+					//return
+				}
+			}(attempt)
 		}
 	}
 	// TODO: error is always being returned as nil; must change this
+	waitGroup.Wait()
+	testResult.Duration = time.Since(testResult.StartTime)
 	return testResult, nil
 }
 
@@ -300,6 +357,12 @@ func TestConnectivityWithResolver(ctx context.Context, resolver dns.Resolver, te
 
 	if errors.Is(err, dns.ErrBadRequest) {
 		return nil, err
+	}
+	if errors.Is(err, ErrAllConnectAttemptsFailed) {
+		fmt.Println("all connect attempts failed...")
+	}
+	if errors.Is(err, context.Canceled) {
+		fmt.Println("context cancelled...")
 	}
 	if errors.Is(err, dns.ErrDial) {
 		return makeConnectivityError("connect", err), nil
