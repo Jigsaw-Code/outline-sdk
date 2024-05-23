@@ -9,18 +9,16 @@ To run the demo, you first must build the library for your platform. You can bui
 ```bash
 cd x
 
-CGO_ENABLED=1 go build -buildmode=c-shared -o=examples/mobileproxy-clib/demo/mobileproxy-clib github.com/Jigsaw-Code/outline-sdk/x/examples/mobileproxy-clib
+CGO_ENABLED=1 go build -buildmode=c-shared -o=examples/mobileproxy-clib/demo/mobileproxy-clib ./examples/mobileproxy-clib
 ```
 
 Then, you can build and run the demo by doing the following:
 
 ```bash
-# build the demo
-gcc -o examples/mobileproxy-clib/demo/demo examples/mobile
-proxy-clib/demo/demo.c /Users/daniellacosse/code/outline-sdk/x/examples/mobileproxy-clib/demo/mobilep
-roxy-clib
-
 cd examples/mobileproxy-clib/demo
+
+# build the demo
+gcc -o demo demo.c mobileproxy-clib
 
 # run the demo
 ./demo

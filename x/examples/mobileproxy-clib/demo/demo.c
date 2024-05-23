@@ -15,25 +15,21 @@
 #include <stdio.h>
 #include "mobileproxy-clib.h"
 
-// Is there a way to import these? Or do we need to define them ourselves?
-typedef unsigned int StreamDialerPtr;
-typedef unsigned int ProxyPtr;
-
 int main()
 {
-  StreamDialerPtr *dialer;
-  ProxyPtr *proxy;
+  StreamDialer dialer;
+  Proxy proxy;
 
   dialer = NewStreamDialerFromConfig("split:3");
   proxy = RunProxy("127.0.0.1:1234", dialer);
 
-  printf("Running proxy on 127.0.0.1:1234. Press any key to terminate. ");
+  printf("Running proxy on 127.0.0.1:1234\nPress <Enter> to terminate...");
   getc(stdin);
 
   // Stop the proxy and clean up
   StopProxy(proxy, 1000);
-  DeleteProxy(proxy);
-  DeleteStreamDialer(dialer);
+  ReleaseProxy(proxy);
+  ReleaseStreamDialer(dialer);
 
   return 0;
 }

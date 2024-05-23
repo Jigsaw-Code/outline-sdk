@@ -30,6 +30,14 @@ import (
 
 const nullptr = C.uintptr_t(0)
 
+func marshalStreamDialer(dialer *mobileproxy.StreamDialer) C.StreamDialer {
+	return C.StreamDialer(cgo.NewHandle(dialer))
+}
+
+func unmarshalStreamDialer(dialerHandle C.StreamDialer) *mobileproxy.StreamDialer {
+	return cgo.Handle(dialerHandle).Value().(*mobileproxy.StreamDialer)
+}
+
 //export NewStreamDialerFromConfig
 func NewStreamDialerFromConfig(config *C.char) C.StreamDialer {
 	sd, err := mobileproxy.NewStreamDialerFromConfig(C.GoString(config))
@@ -39,12 +47,25 @@ func NewStreamDialerFromConfig(config *C.char) C.StreamDialer {
 		return nullptr
 	}
 
-	return C.StreamDialer(cgo.NewHandle(&sd))
+	return marshalStreamDialer(sd)
+}
+
+//export ReleaseStreamDialer
+func ReleaseStreamDialer(dialerHandle C.StreamDialer) {
+	cgo.Handle(dialerHandle).Delete()
+}
+
+func marshalProxy(proxy *mobileproxy.Proxy) C.Proxy {
+	return C.Proxy(cgo.NewHandle(proxy))
+}
+
+func unmarshalProxy(proxyHandle C.Proxy) *mobileproxy.Proxy {
+	return cgo.Handle(proxyHandle).Value().(*mobileproxy.Proxy)
 }
 
 //export RunProxy
 func RunProxy(address *C.char, dialerHandle C.StreamDialer) C.Proxy {
-	dialer := cgo.Handle(dialerHandle).Value().(*mobileproxy.StreamDialer)
+	dialer := unmarshalStreamDialer(dialerHandle)
 
 	proxy, err := mobileproxy.RunProxy(C.GoString(address), dialer)
 
@@ -53,31 +74,25 @@ func RunProxy(address *C.char, dialerHandle C.StreamDialer) C.Proxy {
 		return nullptr
 	}
 
-	return C.Proxy(cgo.NewHandle(&proxy))
+	return marshalProxy(proxy)
 }
 
 //export AddURLProxy
 func AddURLProxy(proxyHandle C.Proxy, url *C.char, dialerHandle C.StreamDialer) {
-	proxy := cgo.Handle(proxyHandle).Value().(*mobileproxy.Proxy)
-	dialer := cgo.Handle(dialerHandle).Value().(*mobileproxy.StreamDialer)
+	proxy := unmarshalProxy(proxyHandle)
+	dialer := unmarshalStreamDialer(dialerHandle)
 
 	proxy.AddURLProxy(C.GoString(url), dialer)
 }
 
 //export StopProxy
 func StopProxy(proxyHandle C.Proxy, timeoutSeconds C.uint) {
-	proxy := cgo.Handle(proxyHandle).Value().(*mobileproxy.Proxy)
-
+	proxy := unmarshalProxy(proxyHandle)
 	proxy.Stop(int(timeoutSeconds))
 }
 
-//export DeleteStreamDialer
-func DeleteStreamDialer(dialerHandle C.StreamDialer) {
-	cgo.Handle(dialerHandle).Delete()
-}
-
-//export DeleteProxy
-func DeleteProxy(proxyHandle C.Proxy) {
+//export ReleaseProxy
+func ReleaseProxy(proxyHandle C.Proxy) {
 	cgo.Handle(proxyHandle).Delete()
 }
 
