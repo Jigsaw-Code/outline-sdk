@@ -24,18 +24,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"runtime"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Psiphon-Labs/psiphon-tunnel-core/ClientLibrary/clientlib"
 	psi "github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon"
 )
 
-type PsiphonDialer struct {
+type Dialer struct {
 	cancel     context.CancelFunc
 	controller *psi.Controller
 }
 
-func (d *PsiphonDialer) DialStream(ctx context.Context, addr string) (transport.StreamConn, error) {
+func (d *Dialer) DialStream(ctx context.Context, addr string) (transport.StreamConn, error) {
 	netConn, err := d.controller.Dial(addr, nil)
 	if err != nil {
 		return nil, err
@@ -43,11 +44,15 @@ func (d *PsiphonDialer) DialStream(ctx context.Context, addr string) (transport.
 	return streamConn{netConn}, nil
 }
 
-func (d *PsiphonDialer) Close() {
+func (d *Dialer) Close() {
 	d.cancel()
 }
 
-func NewStreamDialer(configJSON []byte) (*PsiphonDialer, error) {
+type Config struct {
+	config *psi.Config
+}
+
+func LoadConfig(configJSON []byte) (*Config, error) {
 	config, err := psi.LoadConfig(configJSON)
 	if err != nil {
 		return nil, fmt.Errorf("config load failed: %w", err)
@@ -55,11 +60,15 @@ func NewStreamDialer(configJSON []byte) (*PsiphonDialer, error) {
 	// Don't let Psiphon run its local proxies.
 	config.DisableLocalHTTPProxy = true
 	config.DisableLocalSocksProxy = true
+	config.ClientPlatform = fmt.Sprintf("OutlineSDK/%s/%s", runtime.GOOS, runtime.GOARCH)
 	err = config.Commit(false)
 	if err != nil {
 		return nil, fmt.Errorf("config commit failed: %w", err)
 	}
+	return &Config{config}, nil
+}
 
+func (cfg *Config) NewDialer() (*Dialer, error) {
 	// Will receive a value when the tunnel has successfully connected.
 	connected := make(chan struct{}, 1)
 	// Will receive a value if an error occurs during the connection sequence.
@@ -68,6 +77,7 @@ func NewStreamDialer(configJSON []byte) (*PsiphonDialer, error) {
 	// Set up NoticeWriter to receive events.
 	psi.SetNoticeWriter(psi.NewNoticeReceiver(
 		func(notice []byte) {
+			fmt.Println(string(notice))
 			var event clientlib.NoticeEvent
 			err := json.Unmarshal(notice, &event)
 			if err != nil {
@@ -97,7 +107,7 @@ func NewStreamDialer(configJSON []byte) (*PsiphonDialer, error) {
 			}
 		}))
 
-	controller, err := psi.NewController(config)
+	controller, err := psi.NewController(cfg.config)
 	if err != nil {
 		return nil, fmt.Errorf("controller creation failed: %w", err)
 	}
@@ -107,7 +117,7 @@ func NewStreamDialer(configJSON []byte) (*PsiphonDialer, error) {
 	// Wait for an active tunnel or error
 	select {
 	case <-connected:
-		return &PsiphonDialer{cancel, controller}, nil
+		return &Dialer{cancel, controller}, nil
 	case err := <-errored:
 		cancel()
 		if err != clientlib.ErrTimeout {
@@ -117,7 +127,7 @@ func NewStreamDialer(configJSON []byte) (*PsiphonDialer, error) {
 	}
 }
 
-var _ transport.StreamDialer = (*PsiphonDialer)(nil)
+var _ transport.StreamDialer = (*Dialer)(nil)
 
 // streamConn wraps a [net.Conn] to provide a [transport.StreamConn] interface.
 type streamConn struct {

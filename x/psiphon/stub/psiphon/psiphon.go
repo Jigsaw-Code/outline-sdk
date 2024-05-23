@@ -24,6 +24,9 @@ import (
 // See https://pkg.go.dev/github.com/Psiphon-Labs/psiphon-tunnel-core.
 
 type Config struct {
+	// ClientPlatform is the client platform ("Windows", "Android", etc.) that
+	// the client reports to the server.
+	ClientPlatform string
 	// DisableLocalSocksProxy disables running the local SOCKS proxy.
 	DisableLocalSocksProxy bool
 	// DisableLocalHTTPProxy disables running the local HTTP proxy.

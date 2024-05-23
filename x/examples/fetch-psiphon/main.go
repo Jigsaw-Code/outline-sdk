@@ -65,7 +65,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not read config file: %v\n", err)
 	}
-	dialer, err := psiphon.NewStreamDialer(configJSON)
+	config, err := psiphon.LoadConfig(configJSON)
+	if err != nil {
+		log.Fatalf("Failed to load Psiphon config: %v\n", err)
+	}
+	dialer, err := config.NewDialer()
 	if err != nil {
 		log.Fatalf("Could not create dialer: %v\n", err)
 	}
