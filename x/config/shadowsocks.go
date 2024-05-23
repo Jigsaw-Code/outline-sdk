@@ -25,12 +25,16 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 )
 
-func wrapStreamDialerWithShadowsocks(innerDialer transport.StreamDialer, configURL *url.URL) (transport.StreamDialer, error) {
+func wrapStreamDialerWithShadowsocks(innerSD func() (transport.StreamDialer, error), _ func() (transport.PacketDialer, error), configURL *url.URL) (transport.StreamDialer, error) {
+	sd, err := innerSD()
+	if err != nil {
+		return nil, err
+	}
 	config, err := parseShadowsocksURL(configURL)
 	if err != nil {
 		return nil, err
 	}
-	endpoint := &transport.StreamDialerEndpoint{Dialer: innerDialer, Address: config.serverAddress}
+	endpoint := &transport.StreamDialerEndpoint{Dialer: sd, Address: config.serverAddress}
 	dialer, err := shadowsocks.NewStreamDialer(endpoint, config.cryptoKey)
 	if err != nil {
 		return nil, err
@@ -41,12 +45,16 @@ func wrapStreamDialerWithShadowsocks(innerDialer transport.StreamDialer, configU
 	return dialer, nil
 }
 
-func wrapPacketDialerWithShadowsocks(innerDialer transport.PacketDialer, configURL *url.URL) (transport.PacketDialer, error) {
+func wrapPacketDialerWithShadowsocks(_ func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), configURL *url.URL) (transport.PacketDialer, error) {
+	pd, err := innerPD()
+	if err != nil {
+		return nil, err
+	}
 	config, err := parseShadowsocksURL(configURL)
 	if err != nil {
 		return nil, err
 	}
-	endpoint := &transport.PacketDialerEndpoint{Dialer: innerDialer, Address: config.serverAddress}
+	endpoint := &transport.PacketDialerEndpoint{Dialer: pd, Address: config.serverAddress}
 	listener, err := shadowsocks.NewPacketListener(endpoint, config.cryptoKey)
 	if err != nil {
 		return nil, err
@@ -171,10 +179,19 @@ func parseStringPrefix(utf8Str string) ([]byte, error) {
 }
 
 func sanitizeShadowsocksURL(u *url.URL) (string, error) {
-	const redactedPlaceholder = "REDACTED"
 	config, err := parseShadowsocksURL(u)
 	if err != nil {
-		return "ss://ERROR", err
+		return "", err
 	}
-	return "ss://" + redactedPlaceholder + "@" + config.serverAddress + "?prefix=" + url.PathEscape(string(config.prefix)), nil
+	values := make(url.Values)
+	if prefix := u.Query().Get("prefix"); prefix != "" {
+		values.Add("prefix", prefix)
+	}
+	cleanURL := url.URL{
+		Scheme:   "ss",
+		User:     url.User("REDACTED"),
+		Host:     config.serverAddress,
+		RawQuery: values.Encode(),
+	}
+	return cleanURL.String(), nil
 }

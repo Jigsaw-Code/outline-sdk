@@ -3,8 +3,12 @@
 This package contains a command-line tool to expose a WebSocket endpoint that connects to
 any endpoint over a transport.
 
+
+## Connecting to an arbitrary endpoint
+
+
 ```sh
-go run ./examples/ws2endpoint --endpoint ipinfo.io:443 --transport tls
+go run ./examples/ws2endpoint --backend ipinfo.io:443 --transport tls
 ```
 
 Then, on a browser console, you can do:
@@ -42,6 +46,8 @@ Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
 }
 ```
 
+## Using Cloudflare
+
 You can expose your WebSockets on Cloudflare with [clourdflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/). For example:
 
 ```console
@@ -57,6 +63,52 @@ You can expose your WebSockets on Cloudflare with [clourdflared](https://develop
 
 In this case, use `wss://recorders-uganda-starring-stopping.trycloudflare.com` as the WebSocket url.
 
-
 Note that the Cloudflare tunnel does not add any user authentication mechanism. You must implement authentication yourself
 if you would like to prevent unauthorized access to your service.
+
+## Shadowsocks over WebSocket
+
+Run the reverse proxy, pointing to your Outline Server:
+
+```sh
+go run github.com/Jigsaw-Code/outline-sdk/x/examples/ws2endpoint --backend $HOST:$PORT --listen 127.0.0.1:8080
+```
+
+Expose the endpoint on Cloudflare:
+
+```sh
+cloudflared tunnel --url http://localhost:8080
+```
+
+Connect to the Cloudflare domain. For example:
+
+```sh
+go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch \
+  -transport "tls|ws:tcp_path=/tcp|ss://${REDACTED}@prefix-marion-covered-operators.trycloudflare.com.trycloudflare.com:443" \
+  https://ipinfo.io/
+```
+
+You can use override to make it easier to insert an Outline key:
+
+```sh
+go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch \
+  -transport "tls|ws:tcp_path=/tcp|override:host=prefix-marion-covered-operators.trycloudflare.com&port=443|$OUTLINE_KEY" \
+  https://ipinfo.io/
+```
+
+It's possible to bypass DNS-based blocking by resolving `cloudflare.net`, and SNI-based blocking by using TLS Record Fragmentation:
+
+```sh
+go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch \
+  -transport "override:host=cloudflare.net|tlsfrag:1|tls|ws:tcp_path=/tcp|ss://${REDACTED}@prefix-marion-covered-operators.trycloudflare.com:443" \
+  https://ipinfo.io/
+```
+
+The WebSockets transport supports UDP as well:
+
+```sh
+go run github.com/Jigsaw-Code/outline-sdk/x/examples/resolve \
+  -transport "tls|ws:tcp_path=/tcp&udp_path=/udp|ss://${REDACTED}@prefix-marion-covered-operators.trycloudflare.com:443"
+  -resolver 8.8.8.8 \
+  getoutline.org
+```

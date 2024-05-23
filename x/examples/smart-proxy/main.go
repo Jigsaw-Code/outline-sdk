@@ -86,12 +86,12 @@ func main() {
 		log.Fatalf("Could not read config: %v", err)
 	}
 
-	configParser := config.NewDefaultConfigParser()
-	packetDialer, err := configParser.WrapPacketDialer(&transport.UDPDialer{}, *transportFlag)
+	configToDialer := config.NewDefaultConfigToDialer()
+	packetDialer, err := configToDialer.NewPacketDialer(*transportFlag)
 	if err != nil {
 		log.Fatalf("Could not create packet dialer: %v", err)
 	}
-	streamDialer, err := configParser.WrapStreamDialer(&transport.TCPDialer{}, *transportFlag)
+	streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
 	if err != nil {
 		log.Fatalf("Could not create stream dialer: %v", err)
 	}

@@ -81,43 +81,44 @@ func TestIsSuccess(t *testing.T) {
 	}
 }
 
-func TestSendReportSuccessfully(t *testing.T) {
-	var testSetup = ConnectivitySetup{
-		Proxy:    "testProxy",
-		Resolver: "8.8.8.8",
-		Proto:    "udp",
-		Prefix:   "HTTP1/1",
-	}
-	var testErr = ConnectivityError{
-		Op:         "read",
-		PosixError: "ETIMEDOUT",
-		Msg:        "i/o timeout",
-	}
-	var testReport = ConnectivityReport{
-		Connection: testSetup,
-		Time:       time.Now().UTC().Truncate(time.Second),
-		DurationMs: 1,
-		Error:      testErr,
-	}
+// TODO(fortuna): Make this work without the external service.
+// func TestSendReportSuccessfully(t *testing.T) {
+// 	var testSetup = ConnectivitySetup{
+// 		Proxy:    "testProxy",
+// 		Resolver: "8.8.8.8",
+// 		Proto:    "udp",
+// 		Prefix:   "HTTP1/1",
+// 	}
+// 	var testErr = ConnectivityError{
+// 		Op:         "read",
+// 		PosixError: "ETIMEDOUT",
+// 		Msg:        "i/o timeout",
+// 	}
+// 	var testReport = ConnectivityReport{
+// 		Connection: testSetup,
+// 		Time:       time.Now().UTC().Truncate(time.Second),
+// 		DurationMs: 1,
+// 		Error:      testErr,
+// 	}
 
-	var r Report = testReport
-	v, ok := r.(HasSuccess)
-	if ok {
-		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
-	}
-	u, err := url.Parse("https://script.google.com/macros/s/AKfycbzoMBmftQaR9Aw4jzTB-w4TwkDjLHtSfBCFhh4_2NhTEZAUdj85Qt8uYCKCNOEAwCg4/exec")
-	if err != nil {
-		t.Errorf("Expected no error, but got: %v", err)
-	}
-	c := RemoteCollector{
-		CollectorURL: u,
-		HttpClient:   &http.Client{Timeout: 10 * time.Second},
-	}
-	err = c.Collect(context.Background(), r)
-	if err != nil {
-		t.Errorf("Expected no error, but got: %v", err)
-	}
-}
+// 	var r Report = testReport
+// 	v, ok := r.(HasSuccess)
+// 	if ok {
+// 		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
+// 	}
+// 	u, err := url.Parse("https://script.google.com/macros/s/AKfycbzoMBmftQaR9Aw4jzTB-w4TwkDjLHtSfBCFhh4_2NhTEZAUdj85Qt8uYCKCNOEAwCg4/exec")
+// 	if err != nil {
+// 		t.Errorf("Expected no error, but got: %v", err)
+// 	}
+// 	c := RemoteCollector{
+// 		CollectorURL: u,
+// 		HttpClient:   &http.Client{Timeout: 10 * time.Second},
+// 	}
+// 	err = c.Collect(context.Background(), r)
+// 	if err != nil {
+// 		t.Errorf("Expected no error, but got: %v", err)
+// 	}
+// }
 
 func TestSendReportUnsuccessfully(t *testing.T) {
 	var testReport = ConnectivityReport{
