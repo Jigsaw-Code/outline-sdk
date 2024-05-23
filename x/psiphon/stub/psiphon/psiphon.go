@@ -17,12 +17,18 @@ package psiphon
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
 )
 
 // See https://pkg.go.dev/github.com/Psiphon-Labs/psiphon-tunnel-core.
 
-type Config struct{}
+type Config struct {
+	// DisableLocalSocksProxy disables running the local SOCKS proxy.
+	DisableLocalSocksProxy bool
+	// DisableLocalHTTPProxy disables running the local HTTP proxy.
+	DisableLocalHTTPProxy bool
+}
 
 type Controller struct{}
 
@@ -42,4 +48,14 @@ func (controller *Controller) Run(ctx context.Context) {}
 
 func (controller *Controller) Dial(remoteAddr string, downstreamConn net.Conn) (conn net.Conn, err error) {
 	return nil, errors.New("not available")
+}
+
+func SetNoticeWriter(writer io.Writer)
+
+type NoticeReceiver struct{}
+
+func NewNoticeReceiver(callback func([]byte)) *NoticeReceiver
+
+func (receiver *NoticeReceiver) Write(p []byte) (n int, err error) {
+	return 0, errors.New("not available")
 }

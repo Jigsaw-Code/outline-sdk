@@ -70,8 +70,6 @@ func main() {
 		log.Fatalf("Could not create dialer: %v\n", err)
 	}
 	defer dialer.Close()
-	// TODO: Wait for tunnels to be active.
-	time.Sleep(2 * time.Second)
 	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
 		return dialer.DialStream(ctx, addr)
 	}

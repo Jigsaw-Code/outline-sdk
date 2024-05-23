@@ -21,10 +21,12 @@ package psiphon
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Psiphon-Labs/psiphon-tunnel-core/ClientLibrary/clientlib"
 	psi "github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon"
 )
 
@@ -46,21 +48,73 @@ func (d *PsiphonDialer) Close() {
 }
 
 func NewStreamDialer(configJSON []byte) (*PsiphonDialer, error) {
-	config, err := psi.LoadConfig([]byte(configJSON))
+	config, err := psi.LoadConfig(configJSON)
 	if err != nil {
 		return nil, fmt.Errorf("config load failed: %w", err)
 	}
+	// Don't let Psiphon run its local proxies.
+	config.DisableLocalHTTPProxy = true
+	config.DisableLocalSocksProxy = true
 	err = config.Commit(false)
 	if err != nil {
 		return nil, fmt.Errorf("config commit failed: %w", err)
 	}
+
+	// Will receive a value when the tunnel has successfully connected.
+	connected := make(chan struct{}, 1)
+	// Will receive a value if an error occurs during the connection sequence.
+	errored := make(chan error, 1)
+
+	// Set up NoticeWriter to receive events.
+	psi.SetNoticeWriter(psi.NewNoticeReceiver(
+		func(notice []byte) {
+			var event clientlib.NoticeEvent
+			err := json.Unmarshal(notice, &event)
+			if err != nil {
+				// This is unexpected and probably indicates something fatal has occurred.
+				// We'll interpret it as a connection error and abort.
+				err = fmt.Errorf("failed to unmarshal notice JSON: %w", err)
+				select {
+				case errored <- err:
+				default:
+				}
+				return
+			}
+			switch event.Type {
+			case "EstablishTunnelTimeout":
+				select {
+				case errored <- clientlib.ErrTimeout:
+				default:
+				}
+			case "Tunnels":
+				count := event.Data["count"].(float64)
+				if count > 0 {
+					select {
+					case connected <- struct{}{}:
+					default:
+					}
+				}
+			}
+		}))
+
 	controller, err := psi.NewController(config)
 	if err != nil {
 		return nil, fmt.Errorf("controller creation failed: %w", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	go controller.Run(ctx)
-	return &PsiphonDialer{cancel, controller}, nil
+
+	// Wait for an active tunnel or error
+	select {
+	case <-connected:
+		return &PsiphonDialer{cancel, controller}, nil
+	case err := <-errored:
+		cancel()
+		if err != clientlib.ErrTimeout {
+			err = fmt.Errorf("tunnel start produced error: %w", err)
+		}
+		return nil, err
+	}
 }
 
 var _ transport.StreamDialer = (*PsiphonDialer)(nil)
