@@ -14,71 +14,71 @@
 
 package main
 
-// #include <stdlib.h>
-// #include <stdint.h>
+/*
+#include <stdint.h>  // uintptr_t
+
+typedef uintptr_t StreamDialer;
+typedef uintptr_t Proxy;
+*/
+import "C"
+
 import (
-	"C"
 	"runtime/cgo"
 
 	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
 )
 
-type StreamDialerPtr = C.uintptr_t
-type ProxyPtr = C.uintptr_t
+const nullptr = C.uintptr_t(0)
 
 //export NewStreamDialerFromConfig
-func NewStreamDialerFromConfig(config *C.char) StreamDialerPtr {
-	streamDialerObject, err := mobileproxy.NewStreamDialerFromConfig(C.GoString(config))
+func NewStreamDialerFromConfig(config *C.char) C.StreamDialer {
+	sd, err := mobileproxy.NewStreamDialerFromConfig(C.GoString(config))
 
 	if err != nil {
 		// TODO: return error
-		return C.uintptr_t(nil)
+		return nullptr
 	}
 
-	streamDialerHandle := cgo.NewHandle(streamDialerObject)
-
-	return C.uintptr_t(&streamDialerHandle)
+	return C.StreamDialer(cgo.NewHandle(&sd))
 }
 
 //export RunProxy
-func RunProxy(address *C.char, dialer StreamDialerPtr) ProxyPtr {
-	dialerObject := cgo.Handle(dialer).Value().(mobileproxy.StreamDialer)
+func RunProxy(address *C.char, dialerHandle C.StreamDialer) C.Proxy {
+	dialer := cgo.Handle(dialerHandle).Value().(*mobileproxy.StreamDialer)
 
-	proxyObject, err := mobileproxy.RunProxy(C.GoString(address), &dialerObject)
+	proxy, err := mobileproxy.RunProxy(C.GoString(address), dialer)
 
 	if err != nil {
 		// TODO: return error
-		return C.uintptr_t(nil)
+		return nullptr
 	}
 
-	handle := cgo.NewHandle(proxyObject)
-
-	return C.uintptr_t(&handle)
+	return C.Proxy(cgo.NewHandle(&proxy))
 }
 
 //export AddURLProxy
-func AddURLProxy(proxy ProxyPtr, url *C.char, dialer StreamDialerPtr) {
-	proxyObject := cgo.Handle(proxy).Value().(mobileproxy.Proxy)
-	dialerObject := cgo.Handle(dialer).Value().(mobileproxy.StreamDialer)
+func AddURLProxy(proxyHandle C.Proxy, url *C.char, dialerHandle C.StreamDialer) {
+	proxy := cgo.Handle(proxyHandle).Value().(*mobileproxy.Proxy)
+	dialer := cgo.Handle(dialerHandle).Value().(*mobileproxy.StreamDialer)
 
-	proxyObject.AddURLProxy(C.GoString(url), &dialerObject)
+	proxy.AddURLProxy(C.GoString(url), dialer)
 }
 
 //export StopProxy
-func StopProxy(proxy ProxyPtr, timeoutSeconds C.uint) {
-	proxyObject := cgo.Handle(proxy).Value().(mobileproxy.Proxy)
+func StopProxy(proxyHandle C.Proxy, timeoutSeconds C.uint) {
+	proxy := cgo.Handle(proxyHandle).Value().(*mobileproxy.Proxy)
 
-	proxyObject.Stop(int(timeoutSeconds))
+	proxy.Stop(int(timeoutSeconds))
 }
 
 //export DeleteStreamDialer
-func DeleteStreamDialer(dialer StreamDialerPtr) {
-	(*cgo.Handle)(dialer).Delete()
+func DeleteStreamDialer(dialerHandle C.StreamDialer) {
+	cgo.Handle(dialerHandle).Delete()
 }
 
 //export DeleteProxy
-func DeleteProxy(proxy ProxyPtr) {
-	(*cgo.Handle)(proxy).Delete()
+func DeleteProxy(proxyHandle C.Proxy) {
+	cgo.Handle(proxyHandle).Delete()
 }
 
 func main() {
