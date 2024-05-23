@@ -77,7 +77,6 @@ func (cfg *Config) NewDialer() (*Dialer, error) {
 	// Set up NoticeWriter to receive events.
 	psi.SetNoticeWriter(psi.NewNoticeReceiver(
 		func(notice []byte) {
-			fmt.Println(string(notice))
 			var event clientlib.NoticeEvent
 			err := json.Unmarshal(notice, &event)
 			if err != nil {
