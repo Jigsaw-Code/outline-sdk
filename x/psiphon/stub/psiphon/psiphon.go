@@ -68,11 +68,13 @@ func (controller *Controller) Dial(remoteAddr string, downstreamConn net.Conn) (
 	return nil, errNotAvailable
 }
 
-func SetNoticeWriter(writer io.Writer)
+func SetNoticeWriter(writer io.Writer) {}
 
 type NoticeReceiver struct{}
 
-func NewNoticeReceiver(callback func([]byte)) *NoticeReceiver
+func NewNoticeReceiver(callback func([]byte)) *NoticeReceiver {
+	return nil
+}
 
 func (receiver *NoticeReceiver) Write(p []byte) (n int, err error) {
 	return 0, errNotAvailable
