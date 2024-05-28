@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"net"
 	"runtime"
+	"sync"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Psiphon-Labs/psiphon-tunnel-core/ClientLibrary/clientlib"
@@ -34,6 +35,7 @@ import (
 )
 
 type Dialer struct {
+	mu         sync.Mutex
 	cancel     context.CancelFunc
 	controller *psi.Controller
 }
@@ -63,15 +65,23 @@ func LoadConfig(configJSON []byte) (*Config, error) {
 	config.DisableLocalHTTPProxy = true
 	config.DisableLocalSocksProxy = true
 	config.ClientPlatform = fmt.Sprintf("OutlineSDK/%s/%s", runtime.GOOS, runtime.GOARCH)
-	// TODO(fortuna): Figure out a better way to do this to allow the user to override config options.
-	err = config.Commit(false)
-	if err != nil {
-		return nil, fmt.Errorf("config commit failed: %w", err)
-	}
 	return &Config{config}, nil
 }
 
-func (cfg *Config) NewDialer(ctx context.Context) (*Dialer, error) {
+var singletonDialer Dialer
+
+func (d *Dialer) Start(ctx context.Context, config *Config) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.cancel != nil || d.controller != nil {
+		return errors.New("tried to start dialer that is alread running")
+	}
+
+	err := config.config.Commit(false)
+	if err != nil {
+		return fmt.Errorf("config commit failed: %w", err)
+	}
+
 	// Will receive a value when the tunnel has successfully connected.
 	connected := make(chan struct{}, 1)
 	// Will receive a value if an error occurs during the connection sequence.
@@ -109,9 +119,9 @@ func (cfg *Config) NewDialer(ctx context.Context) (*Dialer, error) {
 			}
 		}))
 
-	err := psiphon.OpenDataStore(&psiphon.Config{DataRootDirectory: cfg.config.DataRootDirectory})
+	err = psiphon.OpenDataStore(&psiphon.Config{DataRootDirectory: config.config.DataRootDirectory})
 	if err != nil {
-		return nil, fmt.Errorf("failed to open Psiphon data store: %w", err)
+		return fmt.Errorf("failed to open Psiphon data store: %w", err)
 	}
 	needsCleanup := true
 	defer func() {
@@ -120,9 +130,9 @@ func (cfg *Config) NewDialer(ctx context.Context) (*Dialer, error) {
 		}
 	}()
 
-	controller, err := psi.NewController(cfg.config)
+	controller, err := psi.NewController(config.config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Psiphon Controller: %w", err)
+		return fmt.Errorf("failed to create Psiphon Controller: %w", err)
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	go controller.Run(ctx)
@@ -131,14 +141,32 @@ func (cfg *Config) NewDialer(ctx context.Context) (*Dialer, error) {
 	select {
 	case <-connected:
 		needsCleanup = false
-		return &Dialer{cancel, controller}, nil
+		d.cancel = cancel
+		d.controller = controller
+		return nil
 	case err := <-errCh:
 		cancel()
 		if !errors.Is(err, context.DeadlineExceeded) {
 			err = fmt.Errorf("failed to start Psiphon tunnel: %w", err)
 		}
-		return nil, err
+		return err
 	}
+}
+
+func (d *Dialer) Stop() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.cancel == nil || d.controller == nil {
+		return errors.New("tried to stop dialer that is not running")
+	}
+	d.cancel()
+	d.cancel = nil
+	d.controller = nil
+	return nil
+}
+
+func GetSingletonDialer() *Dialer {
+	return &singletonDialer
 }
 
 var _ transport.StreamDialer = (*Dialer)(nil)
