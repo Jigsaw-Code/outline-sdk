@@ -19,8 +19,6 @@ import (
 	"errors"
 )
 
-// This file contains helper functions and constants for TLS Client Hello message.
-
 type tlsHandshakeRecordHeader []byte
 
 // TLS record layout from [RFC 8446]:
