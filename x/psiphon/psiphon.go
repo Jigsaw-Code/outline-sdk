@@ -160,6 +160,7 @@ func (d *Dialer) Stop() error {
 	if d.cancel == nil || d.controller == nil {
 		return errors.New("tried to stop dialer that is not running")
 	}
+	// TODO(fortuna): Do we need to wait on the controller to be done? Will cancel block?
 	d.cancel()
 	d.cancel = nil
 	d.controller = nil
