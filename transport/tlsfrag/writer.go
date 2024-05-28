@@ -43,11 +43,9 @@ type clientHelloFragReaderFrom struct {
 }
 
 // Compilation guard against interface implementation
-var (
-	_ io.Writer     = (*clientHelloFragWriter)(nil)
-	_ io.Writer     = (*clientHelloFragReaderFrom)(nil)
-	_ io.ReaderFrom = (*clientHelloFragReaderFrom)(nil)
-)
+var _ io.Writer = (*clientHelloFragWriter)(nil)
+var _ io.Writer = (*clientHelloFragReaderFrom)(nil)
+var _ io.ReaderFrom = (*clientHelloFragReaderFrom)(nil)
 
 // newClientHelloFragWriter creates a [io.Writer] that splits the first TLS Client Hello record into two records
 // based on the provided [FragFunc] callback.

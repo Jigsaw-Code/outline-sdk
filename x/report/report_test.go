@@ -62,7 +62,7 @@ type ConnectivityReport struct {
 }
 
 func TestIsSuccess(t *testing.T) {
-	testReport := ConnectivityReport{
+	var testReport = ConnectivityReport{
 		Connection: nil,
 		Time:       time.Now().UTC().Truncate(time.Second),
 		DurationMs: 1,
@@ -82,18 +82,18 @@ func TestIsSuccess(t *testing.T) {
 }
 
 func TestSendReportSuccessfully(t *testing.T) {
-	testSetup := ConnectivitySetup{
+	var testSetup = ConnectivitySetup{
 		Proxy:    "testProxy",
 		Resolver: "8.8.8.8",
 		Proto:    "udp",
 		Prefix:   "HTTP1/1",
 	}
-	testErr := ConnectivityError{
+	var testErr = ConnectivityError{
 		Op:         "read",
 		PosixError: "ETIMEDOUT",
 		Msg:        "i/o timeout",
 	}
-	testReport := ConnectivityReport{
+	var testReport = ConnectivityReport{
 		Connection: testSetup,
 		Time:       time.Now().UTC().Truncate(time.Second),
 		DurationMs: 1,
@@ -120,7 +120,7 @@ func TestSendReportSuccessfully(t *testing.T) {
 }
 
 func TestSendReportUnsuccessfully(t *testing.T) {
-	testReport := ConnectivityReport{
+	var testReport = ConnectivityReport{
 		Connection: nil,
 		Time:       time.Now().UTC().Truncate(time.Second),
 		DurationMs: 1,
@@ -152,7 +152,7 @@ func TestSendReportUnsuccessfully(t *testing.T) {
 }
 
 func TestSamplingCollector(t *testing.T) {
-	testReport := ConnectivityReport{
+	var testReport = ConnectivityReport{
 		Connection: nil,
 		Time:       time.Now().UTC().Truncate(time.Second),
 		DurationMs: 1,
@@ -181,7 +181,7 @@ func TestSamplingCollector(t *testing.T) {
 }
 
 func TestSendJSONToServer(t *testing.T) {
-	testReport := ConnectivityReport{
+	var testReport = ConnectivityReport{
 		Connection: nil,
 		Time:       time.Now().UTC().Truncate(time.Second),
 		DurationMs: 1,
@@ -221,7 +221,7 @@ func TestSendJSONToServer(t *testing.T) {
 }
 
 func TestFallbackCollector(t *testing.T) {
-	testReport := ConnectivityReport{
+	var testReport = ConnectivityReport{
 		Connection: nil,
 		Time:       time.Now().UTC().Truncate(time.Second),
 		DurationMs: 1,
@@ -258,7 +258,7 @@ func TestFallbackCollector(t *testing.T) {
 }
 
 func TestRetryCollector(t *testing.T) {
-	testReport := ConnectivityReport{
+	var testReport = ConnectivityReport{
 		Connection: nil,
 		Time:       time.Now().UTC().Truncate(time.Second),
 		DurationMs: 1,
@@ -289,7 +289,7 @@ func TestRetryCollector(t *testing.T) {
 }
 
 func TestWriteCollector(t *testing.T) {
-	testReport := ConnectivityReport{
+	var testReport = ConnectivityReport{
 		Connection: nil,
 		Time:       time.Now().UTC().Truncate(time.Second),
 		DurationMs: 1,
@@ -310,7 +310,7 @@ func TestWriteCollector(t *testing.T) {
 
 // TestWriteCollectorToFile that opens a file and collects to a temp file
 func TestWriteCollectorToFile(t *testing.T) {
-	testReport := ConnectivityReport{
+	var testReport = ConnectivityReport{
 		Connection: nil,
 		Time:       time.Now().UTC().Truncate(time.Second),
 		DurationMs: 1,

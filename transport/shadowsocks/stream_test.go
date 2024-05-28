@@ -104,8 +104,7 @@ func TestCipherReaderGoodReads(t *testing.T) {
 	ssText, err := encryptBlocks(key, salt, [][]byte{
 		[]byte("[First Block]"),
 		[]byte(""), // Corner case: empty block
-		[]byte("[Third Block]"),
-	})
+		[]byte("[Third Block]")})
 	if err != nil {
 		t.Fatal(err)
 	}

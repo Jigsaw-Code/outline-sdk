@@ -221,6 +221,7 @@ func TestPacketListenerDialer(t *testing.T) {
 		n, err = conn.Read(receivedResponse)
 		require.NoError(t, err)
 		require.Equal(t, response, receivedResponse[:n])
+
 	}()
 
 	running.Wait()

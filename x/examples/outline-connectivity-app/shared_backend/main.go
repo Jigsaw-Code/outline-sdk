@@ -160,7 +160,7 @@ func makeErrorRecord(err error) *ConnectivityTestError {
 	if err == nil {
 		return nil
 	}
-	record := new(ConnectivityTestError)
+	var record = new(ConnectivityTestError)
 	var testErr *connectivity.TestError
 	if errors.As(err, &testErr) {
 		record.Op = testErr.Op

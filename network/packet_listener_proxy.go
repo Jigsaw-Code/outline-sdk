@@ -34,10 +34,8 @@ const packetMaxSize = 2048
 var packetBufferPool = slicepool.MakePool(packetMaxSize)
 
 // Compilation guard against interface implementation
-var (
-	_ PacketProxy         = (*PacketListenerProxy)(nil)
-	_ PacketRequestSender = (*packetListenerRequestSender)(nil)
-)
+var _ PacketProxy = (*PacketListenerProxy)(nil)
+var _ PacketRequestSender = (*packetListenerRequestSender)(nil)
 
 type PacketListenerProxy struct {
 	listener         transport.PacketListener

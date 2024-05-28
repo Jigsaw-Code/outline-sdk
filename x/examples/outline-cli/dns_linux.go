@@ -28,7 +28,6 @@ const (
 	resolvConfHeadBackupFile = "/etc/resolv.head.outlinecli.backup"
 )
 
-// systemDNSBackup info about systemdns backup
 type systemDNSBackup struct {
 	original, backup string
 }
@@ -42,12 +41,12 @@ nameserver ` + serverHost + "\n")
 
 	err := backupAndWriteFile(resolvConfFile, resolvConfBackupFile, setting)
 	if err != nil {
-		return fmt.Errorf("dns backup: %w", err)
+		return err
 	}
 
 	err = backupAndWriteFile(resolvConfHeadFile, resolvConfHeadBackupFile, setting)
 	if err != nil {
-		return fmt.Errorf("dns head backup: %w", err)
+		return err
 	}
 
 	return nil
@@ -60,18 +59,18 @@ func backupAndWriteFile(original, backup string, data []byte) error {
 			return fmt.Errorf("failed to backup DNS config file '%s' to '%s': %w", original, backup, err)
 		}
 	} else if !errors.Is(err, os.ErrNotExist) { // if not exist - it's ok, just write to it
-		return errors.New("check original file exists")
-	}
-
-	// save data to original
-	if err := os.WriteFile(original, data, 0o644); err != nil {
-		return fmt.Errorf("failed to write DNS config file '%s': %w", original, err)
+		return fmt.Errorf("failed to check the existence of DNS config file '%s': %w", original, err)
 	}
 
 	systemDNSBackups = append(systemDNSBackups, systemDNSBackup{
 		original: original,
 		backup:   backup,
 	})
+
+	// save data to original
+	if err := os.WriteFile(original, data, 0o644); err != nil {
+		return fmt.Errorf("failed to write DNS config file '%s': %w", original, err)
+	}
 
 	return nil
 }
@@ -93,12 +92,12 @@ func restoreSystemDNSServer() {
 		} else if errors.Is(err, os.ErrNotExist) {
 			// backup not exist - just remove original, because it's created by ourselves
 			if err := os.Remove(backup.original); err != nil {
-				logging.Err.Printf("removing original DNS config file '%s': %v", backup.original, err)
+				logging.Err.Printf("failed to remove Outline DNS config file '%s': %v\n", backup.original, err)
 				continue
 			}
-			logging.Info.Printf("DNS config removed '%s'\n", backup.original)
+			logging.Info.Printf("Outline DNS config '%s' has been removed\n", backup.original)
 		} else {
-			logging.Err.Printf("checking backup '%s': %v", backup.backup, err)
+			logging.Err.Printf("failed to check the existence of DNS config backup file '%s': %v\n", backup.backup, err)
 		}
 	}
 }

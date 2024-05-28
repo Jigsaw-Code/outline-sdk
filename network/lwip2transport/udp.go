@@ -24,10 +24,8 @@ import (
 )
 
 // Compilation guard against interface implementation
-var (
-	_ lwip.UDPConnHandler            = (*udpHandler)(nil)
-	_ network.PacketResponseReceiver = (*udpConnResponseWriter)(nil)
-)
+var _ lwip.UDPConnHandler = (*udpHandler)(nil)
+var _ network.PacketResponseReceiver = (*udpConnResponseWriter)(nil)
 
 type udpHandler struct {
 	mu      sync.Mutex                             // Protects the senders field

@@ -108,6 +108,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*timeoutFlag)*time.Second)
 	defer cancel()
 	response, err := resolver.Query(ctx, *q)
+
 	if err != nil {
 		log.Fatalf("Query failed: %v", err)
 	}
