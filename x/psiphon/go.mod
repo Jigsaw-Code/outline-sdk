@@ -8,5 +8,7 @@ replace github.com/Psiphon-Labs/psiphon-tunnel-core => ./stub
 
 require (
 	github.com/Jigsaw-Code/outline-sdk v0.0.16
-	github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20231206204740-a8e5fc0cf6c7
+	// Use github.com/Psiphon-Labs/psiphon-tunnel-core@staging-client as per
+	// https://github.com/Psiphon-Labs/psiphon-tunnel-core/?tab=readme-ov-file#using-psiphon-with-go-modules
+	github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20240522172529-8fcc4b9a51cf
 )
