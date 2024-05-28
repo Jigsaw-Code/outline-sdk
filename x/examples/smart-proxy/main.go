@@ -16,7 +16,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -90,10 +89,7 @@ func main() {
 	configToDialer := config.NewDefaultConfigToDialer()
 	packetDialer, err := configToDialer.NewPacketDialer(*transportFlag)
 	if err != nil {
-		log.Printf("Could not create packet dialer: %v", err)
-		packetDialer = transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-			return nil, errors.New("UDP not supported")
-		})
+		log.Fatalf("Could not create packet dialer: %v", err)
 	}
 	streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
 	if err != nil {
