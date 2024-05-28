@@ -28,6 +28,7 @@ import (
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Psiphon-Labs/psiphon-tunnel-core/ClientLibrary/clientlib"
+	"github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon"
 	psi "github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon"
 )
 
@@ -68,7 +69,7 @@ func LoadConfig(configJSON []byte) (*Config, error) {
 	return &Config{config}, nil
 }
 
-func (cfg *Config) NewDialer() (*Dialer, error) {
+func (cfg *Config) NewDialer(ctx context.Context) (*Dialer, error) {
 	// Will receive a value when the tunnel has successfully connected.
 	connected := make(chan struct{}, 1)
 	// Will receive a value if an error occurs during the connection sequence.
@@ -106,16 +107,28 @@ func (cfg *Config) NewDialer() (*Dialer, error) {
 			}
 		}))
 
+	err := psiphon.OpenDataStore(&psiphon.Config{DataRootDirectory: cfg.config.DataRootDirectory})
+	if err != nil {
+		return nil, fmt.Errorf("failed to open Psiphon data store: %w", err)
+	}
+	needsCleanup := true
+	defer func() {
+		if needsCleanup {
+			psiphon.CloseDataStore()
+		}
+	}()
+
 	controller, err := psi.NewController(cfg.config)
 	if err != nil {
-		return nil, fmt.Errorf("controller creation failed: %w", err)
+		return nil, fmt.Errorf("failed to create Psiphon Controller: %w", err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	go controller.Run(ctx)
 
 	// Wait for an active tunnel or error
 	select {
 	case <-connected:
+		needsCleanup = false
 		return &Dialer{cancel, controller}, nil
 	case err := <-errored:
 		cancel()

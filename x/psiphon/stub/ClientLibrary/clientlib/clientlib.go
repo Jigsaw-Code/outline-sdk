@@ -14,4 +14,10 @@
 
 package clientlib
 
-type NoticeEvent struct{}
+type NoticeEvent struct {
+	Data      map[string]interface{}
+	Type      string
+	Timestamp string
+}
+
+var ErrTimeout error

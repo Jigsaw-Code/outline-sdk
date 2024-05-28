@@ -69,7 +69,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load Psiphon config: %v\n", err)
 	}
-	dialer, err := config.NewDialer()
+	dialer, err := config.NewDialer(context.Background())
 	if err != nil {
 		log.Fatalf("Could not create dialer: %v\n", err)
 	}

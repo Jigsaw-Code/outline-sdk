@@ -21,36 +21,51 @@ import (
 	"net"
 )
 
+var errNotAvailable = errors.New("not available in the Psiphon stub. Use the actual implementation instead.")
+
 // See https://pkg.go.dev/github.com/Psiphon-Labs/psiphon-tunnel-core.
 
 type Config struct {
 	// ClientPlatform is the client platform ("Windows", "Android", etc.) that
 	// the client reports to the server.
 	ClientPlatform string
-	// DisableLocalSocksProxy disables running the local SOCKS proxy.
-	DisableLocalSocksProxy bool
+
+	// DataRootDirectory is the directory in which to store persistent files,
+	// which contain information such as server entries. By default, current
+	// working directory.
+	//
+	// Psiphon will assume full control of files under this directory. They may
+	// be deleted, moved or overwritten.
+	DataRootDirectory string
+
 	// DisableLocalHTTPProxy disables running the local HTTP proxy.
 	DisableLocalHTTPProxy bool
+	// DisableLocalSocksProxy disables running the local SOCKS proxy.
+	DisableLocalSocksProxy bool
 }
 
 type Controller struct{}
 
 func LoadConfig(configJSON []byte) (*Config, error) {
-	return nil, errors.New("not available")
+	return nil, errNotAvailable
 }
 
 func (config *Config) Commit(migrateFromLegacyFields bool) error {
-	return errors.New("not available")
+	return errNotAvailable
+}
+
+func (config *Config) GetDataStoreDirectory() string {
+	return ""
 }
 
 func NewController(config *Config) (controller *Controller, err error) {
-	return nil, errors.New("not available")
+	return nil, errNotAvailable
 }
 
 func (controller *Controller) Run(ctx context.Context) {}
 
 func (controller *Controller) Dial(remoteAddr string, downstreamConn net.Conn) (conn net.Conn, err error) {
-	return nil, errors.New("not available")
+	return nil, errNotAvailable
 }
 
 func SetNoticeWriter(writer io.Writer)
@@ -60,5 +75,19 @@ type NoticeReceiver struct{}
 func NewNoticeReceiver(callback func([]byte)) *NoticeReceiver
 
 func (receiver *NoticeReceiver) Write(p []byte) (n int, err error) {
-	return 0, errors.New("not available")
+	return 0, errNotAvailable
+}
+
+func OpenDataStore(config *Config) error {
+	return errNotAvailable
+}
+
+func CloseDataStore() {}
+
+func ImportEmbeddedServerEntries(
+	ctx context.Context,
+	config *Config,
+	embeddedServerEntryListFilename string,
+	embeddedServerEntryList string) error {
+	return errNotAvailable
 }
