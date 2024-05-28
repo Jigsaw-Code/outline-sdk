@@ -69,11 +69,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load Psiphon config: %v\n", err)
 	}
-	dialer, err := config.NewDialer(context.Background())
-	if err != nil {
-		log.Fatalf("Could not create dialer: %v\n", err)
+	dialer := psiphon.GetSingletonDialer()
+	if err := dialer.Start(context.Background(), config); err != nil {
+		log.Fatalf("Could not start dialer: %v\n", err)
 	}
-	defer dialer.Close()
+	defer dialer.Stop()
 	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
 		return dialer.DialStream(ctx, addr)
 	}
