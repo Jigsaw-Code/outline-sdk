@@ -22,6 +22,7 @@ package psiphon
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"runtime"
@@ -62,6 +63,7 @@ func LoadConfig(configJSON []byte) (*Config, error) {
 	config.DisableLocalHTTPProxy = true
 	config.DisableLocalSocksProxy = true
 	config.ClientPlatform = fmt.Sprintf("OutlineSDK/%s/%s", runtime.GOOS, runtime.GOARCH)
+	// TODO(fortuna): Figure out a better way to do this to allow the user to override config options.
 	err = config.Commit(false)
 	if err != nil {
 		return nil, fmt.Errorf("config commit failed: %w", err)
@@ -73,7 +75,7 @@ func (cfg *Config) NewDialer(ctx context.Context) (*Dialer, error) {
 	// Will receive a value when the tunnel has successfully connected.
 	connected := make(chan struct{}, 1)
 	// Will receive a value if an error occurs during the connection sequence.
-	errored := make(chan error, 1)
+	errCh := make(chan error, 1)
 
 	// Set up NoticeWriter to receive events.
 	psi.SetNoticeWriter(psi.NewNoticeReceiver(
@@ -85,7 +87,7 @@ func (cfg *Config) NewDialer(ctx context.Context) (*Dialer, error) {
 				// We'll interpret it as a connection error and abort.
 				err = fmt.Errorf("failed to unmarshal notice JSON: %w", err)
 				select {
-				case errored <- err:
+				case errCh <- err:
 				default:
 				}
 				return
@@ -93,7 +95,7 @@ func (cfg *Config) NewDialer(ctx context.Context) (*Dialer, error) {
 			switch event.Type {
 			case "EstablishTunnelTimeout":
 				select {
-				case errored <- clientlib.ErrTimeout:
+				case errCh <- context.DeadlineExceeded:
 				default:
 				}
 			case "Tunnels":
@@ -130,10 +132,10 @@ func (cfg *Config) NewDialer(ctx context.Context) (*Dialer, error) {
 	case <-connected:
 		needsCleanup = false
 		return &Dialer{cancel, controller}, nil
-	case err := <-errored:
+	case err := <-errCh:
 		cancel()
-		if err != clientlib.ErrTimeout {
-			err = fmt.Errorf("tunnel start produced error: %w", err)
+		if !errors.Is(err, context.DeadlineExceeded) {
+			err = fmt.Errorf("failed to start Psiphon tunnel: %w", err)
 		}
 		return nil, err
 	}
