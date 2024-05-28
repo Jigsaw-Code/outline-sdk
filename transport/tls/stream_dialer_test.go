@@ -44,10 +44,10 @@ func TestUntrustedRoot(t *testing.T) {
 	require.ErrorAs(t, err, &certErr)
 }
 
-func TestRevoked(t *testing.T) {
+func TestExpired(t *testing.T) {
 	sd, err := NewStreamDialer(&transport.TCPDialer{})
 	require.NoError(t, err)
-	_, err = sd.DialStream(context.Background(), "revoked.badssl.com:443")
+	_, err = sd.DialStream(context.Background(), "expired.badssl.com:443")
 	var certErr x509.CertificateInvalidError
 	require.ErrorAs(t, err, &certErr)
 	require.Equal(t, x509.Expired, certErr.Reason)
