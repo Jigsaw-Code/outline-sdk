@@ -65,6 +65,7 @@ func LoadConfig(configJSON []byte) (*Config, error) {
 	config.DisableLocalHTTPProxy = true
 	config.DisableLocalSocksProxy = true
 	config.ClientPlatform = fmt.Sprintf("OutlineSDK/%s/%s", runtime.GOOS, runtime.GOARCH)
+	// TODO(fortuna): Return something the user can edit.
 	return &Config{config}, nil
 }
 
