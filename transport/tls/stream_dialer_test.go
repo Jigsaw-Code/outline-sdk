@@ -53,6 +53,16 @@ func TestExpired(t *testing.T) {
 	require.Equal(t, x509.Expired, certErr.Reason)
 }
 
+func TestRevoked(t *testing.T) {
+	sd, err := NewStreamDialer(&transport.TCPDialer{})
+	require.NoError(t, err)
+	conn, err := sd.DialStream(context.Background(), "revoked.badssl.com:443")
+
+	// Revocation error is thrown by the system API and is not not strongly typed
+	require.ErrorContains(t, err, "certificate is revoked")
+	require.Nil(t, conn)
+}
+
 func TestIP(t *testing.T) {
 	sd, err := NewStreamDialer(&transport.TCPDialer{})
 	require.NoError(t, err)
