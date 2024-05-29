@@ -17,6 +17,7 @@ package tls
 import (
 	"context"
 	"crypto/x509"
+	"runtime"
 	"testing"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -54,6 +55,11 @@ func TestExpired(t *testing.T) {
 }
 
 func TestRevoked(t *testing.T) {
+	if runtime.GOOS == "linux" {
+		t.Skip("Certificate revocation list is not up-to-date in Linux")
+		return
+	}
+
 	sd, err := NewStreamDialer(&transport.TCPDialer{})
 	require.NoError(t, err)
 	conn, err := sd.DialStream(context.Background(), "revoked.badssl.com:443")
