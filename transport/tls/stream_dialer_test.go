@@ -17,6 +17,7 @@ package tls
 import (
 	"context"
 	"crypto/x509"
+	"runtime"
 	"testing"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -44,13 +45,27 @@ func TestUntrustedRoot(t *testing.T) {
 	require.ErrorAs(t, err, &certErr)
 }
 
-func TestRevoked(t *testing.T) {
+func TestExpired(t *testing.T) {
 	sd, err := NewStreamDialer(&transport.TCPDialer{})
 	require.NoError(t, err)
-	_, err = sd.DialStream(context.Background(), "revoked.badssl.com:443")
+	_, err = sd.DialStream(context.Background(), "expired.badssl.com:443")
 	var certErr x509.CertificateInvalidError
 	require.ErrorAs(t, err, &certErr)
 	require.Equal(t, x509.Expired, certErr.Reason)
+}
+
+func TestRevoked(t *testing.T) {
+	if runtime.GOOS == "linux" || runtime.GOOS == "windows" {
+		t.Skip("Certificate revocation list is not up-to-date in Linux and Windows")
+	}
+
+	sd, err := NewStreamDialer(&transport.TCPDialer{})
+	require.NoError(t, err)
+	conn, err := sd.DialStream(context.Background(), "revoked.badssl.com:443")
+
+	// Revocation error is thrown by the system API and is not strongly typed
+	require.ErrorContains(t, err, "certificate is revoked")
+	require.Nil(t, conn)
 }
 
 func TestIP(t *testing.T) {
