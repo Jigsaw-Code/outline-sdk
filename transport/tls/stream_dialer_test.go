@@ -55,16 +55,15 @@ func TestExpired(t *testing.T) {
 }
 
 func TestRevoked(t *testing.T) {
-	if runtime.GOOS == "linux" {
-		t.Skip("Certificate revocation list is not up-to-date in Linux")
-		return
+	if runtime.GOOS == "linux" || runtime.GOOS == "windows" {
+		t.Skip("Certificate revocation list is not up-to-date in Linux and Windows")
 	}
 
 	sd, err := NewStreamDialer(&transport.TCPDialer{})
 	require.NoError(t, err)
 	conn, err := sd.DialStream(context.Background(), "revoked.badssl.com:443")
 
-	// Revocation error is thrown by the system API and is not not strongly typed
+	// Revocation error is thrown by the system API and is not strongly typed
 	require.ErrorContains(t, err, "certificate is revoked")
 	require.Nil(t, conn)
 }
