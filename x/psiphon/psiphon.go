@@ -14,9 +14,10 @@
 
 // Package psiphon provides adaptors to use Psiphon as a StreamDialer.
 //
-// You will need to provide a [Psiphon config file].
+// You will need to provide your own Psiphon config file, which you can get from the Psiphon team
+// or [generate one yourself].
 //
-// [Psiphon config file]: https://github.com/Psiphon-Labs/psiphon-tunnel-core/tree/master?tab=readme-ov-file#generate-configuration-data
+// [generate one yourself]: https://github.com/Psiphon-Labs/psiphon-tunnel-core/tree/master?tab=readme-ov-file#generate-configuration-data
 package psiphon
 
 import (
