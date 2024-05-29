@@ -21,6 +21,7 @@
 package psiphon
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -31,25 +32,134 @@ import (
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Psiphon-Labs/psiphon-tunnel-core/ClientLibrary/clientlib"
-	"github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon"
 	psi "github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon"
+	"github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/parameters"
 )
 
-type Config struct {
-	config *psi.Config
+// ClientInfo specifies information about the client app that should be communicated
+// to Psiphon for authentication and metrics.
+type ClientInfo struct {
+	// PropagationChannelId is a string identifier which indicates how the
+	// Psiphon client was distributed. This parameter is required. This value
+	// is supplied by and depends on the Psiphon Network.
+	PropagationChannelId string
+
+	// SponsorId is a string identifier which indicates who is sponsoring this
+	// Psiphon client. This parameter is required. This value is supplied
+	// by and depends on the Psiphon Network.
+	SponsorId string
+
+	// ClientVersion is the client version number that the client reports to
+	// the server. The version number refers to the host client application,
+	// not the core tunnel library.
+	ClientVersion string
+
+	// ClientPlatform is the client platform ("Windows", "Android", etc.) that
+	// the client reports to the server.
+	ClientPlatform string
 }
 
-func LoadConfig(configJSON []byte) (*Config, error) {
-	config, err := psi.LoadConfig(configJSON)
+// ServerListConfig specifies how Psiphon obtains server lists.
+type ServerListConfig struct {
+	// ObfuscatedServerListRootURLs is a list of URLs which specify root
+	// locations from which to fetch obfuscated server list files. This value
+	// is supplied by and depends on the Psiphon Network, and is typically
+	// embedded in the client binary. All URLs must point to the same entity
+	// with the same ETag. At least one DownloadURL must have
+	// OnlyAfterAttempts = 0.
+	ObfuscatedServerListRootURLs parameters.TransferURLs
+
+	// RemoteServerListURLs is list of URLs which specify locations to fetch
+	// out-of-band server entries. This facility is used when a tunnel cannot
+	// be established to known servers. This value is supplied by and depends
+	// on the Psiphon Network, and is typically embedded in the client binary.
+	// All URLs must point to the same entity with the same ETag. At least one
+	// TransferURL must have OnlyAfterAttempts = 0.
+	RemoteServerListURLs parameters.TransferURLs
+
+	// RemoteServerListSignaturePublicKey specifies a public key that's used
+	// to authenticate the remote server list payload. This value is supplied
+	// by and depends on the Psiphon Network, and is typically embedded in the
+	// client binary.
+	RemoteServerListSignaturePublicKey string
+
+	// ServerEntrySignaturePublicKey is a base64-encoded, ed25519 public
+	// key value used to verify individual server entry signatures. This value
+	// is supplied by and depends on the Psiphon Network, and is typically
+	// embedded in the client binary.
+	ServerEntrySignaturePublicKey string
+
+	// TargetServerEntry is an encoded server entry. When specified, this
+	// server entry is used exclusively and all other known servers are
+	// ignored; also, when set, ConnectionWorkerPoolSize is ignored and
+	// the pool size is 1.
+	TargetServerEntry string
+}
+
+// StorageConfig specifies where Psiphon should store its data.
+type StorageConfig struct {
+	// DataRootDirectory is the directory in which to store persistent files,
+	// which contain information such as server entries. By default, current
+	// working directory.
+	//
+	// Psiphon will assume full control of files under this directory. They may
+	// be deleted, moved or overwritten.
+	DataRootDirectory string
+}
+
+// Config specifies how the Psiphon dialer should behave.
+type Config struct {
+	ClientInfo
+	ServerListConfig
+	StorageConfig
+}
+
+// extendedConfig allows us to evaluate some settings that are present in the Psiphon config,
+// but the user shouldn't be specifying.
+type extendedConfig struct {
+	Config
+
+	// DisableLocalHTTPProxy disables running the local HTTP proxy.
+	DisableLocalHTTPProxy *bool
+	// DisableLocalSocksProxy disables running the local SOCKS proxy.
+	DisableLocalSocksProxy *bool
+	// TargetApiProtocol specifies whether to force use of "ssh" or "web" API
+	// protocol. When blank, the default, the optimal API protocol is used.
+	// Note that this capability check is not applied before the
+	// "CandidateServers" count is emitted.
+	//
+	// This parameter is intended for testing and debugging only. Not all
+	// parameters are supported in the legacy "web" API protocol, including
+	// speed test samples.
+	TargetApiProtocol *string
+}
+
+// ParseConfig parses the config JSON into a structure that can be further editted.
+func ParseConfig(configJSON []byte) (*Config, error) {
+	var extCfg extendedConfig
+
+	// Set default values
+	extCfg.ClientPlatform = fmt.Sprintf("OutlineSDK/%s/%s", runtime.GOOS, runtime.GOARCH)
+
+	decoder := json.NewDecoder(bytes.NewReader(configJSON))
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&extCfg)
 	if err != nil {
-		return nil, fmt.Errorf("config load failed: %w", err)
+		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
-	// Don't let Psiphon run its local proxies.
-	config.DisableLocalHTTPProxy = true
-	config.DisableLocalSocksProxy = true
-	config.ClientPlatform = fmt.Sprintf("OutlineSDK/%s/%s", runtime.GOOS, runtime.GOARCH)
-	// TODO(fortuna): Return something the user can edit.
-	return &Config{config}, nil
+
+	// We ignore these fields in the config, but only if they are set to the proper values.
+	if extCfg.DisableLocalHTTPProxy != nil && !*extCfg.DisableLocalHTTPProxy {
+		return nil, fmt.Errorf("DisableLocalHTTPProxy must be true if set")
+	}
+	if extCfg.DisableLocalSocksProxy != nil && !*extCfg.DisableLocalSocksProxy {
+		return nil, fmt.Errorf("DisableLocalSocksProxy must be true if set")
+	}
+	if extCfg.TargetApiProtocol != nil && *extCfg.TargetApiProtocol != "ssh" {
+		return nil, fmt.Errorf(`TargetApiProtocol must be "ssh" if set`)
+	}
+
+	return &extCfg.Config, nil
 }
 
 // Dialer is a [transport.StreamDialer] that uses Psiphon to connect to a destination.
@@ -90,7 +200,21 @@ func (d *Dialer) Start(ctx context.Context, config *Config) error {
 		return errors.New("tried to start dialer that is alread running")
 	}
 
-	err := config.config.Commit(false)
+	configJSON, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to convert config to JSON")
+	}
+	pConfig, err := psi.LoadConfig(configJSON)
+	if err != nil {
+		return fmt.Errorf("config load failed: %w", err)
+	}
+
+	// Override some Psiphon defaults.
+	pConfig.DisableLocalHTTPProxy = true
+	pConfig.DisableLocalSocksProxy = true
+	pConfig.TargetApiProtocol = "ssh"
+
+	err = pConfig.Commit(false)
 	if err != nil {
 		return fmt.Errorf("failed to commit config: %w", err)
 	}
@@ -132,18 +256,18 @@ func (d *Dialer) Start(ctx context.Context, config *Config) error {
 			}
 		}))
 
-	err = psiphon.OpenDataStore(&psiphon.Config{DataRootDirectory: config.config.DataRootDirectory})
+	err = psi.OpenDataStore(&psi.Config{DataRootDirectory: pConfig.DataRootDirectory})
 	if err != nil {
 		return fmt.Errorf("failed to open data store: %w", err)
 	}
 	needsCleanup := true
 	defer func() {
 		if needsCleanup {
-			psiphon.CloseDataStore()
+			psi.CloseDataStore()
 		}
 	}()
 
-	controller, err := psi.NewController(config.config)
+	controller, err := psi.NewController(pConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create Controller: %w", err)
 	}
@@ -183,7 +307,7 @@ func (d *Dialer) Stop() error {
 	<-d.controllerDone
 	d.cancel = nil
 	d.controller = nil
-	psiphon.CloseDataStore()
+	psi.CloseDataStore()
 	return nil
 }
 

@@ -42,6 +42,16 @@ type Config struct {
 	DisableLocalHTTPProxy bool
 	// DisableLocalSocksProxy disables running the local SOCKS proxy.
 	DisableLocalSocksProxy bool
+
+	// TargetApiProtocol specifies whether to force use of "ssh" or "web" API
+	// protocol. When blank, the default, the optimal API protocol is used.
+	// Note that this capability check is not applied before the
+	// "CandidateServers" count is emitted.
+	//
+	// This parameter is intended for testing and debugging only. Not all
+	// parameters are supported in the legacy "web" API protocol, including
+	// speed test samples.
+	TargetApiProtocol string
 }
 
 type Controller struct{}
