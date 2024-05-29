@@ -34,24 +34,6 @@ import (
 	psi "github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon"
 )
 
-type Dialer struct {
-	mu         sync.Mutex
-	cancel     context.CancelFunc
-	controller *psi.Controller
-}
-
-func (d *Dialer) DialStream(ctx context.Context, addr string) (transport.StreamConn, error) {
-	netConn, err := d.controller.Dial(addr, nil)
-	if err != nil {
-		return nil, err
-	}
-	return streamConn{netConn}, nil
-}
-
-func (d *Dialer) Close() {
-	d.cancel()
-}
-
 type Config struct {
 	config *psi.Config
 }
@@ -69,8 +51,36 @@ func LoadConfig(configJSON []byte) (*Config, error) {
 	return &Config{config}, nil
 }
 
+// Dialer is a [transport.StreamDialer] that uses Psiphon to connect to a destination.
+// There's only one possible Psiphon Dialer available at any time, which is accessible via [GetSingletonDialer].
+//
+// The Dialer must be configured first with [Dialer.Start] before it can be used, and [Dialer.Stop] must be
+// called before you can start it again with a new configuration. Dialer.Stop should be called
+// when you no longer need the Dialer in order to release resources.
+type Dialer struct {
+	mu         sync.Mutex
+	cancel     context.CancelFunc
+	controller *psi.Controller
+}
+
+var _ transport.StreamDialer = (*Dialer)(nil)
+
+// DialStream implements [transport.StreamDialer].
+func (d *Dialer) DialStream(ctx context.Context, addr string) (transport.StreamConn, error) {
+	if d.controller == nil {
+		return nil, errors.New("dialer has not been started yet")
+	}
+	netConn, err := d.controller.Dial(addr, nil)
+	if err != nil {
+		return nil, err
+	}
+	return streamConn{netConn}, nil
+}
+
+// The single [Dialer] we can have.
 var singletonDialer Dialer
 
+// Start configures and runs the Dialer. It must be called before you can use the Dialer.
 func (d *Dialer) Start(ctx context.Context, config *Config) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -154,6 +164,7 @@ func (d *Dialer) Start(ctx context.Context, config *Config) error {
 	}
 }
 
+// Stop stops the Dialer background processes, releasing resources and allowing it to be reconfigured.
 func (d *Dialer) Stop() error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -167,11 +178,10 @@ func (d *Dialer) Stop() error {
 	return nil
 }
 
+// GetSingletonDialer returns the single Psiphon dialer instance.
 func GetSingletonDialer() *Dialer {
 	return &singletonDialer
 }
-
-var _ transport.StreamDialer = (*Dialer)(nil)
 
 // streamConn wraps a [net.Conn] to provide a [transport.StreamConn] interface.
 type streamConn struct {
