@@ -59,9 +59,10 @@ func LoadConfig(configJSON []byte) (*Config, error) {
 // called before you can start it again with a new configuration. Dialer.Stop should be called
 // when you no longer need the Dialer in order to release resources.
 type Dialer struct {
-	mu         sync.Mutex
-	cancel     context.CancelFunc
-	controller *psi.Controller
+	mu             sync.Mutex
+	cancel         context.CancelFunc
+	controller     *psi.Controller
+	controllerDone <-chan struct{}
 }
 
 var _ transport.StreamDialer = (*Dialer)(nil)
@@ -91,7 +92,7 @@ func (d *Dialer) Start(ctx context.Context, config *Config) error {
 
 	err := config.config.Commit(false)
 	if err != nil {
-		return fmt.Errorf("config commit failed: %w", err)
+		return fmt.Errorf("failed to commit config: %w", err)
 	}
 
 	// Will receive a value when the tunnel has successfully connected.
@@ -133,7 +134,7 @@ func (d *Dialer) Start(ctx context.Context, config *Config) error {
 
 	err = psiphon.OpenDataStore(&psiphon.Config{DataRootDirectory: config.config.DataRootDirectory})
 	if err != nil {
-		return fmt.Errorf("failed to open Psiphon data store: %w", err)
+		return fmt.Errorf("failed to open data store: %w", err)
 	}
 	needsCleanup := true
 	defer func() {
@@ -144,10 +145,15 @@ func (d *Dialer) Start(ctx context.Context, config *Config) error {
 
 	controller, err := psi.NewController(config.config)
 	if err != nil {
-		return fmt.Errorf("failed to create Psiphon Controller: %w", err)
+		return fmt.Errorf("failed to create Controller: %w", err)
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	go controller.Run(ctx)
+	go func() {
+		controllerDone := make(chan struct{})
+		d.controllerDone = controllerDone
+		controller.Run(ctx)
+		close(controllerDone)
+	}()
 
 	// Wait for an active tunnel or error
 	select {
@@ -159,7 +165,7 @@ func (d *Dialer) Start(ctx context.Context, config *Config) error {
 	case err := <-errCh:
 		cancel()
 		if !errors.Is(err, context.DeadlineExceeded) {
-			err = fmt.Errorf("failed to start Psiphon tunnel: %w", err)
+			err = fmt.Errorf("failed to run Controller: %w", err)
 		}
 		return err
 	}
@@ -172,10 +178,12 @@ func (d *Dialer) Stop() error {
 	if d.cancel == nil || d.controller == nil {
 		return errors.New("tried to stop dialer that is not running")
 	}
-	// TODO(fortuna): Do we need to wait on the controller to be done? Will cancel block?
 	d.cancel()
+	// Wait for Controller to finish before cleaning up.
+	<-d.controllerDone
 	d.cancel = nil
 	d.controller = nil
+	psiphon.CloseDataStore()
 	return nil
 }
 
