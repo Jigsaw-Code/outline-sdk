@@ -61,24 +61,40 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
+
+	// Read and process Psiphon config.
 	configJSON, err := os.ReadFile(*configFlag)
 	if err != nil {
 		log.Fatalf("Could not read config file: %v\n", err)
 	}
-	config, err := psiphon.LoadConfig(configJSON)
+	config, err := psiphon.ParseConfig(configJSON)
 	if err != nil {
 		log.Fatalf("Failed to load Psiphon config: %v\n", err)
 	}
+	cacheBaseDir, err := os.UserCacheDir()
+	if err != nil {
+		log.Fatalf("Failed to get work directory: %v", err)
+	}
+	config.DataRootDirectory = path.Join(cacheBaseDir, "fetch-psiphon")
+	if err := os.MkdirAll(config.DataRootDirectory, 0700); err != nil {
+		log.Fatalf("Failed to create storage directory: %v", err)
+	}
+	debugLog.Printf("Using data store in %v\n", config.DataRootDirectory)
+
+	// Start the Psiphon dialer.
 	dialer := psiphon.GetSingletonDialer()
 	if err := dialer.Start(context.Background(), config); err != nil {
 		log.Fatalf("Could not start dialer: %v\n", err)
 	}
 	defer dialer.Stop()
+
+	// Set up HTTP client.
 	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
 		return dialer.DialStream(ctx, addr)
 	}
 	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: 5 * time.Second}
 
+	// Issue HTTP request.
 	req, err := http.NewRequest(*methodFlag, url, nil)
 	if err != nil {
 		log.Fatalln("Failed to create request:", err)
@@ -89,12 +105,12 @@ func main() {
 	}
 	defer resp.Body.Close()
 
+	// Output response.
 	if *verboseFlag {
 		for k, v := range resp.Header {
 			debugLog.Printf("%v: %v", k, v)
 		}
 	}
-
 	_, err = io.Copy(os.Stdout, resp.Body)
 	fmt.Println()
 	if err != nil {
