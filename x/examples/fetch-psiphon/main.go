@@ -1,4 +1,4 @@
-// Copyright 2023 Jigsaw Operations LLC
+// Copyright 2024 Jigsaw Operations LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/x/psiphon"
 )
 
-var debugLog log.Logger = *log.New(io.Discard, "", 0)
+var debugLog *log.Logger = log.New(io.Discard, "", 0)
 
 func init() {
 	flag.Usage = func() {
@@ -40,7 +40,7 @@ func init() {
 
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
-	configFlag := flag.String("config", "", "Config file")
+	configFlag := flag.String("config", "", "A Psiphon JSON config file")
 	methodFlag := flag.String("method", "GET", "The HTTP method to use")
 
 	flag.Parse()
@@ -73,7 +73,7 @@ func main() {
 	}
 	cacheBaseDir, err := os.UserCacheDir()
 	if err != nil {
-		log.Fatalf("Failed to get work directory: %v", err)
+		log.Fatalf("Failed to get the user cache directory: %v", err)
 	}
 	config.DataRootDirectory = path.Join(cacheBaseDir, "fetch-psiphon")
 	if err := os.MkdirAll(config.DataRootDirectory, 0700); err != nil {
