@@ -13,9 +13,7 @@ jobs:
   test:
     strategy:
       matrix:
-        # Use windows-2019, which is a lot faster than windows-2022:
-        # https://github.com/actions/runner-images/issues/5166
-        os: [ubuntu-latest, macos-latest, windows-2019]
+        os: [ubuntu-latest, macos-latest, windows-2022]
 
     runs-on: ${{ matrix.os }}
     env:
