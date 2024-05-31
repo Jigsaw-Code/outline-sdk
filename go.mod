@@ -1,6 +1,6 @@
 module github.com/Jigsaw-Code/outline-sdk
 
-go 1.20
+go 1.21
 
 require (
 	github.com/eycorsican/go-tun2socks v1.16.11
