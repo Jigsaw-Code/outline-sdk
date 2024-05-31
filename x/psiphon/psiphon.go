@@ -15,7 +15,8 @@
 //go:build psiphon && go1.21
 
 /*
-Package psiphon provides adaptors to create StreamDialers that leverage the [Psiphon] network.
+Package psiphon provides adaptors to create StreamDialers that leverage [Psiphon] technology and
+infrastructure to bypass network interference.
 
 You will need to provide your own Psiphon config file, which you must acquire from the Psiphon team.
 See the [Psiphon End-User License Agreement]. For more details, email them at sponsor@psiphon.ca.
@@ -24,7 +25,7 @@ For testing, you can [generate a Psiphon config yourself].
 
 # License restrictions
 
-Psiphon code is licensed as GPLv3, which you will have to take that into account if you incorporate Psiphon logic into your app.
+Psiphon code is licensed as GPLv3, which you will have to take into account if you incorporate Psiphon logic into your app.
 If you don't want your app to be GPL, consider acquiring an appropriate license when acquiring their services.
 
 Note that a few of Psiphon's dependencies may impose additional restrictions. For example, github.com/hashicorp/golang-lru is MPL-2.0
