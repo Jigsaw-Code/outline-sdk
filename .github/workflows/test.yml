@@ -52,8 +52,11 @@ jobs:
 
       - name: Test SDK
         # Enable nettests, which executes external network requests.
-        run: go test -v -race -bench '.' ./... -benchtime=100ms -tags nettest
+        run: go test -race -bench '.' ./... -benchtime=100ms -tags nettest
 
-      - name: Test X
+      - name: Test x
         # Enable nettests, which executes external network requests.
-        run: go test -C x -v -race -bench '.' ./... -benchtime=100ms -tags nettest
+        run: go test -C x -race -bench '.' ./... -benchtime=100ms -tags nettest
+
+      - name: Test x/psiphon
+        run: go test -C x/psiphon -race -bench '.' ./... -benchtime=100ms
