@@ -12,12 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build psiphon
+
 package psiphon
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"runtime"
 	"testing"
+	"time"
+
+	psi "github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon"
 
 	"github.com/stretchr/testify/require"
 )
@@ -70,4 +77,77 @@ func TestParseConfig_RejectUnknownFields(t *testing.T) {
 		"UknownField": false
 	}`))
 	require.Error(t, err)
+}
+
+func TestDialer_StartSuccessful(t *testing.T) {
+	// Create minimal config.
+	cfg := &Config{}
+	cfg.PropagationChannelId = "test"
+	cfg.SponsorId = "test"
+
+	// Intercept notice writer.
+	dialer := GetSingletonDialer()
+	wCh := make(chan io.Writer)
+	dialer.setNoticeWriter = func(w io.Writer) {
+		wCh <- w
+	}
+	defer func() {
+		dialer.setNoticeWriter = psi.SetNoticeWriter
+	}()
+
+	errCh := make(chan error)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		errCh <- dialer.Start(ctx, cfg)
+	}()
+	defer func() {
+		require.NoError(t, dialer.Stop())
+	}()
+
+	// Notify fake tunnel establishment.
+	w := <-wCh
+	psi.SetNoticeWriter(w)
+	psi.NoticeTunnels(1)
+
+	err := <-errCh
+	require.NoError(t, err)
+}
+
+func TestDialerStart_Cancelled(t *testing.T) {
+	cfg := &Config{}
+	cfg.PropagationChannelId = "test"
+	cfg.SponsorId = "test"
+	errCh := make(chan error)
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		errCh <- GetSingletonDialer().Start(ctx, cfg)
+	}()
+	cancel()
+	err := <-errCh
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestDialerStart_Timeout(t *testing.T) {
+	cfg := &Config{}
+	cfg.PropagationChannelId = "test"
+	cfg.SponsorId = "test"
+	errCh := make(chan error)
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now())
+	defer cancel()
+	go func() {
+		errCh <- GetSingletonDialer().Start(ctx, cfg)
+	}()
+	err := <-errCh
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestDialerDialStream_NotStarted(t *testing.T) {
+	_, err := GetSingletonDialer().DialStream(context.Background(), "")
+	require.ErrorIs(t, err, errNotStartedDial)
+}
+
+func TestDialerStop_NotStarted(t *testing.T) {
+	err := GetSingletonDialer().Stop()
+	require.ErrorIs(t, err, errNotStartedStop)
 }

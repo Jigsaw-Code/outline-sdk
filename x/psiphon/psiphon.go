@@ -47,6 +47,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"runtime"
 	"strings"
@@ -56,6 +57,17 @@ import (
 	"github.com/Psiphon-Labs/psiphon-tunnel-core/ClientLibrary/clientlib"
 	psi "github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon"
 	"github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/parameters"
+)
+
+// The single [Dialer] we can have.
+var singletonDialer = Dialer{
+	setNoticeWriter: psi.SetNoticeWriter,
+}
+
+var (
+	errNotStartedDial = errors.New("dialer has not been started yet")
+	errNotStartedStop = errors.New("tried to stop dialer that is not running")
+	errTunnelTimeout  = errors.New("tunnel establishment timed out")
 )
 
 // ClientInfo specifies information about the client app that should be communicated
@@ -192,39 +204,37 @@ func ParseConfig(configJSON []byte) (*Config, error) {
 // called before you can start it again with a new configuration. Dialer.Stop should be called
 // when you no longer need the Dialer in order to release resources.
 type Dialer struct {
-	mu             sync.Mutex
-	cancel         context.CancelFunc
-	controller     *psi.Controller
-	controllerDone <-chan struct{}
+	// Controls the Dialer state and Psiphon's global state.
+	mu sync.Mutex
+	// Used by DialStream.
+	controller *psi.Controller
+	// Used by Stop.
+	stop func()
+	// Allows for overriding the global notice writer for testing.
+	setNoticeWriter func(io.Writer)
 }
 
 var _ transport.StreamDialer = (*Dialer)(nil)
 
 // DialStream implements [transport.StreamDialer].
-func (d *Dialer) DialStream(ctx context.Context, addr string) (transport.StreamConn, error) {
-	if d.controller == nil {
-		return nil, errors.New("dialer has not been started yet")
+// The context is not used because Psiphon's implementation doesn't support it. If you need cancellation,
+// you will need to add it independently.
+func (d *Dialer) DialStream(unusedContext context.Context, addr string) (transport.StreamConn, error) {
+	d.mu.Lock()
+	controller := d.controller
+	d.mu.Unlock()
+	if controller == nil {
+		return nil, errNotStartedDial
 	}
-	netConn, err := d.controller.Dial(addr, nil)
+	netConn, err := controller.Dial(addr, nil)
 	if err != nil {
 		return nil, err
 	}
 	return streamConn{netConn}, nil
 }
 
-// The single [Dialer] we can have.
-var singletonDialer Dialer
-
-var errTunnelTimeout = errors.New("tunnel establishment timed out")
-
-// Start configures and runs the Dialer. It must be called before you can use the Dialer.
+// Start configures and runs the Dialer. It must be called before you can use the Dialer. It returns when the tunnel is ready.
 func (d *Dialer) Start(ctx context.Context, config *Config) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.cancel != nil || d.controller != nil {
-		return errors.New("tried to start dialer that is alread running")
-	}
-
 	configJSON, err := json.Marshal(config)
 	if err != nil {
 		return fmt.Errorf("failed to convert config to JSON")
@@ -239,106 +249,105 @@ func (d *Dialer) Start(ctx context.Context, config *Config) error {
 	pConfig.DisableLocalSocksProxy = true
 	pConfig.TargetApiProtocol = "ssh"
 
-	err = pConfig.Commit(true)
-	if err != nil {
-		return fmt.Errorf("failed to commit config: %w", err)
+	// Will receive a value if an error occurs during the connection sequence.
+	// It will be closed on succesful connection.
+	errCh := make(chan error)
+
+	go func() {
+		onTunnel := func() {
+			// Only emit error if we are still listening.
+			select {
+			case errCh <- nil:
+			default:
+			}
+		}
+		err := d.runController(ctx, pConfig, onTunnel)
+		select {
+		case errCh <- err:
+		default:
+		}
+	}()
+
+	// Wait for an active tunnel or error
+	return <-errCh
+}
+
+func (d *Dialer) runController(ctx context.Context, pConfig *psi.Config, onTunnel func()) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.stop != nil {
+		return errors.New("tried to start dialer that is alread running")
+	}
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(context.Canceled)
+	controllerDone := make(chan struct{})
+	defer close(controllerDone)
+	d.stop = func() {
+		// Tell controller to stop.
+		cancel(context.Canceled)
+		// Wait for controller to return.
+		<-controllerDone
 	}
 
-	// Will receive a value when the tunnel has successfully connected.
-	connected := make(chan struct{}, 1)
-	// Will receive a value if an error occurs during the connection sequence.
-	errCh := make(chan error, 1)
-
 	// Set up NoticeWriter to receive events.
-	psi.SetNoticeWriter(psi.NewNoticeReceiver(
+	d.setNoticeWriter(psi.NewNoticeReceiver(
 		func(notice []byte) {
 			var event clientlib.NoticeEvent
 			err := json.Unmarshal(notice, &event)
 			if err != nil {
 				// This is unexpected and probably indicates something fatal has occurred.
 				// We'll interpret it as a connection error and abort.
-				err = fmt.Errorf("failed to unmarshal notice JSON: %w", err)
-				select {
-				case errCh <- err:
-				default:
-				}
+				cancel(fmt.Errorf("failed to unmarshal notice JSON: %w", err))
 				return
 			}
 			switch event.Type {
 			case "EstablishTunnelTimeout":
-				select {
-				case errCh <- errTunnelTimeout:
-				default:
-				}
+				cancel(errTunnelTimeout)
 			case "Tunnels":
 				count := event.Data["count"].(float64)
 				if count > 0 {
-					select {
-					case connected <- struct{}{}:
-					default:
-					}
+					onTunnel()
 				}
 			}
 		}))
+
+	err := pConfig.Commit(true)
+	if err != nil {
+		return fmt.Errorf("failed to commit config: %w", err)
+	}
 
 	err = psi.OpenDataStore(&psi.Config{DataRootDirectory: pConfig.DataRootDirectory})
 	if err != nil {
 		return fmt.Errorf("failed to open data store: %w", err)
 	}
-	needsCleanup := true
-	defer func() {
-		if needsCleanup {
-			psi.CloseDataStore()
-		}
-	}()
+	defer psi.CloseDataStore()
 
 	controller, err := psi.NewController(pConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create Controller: %w", err)
 	}
-	ctx, cancel := context.WithCancel(ctx)
-	defer func() {
-		if needsCleanup {
-			cancel()
-		}
-	}()
-	go func() {
-		controllerDone := make(chan struct{})
-		d.controllerDone = controllerDone
-		controller.Run(ctx)
-		close(controllerDone)
-	}()
+	d.controller = controller
+	d.mu.Unlock()
 
-	// Wait for an active tunnel or error
-	select {
-	case <-ctx.Done():
-		return context.Cause(ctx)
-	case <-connected:
-		needsCleanup = false
-		d.cancel = cancel
-		d.controller = controller
-		return nil
-	case err := <-errCh:
-		if !errors.Is(err, errTunnelTimeout) {
-			err = fmt.Errorf("failed to run Controller: %w", err)
-		}
-		return err
-	}
+	controller.Run(ctx)
+
+	d.mu.Lock()
+	d.controller = nil
+	d.stop = nil
+	return context.Cause(ctx)
 }
 
 // Stop stops the Dialer background processes, releasing resources and allowing it to be reconfigured.
+// It returns when the Dialer is completely stopped.
 func (d *Dialer) Stop() error {
 	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.cancel == nil || d.controller == nil {
-		return errors.New("tried to stop dialer that is not running")
+	stop := d.stop
+	d.stop = nil
+	d.mu.Unlock()
+	if stop == nil {
+		return errNotStartedStop
 	}
-	d.cancel()
-	// Wait for Controller to finish before cleaning up.
-	<-d.controllerDone
-	d.cancel = nil
-	d.controller = nil
-	psi.CloseDataStore()
+	stop()
 	return nil
 }
 
