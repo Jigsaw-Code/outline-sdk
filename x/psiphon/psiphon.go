@@ -49,6 +49,7 @@ import (
 	"fmt"
 	"net"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -160,7 +161,7 @@ func ParseConfig(configJSON []byte) (*Config, error) {
 	var extCfg extendedConfig
 
 	// Set default values
-	extCfg.ClientPlatform = fmt.Sprintf("OutlineSDK/%s/%s", runtime.GOOS, runtime.GOARCH)
+	extCfg.ClientPlatform = strings.ReplaceAll(fmt.Sprintf("OutlineSDK_%s_%s", runtime.GOOS, runtime.GOARCH), " ", "_")
 
 	decoder := json.NewDecoder(bytes.NewReader(configJSON))
 	decoder.DisallowUnknownFields()
