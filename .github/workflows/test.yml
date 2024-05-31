@@ -59,9 +59,12 @@ jobs:
         run: go run github.com/google/go-licenses check --ignore=golang.org/x --allowed_licenses=Apache-2.0,Apache-3,BSD-3-Clause,BSD-4-Clause,CC0-1.0,MIT ./...
 
       - name: Test SDK
+        # As of Go 1.21, Windows requires cgo for -race tests. See https://go.dev/doc/articles/race_detector#Requirements
+        env: {CGO_ENABLED: 1}
         # Enable nettests, which executes external network requests.
         run: go test -tags nettest -race -bench '.' ./... -benchtime=100ms
 
       - name: Test x
+        env: {CGO_ENABLED: 1}
         # Enable nettests, which executes external network requests.
         run: go test -C x -tags nettest,psiphon -race -bench '.' ./... -benchtime=100ms
