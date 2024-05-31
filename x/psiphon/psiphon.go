@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build gpl
+
 // Package psiphon provides adaptors to use Psiphon as a StreamDialer.
 //
 // You will need to provide your own Psiphon config file, which you can get from the Psiphon team

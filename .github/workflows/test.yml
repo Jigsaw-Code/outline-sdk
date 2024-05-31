@@ -50,13 +50,16 @@ jobs:
         run: PATH="${{ env.OUTPUT_DIR }}:$PATH" gomobile bind -ldflags='-s -w' -v -target=ios -iosversion=11.0 -o "${{ env.OUTPUT_DIR }}/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
         working-directory: ${{ github.workspace }}/x
 
+      - name: Check SDK licenses
+        run: go run github.com/google/go-licenses check --ignore=golang.org/x --allowed_licenses=Apache-2.0,Apache-3,BSD-3-Clause,BSD-4-Clause,MIT ./...
+
       - name: Test SDK
         # Enable nettests, which executes external network requests.
-        run: go test -race -bench '.' ./... -benchtime=100ms -tags nettest
+        run: go test -tags nettest -race -bench '.' ./... -benchtime=100ms
+
+      - name: Check x licenses
+        run: go -C x run github.com/google/go-licenses check --ignore=golang.org/x --allowed_licenses=Apache-2.0,Apache-3,BSD-3-Clause,BSD-4-Clause,MIT ./...
 
       - name: Test x
         # Enable nettests, which executes external network requests.
-        run: go test -C x -race -bench '.' ./... -benchtime=100ms -tags nettest
-
-      - name: Test x/psiphon
-        run: go test -C x/psiphon -race -bench '.' ./... -benchtime=100ms
+        run: go -C x test -tags nettest,gpl -race -bench '.' ./... -benchtime=100ms
