@@ -35,7 +35,7 @@ func TestParseConfig_ParseCorrectly(t *testing.T) {
 func TestParseConfig_DefaultClientPlatform(t *testing.T) {
 	config, err := ParseConfig([]byte(`{}`))
 	require.NoError(t, err)
-	require.Equal(t, fmt.Sprintf("OutlineSDK/%v/%v", runtime.GOOS, runtime.GOARCH), config.ClientPlatform)
+	require.Equal(t, fmt.Sprintf("OutlineSDK_%v_%v", runtime.GOOS, runtime.GOARCH), config.ClientPlatform)
 }
 
 func TestParseConfig_OverrideClientPlatform(t *testing.T) {

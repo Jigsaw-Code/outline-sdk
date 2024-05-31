@@ -297,6 +297,11 @@ func (d *Dialer) Start(ctx context.Context, config *Config) error {
 		return fmt.Errorf("failed to create Controller: %w", err)
 	}
 	ctx, cancel := context.WithCancel(ctx)
+	defer func() {
+		if needsCleanup {
+			cancel()
+		}
+	}()
 	go func() {
 		controllerDone := make(chan struct{})
 		d.controllerDone = controllerDone
@@ -306,13 +311,14 @@ func (d *Dialer) Start(ctx context.Context, config *Config) error {
 
 	// Wait for an active tunnel or error
 	select {
+	case <-ctx.Done():
+		return context.Cause(ctx)
 	case <-connected:
 		needsCleanup = false
 		d.cancel = cancel
 		d.controller = controller
 		return nil
 	case err := <-errCh:
-		cancel()
 		if !errors.Is(err, errTunnelTimeout) {
 			err = fmt.Errorf("failed to run Controller: %w", err)
 		}
