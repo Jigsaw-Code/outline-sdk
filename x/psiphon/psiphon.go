@@ -237,7 +237,7 @@ func (d *Dialer) Start(ctx context.Context, config *Config) error {
 	pConfig.DisableLocalSocksProxy = true
 	pConfig.TargetApiProtocol = "ssh"
 
-	err = pConfig.Commit(false)
+	err = pConfig.Commit(true)
 	if err != nil {
 		return fmt.Errorf("failed to commit config: %w", err)
 	}
