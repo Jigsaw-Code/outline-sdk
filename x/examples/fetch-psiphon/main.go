@@ -46,7 +46,7 @@ func main() {
 	flag.Parse()
 
 	if *verboseFlag {
-		debugLog = *log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
+		debugLog = log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 	}
 
 	url := flag.Arg(0)
