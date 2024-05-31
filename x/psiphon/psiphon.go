@@ -215,6 +215,8 @@ func (d *Dialer) DialStream(ctx context.Context, addr string) (transport.StreamC
 // The single [Dialer] we can have.
 var singletonDialer Dialer
 
+var errTunnelTimeout = errors.New("tunnel establishment timed out")
+
 // Start configures and runs the Dialer. It must be called before you can use the Dialer.
 func (d *Dialer) Start(ctx context.Context, config *Config) error {
 	d.mu.Lock()
@@ -265,7 +267,7 @@ func (d *Dialer) Start(ctx context.Context, config *Config) error {
 			switch event.Type {
 			case "EstablishTunnelTimeout":
 				select {
-				case errCh <- context.DeadlineExceeded:
+				case errCh <- errTunnelTimeout:
 				default:
 				}
 			case "Tunnels":
@@ -311,7 +313,7 @@ func (d *Dialer) Start(ctx context.Context, config *Config) error {
 		return nil
 	case err := <-errCh:
 		cancel()
-		if !errors.Is(err, context.DeadlineExceeded) {
+		if !errors.Is(err, errTunnelTimeout) {
 			err = fmt.Errorf("failed to run Controller: %w", err)
 		}
 		return err
