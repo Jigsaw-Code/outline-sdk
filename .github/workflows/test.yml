@@ -28,7 +28,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version-file: '${{ github.workspace }}/go.mod'
+          go-version-file: '${{ github.workspace }}/x/go.mod'
 
       - name: Build SDK
         run: go build -v ./...
