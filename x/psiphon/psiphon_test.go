@@ -101,9 +101,6 @@ func TestDialer_StartSuccessful(t *testing.T) {
 	go func() {
 		errCh <- dialer.Start(ctx, cfg)
 	}()
-	defer func() {
-		require.NoError(t, dialer.Stop())
-	}()
 
 	// Notify fake tunnel establishment.
 	w := <-wCh
@@ -112,6 +109,7 @@ func TestDialer_StartSuccessful(t *testing.T) {
 
 	err := <-errCh
 	require.NoError(t, err)
+	require.NoError(t, dialer.Stop())
 }
 
 func TestDialerStart_Cancelled(t *testing.T) {

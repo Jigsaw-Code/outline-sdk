@@ -253,9 +253,11 @@ func (d *Dialer) Start(ctx context.Context, config *Config) error {
 	// It will be closed on succesful connection.
 	errCh := make(chan error)
 
+	// Start returns either when a tunnel is ready, or an error happens, whichever comes first.
+	// When emitting the errors, we use a select statement to ensure the channel is being listened
+	// on, to avoid a deadlock after the initial error.
 	go func() {
 		onTunnel := func() {
-			// Only emit error if we are still listening.
 			select {
 			case errCh <- nil:
 			default:
