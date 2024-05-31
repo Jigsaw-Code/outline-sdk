@@ -12,14 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build gpl
+//go:build psiphon && go1.21
 
-// Package psiphon provides adaptors to use Psiphon as a StreamDialer.
-//
-// You will need to provide your own Psiphon config file, which you can get from the Psiphon team
-// or [generate one yourself].
-//
-// [generate one yourself]: https://github.com/Psiphon-Labs/psiphon-tunnel-core/tree/master?tab=readme-ov-file#generate-configuration-data
+/*
+Package psiphon provides adaptors to create StreamDialers that leverage the [Psiphon] network.
+
+You will need to provide your own Psiphon config file, which you must acquire from the Psiphon team.
+See the [Psiphon End-User License Agreement]. For more details, email them at sponsor@psiphon.ca.
+
+For testing, you can [generate a Psiphon config yourself].
+
+# License restrictions
+
+Psiphon code is licensed as GPLv3, which you will have to take that into account if you incorporate Psiphon logic into your app.
+If you don't want your app to be GPL, consider acquiring an appropriate license when acquiring their services.
+
+Note that a few of Psiphon's dependencies may impose additional restrictions. For example, github.com/hashicorp/golang-lru is MPL-2.0
+and github.com/juju/ratelimit is LGPL-3.0. You can use [go-licenses] to analyze the licenses of your Go code dependencies.
+
+To prevent accidental inclusion of unvetted licenses, you must use the "psiphon" build tag in order to use this package. Typically you do that with
+"-tags psiphon".
+
+[Psiphon]: https://psiphon.ca
+[Psiphon End-User License Agreement]: https://psiphon.ca/en/license.html
+[go-licenses]: https://github.com/google/go-licenses
+[generate a Psiphon config yourself]: https://github.com/Psiphon-Labs/psiphon-tunnel-core/tree/master?tab=readme-ov-file#generate-configuration-data
+*/
 package psiphon
 
 import (
@@ -136,7 +154,7 @@ type extendedConfig struct {
 	TargetApiProtocol *string
 }
 
-// ParseConfig parses the config JSON into a structure that can be further editted.
+// ParseConfig parses the config JSON into a structure that can be further edited.
 func ParseConfig(configJSON []byte) (*Config, error) {
 	var extCfg extendedConfig
 
@@ -166,6 +184,7 @@ func ParseConfig(configJSON []byte) (*Config, error) {
 
 // Dialer is a [transport.StreamDialer] that uses Psiphon to connect to a destination.
 // There's only one possible Psiphon Dialer available at any time, which is accessible via [GetSingletonDialer].
+// The zero value of this type is invalid.
 //
 // The Dialer must be configured first with [Dialer.Start] before it can be used, and [Dialer.Stop] must be
 // called before you can start it again with a new configuration. Dialer.Stop should be called

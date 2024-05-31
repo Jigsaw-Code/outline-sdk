@@ -51,15 +51,16 @@ jobs:
         working-directory: ${{ github.workspace }}/x
 
       - name: Check SDK licenses
-        run: go run github.com/google/go-licenses check --ignore=golang.org/x --allowed_licenses=Apache-2.0,Apache-3,BSD-3-Clause,BSD-4-Clause,MIT ./...
+        # We allow only "notice" type of licenses.
+        run: go run github.com/google/go-licenses check --ignore=golang.org/x --allowed_licenses=Apache-2.0,Apache-3,BSD-3-Clause,BSD-4-Clause,CC0-1.0,MIT ./...
 
       - name: Test SDK
         # Enable nettests, which executes external network requests.
         run: go test -tags nettest -race -bench '.' ./... -benchtime=100ms
 
       - name: Check x licenses
-        run: go -C x run github.com/google/go-licenses check --ignore=golang.org/x --allowed_licenses=Apache-2.0,Apache-3,BSD-3-Clause,BSD-4-Clause,MIT ./...
+        run: go -C x run github.com/google/go-licenses check --ignore=golang.org/x --allowed_licenses=Apache-2.0,Apache-3,BSD-3-Clause,BSD-4-Clause,CC0-1.0,MIT ./...
 
       - name: Test x
         # Enable nettests, which executes external network requests.
-        run: go -C x test -tags nettest,gpl -race -bench '.' ./... -benchtime=100ms
+        run: go -C x test -tags nettest,psiphon -race -bench '.' ./... -benchtime=100ms
