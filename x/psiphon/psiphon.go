@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build psiphon && go1.21
+//go:build psiphon
 
 /*
 Package psiphon provides adaptors to create StreamDialers that leverage [Psiphon] technology and
