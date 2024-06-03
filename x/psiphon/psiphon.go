@@ -103,7 +103,7 @@ func newPsiphonConfig(config *DialerConfig) (*psi.Config, error) {
 		case "DisableLocalHTTPProxy", "DisableLocalSocksProxy":
 			b, ok := value.(bool)
 			if !ok {
-				return nil, fmt.Errorf("field %v is not a boolean", key)
+				return nil, fmt.Errorf("field %v must be a boolean", key)
 			}
 			if b != true {
 				return nil, fmt.Errorf("field %v must be true if set", key)
