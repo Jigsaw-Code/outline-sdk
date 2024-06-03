@@ -18,9 +18,8 @@ package psiphon
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"io"
-	"runtime"
 	"testing"
 	"time"
 
@@ -29,61 +28,44 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseConfig_ParseCorrectly(t *testing.T) {
-	config, err := ParseConfig([]byte(`{
-		"PropagationChannelId": "ID1",
-		"SponsorId": "ID2"
-	}`))
+func TestNewPsiphonConfig_ParseCorrectly(t *testing.T) {
+	config, err := newPsiphonConfig(&DialerConfig{
+		ProviderConfig: json.RawMessage(`{
+			"PropagationChannelId": "ID1",
+			"SponsorId": "ID2"
+		}`),
+	})
 	require.NoError(t, err)
 	require.Equal(t, "ID1", config.PropagationChannelId)
 	require.Equal(t, "ID2", config.SponsorId)
 }
 
-func TestParseConfig_DefaultClientPlatform(t *testing.T) {
-	config, err := ParseConfig([]byte(`{}`))
-	require.NoError(t, err)
-	require.Equal(t, fmt.Sprintf("OutlineSDK_%v_%v", runtime.GOOS, runtime.GOARCH), config.ClientPlatform)
-}
-
-func TestParseConfig_OverrideClientPlatform(t *testing.T) {
-	config, err := ParseConfig([]byte(`{"ClientPlatform": "win"}`))
-	require.NoError(t, err)
-	require.Equal(t, "win", config.ClientPlatform)
-}
-
-func TestParseConfig_AcceptOkOptions(t *testing.T) {
-	_, err := ParseConfig([]byte(`{
+func TestNewPsiphonConfig_AcceptOkOptions(t *testing.T) {
+	_, err := newPsiphonConfig(&DialerConfig{
+		ProviderConfig: json.RawMessage(`{
 		"DisableLocalHTTPProxy": true,
-		"DisableLocalSocksProxy": true,
-		"TargetApiProtocol": "ssh"
-	}`))
+		"DisableLocalSocksProxy": true
+	}`)})
 	require.NoError(t, err)
 }
 
-func TestParseConfig_RejectBadOptions(t *testing.T) {
-	_, err := ParseConfig([]byte(`{"DisableLocalHTTPProxy": false}`))
+func TestNewPsiphonConfig_RejectBadOptions(t *testing.T) {
+	_, err := newPsiphonConfig(&DialerConfig{
+		ProviderConfig: json.RawMessage(`{"DisableLocalHTTPProxy": false}`)})
 	require.Error(t, err)
 
-	_, err = ParseConfig([]byte(`{"DisableLocalSocksProxy": false}`))
+	_, err = newPsiphonConfig(&DialerConfig{
+		ProviderConfig: json.RawMessage(`{"DisableLocalSocksProxy": false}`)})
 	require.Error(t, err)
-
-	_, err = ParseConfig([]byte(`{"TargetApiProtocol": "web"}`))
-	require.Error(t, err)
-}
-
-func TestParseConfig_RejectUnknownFields(t *testing.T) {
-	_, err := ParseConfig([]byte(`{
-		"PropagationChannelId": "ID",
-		"UknownField": false
-	}`))
 	require.Error(t, err)
 }
 
 func TestDialer_StartSuccessful(t *testing.T) {
 	// Create minimal config.
-	cfg := &Config{}
-	cfg.PropagationChannelId = "test"
-	cfg.SponsorId = "test"
+	cfg := &DialerConfig{ProviderConfig: json.RawMessage(`{
+  	  "PropagationChannelId": "test",
+	  "SponsorId": "test"
+	}`)}
 
 	// Intercept notice writer.
 	dialer := GetSingletonDialer()
@@ -102,10 +84,15 @@ func TestDialer_StartSuccessful(t *testing.T) {
 		errCh <- dialer.Start(ctx, cfg)
 	}()
 
-	// Notify fake tunnel establishment.
-	w := <-wCh
-	psi.SetNoticeWriter(w)
-	psi.NoticeTunnels(1)
+	// We use a select because the error may happen before the notice writer is set.
+	select {
+	case w := <-wCh:
+		// Notify fake tunnel establishment once we have the notice writer.
+		psi.SetNoticeWriter(w)
+		psi.NoticeTunnels(1)
+	case err := <-errCh:
+		t.Fatalf("Got error from Start: %v", err)
+	}
 
 	err := <-errCh
 	require.NoError(t, err)
@@ -113,9 +100,10 @@ func TestDialer_StartSuccessful(t *testing.T) {
 }
 
 func TestDialerStart_Cancelled(t *testing.T) {
-	cfg := &Config{}
-	cfg.PropagationChannelId = "test"
-	cfg.SponsorId = "test"
+	cfg := &DialerConfig{ProviderConfig: json.RawMessage(`{
+  	  "PropagationChannelId": "test",
+	  "SponsorId": "test"
+	}`)}
 	errCh := make(chan error)
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
@@ -127,9 +115,10 @@ func TestDialerStart_Cancelled(t *testing.T) {
 }
 
 func TestDialerStart_Timeout(t *testing.T) {
-	cfg := &Config{}
-	cfg.PropagationChannelId = "test"
-	cfg.SponsorId = "test"
+	cfg := &DialerConfig{ProviderConfig: json.RawMessage(`{
+  	  "PropagationChannelId": "test",
+	  "SponsorId": "test"
+	}`)}
 	errCh := make(chan error)
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now())
 	defer cancel()
