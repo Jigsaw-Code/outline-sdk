@@ -38,3 +38,5 @@ To prevent accidental inclusion of unvetted licenses, you must use the "psiphon"
 [generate a Psiphon config yourself]: https://github.com/Psiphon-Labs/psiphon-tunnel-core/tree/master?tab=readme-ov-file#generate-configuration-data
 */
 package psiphon
+
+var _ = mustSetPsiphonBuildTag
