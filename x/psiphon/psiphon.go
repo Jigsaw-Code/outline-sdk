@@ -197,6 +197,7 @@ func (d *Dialer) runController(ctx context.Context, pConfig *psi.Config, onTunne
 				}
 			}
 		}))
+	defer psi.SetNoticeWriter(io.Discard)
 
 	err := pConfig.Commit(true)
 	if err != nil {

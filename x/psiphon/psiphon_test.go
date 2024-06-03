@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"os"
 	"testing"
 	"time"
 
@@ -27,6 +28,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+func newTestConfig(tb testing.TB, providerConfig string) (*DialerConfig, func()) {
+	tempDir, err := os.MkdirTemp("", "psiphon")
+	require.NoError(tb, err)
+	return &DialerConfig{
+		DataRootDirectory: tempDir,
+		ProviderConfig:    json.RawMessage(providerConfig),
+	}, func() { os.RemoveAll(tempDir) }
+}
 
 func TestNewPsiphonConfig_ParseCorrectly(t *testing.T) {
 	config, err := newPsiphonConfig(&DialerConfig{
@@ -62,10 +72,11 @@ func TestNewPsiphonConfig_RejectBadOptions(t *testing.T) {
 
 func TestDialer_StartSuccessful(t *testing.T) {
 	// Create minimal config.
-	cfg := &DialerConfig{ProviderConfig: json.RawMessage(`{
-  	  "PropagationChannelId": "test",
-	  "SponsorId": "test"
-	}`)}
+	cfg, delete := newTestConfig(t, `{
+		"PropagationChannelId": "test",
+		"SponsorId": "test"
+	}`)
+	defer delete()
 
 	// Intercept notice writer.
 	dialer := GetSingletonDialer()
@@ -100,10 +111,11 @@ func TestDialer_StartSuccessful(t *testing.T) {
 }
 
 func TestDialerStart_Cancelled(t *testing.T) {
-	cfg := &DialerConfig{ProviderConfig: json.RawMessage(`{
-  	  "PropagationChannelId": "test",
-	  "SponsorId": "test"
-	}`)}
+	cfg, delete := newTestConfig(t, `{
+		"PropagationChannelId": "test",
+		"SponsorId": "test"
+	}`)
+	defer delete()
 	errCh := make(chan error)
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
@@ -115,10 +127,11 @@ func TestDialerStart_Cancelled(t *testing.T) {
 }
 
 func TestDialerStart_Timeout(t *testing.T) {
-	cfg := &DialerConfig{ProviderConfig: json.RawMessage(`{
-  	  "PropagationChannelId": "test",
-	  "SponsorId": "test"
-	}`)}
+	cfg, delete := newTestConfig(t, `{
+		"PropagationChannelId": "test",
+		"SponsorId": "test"
+	}`)
+	defer delete()
 	errCh := make(chan error)
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now())
 	defer cancel()
