@@ -41,6 +41,7 @@ var (
 	errTunnelTimeout  = errors.New("tunnel establishment timed out")
 )
 
+// DialerConfig specifies the parameters for [Dialer].
 type DialerConfig struct {
 	// Used as the directory for the datastore, remote server list, and obfuscasted
 	// server list.

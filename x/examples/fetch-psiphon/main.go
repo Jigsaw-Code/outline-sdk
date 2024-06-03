@@ -67,10 +67,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not read config file: %v\n", err)
 	}
-	config, err := psiphon.ParseConfig(configJSON)
-	if err != nil {
-		log.Fatalf("Failed to load Psiphon config: %v\n", err)
-	}
+	config := &psiphon.DialerConfig{ProviderConfig: configJSON}
 	cacheBaseDir, err := os.UserCacheDir()
 	if err != nil {
 		log.Fatalf("Failed to get the user cache directory: %v", err)
