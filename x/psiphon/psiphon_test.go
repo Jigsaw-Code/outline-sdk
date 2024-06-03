@@ -29,12 +29,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestConfig(tb testing.TB, providerConfig string) (*DialerConfig, func()) {
+func newTestConfig(tb testing.TB) (*DialerConfig, func()) {
 	tempDir, err := os.MkdirTemp("", "psiphon")
 	require.NoError(tb, err)
 	return &DialerConfig{
 		DataRootDirectory: tempDir,
-		ProviderConfig:    json.RawMessage(providerConfig),
+		ProviderConfig: json.RawMessage(`{
+			"PropagationChannelId": "ID1",
+			"SponsorId": "ID2"
+		}`),
 	}, func() { os.RemoveAll(tempDir) }
 }
 
@@ -72,10 +75,7 @@ func TestNewPsiphonConfig_RejectBadOptions(t *testing.T) {
 
 func TestDialer_StartSuccessful(t *testing.T) {
 	// Create minimal config.
-	cfg, delete := newTestConfig(t, `{
-		"PropagationChannelId": "test",
-		"SponsorId": "test"
-	}`)
+	cfg, delete := newTestConfig(t)
 	defer delete()
 
 	// Intercept notice writer.
@@ -111,10 +111,7 @@ func TestDialer_StartSuccessful(t *testing.T) {
 }
 
 func TestDialerStart_Cancelled(t *testing.T) {
-	cfg, delete := newTestConfig(t, `{
-		"PropagationChannelId": "test",
-		"SponsorId": "test"
-	}`)
+	cfg, delete := newTestConfig(t)
 	defer delete()
 	errCh := make(chan error)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -127,10 +124,7 @@ func TestDialerStart_Cancelled(t *testing.T) {
 }
 
 func TestDialerStart_Timeout(t *testing.T) {
-	cfg, delete := newTestConfig(t, `{
-		"PropagationChannelId": "test",
-		"SponsorId": "test"
-	}`)
+	cfg, delete := newTestConfig(t)
 	defer delete()
 	errCh := make(chan error)
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now())
