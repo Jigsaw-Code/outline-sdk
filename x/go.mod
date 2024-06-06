@@ -6,7 +6,7 @@ require (
 	github.com/Jigsaw-Code/outline-sdk v0.0.16
 	// Use github.com/Psiphon-Labs/psiphon-tunnel-core@staging-client as per
 	// https://github.com/Psiphon-Labs/psiphon-tunnel-core/?tab=readme-ov-file#using-psiphon-with-go-modules
-	github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20240522172529-8fcc4b9a51cf
+	github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20240614155336-be2427e798f0
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/stretchr/testify v1.9.0
 	github.com/vishvananda/netlink v1.1.0

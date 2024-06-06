@@ -19,13 +19,13 @@ package psiphon
 import (
 	"context"
 	"encoding/json"
-	"io"
+	"fmt"
+	"net"
 	"os"
 	"testing"
 	"time"
 
-	psi "github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon"
-
+	psi "github.com/Psiphon-Labs/psiphon-tunnel-core/ClientLibrary/clientlib"
 	"github.com/stretchr/testify/require"
 )
 
@@ -41,51 +41,19 @@ func newTestConfig(tb testing.TB) (*DialerConfig, func()) {
 	}, func() { os.RemoveAll(tempDir) }
 }
 
-func TestNewPsiphonConfig_ParseCorrectly(t *testing.T) {
-	config, err := newPsiphonConfig(&DialerConfig{
-		ProviderConfig: json.RawMessage(`{
-			"PropagationChannelId": "ID1",
-			"SponsorId": "ID2"
-		}`),
-	})
-	require.NoError(t, err)
-	require.Equal(t, "ID1", config.PropagationChannelId)
-	require.Equal(t, "ID2", config.SponsorId)
-}
-
-func TestNewPsiphonConfig_AcceptOkOptions(t *testing.T) {
-	_, err := newPsiphonConfig(&DialerConfig{
-		ProviderConfig: json.RawMessage(`{
-		"DisableLocalHTTPProxy": true,
-		"DisableLocalSocksProxy": true
-	}`)})
-	require.NoError(t, err)
-}
-
-func TestNewPsiphonConfig_RejectBadOptions(t *testing.T) {
-	_, err := newPsiphonConfig(&DialerConfig{
-		ProviderConfig: json.RawMessage(`{"DisableLocalHTTPProxy": false}`)})
-	require.Error(t, err)
-
-	_, err = newPsiphonConfig(&DialerConfig{
-		ProviderConfig: json.RawMessage(`{"DisableLocalSocksProxy": false}`)})
-	require.Error(t, err)
-	require.Error(t, err)
-}
-
-func TestDialer_StartSuccessful(t *testing.T) {
+func TestDialer_Start_Success(t *testing.T) {
 	// Create minimal config.
 	cfg, delete := newTestConfig(t)
 	defer delete()
 
-	// Intercept notice writer.
 	dialer := GetSingletonDialer()
-	wCh := make(chan io.Writer)
-	dialer.setNoticeWriter = func(w io.Writer) {
-		wCh <- w
+
+	// Set a no-op startTunnel
+	dialer.startTunnel = func(ctx context.Context, config *DialerConfig) (*psi.PsiphonTunnel, error) {
+		return &psi.PsiphonTunnel{}, nil
 	}
 	defer func() {
-		dialer.setNoticeWriter = psi.SetNoticeWriter
+		dialer.startTunnel = startTunnel
 	}()
 
 	errCh := make(chan error)
@@ -95,22 +63,12 @@ func TestDialer_StartSuccessful(t *testing.T) {
 		errCh <- dialer.Start(ctx, cfg)
 	}()
 
-	// We use a select because the error may happen before the notice writer is set.
-	select {
-	case w := <-wCh:
-		// Notify fake tunnel establishment once we have the notice writer.
-		psi.SetNoticeWriter(w)
-		psi.NoticeTunnels(1)
-	case err := <-errCh:
-		t.Fatalf("Got error from Start: %v", err)
-	}
-
 	err := <-errCh
 	require.NoError(t, err)
 	require.NoError(t, dialer.Stop())
 }
 
-func TestDialerStart_Cancelled(t *testing.T) {
+func TestDialer_Start_Cancelled(t *testing.T) {
 	cfg, delete := newTestConfig(t)
 	defer delete()
 	errCh := make(chan error)
@@ -120,10 +78,11 @@ func TestDialerStart_Cancelled(t *testing.T) {
 	}()
 	cancel()
 	err := <-errCh
+	GetSingletonDialer().Stop()
 	require.ErrorIs(t, err, context.Canceled)
 }
 
-func TestDialerStart_Timeout(t *testing.T) {
+func TestDialer_Start_Timeout(t *testing.T) {
 	cfg, delete := newTestConfig(t)
 	defer delete()
 	errCh := make(chan error)
@@ -133,15 +92,374 @@ func TestDialerStart_Timeout(t *testing.T) {
 		errCh <- GetSingletonDialer().Start(ctx, cfg)
 	}()
 	err := <-errCh
+	GetSingletonDialer().Stop()
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
-func TestDialerDialStream_NotStarted(t *testing.T) {
+func TestDialer_DialStream_NotStarted(t *testing.T) {
 	_, err := GetSingletonDialer().DialStream(context.Background(), "")
 	require.ErrorIs(t, err, errNotStartedDial)
 }
 
-func TestDialerStop_NotStarted(t *testing.T) {
+func TestDialer_Stop_NotStarted(t *testing.T) {
 	err := GetSingletonDialer().Stop()
 	require.ErrorIs(t, err, errNotStartedStop)
+}
+
+func TestDialer_Start_AlreadyStarted(t *testing.T) {
+	// Create minimal config.
+	cfg, delete := newTestConfig(t)
+	defer delete()
+
+	dialer := GetSingletonDialer()
+
+	// Set a no-op startTunnel
+	dialer.startTunnel = func(ctx context.Context, config *DialerConfig) (*psi.PsiphonTunnel, error) {
+		return &psi.PsiphonTunnel{}, nil
+	}
+	defer func() {
+		dialer.startTunnel = startTunnel
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err := dialer.Start(ctx, cfg)
+	require.NoError(t, err)
+
+	err = dialer.Start(ctx, cfg)
+	require.ErrorIs(t, err, errTunnelAlreadyStarted)
+
+	require.NoError(t, dialer.Stop())
+
+	err = dialer.Start(ctx, cfg)
+	require.NoError(t, err)
+
+	require.NoError(t, dialer.Stop())
+}
+
+func TestDialer_Stop_AlreadyStopped(t *testing.T) {
+	// Create minimal config.
+	cfg, delete := newTestConfig(t)
+	defer delete()
+
+	dialer := GetSingletonDialer()
+
+	// Set a no-op startTunnel
+	dialer.startTunnel = func(ctx context.Context, config *DialerConfig) (*psi.PsiphonTunnel, error) {
+		return &psi.PsiphonTunnel{}, nil
+	}
+	defer func() {
+		dialer.startTunnel = startTunnel
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err := dialer.Start(ctx, cfg)
+	require.NoError(t, err)
+
+	require.NoError(t, dialer.Stop())
+
+	require.ErrorIs(t, dialer.Stop(), errNotStartedStop)
+}
+
+func TestDialer_DialStream_Stopped(t *testing.T) {
+	// Create minimal config.
+	cfg, delete := newTestConfig(t)
+	defer delete()
+
+	dialer := GetSingletonDialer()
+
+	// Regardless of what we do below, restore the real startTunnel.
+	defer func() {
+		dialer.startTunnel = startTunnel
+	}()
+
+	// Set a no-op startTunnel
+	dialer.startTunnel = func(ctx context.Context, config *DialerConfig) (*psi.PsiphonTunnel, error) {
+		return &psi.PsiphonTunnel{}, nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	err := dialer.Start(ctx, cfg)
+
+	require.NoError(t, err)
+
+	require.NoError(t, dialer.Stop())
+
+	_, err = dialer.DialStream(context.Background(), "")
+	require.ErrorIs(t, err, errNotStartedDial)
+
+	cancel()
+}
+
+func TestDialer_DialStream_Success(t *testing.T) {
+	// Create minimal config.
+	cfg, delete := newTestConfig(t)
+	defer delete()
+
+	dialer := GetSingletonDialer()
+
+	// Regardless of what we do below, restore the real startTunnel.
+	defer func() {
+		dialer.startTunnel = startTunnel
+		dialer.tunnelDial = tunnelDial
+	}()
+
+	// Set a no-op startTunnel
+	dialer.startTunnel = func(ctx context.Context, config *DialerConfig) (*psi.PsiphonTunnel, error) {
+		return &psi.PsiphonTunnel{}, nil
+	}
+
+	// Set a no-op tunnelDial
+	dialer.tunnelDial = func(tunnel *psi.PsiphonTunnel, addr string) (net.Conn, error) {
+		return nil, nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err := dialer.Start(ctx, cfg)
+	require.NoError(t, err)
+
+	_, err = dialer.DialStream(context.Background(), "")
+	require.NoError(t, err)
+
+	require.NoError(t, dialer.Stop())
+}
+
+func TestDialer_DialStream_Error(t *testing.T) {
+	// Create minimal config.
+	cfg, delete := newTestConfig(t)
+	defer delete()
+
+	dialer := GetSingletonDialer()
+
+	// Regardless of what we do below, restore the real startTunnel.
+	defer func() {
+		dialer.startTunnel = startTunnel
+		dialer.tunnelDial = tunnelDial
+	}()
+
+	// Set a no-op startTunnel
+	dialer.startTunnel = func(ctx context.Context, config *DialerConfig) (*psi.PsiphonTunnel, error) {
+		return &psi.PsiphonTunnel{}, nil
+	}
+
+	// Force tunnelDial to always error
+	dialer.tunnelDial = func(tunnel *psi.PsiphonTunnel, addr string) (net.Conn, error) {
+		return nil, fmt.Errorf("error")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err := dialer.Start(ctx, cfg)
+	require.NoError(t, err)
+
+	_, err = dialer.DialStream(context.Background(), "")
+	require.Error(t, err)
+
+	require.NoError(t, dialer.Stop())
+}
+
+func TestDialer_Concurrent(t *testing.T) {
+	// Create minimal config.
+	cfg, delete := newTestConfig(t)
+	defer delete()
+
+	dialer := GetSingletonDialer()
+
+	// Regardless of what we do below, restore the real startTunnel.
+	defer func() {
+		dialer.startTunnel = startTunnel
+	}()
+
+	errCh1 := make(chan error)
+	errCh2 := make(chan error)
+
+	//
+	// Two concurrent calls to Start.
+	//
+	dialer.startTunnel = func(ctx context.Context, config *DialerConfig) (*psi.PsiphonTunnel, error) {
+		return &psi.PsiphonTunnel{}, nil
+	}
+	go func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		errCh1 <- dialer.Start(ctx, cfg)
+	}()
+	go func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		errCh2 <- dialer.Start(ctx, cfg)
+	}()
+	err1 := <-errCh1
+	err2 := <-errCh2
+	require.NotEqual(t, (err1 == nil), (err2 == nil), "Expected one of the calls to fail: %v %v", err1, err2)
+
+	require.NoError(t, dialer.Stop())
+
+	//
+	// Two concurrent calls to Start, ensuring that the first is still in progress when the second starts.
+	// Set a no-op startTunnel that will take a while.
+	//
+	dialer.startTunnel = func(ctx context.Context, config *DialerConfig) (*psi.PsiphonTunnel, error) {
+		// Wait a bit before returning.
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+		return &psi.PsiphonTunnel{}, nil
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		errCh1 <- dialer.Start(ctx, cfg)
+	}()
+	go func() {
+		time.Sleep(20 * time.Millisecond) // delay the start a bit
+		errCh2 <- dialer.Start(ctx, cfg)
+	}()
+	err1 = <-errCh1
+	err2 = <-errCh2
+	cancel()
+	require.NoError(t, err1)
+	require.ErrorIs(t, err2, errTunnelAlreadyStarted)
+	require.NoError(t, dialer.Stop())
+
+	//
+	// Force Stop to occur during Start. (Stopping before and after is tested elsewhere.)
+	// Set a no-op startTunnel that will take a while.
+	//
+	dialer.startTunnel = func(ctx context.Context, config *DialerConfig) (*psi.PsiphonTunnel, error) {
+		// Wait a bit before returning.
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+		return &psi.PsiphonTunnel{}, nil
+	}
+	ctx, cancel = context.WithCancel(context.Background())
+	go func() {
+		errCh1 <- dialer.Start(ctx, cfg)
+	}()
+	go func() {
+		time.Sleep(20 * time.Millisecond) // delay the stop a bit
+		errCh2 <- dialer.Stop()
+	}()
+	err1 = <-errCh1
+	err2 = <-errCh2
+	cancel()
+	require.ErrorIs(t, err1, context.Canceled)
+	require.NoError(t, err2)
+
+	//
+	// Call Stop twice concurrently.
+	//
+	dialer.startTunnel = func(ctx context.Context, config *DialerConfig) (*psi.PsiphonTunnel, error) {
+		return &psi.PsiphonTunnel{}, nil
+	}
+	ctx, cancel = context.WithCancel(context.Background())
+	require.NoError(t, dialer.Start(ctx, cfg))
+	go func() {
+		errCh1 <- dialer.Stop()
+	}()
+	go func() {
+		errCh2 <- dialer.Stop()
+	}()
+	err1 = <-errCh1
+	err2 = <-errCh2
+	cancel()
+	require.NotEqual(t, (err1 == nil), (err2 == nil), "Expected one of the calls to fail: %v %v", err1, err2)
+
+	//
+	// Call DialStream concurrently with Start.
+	//
+	dialer.startTunnel = func(ctx context.Context, config *DialerConfig) (*psi.PsiphonTunnel, error) {
+		// Wait a bit before returning.
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+		return &psi.PsiphonTunnel{}, nil
+	}
+	dialer.tunnelDial = func(tunnel *psi.PsiphonTunnel, addr string) (net.Conn, error) {
+		return nil, nil
+	}
+	ctx, cancel = context.WithCancel(context.Background())
+	go func() {
+		errCh1 <- dialer.Start(ctx, cfg)
+	}()
+	go func() {
+		time.Sleep(20 * time.Millisecond) // delay the dial a bit, to ensure start is in progress
+		_, err := dialer.DialStream(context.Background(), "")
+		errCh2 <- err
+	}()
+	err1 = <-errCh1
+	err2 = <-errCh2
+	cancel()
+	require.NoError(t, err1)
+	require.ErrorIs(t, err2, errNotStartedDial)
+	require.NoError(t, dialer.Stop())
+
+	//
+	// Call DialStream concurrently with Stop.
+	//
+	dialer.startTunnel = func(ctx context.Context, config *DialerConfig) (*psi.PsiphonTunnel, error) {
+		return &psi.PsiphonTunnel{}, nil
+	}
+	dialer.tunnelDial = func(tunnel *psi.PsiphonTunnel, addr string) (net.Conn, error) {
+		return nil, nil
+	}
+	ctx, cancel = context.WithCancel(context.Background())
+	require.NoError(t, dialer.Start(ctx, cfg))
+	go func() {
+		_, err := dialer.DialStream(context.Background(), "")
+		errCh1 <- err
+	}()
+	go func() {
+		errCh2 <- dialer.Stop()
+	}()
+	err1 = <-errCh1
+	err2 = <-errCh2
+	cancel()
+	// The dial should either not fail (because it beat the stop) or fail with the right error.
+	if err1 != nil {
+		require.ErrorIs(t, err1, errNotStartedDial)
+	}
+	require.NoError(t, err2)
+
+	//
+	// Call DialStream twice concurrently.
+	//
+	dialer.startTunnel = func(ctx context.Context, config *DialerConfig) (*psi.PsiphonTunnel, error) {
+		return &psi.PsiphonTunnel{}, nil
+	}
+	dialer.tunnelDial = func(tunnel *psi.PsiphonTunnel, addr string) (net.Conn, error) {
+		return nil, nil
+	}
+	ctx, cancel = context.WithCancel(context.Background())
+	require.NoError(t, dialer.Start(ctx, cfg))
+	go func() {
+		_, err := dialer.DialStream(context.Background(), "")
+		errCh1 <- err
+	}()
+	go func() {
+		_, err := dialer.DialStream(context.Background(), "")
+		errCh2 <- err
+	}()
+	err1 = <-errCh1
+	err2 = <-errCh2
+	cancel()
+	require.NoError(t, err1)
+	require.NoError(t, err2)
+	require.NoError(t, dialer.Stop())
+
 }
