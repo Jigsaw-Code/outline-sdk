@@ -163,84 +163,90 @@ func main() {
 		domainIP = append(domainIP, ip.String())
 	}
 
-	// msmtCh := make(chan Measurement)
+	msmtCh := make(chan Measurement)
 	var pending atomic.Int32
-	w := csv.NewWriter(os.Stdout)
-	w.Write([]string{"domain", "country_code", "isp", "strategy", "attempt", "img", "error_op", "error_msg"})
 	for _, isp := range isps {
 		for di, domain := range cfg.Domains {
-			for _, strategy := range cfg.Strategies {
-				transport := isp.Transport
-				if transport != "" && strategy != "" {
-					transport += "|" + strategy
-				}
-				dialer, err := transportToDialer.NewStreamDialer(transport)
-				if err != nil {
-					log.Fatalf("Could not create dialer: %v\n", err)
-				}
+			// Make variable copies for go routine.
+			isp := isp
+			domain := domain
+			ip := domainIP[di]
+			pending.Add(1)
+			go func() {
+				defer func() {
+					if pending.Add(-1) == 0 {
+						close(msmtCh)
+					}
+				}()
+				for _, strategy := range cfg.Strategies {
+					transport := isp.Transport
+					if transport != "" && strategy != "" {
+						transport += "|" + strategy
+					}
+					dialer, err := transportToDialer.NewStreamDialer(transport)
+					if err != nil {
+						log.Fatalf("Could not create dialer: %v\n", err)
+					}
 
-				numAttempts := 1
-				if cfg.NumAttempts != nil {
-					numAttempts = *cfg.NumAttempts
-				}
-				for attempt := 1; attempt <= numAttempts; attempt++ {
-					m := Measurement{
-						Time:     time.Now(),
-						Domain:   domain,
-						ISP:      isp.Name,
-						Country:  isp.CountryCode,
-						Strategy: strategy,
-						Attempt:  attempt,
+					numAttempts := 1
+					if cfg.NumAttempts != nil {
+						numAttempts = *cfg.NumAttempts
 					}
-					if strategy == "" {
-						m.Strategy = "direct"
-					}
-					pending.Add(1)
-					func(domain string, ip string) {
-						ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*timeoutSecFlag)*time.Second)
-						defer cancel()
-						tcpConn, err := dialer.DialStream(ctx, net.JoinHostPort(ip, "443"))
-						if err != nil {
-							if err == context.Canceled {
-								err = context.Cause(ctx)
-							}
-							m.ErrorOp = "connect"
-							m.ErrorMessage = makeErrorMsg(err, domain)
-							return
+					for attempt := 1; attempt <= numAttempts; attempt++ {
+						m := Measurement{
+							Time:     time.Now(),
+							Domain:   domain,
+							ISP:      isp.Name,
+							Country:  isp.CountryCode,
+							Strategy: strategy,
+							Attempt:  attempt,
 						}
-						tlsConn, err := tls.WrapConn(ctx, tcpConn, domain)
-						if err != nil {
-							if err == context.Canceled {
-								err = context.Cause(ctx)
-							}
-							m.ErrorOp = "tls"
-							m.ErrorMessage = makeErrorMsg(err, domain)
-							return
+						if strategy == "" {
+							m.Strategy = "direct"
 						}
-						tlsConn.Close()
-						// msmtCh <- m
-					}(domain, domainIP[di])
-					if m.ErrorOp == "" {
-						m.Img = "✅"
-					} else {
-						m.Img = "❌"
+						func() {
+							ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*timeoutSecFlag)*time.Second)
+							defer cancel()
+							tcpConn, err := dialer.DialStream(ctx, net.JoinHostPort(ip, "443"))
+							if err != nil {
+								if err == context.Canceled {
+									err = context.Cause(ctx)
+								}
+								m.ErrorOp = "connect"
+								m.ErrorMessage = makeErrorMsg(err, domain)
+								return
+							}
+							tlsConn, err := tls.WrapConn(ctx, tcpConn, domain)
+							if err != nil {
+								if err == context.Canceled {
+									err = context.Cause(ctx)
+								}
+								m.ErrorOp = "tls"
+								m.ErrorMessage = makeErrorMsg(err, domain)
+								return
+							}
+							tlsConn.Close()
+						}()
+						if m.ErrorOp == "" {
+							m.Img = "✅"
+						} else {
+							m.Img = "❌"
+						}
+						msmtCh <- m
 					}
-					w.Write([]string{m.Domain, m.Country, m.ISP, m.Strategy, fmt.Sprint(m.Attempt), m.Img, m.ErrorOp, m.ErrorMessage})
-					w.Flush()
-
 				}
-			}
+			}()
 		}
 	}
 
-	// w := csv.NewWriter(os.Stdout)
-	// w.Write([]string{"domain", "isp", "strategy", "attempt", "error_op", "error_msg"})
-	// for {
-	// 	m := <-msmtCh
-	// 	w.Write([]string{m.Domain, m.ISP, m.Strategy, fmt.Sprint(m.Attempt), m.ErrorOp, m.ErrorMessage})
-	// 	w.Flush()
-	// 	if pending.Add(-1) == 0 {
-	// 		break
-	// 	}
-	// }
+	w := csv.NewWriter(os.Stdout)
+	w.Write([]string{"domain", "country_code", "isp", "strategy", "attempt", "img", "error_op", "error_msg"})
+	for {
+		m, ok := <-msmtCh
+		if !ok {
+			break
+		}
+		w.Write([]string{m.Domain, m.Country, m.ISP, m.Strategy, fmt.Sprint(m.Attempt), m.Img, m.ErrorOp, m.ErrorMessage})
+		w.Flush()
+	}
 }
