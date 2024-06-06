@@ -166,18 +166,20 @@ func main() {
 	msmtCh := make(chan Measurement)
 	var pending atomic.Int32
 	for _, isp := range isps {
-		for di, domain := range cfg.Domains {
-			// Make variable copies for go routine.
-			isp := isp
-			domain := domain
-			ip := domainIP[di]
-			pending.Add(1)
-			go func() {
-				defer func() {
-					if pending.Add(-1) == 0 {
-						close(msmtCh)
-					}
-				}()
+		// Make variable copies for go routine.
+		isp := isp
+		pending.Add(1)
+		go func() {
+			defer func() {
+				if pending.Add(-1) == 0 {
+					close(msmtCh)
+				}
+			}()
+			numAttempts := 1
+			if cfg.NumAttempts != nil {
+				numAttempts = *cfg.NumAttempts
+			}
+			for attempt := 1; attempt <= numAttempts; attempt++ {
 				for _, strategy := range cfg.Strategies {
 					transport := isp.Transport
 					if transport != "" && strategy != "" {
@@ -187,12 +189,10 @@ func main() {
 					if err != nil {
 						log.Fatalf("Could not create dialer: %v\n", err)
 					}
+					for di, domain := range cfg.Domains {
+						domain := domain
+						ip := domainIP[di]
 
-					numAttempts := 1
-					if cfg.NumAttempts != nil {
-						numAttempts = *cfg.NumAttempts
-					}
-					for attempt := 1; attempt <= numAttempts; attempt++ {
 						m := Measurement{
 							Time:     time.Now(),
 							Domain:   domain,
@@ -235,8 +235,8 @@ func main() {
 						msmtCh <- m
 					}
 				}
-			}()
-		}
+			}
+		}()
 	}
 
 	w := csv.NewWriter(os.Stdout)
