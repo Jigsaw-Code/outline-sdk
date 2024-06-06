@@ -82,6 +82,10 @@ type ISPInfo struct {
 
 var transportToDialer = config.NewDefaultConfigToDialer()
 
+func makeErrorMsg(err error, domain string) string {
+	return strings.ReplaceAll(err.Error(), domain, "${DOMAIN}")
+}
+
 func newISP(ispProxy string) ISP {
 	dialer, err := transportToDialer.NewStreamDialer(ispProxy)
 	if err != nil {
@@ -144,7 +148,7 @@ func main() {
 	isps := make([]ISP, 0, len(cfg.ISPProxies))
 	for _, ispProxy := range cfg.ISPProxies {
 		isp := newISP(ispProxy)
-		debugLog.Println("Loaded ISP", isp)
+		debugLog.Printf("Loaded ISP \"%v\" (country: %v)\n", isp.Name, isp.CountryCode)
 		isps = append(isps, isp)
 	}
 
@@ -194,7 +198,7 @@ func main() {
 							err = context.Cause(ctx)
 						}
 						m.ErrorOp = "connect"
-						m.ErrorMessage = err.Error()
+						m.ErrorMessage = makeErrorMsg(err, domain)
 						return
 					}
 					tlsConn, err := tls.WrapConn(ctx, tcpConn, domain)
@@ -203,7 +207,7 @@ func main() {
 							err = context.Cause(ctx)
 						}
 						m.ErrorOp = "tls"
-						m.ErrorMessage = err.Error()
+						m.ErrorMessage = makeErrorMsg(err, domain)
 						return
 					}
 					tlsConn.Close()
