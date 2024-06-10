@@ -35,11 +35,11 @@ import (
 // go run ./x/examples/smart-proxy -v -localAddr=localhost:1080 --transport="" --domain www.rferl.org  --config=<(echo '{"dns": [{"https": {"name": "doh.sb"}}]}')
 
 type StrategyFinder struct {
-	TestTimeout  time.Duration
-	LogWriter    io.Writer
-	StreamDialer transport.StreamDialer
-	PacketDialer transport.PacketDialer
-	logMu        sync.Mutex
+	TestTimeout     time.Duration
+	LogWriter       io.Writer
+	NewStreamDialer func() (transport.StreamDialer, error)
+	NewPacketDialer func() (transport.PacketDialer, error)
+	logMu           sync.Mutex
 }
 
 func (f *StrategyFinder) log(format string, a ...any) {
@@ -118,7 +118,11 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryJSON) (dns.Resolv
 			port = "443"
 		}
 		dohURL := url.URL{Scheme: "https", Host: net.JoinHostPort(cfg.Name, port), Path: "/dns-query"}
-		return dns.NewHTTPSResolver(f.StreamDialer, serverAddr, dohURL.String()), true, nil
+		baseDialer, err := f.NewStreamDialer()
+		if err != nil {
+			return nil, true, fmt.Errorf("failed to create base dialer: %w", err)
+		}
+		return dns.NewHTTPSResolver(baseDialer, serverAddr, dohURL.String()), true, nil
 	} else if cfg := entry.TLS; cfg != nil {
 		if cfg.Name == "" {
 			return nil, true, errors.New("tls entry has empty server name")
@@ -131,7 +135,11 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryJSON) (dns.Resolv
 		if err != nil {
 			serverAddr = net.JoinHostPort(serverAddr, "853")
 		}
-		return dns.NewTLSResolver(f.StreamDialer, serverAddr, cfg.Name), true, nil
+		baseDialer, err := f.NewStreamDialer()
+		if err != nil {
+			return nil, true, fmt.Errorf("failed to create base dialer: %w", err)
+		}
+		return dns.NewTLSResolver(baseDialer, serverAddr, cfg.Name), true, nil
 	} else if cfg := entry.TCP; cfg != nil {
 		if cfg.Address == "" {
 			return nil, false, errors.New("tcp entry has empty server address")
@@ -142,7 +150,11 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryJSON) (dns.Resolv
 			port = "53"
 		}
 		serverAddr := net.JoinHostPort(host, port)
-		return dns.NewTCPResolver(f.StreamDialer, serverAddr), false, nil
+		baseDialer, err := f.NewStreamDialer()
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to create base dialer: %w", err)
+		}
+		return dns.NewTCPResolver(baseDialer, serverAddr), false, nil
 	} else if cfg := entry.UDP; cfg != nil {
 		if cfg.Address == "" {
 			return nil, false, errors.New("udp entry has empty server address")
@@ -153,7 +165,11 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryJSON) (dns.Resolv
 			port = "53"
 		}
 		serverAddr := net.JoinHostPort(host, port)
-		return dns.NewUDPResolver(f.PacketDialer, serverAddr), false, nil
+		baseDialer, err := f.NewPacketDialer()
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to create base dialer: %w", err)
+		}
+		return dns.NewUDPResolver(baseDialer, serverAddr), false, nil
 	} else {
 		return nil, false, errors.New("invalid DNS entry")
 	}
@@ -313,14 +329,18 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 		return nil, err
 	}
 	var dnsDialer transport.StreamDialer
+	baseDialer, err := f.NewStreamDialer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create base stream dialer: %w", err)
+	}
 	if resolver == nil {
-		if _, ok := f.StreamDialer.(*transport.TCPDialer); !ok {
-			return nil, fmt.Errorf("cannot use system resolver with base dialer of type %T", f.StreamDialer)
+		if _, ok := baseDialer.(*transport.TCPDialer); !ok {
+			return nil, fmt.Errorf("cannot use system resolver with base dialer of type %T", f.NewStreamDialer)
 		}
-		dnsDialer = f.StreamDialer
+		dnsDialer = baseDialer
 	} else {
 		resolver = newSimpleLRUCacheResolver(resolver, 100)
-		dnsDialer, err = dns.NewStreamDialer(resolver, f.StreamDialer)
+		dnsDialer, err = dns.NewStreamDialer(resolver, baseDialer)
 		if err != nil {
 			return nil, fmt.Errorf("dns.NewStreamDialer failed: %w", err)
 		}

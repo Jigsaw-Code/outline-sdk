@@ -87,15 +87,21 @@ func main() {
 	}
 
 	configToDialer := config.NewDefaultConfigToDialer()
-	packetDialer, err := configToDialer.NewPacketDialer(*transportFlag)
-	if err != nil {
-		log.Fatalf("Could not create packet dialer: %v", err)
+	finder := smart.StrategyFinder{
+		LogWriter:   debugLog.Writer(),
+		TestTimeout: 5 * time.Second,
 	}
-	streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
-	if err != nil {
-		log.Fatalf("Could not create stream dialer: %v", err)
+	finder.NewPacketDialer = func() (transport.PacketDialer, error) {
+		return configToDialer.NewPacketDialer(*transportFlag)
 	}
-	if !supportsHappyEyeballs(streamDialer) {
+	finder.NewStreamDialer = func() (transport.StreamDialer, error) {
+		streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
+		if err != nil {
+			return nil, err
+		}
+		if supportsHappyEyeballs(streamDialer) {
+			return streamDialer, nil
+		}
 		fmt.Println("⚠️ Warning: base transport is not compatible with Happy Eyeballs. Disabling IPv6.")
 		innerDialer := streamDialer
 		// Disable IPv6 if the dialer doesn't support HappyEyballs.
@@ -109,12 +115,7 @@ func main() {
 			}
 			return innerDialer.DialStream(ctx, addr)
 		})
-	}
-	finder := smart.StrategyFinder{
-		LogWriter:    debugLog.Writer(),
-		TestTimeout:  5 * time.Second,
-		StreamDialer: streamDialer,
-		PacketDialer: packetDialer,
+		return streamDialer, nil
 	}
 
 	fmt.Println("Finding strategy")

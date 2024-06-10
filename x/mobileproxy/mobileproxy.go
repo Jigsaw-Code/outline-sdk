@@ -211,10 +211,14 @@ func NewSmartStreamDialer(testDomains *StringList, searchConfig string, logWrite
 	logBytesWriter := toWriter(logWriter)
 	// TODO: inject the base dialer for tests.
 	finder := smart.StrategyFinder{
-		LogWriter:    logBytesWriter,
-		TestTimeout:  5 * time.Second,
-		StreamDialer: &transport.TCPDialer{},
-		PacketDialer: &transport.UDPDialer{},
+		LogWriter:   logBytesWriter,
+		TestTimeout: 5 * time.Second,
+		NewStreamDialer: func() (transport.StreamDialer, error) {
+			return &transport.TCPDialer{}, nil
+		},
+		NewPacketDialer: func() (transport.PacketDialer, error) {
+			return &transport.UDPDialer{}, nil
+		},
 	}
 	dialer, err := finder.NewDialer(context.Background(), testDomains.list, []byte(searchConfig))
 	if err != nil {
