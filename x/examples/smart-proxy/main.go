@@ -65,6 +65,7 @@ func main() {
 	addrFlag := flag.String("localAddr", "localhost:1080", "Local proxy address")
 	configFlag := flag.String("config", "config.json", "Address of the config file")
 	transportFlag := flag.String("transport", "", "The base transport for the connections")
+	findOnlyFlag := flag.Bool("find_only", false, "Whether to only find the strategy or run the proxy too.")
 	var domainsFlag stringArrayFlagValue
 	flag.Var(&domainsFlag, "domain", "The test domains to find strategies.")
 
@@ -125,6 +126,9 @@ func main() {
 		log.Fatalf("Failed to find dialer: %v", err)
 	}
 	fmt.Printf("Found strategy in %0.2fs\n", time.Since(startTime).Seconds())
+	if *findOnlyFlag {
+		return
+	}
 	logDialer := transport.FuncStreamDialer(func(ctx context.Context, address string) (transport.StreamConn, error) {
 		conn, err := dialer.DialStream(ctx, address)
 		if err != nil {
