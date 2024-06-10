@@ -92,21 +92,21 @@ func main() {
 		LogWriter:   debugLog.Writer(),
 		TestTimeout: 5 * time.Second,
 	}
+	// Create PacketDialer on demand, to avoid issues when a Packet Dialer is not available, but not needed.
 	finder.NewPacketDialer = func() (transport.PacketDialer, error) {
 		return configToDialer.NewPacketDialer(*transportFlag)
 	}
-	finder.NewStreamDialer = func() (transport.StreamDialer, error) {
-		streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
-		if err != nil {
-			return nil, err
-		}
-		if supportsHappyEyeballs(streamDialer) {
-			return streamDialer, nil
-		}
+
+	// Pre-create the StreamDialer, since it's always needed.
+	baseStreamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
+	if err != nil {
+		log.Fatalln("failed to create base StreamDialer:", err)
+	}
+	if !supportsHappyEyeballs(baseStreamDialer) {
 		fmt.Println("⚠️ Warning: base transport is not compatible with Happy Eyeballs. Disabling IPv6.")
-		innerDialer := streamDialer
+		innerDialer := baseStreamDialer
 		// Disable IPv6 if the dialer doesn't support HappyEyballs.
-		streamDialer = transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+		baseStreamDialer = transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
 			host, _, err := net.SplitHostPort(addr)
 			if err != nil {
 				return nil, err
@@ -116,7 +116,9 @@ func main() {
 			}
 			return innerDialer.DialStream(ctx, addr)
 		})
-		return streamDialer, nil
+	}
+	finder.NewStreamDialer = func() (transport.StreamDialer, error) {
+		return baseStreamDialer, nil
 	}
 
 	fmt.Println("Finding strategy")
