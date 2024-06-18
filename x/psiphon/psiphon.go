@@ -156,8 +156,8 @@ func (d *Dialer) Start(ctx context.Context, config *DialerConfig) error {
 		if ctx.Err() != nil {
 			err = context.Cause(ctx)
 		}
-		resultCh <- err
 		if err != nil {
+			resultCh <- err
 			return
 		}
 		d.tunnel = tunnel
@@ -165,6 +165,7 @@ func (d *Dialer) Start(ctx context.Context, config *DialerConfig) error {
 			d.tunnel = nil
 			tunnel.Stop()
 		}()
+		resultCh <- nil
 
 		d.mu.Unlock()
 		// wait for Stop
