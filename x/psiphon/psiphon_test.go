@@ -85,6 +85,33 @@ func TestDialer_StopOnStart(t *testing.T) {
 	require.Error(t, <-resultCh)
 }
 
+func TestDialer_StartOnStart(t *testing.T) {
+	dialer := GetSingletonDialer()
+	startCalled := make(chan struct{})
+	startTunnel = func(ctx context.Context, config *DialerConfig) (psiphonTunnel, error) {
+		startCalled <- struct{}{}
+		select {
+		case <-ctx.Done():
+			return nil, context.Cause(ctx)
+		}
+	}
+	defer func() {
+		startTunnel = psiphonStartTunnel
+	}()
+
+	resultCh := make(chan error)
+	go func() {
+		resultCh <- dialer.Start(context.Background(), nil)
+	}()
+	<-startCalled
+	startTunnel = func(ctx context.Context, config *DialerConfig) (psiphonTunnel, error) {
+		return nil, errors.New("failed to start")
+	}
+	require.ErrorIs(t, dialer.Start(context.Background(), nil), errAlreadyStarted)
+	require.NoError(t, dialer.Stop())
+	require.Error(t, <-resultCh)
+}
+
 func TestDialer_Start_NilConfig(t *testing.T) {
 	require.Error(t, GetSingletonDialer().Start(context.Background(), nil))
 }
