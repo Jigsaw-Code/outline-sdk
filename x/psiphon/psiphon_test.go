@@ -19,6 +19,7 @@ package psiphon
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"os"
 	"testing"
 	"time"
@@ -44,19 +45,27 @@ func TestDialer_Start_Successful(t *testing.T) {
 	defer delete()
 
 	dialer := GetSingletonDialer()
-	startTunnel = func(ctx context.Context, configJSON []byte, embeddedServerEntryList string, params clientlib.Parameters, paramsDelta clientlib.ParametersDelta, noticeReceiver func(clientlib.NoticeEvent)) (retTunnel *clientlib.PsiphonTunnel, retErr error) {
+	startTunnel = func(ctx context.Context, config *DialerConfig) (psiphonTunnel, error) {
 		return &clientlib.PsiphonTunnel{}, nil
 	}
 	defer func() {
-		startTunnel = clientlib.StartTunnel
+		startTunnel = psiphonStartTunnel
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	require.NoError(t, dialer.Start(ctx, cfg))
+	require.NotNil(t, dialer.tunnel)
 	require.ErrorIs(t, dialer.Start(ctx, cfg), errAlreadyStarted)
 	require.NoError(t, dialer.Stop())
+	require.Nil(t, dialer.tunnel)
 	require.ErrorIs(t, dialer.Stop(), errNotStartedStop)
+	require.NoError(t, dialer.Start(ctx, cfg))
+	require.NoError(t, dialer.Stop())
+}
+
+func TestDialer_Start_NilConfig(t *testing.T) {
+	require.Error(t, GetSingletonDialer().Start(context.Background(), nil))
 }
 
 func TestDialer_Start_Cancelled(t *testing.T) {
@@ -85,9 +94,50 @@ func TestDialer_Start_Timeout(t *testing.T) {
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
-func TestDialer_DialStream_NotStarted(t *testing.T) {
-	_, err := GetSingletonDialer().DialStream(context.Background(), "")
+type noopTunnel struct {
+	stopped bool
+}
+
+func (t *noopTunnel) Dial(addr string) (net.Conn, error) {
+	return nil, nil
+}
+
+func (t *noopTunnel) Stop() {
+	t.stopped = true
+}
+
+func TestDialer_DialStream(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	dialer := GetSingletonDialer()
+
+	// Dial before Start.
+	_, err := dialer.DialStream(ctx, "")
 	require.ErrorIs(t, err, errNotStartedDial)
+
+	var tunnel noopTunnel
+	startTunnel = func(ctx context.Context, config *DialerConfig) (psiphonTunnel, error) {
+		tunnel.stopped = false
+		return &tunnel, nil
+	}
+	defer func() {
+		startTunnel = psiphonStartTunnel
+	}()
+	// Make sure it works on restarts.
+	for i := 0; i < 2; i++ {
+		// Dial after Start.
+		require.NoError(t, dialer.Start(ctx, nil))
+		require.False(t, tunnel.stopped)
+		_, err = dialer.DialStream(ctx, "")
+		require.NoError(t, err)
+
+		// Dial after Stop.
+		require.NoError(t, dialer.Stop())
+		require.True(t, tunnel.stopped)
+		_, err = dialer.DialStream(nil, "")
+		require.ErrorIs(t, err, errNotStartedDial)
+	}
 }
 
 func TestDialer_Stop_NotStarted(t *testing.T) {

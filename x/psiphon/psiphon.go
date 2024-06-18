@@ -60,7 +60,12 @@ type Dialer struct {
 	// Controls the Dialer state and Psiphon's global state.
 	mu sync.Mutex
 	// Used by DialStream.
-	tunnel *clientlib.PsiphonTunnel
+	tunnel psiphonTunnel
+}
+
+type psiphonTunnel interface {
+	Dial(remoteAddr string) (net.Conn, error)
+	Stop()
 }
 
 var _ transport.StreamDialer = (*Dialer)(nil)
@@ -92,7 +97,26 @@ func getClientPlatform() string {
 }
 
 // Allows for overriding in tests.
-var startTunnel = clientlib.StartTunnel
+var startTunnel func(ctx context.Context, config *DialerConfig) (psiphonTunnel, error) = psiphonStartTunnel
+
+func psiphonStartTunnel(ctx context.Context, config *DialerConfig) (psiphonTunnel, error) {
+	if config == nil {
+		return nil, errors.New("config must not be nil")
+	}
+
+	// Note that these parameters override anything in the provider config.
+	clientPlatform := getClientPlatform()
+	trueValue := true
+	params := clientlib.Parameters{
+		DataRootDirectory: &config.DataRootDirectory,
+		ClientPlatform:    &clientPlatform,
+		// Disable Psiphon's local proxy servers, which we don't use.
+		DisableLocalSocksProxy: &trueValue,
+		DisableLocalHTTPProxy:  &trueValue,
+	}
+
+	return clientlib.StartTunnel(ctx, config.ProviderConfig, "", params, nil, nil)
+}
 
 // Start configures and runs the Dialer. It must be called before you can use the Dialer. It returns when the tunnel is ready.
 func (d *Dialer) Start(ctx context.Context, config *DialerConfig) error {
@@ -103,18 +127,7 @@ func (d *Dialer) Start(ctx context.Context, config *DialerConfig) error {
 		return errAlreadyStarted
 	}
 
-	trueValue := true
-	clientPlatform := getClientPlatform()
-	// Note that these parameters override anything in the provider config.
-	params := clientlib.Parameters{
-		DataRootDirectory: &config.DataRootDirectory,
-		ClientPlatform:    &clientPlatform,
-		// Disable Psiphon's local proxy servers, which we don't use.
-		DisableLocalSocksProxy: &trueValue,
-		DisableLocalHTTPProxy:  &trueValue,
-	}
-
-	tunnel, err := startTunnel(ctx, config.ProviderConfig, "", params, nil, nil)
+	tunnel, err := startTunnel(ctx, config)
 	if err != nil {
 		if ctx.Err() != nil {
 			return context.Cause(ctx)
