@@ -151,8 +151,10 @@ func TestDialer_DialStream(t *testing.T) {
 		// Dial after Start.
 		require.NoError(t, dialer.Start(ctx, nil))
 		require.False(t, tunnel.stopped)
-		_, err = dialer.DialStream(ctx, "")
+		conn, err := dialer.DialStream(ctx, "")
 		require.NoError(t, err)
+		require.NoError(t, conn.CloseRead())
+		require.NoError(t, conn.CloseWrite())
 
 		// Dial after Stop.
 		require.NoError(t, dialer.Stop())
