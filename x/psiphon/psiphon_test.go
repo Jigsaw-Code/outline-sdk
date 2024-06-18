@@ -42,9 +42,6 @@ func newTestConfig(tb testing.TB) (*DialerConfig, func()) {
 }
 
 func TestDialer_Start_Successful(t *testing.T) {
-	cfg, delete := newTestConfig(t)
-	defer delete()
-
 	dialer := GetSingletonDialer()
 	startTunnel = func(ctx context.Context, config *DialerConfig) (psiphonTunnel, error) {
 		return &clientlib.PsiphonTunnel{}, nil
@@ -55,14 +52,37 @@ func TestDialer_Start_Successful(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	require.NoError(t, dialer.Start(ctx, cfg))
+	require.NoError(t, dialer.Start(ctx, nil))
 	require.NotNil(t, dialer.tunnel)
-	require.ErrorIs(t, dialer.Start(ctx, cfg), errAlreadyStarted)
+	require.ErrorIs(t, dialer.Start(ctx, nil), errAlreadyStarted)
 	require.NoError(t, dialer.Stop())
 	require.Nil(t, dialer.tunnel)
 	require.ErrorIs(t, dialer.Stop(), errNotStartedStop)
-	require.NoError(t, dialer.Start(ctx, cfg))
+	require.NoError(t, dialer.Start(ctx, nil))
 	require.NoError(t, dialer.Stop())
+}
+
+func TestDialer_StopOnStart(t *testing.T) {
+	dialer := GetSingletonDialer()
+	startCalled := make(chan struct{})
+	startTunnel = func(ctx context.Context, config *DialerConfig) (psiphonTunnel, error) {
+		startCalled <- struct{}{}
+		select {
+		case <-ctx.Done():
+			return nil, context.Cause(ctx)
+		}
+	}
+	defer func() {
+		startTunnel = psiphonStartTunnel
+	}()
+
+	resultCh := make(chan error)
+	go func() {
+		resultCh <- dialer.Start(context.Background(), nil)
+	}()
+	<-startCalled
+	require.NoError(t, dialer.Stop())
+	require.Error(t, <-resultCh)
 }
 
 func TestDialer_Start_NilConfig(t *testing.T) {

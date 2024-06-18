@@ -61,6 +61,8 @@ type Dialer struct {
 	mu sync.Mutex
 	// Used by DialStream.
 	tunnel psiphonTunnel
+	// Used by Stop.
+	stop func()
 }
 
 type psiphonTunnel interface {
@@ -120,36 +122,69 @@ func psiphonStartTunnel(ctx context.Context, config *DialerConfig) (psiphonTunne
 
 // Start configures and runs the Dialer. It must be called before you can use the Dialer. It returns when the tunnel is ready.
 func (d *Dialer) Start(ctx context.Context, config *DialerConfig) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	resultCh := make(chan error)
+	go func() {
+		d.mu.Lock()
+		defer d.mu.Unlock()
 
-	if d.tunnel != nil {
-		return errAlreadyStarted
-	}
-
-	tunnel, err := startTunnel(ctx, config)
-	if err != nil {
-		if ctx.Err() != nil {
-			return context.Cause(ctx)
+		if d.stop != nil {
+			resultCh <- errAlreadyStarted
+			return
 		}
-		return err
-	}
-	d.tunnel = tunnel
 
-	return nil
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		tunnelDone := make(chan struct{})
+		defer close(tunnelDone)
+		d.stop = func() {
+			// Tell start to stop.
+			cancel()
+			// Wait for tunnel to be done.
+			<-tunnelDone
+		}
+		defer func() {
+			// Cleanup.
+			d.stop = nil
+		}()
+
+		d.mu.Unlock()
+
+		tunnel, err := startTunnel(ctx, config)
+
+		d.mu.Lock()
+
+		if ctx.Err() != nil {
+			err = context.Cause(ctx)
+		}
+		resultCh <- err
+		if err != nil {
+			return
+		}
+		d.tunnel = tunnel
+		defer func() {
+			d.tunnel = nil
+			tunnel.Stop()
+		}()
+
+		d.mu.Unlock()
+		// wait for Stop
+		<-ctx.Done()
+		d.mu.Lock()
+	}()
+	return <-resultCh
 }
 
 // Stop stops the Dialer background processes, releasing resources and allowing it to be reconfigured.
 // It returns when the Dialer is completely stopped.
 func (d *Dialer) Stop() error {
 	d.mu.Lock()
-	tunnel := d.tunnel
-	d.tunnel = nil
+	stop := d.stop
 	d.mu.Unlock()
-	if tunnel == nil {
+
+	if stop == nil {
 		return errNotStartedStop
 	}
-	tunnel.Stop()
+	stop()
 	return nil
 }
 
