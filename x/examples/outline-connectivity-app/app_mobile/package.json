@@ -12,7 +12,7 @@
     "@capacitor/cli": "latest",
     "concurrently": "^8.2.0",
     "typescript": "^5.1.6",
-    "vite": "^2.9.13"
+    "vite": "^2.9.18"
   },
   "name": "app_mobile",
   "scripts": {
