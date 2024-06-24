@@ -51,7 +51,8 @@ func (d *sanitizeErrorDialer) DialStream(ctx context.Context, addr string) (tran
 }
 
 type connectHandler struct {
-	dialer *sanitizeErrorDialer
+	dialer       *sanitizeErrorDialer
+	dialerConfig *config.ConfigToDialer
 }
 
 var _ http.Handler = (*connectHandler)(nil)
@@ -76,7 +77,7 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 
 	// Dial the target.
 	transportConfig := proxyReq.Header.Get("Transport")
-	dialer, err := config.WrapStreamDialer(h.dialer, transportConfig)
+	dialer, err := h.dialerConfig.NewStreamDialer(transportConfig)
 	if err != nil {
 		// Because we sanitize the base dialer error, it's safe to return error details here.
 		http.Error(proxyResp, fmt.Sprintf("Invalid config in Transport header: %v", err), http.StatusBadRequest)
@@ -116,7 +117,16 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 
 	// Relay data between client and target in both directions.
 	go func() {
-		io.Copy(targetConn, clientRW)
+		// io.Copy prefers WriteTo, which clientRW implements. However,
+		// bufio.ReadWriter.WriteTo issues an empty Write() call, which flushes
+		// the Shadowsocks IV and connect request, breaking the coalescing with
+		// the initial data. By preferring ReaderFrom, the coalescing of IV,
+		// request and initial data is preserved.
+		if rf, ok := targetConn.(io.ReaderFrom); ok {
+			rf.ReadFrom(clientRW)
+		} else {
+			io.Copy(targetConn, clientRW)
+		}
 		targetConn.CloseWrite()
 	}()
 	// We can't use io.Copy here because it doesn't call Flush on writes, so the first
@@ -137,5 +147,9 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 func NewConnectHandler(dialer transport.StreamDialer) http.Handler {
 	// We sanitize the errors from the input Dialer because we don't want to leak sensitive details
 	// of the base dialer (e.g. access key credentials) to the user.
-	return &connectHandler{&sanitizeErrorDialer{dialer}}
+	sd := &sanitizeErrorDialer{dialer}
+	// TODO(fortuna): Inject the config parser
+	dialerConfig := config.NewDefaultConfigToDialer()
+	dialerConfig.BaseStreamDialer = sd
+	return &connectHandler{sd, dialerConfig}
 }

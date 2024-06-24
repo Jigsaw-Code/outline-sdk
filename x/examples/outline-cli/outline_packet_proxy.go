@@ -56,7 +56,6 @@ func (proxy *outlinePacketProxy) testConnectivityAndRefresh(resolverAddr, domain
 	dialer := transport.PacketListenerDialer{Listener: proxy.remotePl}
 	dnsResolver := dns.NewUDPResolver(dialer, resolverAddr)
 	result, err := connectivity.TestConnectivityWithResolver(context.Background(), dnsResolver, domain)
-
 	if err != nil {
 		logging.Info.Printf("connectivity test failed. Refresh skipped. Error: %v\n", err)
 		return err

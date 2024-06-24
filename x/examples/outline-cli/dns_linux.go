@@ -15,6 +15,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 )
@@ -27,40 +28,76 @@ const (
 	resolvConfHeadBackupFile = "/etc/resolv.head.outlinecli.backup"
 )
 
+type systemDNSBackup struct {
+	original, backup string
+}
+
+var systemDNSBackups = make([]systemDNSBackup, 0, 2)
+
 func setSystemDNSServer(serverHost string) error {
 	setting := []byte(`# Outline CLI DNS Setting
 # The original file has been renamed as resolv[.head].outlinecli.backup
 nameserver ` + serverHost + "\n")
 
-	if err := backupAndWriteFile(resolvConfFile, resolvConfBackupFile, setting); err != nil {
+	err := backupAndWriteFile(resolvConfFile, resolvConfBackupFile, setting)
+	if err != nil {
 		return err
 	}
-	return backupAndWriteFile(resolvConfHeadFile, resolvConfHeadBackupFile, setting)
-}
 
-func restoreSystemDNSServer() {
-	restoreFileIfExists(resolvConfBackupFile, resolvConfFile)
-	restoreFileIfExists(resolvConfHeadBackupFile, resolvConfHeadFile)
-}
+	err = backupAndWriteFile(resolvConfHeadFile, resolvConfHeadBackupFile, setting)
+	if err != nil {
+		return err
+	}
 
-func backupAndWriteFile(original, backup string, data []byte) error {
-	if err := os.Rename(original, backup); err != nil {
-		return fmt.Errorf("failed to backup DNS config file '%s' to '%s': %w", original, backup, err)
-	}
-	if err := os.WriteFile(original, data, 0644); err != nil {
-		return fmt.Errorf("failed to write DNS config file '%s': %w", original, err)
-	}
 	return nil
 }
 
-func restoreFileIfExists(backup, original string) {
-	if _, err := os.Stat(backup); err != nil {
-		logging.Warn.Printf("no DNS config backup file '%s' presents: %v\n", backup, err)
-		return
+func backupAndWriteFile(original, backup string, data []byte) error {
+	if _, err := os.Stat(original); err == nil {
+		// original file exist - move it into backup
+		if err := os.Rename(original, backup); err != nil {
+			return fmt.Errorf("failed to backup DNS config file '%s' to '%s': %w", original, backup, err)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) { // if not exist - it's ok, just write to it
+		return fmt.Errorf("failed to check the existence of DNS config file '%s': %w", original, err)
 	}
-	if err := os.Rename(backup, original); err != nil {
-		logging.Err.Printf("failed to restore DNS config from backup '%s' to '%s': %v\n", backup, original, err)
-		return
+
+	systemDNSBackups = append(systemDNSBackups, systemDNSBackup{
+		original: original,
+		backup:   backup,
+	})
+
+	// save data to original
+	if err := os.WriteFile(original, data, 0o644); err != nil {
+		return fmt.Errorf("failed to write DNS config file '%s': %w", original, err)
 	}
-	logging.Info.Printf("DNS config restored from '%s' to '%s'\n", backup, original)
+
+	return nil
+}
+
+func restoreSystemDNSServer() {
+	for _, backup := range systemDNSBackups {
+		if _, err := os.Stat(backup.backup); err == nil {
+			// backup exist - replace original with it
+			if err := os.Rename(backup.backup, backup.original); err != nil {
+				logging.Err.Printf(
+					"failed to restore DNS config from backup '%s' to '%s': %v\n",
+					backup.backup,
+					backup.original,
+					err,
+				)
+				continue
+			}
+			logging.Info.Printf("DNS config restored from '%s' to '%s'\n", backup.backup, backup.original)
+		} else if errors.Is(err, os.ErrNotExist) {
+			// backup not exist - just remove original, because it's created by ourselves
+			if err := os.Remove(backup.original); err != nil {
+				logging.Err.Printf("failed to remove Outline DNS config file '%s': %v\n", backup.original, err)
+				continue
+			}
+			logging.Info.Printf("Outline DNS config '%s' has been removed\n", backup.original)
+		} else {
+			logging.Err.Printf("failed to check the existence of DNS config backup file '%s': %v\n", backup.backup, err)
+		}
+	}
 }

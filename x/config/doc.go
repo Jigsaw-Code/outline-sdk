@@ -32,7 +32,9 @@ The configuration string is composed of parts separated by the `|` symbol, which
 For example, `A|B` means dialer `B` takes dialer `A` as its input.
 An empty string represents the direct TCP/UDP dialer, and is used as the input to the first cofigured dialer.
 
-Each dialer configuration follows a URL format, where the scheme defines the type of Dialer. Supported formats include:
+Each dialer configuration follows a URL format, where the scheme defines the type of Dialer. Supported formats are described below.
+
+# Proxy Protocols
 
 Shadowsocks proxy (compatible with Outline's access keys, package [github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks])
 
@@ -44,11 +46,7 @@ SOCKS5 proxy (currently streams only, package [github.com/Jigsaw-Code/outline-sd
 
 USERINFO field is optional and only required if username and password authentication is used. It is in the format of username:password.
 
-Stream split transport (streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/split])
-
-It takes the length of the prefix. The stream will be split when PREFIX_LENGTH bytes are first written.
-
-	split:[PREFIX_LENGTH]
+# Transports
 
 TLS transport (currently streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/tls])
 
@@ -57,13 +55,26 @@ The certname parameter defines what name to validate against the server certific
 
 	tls:sni=[SNI]&certname=[CERT_NAME]
 
-TLS fragmentation (streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag]).
+WebSockets
 
-The Client Hello record payload will be split into two fragments of size LENGTH and len(payload)-LENGTH if LENGTH>0.
-If LENGTH<0, the two fragments will be of size len(payload)-LENGTH and LENGTH respectively.
-For more details, refer to [github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag].
+	ws:tcp_path=[PATH]&udp_path=[PATH]
 
-	tlsfrag:[LENGTH]
+# DNS Protection
+
+DNS resolution (streams only, package [github.com/Jigsaw-Code/outline-sdk/dns])
+
+It takes a host:port address. If the port is missing, it will use 53. The resulting dialer will use the input dialer with
+Happy Eyeballs to connect to the destination.
+
+	do53:address=[ADDRESS]
+
+DNS-over-HTTPS resolution (streams only, package [github.com/Jigsaw-Code/outline-sdk/dns])
+
+It takes a host name and a host:port address. The name will be used in the SNI and Host header, while the address is used to connect
+to the DoH server. The address is optional, and will default to "[NAME]:443". The resulting dialer will use the input dialer with
+Happy Eyeballs to connect to the destination.
+
+	doh:name=[NAME]&address=[ADDRESS]
 
 Address override.
 
@@ -74,16 +85,35 @@ The port parameter, if not empty, specifies the port to dial instead of the orig
 
 	override:host=[HOST]&port=[PORT]
 
+# Packet manipulation
+
+These strategies manipulate packets to bypass SNI-based blocking.
+
+Stream split transport (streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/split])
+
+It takes the length of the prefix. The stream will be split when PREFIX_LENGTH bytes are first written.
+
+	split:[PREFIX_LENGTH]
+
+TLS fragmentation (streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag]).
+
+The Client Hello record payload will be split into two fragments of size LENGTH and len(payload)-LENGTH if LENGTH>0.
+If LENGTH<0, the two fragments will be of size len(payload)-LENGTH and LENGTH respectively.
+For more details, refer to [github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag].
+
+	tlsfrag:[LENGTH]
+
 # Examples
 
 Packet splitting - To split outgoing streams on bytes 2 and 123, you can use:
 
 	split:2|split:123
 
-Evading DNS and SNI blocking - A blocked site hosted on Cloudflare can potentially be accessed by resolving cloudflare.net instead of the original
-domain and using stream split:
+Evading DNS and SNI blocking - You can use Cloudflare's DNS-over-HTTPS to protect against DNS disruption.
+The DoH resolver cloudflare-dns.com is accessible from any cloudflare.net IP, so you can specify the address to avoid blocking
+of the resolver itself. This can be combines with a TCP split or TLS Record Fragmentation to bypass SNI-based blocking:
 
-	override:host=cloudflare.net.|split:2
+	doh:name=cloudflare-dns.com.&address=cloudflare.net.:443|split:2
 
 SOCKS5-over-TLS, with domain-fronting - To tunnel SOCKS5 over TLS, and set the SNI to decoy.example.com, while still validating against your host name, use:
 
@@ -98,6 +128,20 @@ In that case, HOST1 will be your entry node, and HOST3 will be your exit node.
 DPI Evasion - To add packet splitting to a Shadowsocks server for enhanced DPI evasion, use:
 
 	split:2|ss://[USERINFO]@[HOST]:[PORT]
+
+Defining custom transport - You can define your custom transport by implementing and registering the [NewStreamDialerFunc] and [NewPacketDialerFunc] functions:
+
+	// create new config parser
+	// p := new(ConfigToDialer)
+	// or
+	p := NewDefaultConfigToDialer()
+	// register your custom dialer
+	p.RegisterPacketDialerWrapper("custom", wrapStreamDialerWithCustom)
+	p.RegisterStreamDialerWrapper("custom", wrapPacketDialerWithCustom)
+	// then use it
+	dialer, err := p.NewStreamDialer(innerDialer, "custom://config")
+
+where wrapStreamDialerWithCustom and wrapPacketDialerWithCustom implement [NewPacketDialerFunc] and [NewStreamDialerFunc].
 
 [Onion Routing]: https://en.wikipedia.org/wiki/Onion_routing
 */

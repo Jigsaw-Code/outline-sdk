@@ -161,6 +161,7 @@ func main() {
 	success := false
 	jsonEncoder := json.NewEncoder(os.Stdout)
 	jsonEncoder.SetEscapeHTML(false)
+	configToDialer := config.NewDefaultConfigToDialer()
 	for _, resolverHost := range strings.Split(*resolverFlag, ",") {
 		resolverHost := strings.TrimSpace(resolverHost)
 		resolverAddress := net.JoinHostPort(resolverHost, "53")
@@ -169,13 +170,13 @@ func main() {
 			var resolver dns.Resolver
 			switch proto {
 			case "tcp":
-				streamDialer, err := config.NewStreamDialer(*transportFlag)
+				streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create StreamDialer: %v", err)
 				}
 				resolver = dns.NewTCPResolver(streamDialer, resolverAddress)
 			case "udp":
-				packetDialer, err := config.NewPacketDialer(*transportFlag)
+				packetDialer, err := configToDialer.NewPacketDialer(*transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create PacketDialer: %v", err)
 				}

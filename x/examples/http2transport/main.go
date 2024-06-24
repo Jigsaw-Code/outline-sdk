@@ -34,7 +34,8 @@ func main() {
 	urlProxyPrefixFlag := flag.String("urlProxyPrefix", "/proxy", "Path where to run the URL proxy. Set to empty (\"\") to disable it.")
 	flag.Parse()
 
-	dialer, err := config.NewStreamDialer(*transportFlag)
+	dialer, err := config.NewDefaultConfigToDialer().NewStreamDialer(*transportFlag)
+
 	if err != nil {
 		log.Fatalf("Could not create dialer: %v", err)
 	}

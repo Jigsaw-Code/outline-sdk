@@ -15,6 +15,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/textproto"
 	"os"
 	"path"
 	"strings"
@@ -31,6 +33,17 @@ import (
 )
 
 var debugLog log.Logger = *log.New(io.Discard, "", 0)
+
+type stringArrayFlagValue []string
+
+func (v *stringArrayFlagValue) String() string {
+	return fmt.Sprint(*v)
+}
+
+func (v *stringArrayFlagValue) Set(value string) error {
+	*v = append(*v, value)
+	return nil
+}
 
 func init() {
 	flag.Usage = func() {
@@ -44,6 +57,9 @@ func main() {
 	transportFlag := flag.String("transport", "", "Transport config")
 	addressFlag := flag.String("address", "", "Address to connect to. If empty, use the URL authority")
 	methodFlag := flag.String("method", "GET", "The HTTP method to use")
+	var headersFlag stringArrayFlagValue
+	flag.Var(&headersFlag, "H", "Raw HTTP Header line to add. It must not end in \\r\\n")
+	timeoutSecFlag := flag.Int("timeout", 5, "Timeout in seconds")
 
 	flag.Parse()
 
@@ -68,7 +84,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	dialer, err := config.NewStreamDialer(*transportFlag)
+	dialer, err := config.NewDefaultConfigToDialer().NewStreamDialer(*transportFlag)
 	if err != nil {
 		log.Fatalf("Could not create dialer: %v\n", err)
 	}
@@ -88,11 +104,27 @@ func main() {
 		}
 		return dialer.DialStream(ctx, net.JoinHostPort(host, port))
 	}
-	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: 5 * time.Second}
+	httpClient := &http.Client{
+		Transport: &http.Transport{DialContext: dialContext},
+		Timeout:   time.Duration(*timeoutSecFlag) * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 
 	req, err := http.NewRequest(*methodFlag, url, nil)
 	if err != nil {
 		log.Fatalln("Failed to create request:", err)
+	}
+	headerText := strings.Join(headersFlag, "\r\n") + "\r\n\r\n"
+	h, err := textproto.NewReader(bufio.NewReader(strings.NewReader(headerText))).ReadMIMEHeader()
+	if err != nil {
+		log.Fatalf("invalid header line: %v", err)
+	}
+	for name, values := range h {
+		for _, value := range values {
+			req.Header.Add(name, value)
+		}
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {

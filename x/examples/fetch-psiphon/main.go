@@ -24,13 +24,12 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"strings"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/psiphon"
 )
 
-var debugLog log.Logger = *log.New(io.Discard, "", 0)
+var debugLog *log.Logger = log.New(io.Discard, "", 0)
 
 func init() {
 	flag.Usage = func() {
@@ -41,14 +40,13 @@ func init() {
 
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
-	transportFlag := flag.String("transport", "", "Transport config")
+	configFlag := flag.String("config", "", "A Psiphon JSON config file")
 	methodFlag := flag.String("method", "GET", "The HTTP method to use")
-	timeoutFlag := flag.Duration("timeout", 10*time.Second, "The HTTP timeout value")
 
 	flag.Parse()
 
 	if *verboseFlag {
-		debugLog = *log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
+		debugLog = log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 	}
 
 	url := flag.Arg(0)
@@ -58,55 +56,61 @@ func main() {
 		os.Exit(1)
 	}
 
-	dialer, err := config.NewDefaultConfigToDialer().NewStreamDialer(*transportFlag)
-	if err != nil {
-		log.Fatalf("Could not create dialer: %v\n", err)
+	if *configFlag == "" {
+		log.Println("Need to pass config file in the command-line")
+		flag.Usage()
+		os.Exit(1)
 	}
-	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		host, port, err := net.SplitHostPort(addr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid address: %w", err)
-		}
-		if !strings.HasPrefix(network, "tcp") {
-			return nil, fmt.Errorf("protocol not supported: %v", network)
-		}
-		return dialer.DialStream(ctx, net.JoinHostPort(host, port))
-	}
-	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: *timeoutFlag}
 
+	// Read and process Psiphon config.
+	configJSON, err := os.ReadFile(*configFlag)
+	if err != nil {
+		log.Fatalf("Could not read config file: %v\n", err)
+	}
+	config := &psiphon.DialerConfig{ProviderConfig: configJSON}
+	cacheBaseDir, err := os.UserCacheDir()
+	if err != nil {
+		log.Fatalf("Failed to get the user cache directory: %v", err)
+	}
+	config.DataRootDirectory = path.Join(cacheBaseDir, "fetch-psiphon")
+	if err := os.MkdirAll(config.DataRootDirectory, 0700); err != nil {
+		log.Fatalf("Failed to create storage directory: %v", err)
+	}
+	debugLog.Printf("Using data store in %v\n", config.DataRootDirectory)
+
+	// Start the Psiphon dialer.
+	dialer := psiphon.GetSingletonDialer()
+	if err := dialer.Start(context.Background(), config); err != nil {
+		log.Fatalf("Could not start dialer: %v\n", err)
+	}
+	defer dialer.Stop()
+
+	// Set up HTTP client.
+	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return dialer.DialStream(ctx, addr)
+	}
+	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: 5 * time.Second}
+
+	// Issue HTTP request.
 	req, err := http.NewRequest(*methodFlag, url, nil)
 	if err != nil {
 		log.Fatalln("Failed to create request:", err)
 	}
-
-	// Start timing the download
-	startTime := time.Now()
-
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		log.Fatalf("HTTP request failed: %v\n", err)
 	}
 	defer resp.Body.Close()
 
-	written, err := io.Copy(io.Discard, resp.Body)
-	fmt.Println()
-	if err != nil {
-		log.Fatalf("Read of page body failed: %v\n", err)
-	}
-
-	// Calculate the download speed
-	durationSeconds := time.Since(startTime).Seconds()
-
-	// Convert Downloaded size to MiB
-	writtenMiB := float64(written) / 1048576
-	downloadSpeed := writtenMiB / durationSeconds
-
-	fmt.Printf("\nDownloaded %.2f MiB in %.2fs\n", writtenMiB, durationSeconds)
-	fmt.Printf("\nDownloaded Speed: %.2f MiB/s\n", downloadSpeed)
-
+	// Output response.
 	if *verboseFlag {
 		for k, v := range resp.Header {
 			debugLog.Printf("%v: %v", k, v)
 		}
+	}
+	_, err = io.Copy(os.Stdout, resp.Body)
+	fmt.Println()
+	if err != nil {
+		log.Fatalf("Read of page body failed: %v\n", err)
 	}
 }

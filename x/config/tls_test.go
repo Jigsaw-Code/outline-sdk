@@ -26,7 +26,7 @@ import (
 func TestTLS(t *testing.T) {
 	tlsURL, err := url.Parse("tls")
 	require.NoError(t, err)
-	_, err = newTlsStreamDialerFromURL(&transport.TCPDialer{}, tlsURL)
+	_, err = wrapStreamDialerWithTLS(func() (transport.StreamDialer, error) { return &transport.TCPDialer{}, nil }, nil, tlsURL)
 	require.NoError(t, err)
 }
 
