@@ -18,25 +18,23 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"net"
+	"runtime"
+	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Psiphon-Labs/psiphon-tunnel-core/ClientLibrary/clientlib"
-	psi "github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon"
 )
 
 // The single [Dialer] we can have.
-var singletonDialer = Dialer{
-	setNoticeWriter: psi.SetNoticeWriter,
-}
+var singletonDialer Dialer
 
 var (
 	errNotStartedDial = errors.New("dialer has not been started yet")
 	errNotStartedStop = errors.New("tried to stop dialer that is not running")
-	errTunnelTimeout  = errors.New("tunnel establishment timed out")
+	errAlreadyStarted = errors.New("dialer has already started")
 )
 
 // DialerConfig specifies the parameters for [Dialer].
@@ -62,11 +60,14 @@ type Dialer struct {
 	// Controls the Dialer state and Psiphon's global state.
 	mu sync.Mutex
 	// Used by DialStream.
-	controller *psi.Controller
+	tunnel psiphonTunnel
 	// Used by Stop.
 	stop func()
-	// Allows for overriding the global notice writer for testing.
-	setNoticeWriter func(io.Writer)
+}
+
+type psiphonTunnel interface {
+	Dial(remoteAddr string) (net.Conn, error)
+	Stop()
 }
 
 var _ transport.StreamDialer = (*Dialer)(nil)
@@ -76,153 +77,102 @@ var _ transport.StreamDialer = (*Dialer)(nil)
 // you will need to add it independently.
 func (d *Dialer) DialStream(unusedContext context.Context, addr string) (transport.StreamConn, error) {
 	d.mu.Lock()
-	controller := d.controller
+	tunnel := d.tunnel
 	d.mu.Unlock()
-	if controller == nil {
+	if tunnel == nil {
 		return nil, errNotStartedDial
 	}
-	netConn, err := controller.Dial(addr, nil)
+	netConn, err := tunnel.Dial(addr)
 	if err != nil {
 		return nil, err
 	}
 	return streamConn{netConn}, nil
 }
 
-func newPsiphonConfig(config *DialerConfig) (*psi.Config, error) {
+func getClientPlatform() string {
+	clientPlatformAllowChars := func(r rune) bool {
+		return !unicode.IsSpace(r) && r != '_'
+	}
+	goos := strings.Join(strings.FieldsFunc(runtime.GOOS, clientPlatformAllowChars), "-")
+	goarch := strings.Join(strings.FieldsFunc(runtime.GOARCH, clientPlatformAllowChars), "-")
+	return "outline-sdk_" + goos + "_" + goarch
+}
+
+// Allows for overriding in tests.
+var startTunnel func(ctx context.Context, config *DialerConfig) (psiphonTunnel, error) = psiphonStartTunnel
+
+func psiphonStartTunnel(ctx context.Context, config *DialerConfig) (psiphonTunnel, error) {
 	if config == nil {
 		return nil, errors.New("config must not be nil")
 	}
-	// Validate keys. We parse as a map first because we need to check for the existence
-	// of certain keys.
-	var configMap map[string]interface{}
-	if err := json.Unmarshal(config.ProviderConfig, &configMap); err != nil {
-		return nil, fmt.Errorf("failed to parse config: %w", err)
-	}
-	for key, value := range configMap {
-		switch key {
-		case "DisableLocalHTTPProxy", "DisableLocalSocksProxy":
-			b, ok := value.(bool)
-			if !ok {
-				return nil, fmt.Errorf("field %v must be a boolean", key)
-			}
-			if b != true {
-				return nil, fmt.Errorf("field %v must be true if set", key)
-			}
-		case "DataRootDirectory":
-			return nil, errors.New("field DataRootDirectory must not be set in the provider config. Specify it in the DialerConfig instead.")
-		}
+
+	// Note that these parameters override anything in the provider config.
+	clientPlatform := getClientPlatform()
+	trueValue := true
+	params := clientlib.Parameters{
+		DataRootDirectory: &config.DataRootDirectory,
+		ClientPlatform:    &clientPlatform,
+		// Disable Psiphon's local proxy servers, which we don't use.
+		DisableLocalSocksProxy: &trueValue,
+		DisableLocalHTTPProxy:  &trueValue,
 	}
 
-	// Parse provider config.
-	pConfig, err := psi.LoadConfig(config.ProviderConfig)
-	if err != nil {
-		return nil, fmt.Errorf("config load failed: %w", err)
-	}
-
-	// Force some Psiphon config defaults for the Outline SDK case.
-	pConfig.DisableLocalHTTPProxy = true
-	pConfig.DisableLocalSocksProxy = true
-	pConfig.DataRootDirectory = config.DataRootDirectory
-
-	return pConfig, nil
+	return clientlib.StartTunnel(ctx, config.ProviderConfig, "", params, nil, nil)
 }
 
 // Start configures and runs the Dialer. It must be called before you can use the Dialer. It returns when the tunnel is ready.
 func (d *Dialer) Start(ctx context.Context, config *DialerConfig) error {
-	pConfig, err := newPsiphonConfig(config)
-	if err != nil {
-		return err
-	}
-
-	// Will receive a value if an error occurs during the connection sequence.
-	// It will be closed on succesful connection.
-	errCh := make(chan error)
-
-	// Start returns either when a tunnel is ready, or an error happens, whichever comes first.
-	// When emitting the errors, we use a select statement to ensure the channel is being listened
-	// on, to avoid a deadlock after the initial error.
+	resultCh := make(chan error)
 	go func() {
-		onTunnel := func() {
-			select {
-			case errCh <- nil:
-			default:
-			}
+		d.mu.Lock()
+		defer d.mu.Unlock()
+
+		if d.stop != nil {
+			resultCh <- errAlreadyStarted
+			return
 		}
-		err := d.runController(ctx, pConfig, onTunnel)
-		select {
-		case errCh <- err:
-		default:
+
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		tunnelDone := make(chan struct{})
+		defer close(tunnelDone)
+		d.stop = func() {
+			// Tell start to stop.
+			cancel()
+			// Wait for tunnel to be done.
+			<-tunnelDone
 		}
+		defer func() {
+			// Cleanup.
+			d.stop = nil
+		}()
+
+		d.mu.Unlock()
+
+		tunnel, err := startTunnel(ctx, config)
+
+		d.mu.Lock()
+
+		if ctx.Err() != nil {
+			err = context.Cause(ctx)
+		}
+		if err != nil {
+			resultCh <- err
+			return
+		}
+		d.tunnel = tunnel
+		defer func() {
+			d.tunnel = nil
+			tunnel.Stop()
+		}()
+		resultCh <- nil
+
+		d.mu.Unlock()
+		// wait for Stop
+		<-ctx.Done()
+		d.mu.Lock()
 	}()
-
-	// Wait for an active tunnel or error
-	return <-errCh
-}
-
-func (d *Dialer) runController(ctx context.Context, pConfig *psi.Config, onTunnel func()) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.stop != nil {
-		return errors.New("tried to start dialer that is alread running")
-	}
-	ctx, cancel := context.WithCancelCause(ctx)
-	defer cancel(context.Canceled)
-	controllerDone := make(chan struct{})
-	defer close(controllerDone)
-	d.stop = func() {
-		// Tell controller to stop.
-		cancel(context.Canceled)
-		// Wait for controller to return.
-		<-controllerDone
-	}
-
-	// Set up NoticeWriter to receive events.
-	d.setNoticeWriter(psi.NewNoticeReceiver(
-		func(notice []byte) {
-			var event clientlib.NoticeEvent
-			err := json.Unmarshal(notice, &event)
-			if err != nil {
-				// This is unexpected and probably indicates something fatal has occurred.
-				// We'll interpret it as a connection error and abort.
-				cancel(fmt.Errorf("failed to unmarshal notice JSON: %w", err))
-				return
-			}
-			switch event.Type {
-			case "EstablishTunnelTimeout":
-				cancel(errTunnelTimeout)
-			case "Tunnels":
-				count := event.Data["count"].(float64)
-				if count > 0 {
-					onTunnel()
-				}
-			}
-		}))
-	defer psi.SetNoticeWriter(io.Discard)
-
-	err := pConfig.Commit(true)
-	if err != nil {
-		return fmt.Errorf("failed to commit config: %w", err)
-	}
-
-	err = psi.OpenDataStore(&psi.Config{DataRootDirectory: pConfig.DataRootDirectory})
-	if err != nil {
-		return fmt.Errorf("failed to open data store: %w", err)
-	}
-	defer psi.CloseDataStore()
-
-	controller, err := psi.NewController(pConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create Controller: %w", err)
-	}
-	d.controller = controller
-	d.mu.Unlock()
-
-	controller.Run(ctx)
-
-	d.mu.Lock()
-	d.controller = nil
-	d.stop = nil
-	return context.Cause(ctx)
+	return <-resultCh
 }
 
 // Stop stops the Dialer background processes, releasing resources and allowing it to be reconfigured.
@@ -230,8 +180,8 @@ func (d *Dialer) runController(ctx context.Context, pConfig *psi.Config, onTunne
 func (d *Dialer) Stop() error {
 	d.mu.Lock()
 	stop := d.stop
-	d.stop = nil
 	d.mu.Unlock()
+
 	if stop == nil {
 		return errNotStartedStop
 	}
