@@ -78,6 +78,7 @@ func parseShadowsocksURL(url *url.URL) (*shadowsocksConfig, error) {
 	if err == nil {
 		return config, nil
 	}
+	fmt.Printf("Failed to parse SIP002 URL: %v\n", err)
 	return parseShadowsocksLegacyBase64URL(url)
 }
 
@@ -131,16 +132,32 @@ func parseShadowsocksLegacyBase64URL(url *url.URL) (*shadowsocksConfig, error) {
 // parseShadowsocksSIP002URL parses URL based on SIP002 format:
 // https://shadowsocks.org/doc/sip002.html
 func parseShadowsocksSIP002URL(url *url.URL) (*shadowsocksConfig, error) {
+	fmt.Println("Parsing SIP002 URL")
 	config := &shadowsocksConfig{}
 	if url.Host == "" {
 		return nil, errors.New("host not specified")
 	}
 	config.serverAddress = url.Host
+	var cipherInfoBytes []byte
 	cipherInfoBytes, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(url.User.String())
+	if err != nil {
+		// try legacy decoding
+		// https://github.com/dgrijalva/jwt-go/issues/293#issuecomment-423667967
+		fmt.Printf("Failed to decode cipher info [%v]: %v\n", url.User.String(), err)
+		cipherInfoBytes, err = base64.StdEncoding.DecodeString(url.User.String())
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode cipher info [%v]: %w", url.User.String(), err)
+		}
+	}
+	//fmt.Printf("SIP002 cipherInfoBytes: %v\n", cipherInfoBytes)
+	cipherName, secret, found := strings.Cut(string(cipherInfoBytes), ":")
+	//fmt.Printf("cipherName: %v\n", cipherName)
+	//fmt.Printf("secret: %v\n", secret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode cipher info [%v]: %w", url.User.String(), err)
 	}
-	cipherName, secret, found := strings.Cut(string(cipherInfoBytes), ":")
+	//cipherName, secret, found := strings.Cut(string(cipherInfoBytes), ":")
+
 	if !found {
 		return nil, errors.New("invalid cipher info: no ':' separator")
 	}
