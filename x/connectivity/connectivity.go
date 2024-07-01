@@ -132,6 +132,7 @@ loop:
 					}
 					ips, err := (&net.Resolver{PreferGo: false}).LookupHost(ctx, host)
 					if err != nil {
+						fmt.Println("LookupHost failed: ", err)
 						cancel()
 						done <- true
 						return nil, err
@@ -141,7 +142,7 @@ loop:
 						// proceed to setting up the next test
 						proceed <- true
 						ip := ips[ipIndex]
-						//fmt.Printf("Trying address %v\n", ip)
+						fmt.Printf("Trying IP address %v\n", ip)
 						ipIndex++
 						addr := net.JoinHostPort(ip, port)
 						attempt.Address = addr
@@ -155,21 +156,22 @@ loop:
 						return conn, err
 					} else {
 						// stop iterating
+						// fmt.Println("No more IPs to try")
 						done <- true
 						return nil, ErrNoMoreIPs
 					}
 				})
 				dialer, err := wrap(interceptDialer)
 				if err != nil {
-					attempt.Duration = time.Since(attempt.StartTime)
-					attempt.Error.Err = err
-					*connectResult = append(*connectResult, *attempt)
+					fmt.Printf("wrap failed: %v\n", err)
+					done <- true
 					return
 				}
 				resolverConn, err := dialer.DialStream(ctx, resolverAddress)
 				if err != nil {
 					// Do not include cencelled errors in the result
 					if errors.Is(err, context.Canceled) {
+						fmt.Println("Context cancelled")
 						return
 					}
 					// Do not include ErrNoMoreIPs type error in the attempt result
@@ -190,7 +192,10 @@ loop:
 				// I am ignoring the error returned by TestConnectivityWithResolver
 				// because I am already capturing the error in the attempt. Not sure
 				// if this is the right approach.
-				attempt.Error, _ = TestConnectivityWithResolver(ctx, resolver, testDomain)
+				attempt.Error, err = TestConnectivityWithResolver(ctx, resolver, testDomain)
+				if err != nil {
+					return
+				}
 				attempt.Duration = time.Since(attempt.StartTime)
 				*connectResult = append(*connectResult, *attempt)
 				if attempt.Error == nil {
@@ -259,7 +264,7 @@ loop:
 						proceed <- true
 						ip := ips[ipIndex]
 						ipIndex++
-						//fmt.Printf("Trying address %v\n", ip)
+						fmt.Printf("Trying address %v\n", ip)
 						addr = net.JoinHostPort(ip, port)
 						attempt.Address = addr
 						conn, err = baseDialer.DialPacket(ctx, addr)
@@ -275,8 +280,8 @@ loop:
 				})
 				dialer, err := wrap(interceptDialer)
 				if err != nil {
-					fmt.Println("wrap failed...")
-					*connectResult = append(*connectResult, *attempt)
+					fmt.Printf("wrap failed: %v\n", err)
+					done <- true
 					return
 				}
 				resolverConn, err := dialer.DialPacket(ctx, resolverAddress)
@@ -305,7 +310,7 @@ loop:
 				//resolver := dns.NewUDPResolver(dialer, resolverAddress)
 				attempt.Error, err = TestConnectivityWithResolver(ctx, resolver, testDomain)
 				if err != nil {
-					//fmt.Printf("Test failed: %v\n", err)
+					fmt.Printf("Test failed: %v\n", err)
 					return
 				}
 				attempt.Duration = time.Since(attempt.StartTime)
@@ -337,7 +342,7 @@ loop:
 func TestConnectivityWithResolver(ctx context.Context, resolver dns.Resolver, testDomain string) (*ConnectivityError, error) {
 	if _, ok := ctx.Deadline(); !ok {
 		// Default deadline is 5 seconds.
-		deadline := time.Now().Add(5 * time.Second)
+		deadline := time.Now().Add(8 * time.Second)
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithDeadline(ctx, deadline)
 		// Releases the timer.
@@ -350,15 +355,25 @@ func TestConnectivityWithResolver(ctx context.Context, resolver dns.Resolver, te
 
 	_, err = resolver.Query(ctx, *q)
 
+	// This code block has an issue since
+	// it does not distinguish between a context deadline exeeded
+	// and context cancelled error.
+	// if ctx.Err() != nil {
+	// 	fmt.Println("Context error: ", ctx.Err())
+	// 	return nil, ctx.Err()
+	// }
+
 	if errors.Is(err, dns.ErrBadRequest) {
 		// maybe change this to include err in report?
 		return nil, err
 	}
 	// If the connection is force cancelled,
 	// we don't want to report an error.
+	// Fortuna suggestion: ctx.Err() is not nil
 	if errors.Is(err, net.ErrClosed) {
 		return nil, err
 	}
+
 	if errors.Is(err, dns.ErrDial) {
 		return makeConnectivityError("connect", err), nil
 	} else if errors.Is(err, dns.ErrSend) {
