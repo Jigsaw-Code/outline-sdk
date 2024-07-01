@@ -15,7 +15,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -45,6 +47,7 @@ func main() {
 	transportFlag := flag.String("transport", "", "Transport config")
 	addressFlag := flag.String("address", "", "Address to connect to. If empty, use the URL authority")
 	methodFlag := flag.String("method", "GET", "The HTTP method to use")
+	payloadFlag := flag.String("payload", "", "The JSON payload to send")
 
 	flag.Parse()
 
@@ -52,8 +55,9 @@ func main() {
 		debugLog = *log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 	}
 	var overrideHost, overridePort string
+	var err error
 	if *addressFlag != "" {
-		var err error
+		//var err error
 		overrideHost, overridePort, err = net.SplitHostPort(*addressFlag)
 		if err != nil {
 			// Fail to parse. Assume the flag is host only.
@@ -67,6 +71,15 @@ func main() {
 		log.Println("Need to pass the URL to fetch in the command-line")
 		flag.Usage()
 		os.Exit(1)
+	}
+
+	// Parse the JSON payload from the flag
+	var payload map[string]interface{}
+	if *payloadFlag != "" {
+		err := json.Unmarshal([]byte(*payloadFlag), &payload)
+		if err != nil {
+			log.Fatalln("Failed to parse JSON payload:", err)
+		}
 	}
 
 	dialer, err := config.NewDefaultConfigParser().WrapStreamDialer(&transport.TCPDialer{}, *transportFlag)
@@ -89,12 +102,29 @@ func main() {
 		}
 		return dialer.DialStream(ctx, net.JoinHostPort(host, port))
 	}
-	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: 5 * time.Second}
+	// pass timeout as
+	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: 10 * time.Second}
 
-	req, err := http.NewRequest(*methodFlag, url, nil)
-	if err != nil {
-		log.Fatalln("Failed to create request:", err)
+	// Create a new request with the JSON payload
+	var req *http.Request
+	if payload != nil {
+		jsonPayload, err := json.Marshal(payload)
+		if err != nil {
+			log.Fatalln("Failed to marshal JSON:", err)
+		}
+		req, err = http.NewRequest(*methodFlag, url, bytes.NewBuffer(jsonPayload))
+		if err != nil {
+			log.Fatalln("Failed to create request:", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+	} else {
+		req, err = http.NewRequest(*methodFlag, url, nil)
+		if err != nil {
+			log.Fatalln("Failed to create request:", err)
+		}
 	}
+	//req, err := http.NewRequest(*methodFlag, url, nil)
+
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		log.Fatalf("HTTP request failed: %v\n", err)
