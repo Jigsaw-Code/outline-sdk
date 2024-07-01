@@ -20,7 +20,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -36,9 +35,9 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/x/report"
 )
 
-var debugLog log.Logger = *log.New(io.Discard, "", 0)
+var debugLog log.Logger = *log.New(os.Stderr, "", 0)
 
-// var errorLog log.Logger = *log.New(os.Stderr, "[ERROR] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
+//var errorLog log.Logger = *log.New(os.Stderr, "[ERROR] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
 type connectivityReport struct {
 	// Inputs
@@ -80,14 +79,15 @@ type errorJSON struct {
 type addressJSON struct {
 	Host        string `json:"host"`
 	Port        string `json:"port"`
-	AddressType IPType `json:"ip_type"`
+	AddressType IPType `json:"ip_type,omitempty"`
 }
 
 type IPType string
 
 const (
-	IPv4 IPType = "v4"
-	IPv6 IPType = "v6"
+	IPv4   IPType = "v4"
+	IPv6   IPType = "v6"
+	Domain IPType = ""
 )
 
 func newAddressJSON(address string) (addressJSON, error) {
@@ -97,7 +97,8 @@ func newAddressJSON(address string) (addressJSON, error) {
 	}
 	ipType, err := checkIPVersion(host)
 	if err != nil {
-		return addressJSON{}, err
+		// If the address is not an IP, it is a domain name
+		return addressJSON{Host: host, Port: port, AddressType: Domain}, nil
 	}
 	return addressJSON{host, port, ipType}, nil
 }
@@ -105,7 +106,7 @@ func newAddressJSON(address string) (addressJSON, error) {
 func checkIPVersion(ipStr string) (IPType, error) {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
-		return "", fmt.Errorf("invalid ip address: %s", ipStr)
+		return Domain, fmt.Errorf("invalid ip address: %s", ipStr)
 	}
 	if ip.To4() != nil {
 		return IPv4, nil
@@ -153,6 +154,7 @@ func init() {
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
 	transportFlag := flag.String("transport", "", "Transport config")
+	baseTransportFlag := flag.String("base-transport", "", "Remote Transport config")
 	domainFlag := flag.String("domain", "example.com.", "Domain name to resolve in the test")
 	resolverFlag := flag.String("resolver", "8.8.8.8,2001:4860:4860::8888", "Comma-separated list of addresses of DNS resolver to use for the test")
 	protoFlag := flag.String("proto", "tcp,udp", "Comma-separated list of the protocols to test. Must be \"tcp\", \"udp\", or a combination of them")
@@ -179,6 +181,26 @@ func main() {
 		debugLog = *log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 	}
 
+	baseDialer, err := config.NewDefaultConfigParser().WrapStreamDialer(&transport.TCPDialer{}, *baseTransportFlag)
+	if err != nil {
+		log.Fatalf("Could not create dialer: %v\n", err)
+	}
+	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid address: %w", err)
+		}
+		if !strings.HasPrefix(network, "tcp") {
+			return nil, fmt.Errorf("protocol not supported: %v", network)
+		}
+		return baseDialer.DialStream(ctx, net.JoinHostPort(host, port))
+	}
+	// TODO: provide timeout as input argument to cli
+	httpClient := &http.Client{
+		Transport: &http.Transport{DialContext: dialContext},
+		Timeout:   30 * time.Second,
+	}
+
 	var reportCollector report.Collector
 	if *reportToFlag != "" {
 		collectorURL, err := url.Parse(*reportToFlag)
@@ -187,11 +209,11 @@ func main() {
 		}
 		remoteCollector := &report.RemoteCollector{
 			CollectorURL: collectorURL,
-			HttpClient:   &http.Client{Timeout: 10 * time.Second},
+			HttpClient:   httpClient,
 		}
 		retryCollector := &report.RetryCollector{
 			Collector:    remoteCollector,
-			MaxRetry:     3,
+			MaxRetry:     1,
 			InitialDelay: 1 * time.Second,
 		}
 		reportCollector = &report.SamplingCollector{
@@ -224,15 +246,23 @@ func main() {
 			startTime := time.Now()
 			switch proto {
 			case "tcp":
+				base, err := configParser.WrapStreamDialer(&transport.TCPDialer{}, *baseTransportFlag)
+				if err != nil {
+					log.Fatalf("Could not create base dialer: %v\n", err)
+				}
 				wrap := func(baseDialer transport.StreamDialer) (transport.StreamDialer, error) {
 					return config.WrapStreamDialer(baseDialer, *transportFlag)
 				}
-				testResult, testErr = connectivity.TestStreamConnectivityWithDNS(context.Background(), &transport.TCPDialer{}, wrap, resolverAddress, *domainFlag)
+				testResult, testErr = connectivity.TestStreamConnectivityWithDNS(context.Background(), base, wrap, resolverAddress, *domainFlag)
 			case "udp":
+				base, err := configParser.WrapPacketDialer(&transport.UDPDialer{}, *baseTransportFlag)
+				if err != nil {
+					log.Fatalf("Could not create base dialer: %v\n", err)
+				}
 				wrap := func(baseDialer transport.PacketDialer) (transport.PacketDialer, error) {
 					return config.WrapPacketDialer(baseDialer, *transportFlag)
 				}
-				testResult, testErr = connectivity.TestPacketConnectivityWithDNS(context.Background(), &transport.UDPDialer{}, wrap, resolverAddress, *domainFlag)
+				testResult, testErr = connectivity.TestPacketConnectivityWithDNS(context.Background(), base, wrap, resolverAddress, *domainFlag)
 			default:
 				log.Fatalf(`Invalid proto %v. Must be "tcp" or "udp"`, proto)
 			}
@@ -283,7 +313,9 @@ func main() {
 			// 	}
 			// }
 
-			if reportCollector != nil {
+			if reportCollector != nil && r.Result.Attempts != nil {
+				// do not report if there are no attempts
+				fmt.Println("sending the report....")
 				err = reportCollector.Collect(context.Background(), r)
 				if err != nil {
 					debugLog.Printf("Failed to collect report: %v\n", err)
