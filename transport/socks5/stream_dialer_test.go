@@ -226,7 +226,7 @@ func TestConnectWithAuth(t *testing.T) {
 	require.NoError(t, err)
 	err = dialer.SetCredentials([]byte("testusername"), []byte("testpassword"))
 	require.NoError(t, err)
-	_, err = dialer.DialStream(context.Background(), address)
+	_, err = dialer.DialStream(context.Background(), "example.com:443")
 	require.NoError(t, err)
 
 	// Try to connect with incorrect credentials
@@ -234,4 +234,11 @@ func TestConnectWithAuth(t *testing.T) {
 	require.NoError(t, err)
 	_, err = dialer.DialStream(context.Background(), address)
 	require.Error(t, err)
+
+	// Try UDP Associate with correct credentials
+	err = dialer.SetCredentials([]byte("testusername"), []byte("testpassword"))
+	require.NoError(t, err)
+	dialer.udpAssociate = true
+	_, err = dialer.DialStream(context.Background(), "8.8.8.8:53")
+	require.NoError(t, err)
 }
