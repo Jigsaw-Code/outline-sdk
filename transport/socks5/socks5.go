@@ -41,7 +41,7 @@ const (
 const (
 	CmdConnect      = byte(1)
 	CmdBind         = byte(2)
-	CmdUDPAssociate = byte(1)
+	CmdUDPAssociate = byte(3)
 )
 
 // SOCKS5 authentication methods, as specified in https://datatracker.ietf.org/doc/html/rfc1928#section-3
