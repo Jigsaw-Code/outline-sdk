@@ -50,6 +50,7 @@ type Dialer struct {
 }
 
 var _ transport.StreamDialer = (*Dialer)(nil)
+var _ transport.PacketDialer = (*Dialer)(nil)
 
 func (d *Dialer) SetCredentials(username, password []byte) error {
 	if len(username) > 255 {
@@ -213,6 +214,7 @@ func (d *Dialer) request(ctx context.Context, cmd byte, dstAddr string) (transpo
 	// 4. Read BND.ADDR.
 	host := ""
 	var bndAddrLen int
+	fmt.Printf("bind address type is %v \n", buffer[3])
 	switch buffer[3] {
 	case addrTypeIPv4:
 		if _, err := io.ReadFull(proxyConn, buffer[:4]); err != nil {
@@ -225,7 +227,7 @@ func (d *Dialer) request(ctx context.Context, cmd byte, dstAddr string) (transpo
 		}
 		host = netip.AddrFrom16([16]byte(buffer[:16])).String()
 	case addrTypeDomainName:
-		// buffer[8]: length of the domain name
+		// read address length
 		_, err := io.ReadFull(proxyConn, buffer[:1])
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to read address length in connect response: %w", err)
@@ -244,7 +246,9 @@ func (d *Dialer) request(ctx context.Context, cmd byte, dstAddr string) (transpo
 		return nil, "", fmt.Errorf("failed to read bound port: %w", err)
 	}
 	port := binary.BigEndian.Uint16(buffer[:2])
-	bindAddr := net.JoinHostPort(host, strconv.FormatUint(uint64(port), 10))
+	portStr := strconv.FormatUint(uint64(port), 10)
+	fmt.Printf("bind address is %v:%v \n", host, portStr)
+	bindAddr := net.JoinHostPort(host, portStr)
 
 	dialSuccess = true
 	return proxyConn, bindAddr, nil
