@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strconv"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -61,9 +60,6 @@ func (c *packetConn) Read(b []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	fmt.Printf("Read buffer is %#X \n", buffer)
-	fmt.Printf("Read buffer length is %d \n", n)
-
 	// Minimum size of header is 10 bytes
 	if n < 10 {
 		return 0, fmt.Errorf("invalid SOCKS5 UDP packet: too short")
@@ -112,7 +108,6 @@ func (c *packetConn) Read(b []byte) (int, error) {
 }
 
 func (c *packetConn) Write(b []byte) (int, error) {
-	// TODO: write header
 	// Encapsulate the payload in a SOCKS5 UDP packet
 	header := []byte{
 		0x00, 0x00, // Reserved
@@ -120,34 +115,12 @@ func (c *packetConn) Write(b []byte) (int, error) {
 		// To be appended below: ATYP, IPv4, IPv6, Domain name
 		// To be appended below: IP and port (destination address)
 	}
-	destHost, destPortStr, _ := net.SplitHostPort(c.dstAddr.String())
-	destPort, _ := strconv.Atoi(destPortStr)
-	// check if address is IPv4, IPv6 or domain name
-	if ipv4 := net.ParseIP(destHost).To4(); ipv4 != nil {
-		header = append(header, addrTypeIPv4)
-		header = append(header, ipv4...)
-	} else if ipv6 := net.ParseIP(destHost).To16(); ipv6 != nil {
-		header = append(header, addrTypeIPv6)
-		header = append(header, ipv6...)
-	} else {
-		// TODO: resolve domain name to IP?
-		_, err := net.LookupHost(destHost)
-		if err != nil {
-			return 0, fmt.Errorf("failed to resolve host: %w", err)
-		}
-		header = append(header, addrTypeDomainName)
-		header = append(header, []byte(destHost)...)
+	header, err := appendSOCKS5Address(header, c.dstAddr.String())
+	if err != nil {
+		return 0, fmt.Errorf("failed to append SOCKS5 address: %w", err)
 	}
-
-	header = append(header, byte(destPort>>8), byte(destPort))
-
-	fmt.Printf("Write header is %#X \n", header)
-
 	// Combine the header and the payload
 	fullPacket := append(header, b...)
-
-	fmt.Printf("fullPacket is %#X \n", fullPacket)
-
 	return c.pc.Write(fullPacket)
 }
 
@@ -162,8 +135,8 @@ func (d *Dialer) DialPacket(ctx context.Context, dstAddr string) (net.Conn, erro
 		return nil, fmt.Errorf("failed to parse address: %w", err)
 	}
 	// TODO: how to provide the bind address?
-	sc, bindAddr, err := d.request(ctx, CmdUDPAssociate, "[::]:12800")
-	fmt.Println("Bound address is:", bindAddr)
+	sc, bindAddr, err := d.request(ctx, CmdUDPAssociate, "0.0.0.0:0")
+	//fmt.Println("Bound address is:", bindAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -172,6 +145,17 @@ func (d *Dialer) DialPacket(ctx context.Context, dstAddr string) (net.Conn, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse bound address: %w", err)
 	}
+	fmt.Printf("bound host is %v, bound port is %v \n", host, port)
+
+	if host == "::" {
+		schost, scPort, err := net.SplitHostPort(sc.RemoteAddr().String())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse tcp address: %w", err)
+		}
+		fmt.Printf("tcp host is %v, tcp port is %v \n", schost, scPort)
+		host = schost
+	}
+
 	pc, err := d.pd.DialPacket(ctx, net.JoinHostPort(host, port))
 	if err != nil {
 		sc.Close()
