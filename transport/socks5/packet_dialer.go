@@ -134,25 +134,25 @@ func (d *Dialer) DialPacket(ctx context.Context, dstAddr string) (net.Conn, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse address: %w", err)
 	}
-	// TODO: how to provide the bind address?
 	sc, bindAddr, err := d.request(ctx, CmdUDPAssociate, "0.0.0.0:0")
 	//fmt.Println("Bound address is:", bindAddr)
 	if err != nil {
 		return nil, err
 	}
 
+	// Wait for the bind to be ready
+	//time.Sleep(1 * time.Millisecond)
+
 	host, port, err := net.SplitHostPort(bindAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse bound address: %w", err)
 	}
-	fmt.Printf("bound host is %v, bound port is %v \n", host, port)
 
-	if host == "::" {
-		schost, scPort, err := net.SplitHostPort(sc.RemoteAddr().String())
+	if ipAddr := net.ParseIP(host); ipAddr != nil && ipAddr.IsUnspecified() {
+		schost, _, err := net.SplitHostPort(sc.RemoteAddr().String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse tcp address: %w", err)
 		}
-		fmt.Printf("tcp host is %v, tcp port is %v \n", schost, scPort)
 		host = schost
 	}
 
