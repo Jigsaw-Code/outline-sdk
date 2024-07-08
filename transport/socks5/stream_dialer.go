@@ -214,7 +214,6 @@ func (d *Dialer) request(ctx context.Context, cmd byte, dstAddr string) (transpo
 	// 4. Read BND.ADDR.
 	host := ""
 	var bndAddrLen int
-	fmt.Printf("bind address type is %v \n", buffer[3])
 	switch buffer[3] {
 	case addrTypeIPv4:
 		if _, err := io.ReadFull(proxyConn, buffer[:4]); err != nil {
@@ -247,7 +246,6 @@ func (d *Dialer) request(ctx context.Context, cmd byte, dstAddr string) (transpo
 	}
 	port := binary.BigEndian.Uint16(buffer[:2])
 	portStr := strconv.FormatUint(uint64(port), 10)
-	fmt.Printf("bind address is %v:%v \n", host, portStr)
 	bindAddr := net.JoinHostPort(host, portStr)
 
 	dialSuccess = true

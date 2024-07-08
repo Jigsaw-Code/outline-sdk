@@ -50,7 +50,6 @@ func TestSOCKS5Associate(t *testing.T) {
 	conn, err := dialer.DialPacket(context.Background(), echoServerAddr.String())
 	require.NoError(t, err)
 	defer conn.Close()
-	//fmt.Printf("local address is: %v\n", conn.LocalAddr())
 
 	// Send "ping" message
 	_, err = conn.Write([]byte("ping"))
