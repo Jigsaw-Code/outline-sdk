@@ -3,12 +3,10 @@ module github.com/Jigsaw-Code/outline-sdk/x
 go 1.21
 
 require (
-	github.com/Jigsaw-Code/outline-sdk v0.0.16
 	// Use github.com/Psiphon-Labs/psiphon-tunnel-core@staging-client as per
 	// https://github.com/Psiphon-Labs/psiphon-tunnel-core/?tab=readme-ov-file#using-psiphon-with-go-modules
 	github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20240522172529-8fcc4b9a51cf
-	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
-	github.com/stretchr/testify v1.9.0
+	github.com/Jigsaw-Code/outline-sdk v0.0.17-0.20240708052545-4f51b366fe75
 	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/mobile v0.0.0-20240520174638-fa72addaaa1b
 	golang.org/x/net v0.25.0
