@@ -121,3 +121,15 @@ func TestParseShadowsocksSIP002URLSuccessful(t *testing.T) {
 	require.Equal(t, "example.com:1234", config.serverAddress)
 	require.Equal(t, "HTTP/1.1 ", string(config.prefix))
 }
+
+func TestParseShadowsocksSIP002URLSuccessfulWithoutEncoding(t *testing.T) {
+	configString := "ss://aes-256-gcm:1234567@example.com:1234"
+	urls, err := parseConfig(configString)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(urls))
+
+	config, err := parseShadowsocksSIP002URL(urls[0])
+
+	require.NoError(t, err)
+	require.Equal(t, "example.com:1234", config.serverAddress)
+}
