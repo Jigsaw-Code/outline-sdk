@@ -88,7 +88,7 @@ func TestParseShadowsocksURLInvalidCipherInfoFails(t *testing.T) {
 }
 
 func TestParseShadowsocksURLUnsupportedCypherFails(t *testing.T) {
-	configString := "ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwnTpLeTUyN2duU3FEVFB3R0JpQ1RxUnlT@example.com:1234?prefix=HTTP%2F1.1%20"
+	configString := "ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwnTpLeTUyN2duU3FEVFB3R0JpQ1RxUnlT@example.com:1234"
 	urls, err := parseConfig(configString)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(urls))
