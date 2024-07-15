@@ -144,12 +144,15 @@ func parseShadowsocksSIP002URL(url *url.URL) (*shadowsocksConfig, error) {
 		return nil, errors.New("host not specified")
 	}
 	config.serverAddress = url.Host
-	cipherInfo := url.User.String()
+	userInfo := url.User.String()
 	// Cipher info can be optionally encoded with Base64URL.
 	encoding := base64.URLEncoding.WithPadding(base64.NoPadding)
-	decodedCipherInfo, err := encoding.DecodeString(cipherInfo)
-	if err == nil && encoding.EncodeToString(decodedCipherInfo) == cipherInfo {
-		cipherInfo = string(decodedCipherInfo)
+	decodedUserInfo, err := encoding.DecodeString(userInfo)
+	var cipherInfo string
+	if err == nil {
+		cipherInfo = string(decodedUserInfo)
+	} else {
+		cipherInfo = userInfo
 	}
 	cipherName, secret, found := strings.Cut(cipherInfo, ":")
 	if !found {
