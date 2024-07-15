@@ -117,8 +117,9 @@ func (c *packetConn) Read(b []byte) (int, error) {
 }
 
 func (c *packetConn) Write(b []byte) (int, error) {
-	// Encapsulate the payload in a SOCKS5 UDP packet
-	// this is the minimum preallocated header size (10 bytes)
+	// Encapsulate the payload in a SOCKS5 UDP packet as specified in
+	// https://datatracker.ietf.org/doc/html/rfc1928#section-7
+	// The minimum preallocated header size (10 bytes)
 	header := make([]byte, 10)
 	header = append(header[:0],
 		0x00, 0x00, // Reserved
