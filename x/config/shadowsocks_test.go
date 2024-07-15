@@ -76,6 +76,17 @@ func TestParseShadowsocksURLNoEncoding(t *testing.T) {
 	require.Equal(t, "example.com:1234", config.serverAddress)
 }
 
+func TestParseShadowsocksURLInvalidCipherInfoFails(t *testing.T) {
+	configString := "ss://aes-256-gcm1234567@example.com:1234"
+	urls, err := parseConfig(configString)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(urls))
+
+	_, err = parseShadowsocksURL(urls[0])
+
+	require.Error(t, err)
+}
+
 func TestParseShadowsocksURLUnsupportedCypherFails(t *testing.T) {
 	configString := "ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwnTpLeTUyN2duU3FEVFB3R0JpQ1RxUnlT@example.com:1234?prefix=HTTP%2F1.1%20"
 	urls, err := parseConfig(configString)
