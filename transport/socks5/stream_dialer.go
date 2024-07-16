@@ -16,13 +16,9 @@ package socks5
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
-	"net"
-	"net/netip"
-	"strconv"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
@@ -198,7 +194,7 @@ func (d *Dialer) request(ctx context.Context, cmd byte, dstAddr string) (transpo
 	// buffer[1]: REP
 	// buffer[2]: RSV
 	// buffer[3]: ATYP
-	if _, err = io.ReadFull(proxyConn, buffer[:4]); err != nil {
+	if _, err = io.ReadFull(proxyConn, buffer[:3]); err != nil {
 		return nil, "", fmt.Errorf("failed to read connect server response: %w", err)
 	}
 
@@ -212,41 +208,10 @@ func (d *Dialer) request(ctx context.Context, cmd byte, dstAddr string) (transpo
 	}
 
 	// 4. Read BND.ADDR.
-	host := ""
-	var bndAddrLen int
-	switch buffer[3] {
-	case addrTypeIPv4:
-		if _, err := io.ReadFull(proxyConn, buffer[:4]); err != nil {
-			return nil, "", fmt.Errorf("failed to read bound IPv4 address: %w", err)
-		}
-		host = netip.AddrFrom4([4]byte(buffer[:4])).String()
-	case addrTypeIPv6:
-		if _, err := io.ReadFull(proxyConn, buffer[:16]); err != nil {
-			return nil, "", fmt.Errorf("failed to read bound IPv6 address: %w", err)
-		}
-		host = netip.AddrFrom16([16]byte(buffer[:16])).String()
-	case addrTypeDomainName:
-		// read address length
-		_, err := io.ReadFull(proxyConn, buffer[:1])
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to read address length in connect response: %w", err)
-		}
-		bndAddrLen = int(buffer[0])
-		if _, err := io.ReadFull(proxyConn, buffer[:bndAddrLen]); err != nil {
-			return nil, "", fmt.Errorf("failed to read bound domain address: %w", err)
-		}
-		host = string(buffer[:bndAddrLen])
-	default:
-		return nil, "", fmt.Errorf("invalid address type %v", buffer[3])
+	bindAddr, _, err := readAddress(proxyConn)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to read bound address: %w", err)
 	}
-
-	// Read BND.PORT
-	if _, err = io.ReadFull(proxyConn, buffer[:2]); err != nil {
-		return nil, "", fmt.Errorf("failed to read bound port: %w", err)
-	}
-	port := binary.BigEndian.Uint16(buffer[:2])
-	portStr := strconv.FormatUint(uint64(port), 10)
-	bindAddr := net.JoinHostPort(host, portStr)
 
 	dialSuccess = true
 	return proxyConn, bindAddr, nil
