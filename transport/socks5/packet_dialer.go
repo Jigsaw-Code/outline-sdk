@@ -15,16 +15,25 @@
 package socks5
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"time"
 
+	"github.com/Jigsaw-Code/outline-sdk/internal/slicepool"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
+
+// clientUDPBufferSize is the maximum supported UDP packet size in bytes.
+const clientUDPBufferSize = 16 * 1024
+
+// udpPool stores the byte slices used for storing packets.
+var udpPool = slicepool.MakePool(clientUDPBufferSize)
 
 type packetConn struct {
 	dstAddr net.Addr
@@ -55,7 +64,9 @@ func (c *packetConn) SetWriteDeadline(t time.Time) error {
 }
 
 func (c *packetConn) Read(b []byte) (int, error) {
-	buffer := make([]byte, 65536) // Maximum size for UDP packet
+	lazySlice := udpPool.LazySlice()
+	buffer := lazySlice.Acquire()
+	defer lazySlice.Release()
 	n, err := c.pc.Read(buffer)
 	if err != nil {
 		return 0, err
@@ -79,26 +90,11 @@ func (c *packetConn) Read(b []byte) (int, error) {
 		return 0, errors.New("fragmentation is not supported")
 	}
 
-	atyp := pkt[3]
-	addrLen := 0
-	switch atyp {
-	case addrTypeIPv4:
-		addrLen = 4
-	case addrTypeIPv6:
-		addrLen = 16
-	case addrTypeDomainName:
-		// Domain name's first byte is the length of the name
-		addrLen = int(pkt[4]) + 1 // +1 for the length byte itself
-	default:
-		return 0, fmt.Errorf("unknown address type %#x", atyp)
+	// Do something with address?
+	_, addrLen, err := readAddress(bytes.NewReader(pkt[3:]))
+	if err != nil {
+		return 0, fmt.Errorf("failed to read address: %w", err)
 	}
-
-	pkt = pkt[4:] // Skip the header
-	addr := pkt[:addrLen]
-
-	pkt = pkt[addrLen:] // Skip the address
-	port := binary.BigEndian.Uint16(pkt[:2])
-	fmt.Printf("Received packet from %d:%d\n", addr, port)
 
 	// Calculate the start position of the actual data
 	headerLength := 4 + addrLen + 2 // RSV (2) + FRAG (1) + ATYP (1) + ADDR (variable) + PORT (2)
@@ -153,7 +149,7 @@ func (d *Dialer) DialPacket(ctx context.Context, dstAddr string) (net.Conn, erro
 	}
 
 	// Wait for the bind to be ready
-	//time.Sleep(1 * time.Millisecond)
+	// time.Sleep(10 * time.Millisecond)
 
 	host, port, err := net.SplitHostPort(bindAddr)
 	if err != nil {
@@ -177,41 +173,43 @@ func (d *Dialer) DialPacket(ctx context.Context, dstAddr string) (net.Conn, erro
 	return &packetConn{netDstAddr, pc, sc}, nil
 }
 
-// func readAddress(conn *net.Conn) (string, error) {
-// 	// Read the address type
-// 	fmt.Println("Reading address type")
-// 	addrType := make([]byte, 1)
-// 	addrLen := 0
-// 	n, err := io.ReadFull(*conn, addrType)
-// 	//n, err := *conn.Read(addrType)
-// 	if err != nil {
-// 		return "", fmt.Errorf("failed to read address type: %w", err)
-// 	}
-// 	fmt.Printf("Read address type %d bytes\n", n)
-// 	// Read the address type
-// 	switch addrType[0] {
-// 	case addrTypeIPv4:
-// 		addrLen = 4
-// 	case addrTypeIPv6:
-// 		addrLen = 16
-// 	case addrTypeDomainName:
-// 		// Domain name's first byte is the length of the name
-// 		domainAddrLen := make([]byte, 1)
-// 		_, err := io.ReadFull(*conn, domainAddrLen)
-// 		//_, err := reader.Read(domainAddrLen)
-// 		if err != nil {
-// 			return "", fmt.Errorf("failed to read domain address length: %w", err)
-// 		}
-// 		addrLen = int(domainAddrLen[0])
-// 	default:
-// 		return "", fmt.Errorf("unknown address type %#x", addrType[0])
-// 	}
-// 	fmt.Printf("Address length is: %d\n", addrLen)
-// 	addr := make([]byte, addrLen)
-// 	_, err = io.ReadFull(*conn, addr)
-// 	//_, err = reader.Read(addr)
-// 	if err != nil {
-// 		return "", fmt.Errorf("failed to read address: %w", err)
-// 	}
-// 	return string(addr), nil
-// }
+func readAddress(reader io.Reader) (string, int, error) {
+	// Read the address type
+	addrType := make([]byte, 1)
+	addrLen := 0
+	_, err := io.ReadFull(reader, addrType)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to read address type: %w", err)
+	}
+	// Read the address type
+	switch addrType[0] {
+	case addrTypeIPv4:
+		addrLen = 4
+	case addrTypeIPv6:
+		addrLen = 16
+	case addrTypeDomainName:
+		// Domain name's first byte is the length of the name
+		domainAddrLen := make([]byte, 1)
+		_, err := io.ReadFull(reader, domainAddrLen)
+		if err != nil {
+			return "", 0, fmt.Errorf("failed to read domain address length: %w", err)
+		}
+		addrLen = int(domainAddrLen[0])
+	default:
+		return "", 0, fmt.Errorf("unknown address type %#x", addrType[0])
+	}
+	host := make([]byte, addrLen)
+	_, err = io.ReadFull(reader, host)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to read address: %w", err)
+	}
+	port := make([]byte, 2)
+	_, err = io.ReadFull(reader, port)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to read port: %w", err)
+	}
+	p := binary.BigEndian.Uint16(port)
+	portStr := strconv.FormatUint(uint64(p), 10)
+	addr := net.JoinHostPort(net.IP(host).String(), portStr)
+	return addr, addrLen, nil
+}
