@@ -175,41 +175,44 @@ func (d *Dialer) DialPacket(ctx context.Context, dstAddr string) (net.Conn, erro
 
 func readAddress(reader io.Reader) (string, int, error) {
 	// Read the address type
-	addrType := make([]byte, 1)
+	// The maximum buffer size is:
+	// 1 address type + 1 address length + 256 (max domain name length)
+	var buffer [1 + 1 + 256]byte
 	addrLen := 0
-	_, err := io.ReadFull(reader, addrType)
+	_, err := io.ReadFull(reader, buffer[:1])
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to read address type: %w", err)
 	}
 	// Read the address type
-	switch addrType[0] {
+	switch buffer[0] {
 	case addrTypeIPv4:
 		addrLen = 4
 	case addrTypeIPv6:
 		addrLen = 16
 	case addrTypeDomainName:
 		// Domain name's first byte is the length of the name
-		domainAddrLen := make([]byte, 1)
-		_, err := io.ReadFull(reader, domainAddrLen)
+		// Read domainAddrLen
+		_, err := io.ReadFull(reader, buffer[1:])
 		if err != nil {
 			return "", 0, fmt.Errorf("failed to read domain address length: %w", err)
 		}
-		addrLen = int(domainAddrLen[0])
+		addrLen = int(buffer[1])
 	default:
-		return "", 0, fmt.Errorf("unknown address type %#x", addrType[0])
+		return "", 0, fmt.Errorf("unknown address type %#x", buffer[0])
 	}
-	host := make([]byte, addrLen)
-	_, err = io.ReadFull(reader, host)
+	// Read host address
+	_, err = io.ReadFull(reader, buffer[:addrLen])
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to read address: %w", err)
 	}
-	port := make([]byte, 2)
-	_, err = io.ReadFull(reader, port)
+	host := net.IP(buffer[:addrLen]).String()
+	// Read port number
+	_, err = io.ReadFull(reader, buffer[:2])
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to read port: %w", err)
 	}
-	p := binary.BigEndian.Uint16(port)
+	p := binary.BigEndian.Uint16(buffer[:2])
 	portStr := strconv.FormatUint(uint64(p), 10)
-	addr := net.JoinHostPort(net.IP(host).String(), portStr)
+	addr := net.JoinHostPort(host, portStr)
 	return addr, addrLen, nil
 }
