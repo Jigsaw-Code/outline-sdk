@@ -45,7 +45,7 @@ func parseProxyProtoConfig(configURL *url.URL) (*proxyProtoConfig, error) {
 			if len(values) != 1 {
 				return nil, fmt.Errorf("version option must has one value, found %v", len(values))
 			}
-			version, err := strconv.Atoi(values[0])
+			version, err := strconv.ParseInt(values[0], 10, 8)
 			if err != nil {
 				return nil, fmt.Errorf("version must be a number")
 			}
