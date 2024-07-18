@@ -18,6 +18,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 )
@@ -125,4 +126,48 @@ func appendSOCKS5Address(b []byte, address string) ([]byte, error) {
 	}
 	b = binary.BigEndian.AppendUint16(b, uint16(portNum))
 	return b, nil
+}
+
+func readAddress(reader io.Reader) (string, int, error) {
+	// Read the address type
+	// The maximum buffer size is:
+	// 1 address type + 1 address length + 256 (max domain name length)
+	var buffer [1 + 1 + 256]byte
+	addrLen := 0
+	_, err := io.ReadFull(reader, buffer[:1])
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to read address type: %w", err)
+	}
+	// Read the address type
+	switch buffer[0] {
+	case addrTypeIPv4:
+		addrLen = 4
+	case addrTypeIPv6:
+		addrLen = 16
+	case addrTypeDomainName:
+		// Domain name's first byte is the length of the name
+		// Read domainAddrLen
+		_, err := io.ReadFull(reader, buffer[1:])
+		if err != nil {
+			return "", 0, fmt.Errorf("failed to read domain address length: %w", err)
+		}
+		addrLen = int(buffer[1])
+	default:
+		return "", 0, fmt.Errorf("unknown address type %#x", buffer[0])
+	}
+	// Read host address
+	_, err = io.ReadFull(reader, buffer[:addrLen])
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to read address: %w", err)
+	}
+	host := net.IP(buffer[:addrLen]).String()
+	// Read port number
+	_, err = io.ReadFull(reader, buffer[:2])
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to read port: %w", err)
+	}
+	p := binary.BigEndian.Uint16(buffer[:2])
+	portStr := strconv.FormatUint(uint64(p), 10)
+	addr := net.JoinHostPort(host, portStr)
+	return addr, addrLen, nil
 }
