@@ -32,23 +32,24 @@ type credentials struct {
 
 // NewDialer creates a [transport.StreamDialer] that routes connections to a SOCKS5
 // proxy listening at the given [transport.StreamEndpoint].
-func NewDialer(streamEndpoint transport.StreamEndpoint) (*Dialer, error) {
+func NewClient(streamEndpoint transport.StreamEndpoint) (*Client, error) {
 	if streamEndpoint == nil {
 		return nil, errors.New("argument endpoint must not be nil")
 	}
-	return &Dialer{se: streamEndpoint, cred: nil}, nil
+	return &Client{se: streamEndpoint, cred: nil}, nil
 }
 
-type Dialer struct {
+type Client struct {
 	se   transport.StreamEndpoint
+	pe   transport.PacketEndpoint
 	pd   transport.PacketDialer
 	cred *credentials
 }
 
-var _ transport.StreamDialer = (*Dialer)(nil)
-var _ transport.PacketDialer = (*Dialer)(nil)
+var _ transport.StreamDialer = (*Client)(nil)
+var _ transport.PacketListener = (*Client)(nil)
 
-func (d *Dialer) SetCredentials(username, password []byte) error {
+func (c *Client) SetCredentials(username, password []byte) error {
 	if len(username) > 255 {
 		return errors.New("username exceeds 255 bytes")
 	}
@@ -63,16 +64,16 @@ func (d *Dialer) SetCredentials(username, password []byte) error {
 		return errors.New("password must be at least 1 byte")
 	}
 
-	d.cred = &credentials{username: username, password: password}
+	c.cred = &credentials{username: username, password: password}
 	return nil
 }
 
-func (d *Dialer) EnablePacket(packetDialer transport.PacketDialer) {
-	d.pd = packetDialer
+func (c *Client) EnablePacket(packetDialer transport.PacketDialer) {
+	c.pd = packetDialer
 }
 
-func (d *Dialer) request(ctx context.Context, cmd byte, dstAddr string) (transport.StreamConn, string, error) {
-	proxyConn, err := d.se.ConnectStream(ctx)
+func (c *Client) request(ctx context.Context, cmd byte, dstAddr string) (transport.StreamConn, string, error) {
+	proxyConn, err := c.se.ConnectStream(ctx)
 	if err != nil {
 		return nil, "", fmt.Errorf("could not connect to SOCKS5 proxy: %w", err)
 	}
@@ -93,7 +94,7 @@ func (d *Dialer) request(ctx context.Context, cmd byte, dstAddr string) (transpo
 	var buffer [(1 + 1 + 1) + (1 + 1 + 255 + 1 + 255) + 256]byte
 	var b []byte
 
-	if d.cred == nil {
+	if c.cred == nil {
 		// Method selection part: VER = 5, NMETHODS = 1, METHODS = 0 (no auth)
 		// +----+----------+----------+
 		// |VER | NMETHODS | METHODS  |
@@ -113,10 +114,10 @@ func (d *Dialer) request(ctx context.Context, cmd byte, dstAddr string) (transpo
 		// | 1  |  1   | 1 to 255 |  1   | 1 to 255 |
 		// +----+------+----------+------+----------+
 		b = append(b, 1)
-		b = append(b, byte(len(d.cred.username)))
-		b = append(b, d.cred.username...)
-		b = append(b, byte(len(d.cred.password)))
-		b = append(b, d.cred.password...)
+		b = append(b, byte(len(c.cred.username)))
+		b = append(b, c.cred.username...)
+		b = append(b, byte(len(c.cred.password)))
+		b = append(b, c.cred.password...)
 	}
 
 	// CMD Request:
@@ -222,8 +223,8 @@ func (d *Dialer) request(ctx context.Context, cmd byte, dstAddr string) (transpo
 // the connect requests in one packet, to avoid an additional roundtrip.
 // The returned [error] will be of type [ReplyCode] if the server sends a SOCKS error reply code, which
 // you can check against the error constants in this package using [errors.Is].
-func (d *Dialer) DialStream(ctx context.Context, dstAddr string) (transport.StreamConn, error) {
-	proxyConn, _, err := d.request(ctx, CmdConnect, dstAddr)
+func (c *Client) DialStream(ctx context.Context, dstAddr string) (transport.StreamConn, error) {
+	proxyConn, _, err := c.request(ctx, CmdConnect, dstAddr)
 	if err != nil {
 		return nil, err
 	}
