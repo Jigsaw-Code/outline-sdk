@@ -14,7 +14,6 @@ import (
 )
 
 func TestSOCKS5Associate(t *testing.T) {
-
 	// Create a local listener
 	// This creates a UDP server that responded to "ping"
 	// message with "pong" response
@@ -41,23 +40,24 @@ func TestSOCKS5Associate(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Connect, auth and connec to local server
-	dialer, err := NewDialer(&transport.TCPEndpoint{Address: proxyServerAddress})
-	require.NotNil(t, dialer)
+	client, err := NewClient(&transport.TCPEndpoint{Address: proxyServerAddress})
+	require.NotNil(t, client)
 	require.NoError(t, err)
-	err = dialer.SetCredentials([]byte("testusername"), []byte("testpassword"))
+	err = client.SetCredentials([]byte("testusername"), []byte("testpassword"))
 	require.NoError(t, err)
-	dialer.EnablePacket(&transport.UDPDialer{})
-	conn, err := dialer.DialPacket(context.Background(), echoServerAddr.String())
+	client.EnablePacket(&transport.UDPDialer{})
+	conn, err := client.ListenPacket(context.Background())
 	require.NoError(t, err)
 	defer conn.Close()
 
 	// Send "ping" message
-	_, err = conn.Write([]byte("ping"))
+	_, err = conn.WriteTo([]byte("ping"), echoServerAddr)
 	require.NoError(t, err)
 	// max wait time for response
 	conn.SetDeadline(time.Now().Add(time.Second))
 	response := make([]byte, 1024)
-	n, err := conn.Read(response)
+	n, addr, err := conn.ReadFrom(response)
+	require.Equal(t, echoServerAddr, addr)
 	//conn.SetDeadline(time.Time{})
 	require.NoError(t, err)
 	require.Equal(t, []byte("pong"), response[:n])
@@ -92,6 +92,7 @@ func setupUDPEchoServer(t *testing.T, serverAddr *net.UDPAddr) *net.UDPConn {
 				//log.Printf("Error reading: %v", err)
 				return
 			}
+			//log.Printf("Received %s from %s\n", buf[:n], remote.String())
 			if bytes.Equal(buf[:n], []byte("ping")) {
 				server.WriteTo([]byte("pong"), remote)
 			}
