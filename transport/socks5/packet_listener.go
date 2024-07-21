@@ -61,122 +61,124 @@ func (c *packetConn) SetWriteDeadline(t time.Time) error {
 	return c.pc.SetWriteDeadline(t)
 }
 
-func (p *packetConn) ReadFrom(b []byte) (n int, addr net.Addr, err error) {
+// ReadFrom reads the packet from the SOCKS5 server and extract the payload
+// The packet format is specified in https://datatracker.ietf.org/doc/html/rfc1928#section-7
+func (p *packetConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	lazySlice := udpPool.LazySlice()
 	buffer := lazySlice.Acquire()
 	defer lazySlice.Release()
-	n, err = p.pc.Read(buffer)
+
+	n, err := p.pc.Read(buffer)
 	if err != nil {
 		return 0, nil, err
 	}
-	// Minimum size of header is 10 bytes
-	// 2 bytes for reserved, 1 byte for fragment, 1 byte for address type, 4 byte for ipv4, 2 bytes for port
+	// Minimum packet size
 	if n < 10 {
 		return 0, nil, fmt.Errorf("invalid SOCKS5 UDP packet: too short")
 	}
 
-	pkt := buffer[:n]
+	// Using bytes.Buffer to handle data
+	buf := bytes.NewBuffer(buffer[:n])
 
-	// Start parsing the header
-	rsv := pkt[:2]
+	// Read and check reserved bytes
+	rsv := make([]byte, 2)
+	if _, err := buf.Read(rsv); err != nil {
+		return 0, nil, err
+	}
 	if rsv[0] != 0x00 || rsv[1] != 0x00 {
 		return 0, nil, fmt.Errorf("invalid reserved bytes: expected 0x0000, got %#x%#x", rsv[0], rsv[1])
 	}
 
-	frag := pkt[2]
+	// Read fragment byte
+	frag, err := buf.ReadByte()
+	if err != nil {
+		return 0, nil, err
+	}
 	if frag != 0 {
 		return 0, nil, errors.New("fragmentation is not supported")
 	}
 
-	// Do something with address?
-	address, addrLen, err := readAddress(bytes.NewReader(pkt[3:]))
+	// Read address using socks.ReadAddr which must now accept a bytes.Buffer directly
+	address, err := readAddr(buf)
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to read address: %w", err)
 	}
 
-	// Calculate the start position of the actual data
-	headerLength := 4 + addrLen + 2 // RSV (2) + FRAG (1) + ATYP (1) + ADDR (variable) + PORT (2)
-	if n < headerLength {
-		return 0, nil, fmt.Errorf("invalid SOCKS5 UDP packet: header too short")
+	// Convert the address to a net.Addr
+	addr, err := transport.MakeNetAddr("udp", address.String())
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to convert address: %w", err)
 	}
 
-	// Copy the payload into the provided buffer
-	payloadLength := n - headerLength
+	// Payload handling: remaining bytes in the buffer are the payload
+	payload := buf.Bytes()
+	payloadLength := len(payload)
 	if payloadLength > len(b) {
 		return 0, nil, io.ErrShortBuffer
 	}
-	copy(b, buffer[headerLength:n])
+	copy(b, payload)
 
-	addr, err = net.ResolveUDPAddr("udp", address)
-	if err != nil {
-		return 0, nil, fmt.Errorf("failed to resolve address: %w", err)
-	}
 	return payloadLength, addr, nil
 }
 
+// Writeto encapsulates the payload in a SOCKS5 UDP packet as specified in
+// https://datatracker.ietf.org/doc/html/rfc1928#section-7
+// and write it to the SOCKS5 server via the underlying connection.
 func (p *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
-	// Encapsulate the payload in a SOCKS5 UDP packet as specified in
-	// https://datatracker.ietf.org/doc/html/rfc1928#section-7
+
 	// The minimum preallocated header size (10 bytes)
-	header := make([]byte, 10)
-	header = append(header[:0],
+	lazySlice := udpPool.LazySlice()
+	buffer := lazySlice.Acquire()
+	defer lazySlice.Release()
+	buffer = append(buffer[:0],
 		0x00, 0x00, // Reserved
 		0x00, // Fragment number
 		// To be appended below:
 		// ATYP, IPv4, IPv6, Domain Name, Port
 	)
-	header, err := appendSOCKS5Address(header, addr.String())
+	buffer, err := appendSOCKS5Address(buffer, addr.String())
 	if err != nil {
 		return 0, fmt.Errorf("failed to append SOCKS5 address: %w", err)
 	}
 	// Combine the header and the payload
-	fullPacket := append(header, b...)
-	return p.pc.Write(fullPacket)
+	return p.pc.Write(append(buffer, b...))
 }
 
+// Close closes both the underlying stream and packet connections.
 func (p *packetConn) Close() error {
 	return errors.Join(p.sc.Close(), p.pc.Close())
 }
 
-// DialPacket creates a packet [net.Conn] via SOCKS5.
+// ListenPacket creates a [net.PacketConn] for dialing to SOCKS5 server.
 func (c *Client) ListenPacket(ctx context.Context) (net.PacketConn, error) {
 	// Connect to the SOCKS5 server and perform UDP association
-	sc, bindAddr, err := c.request(ctx, CmdUDPAssociate, "0.0.0.0:0")
+	// Since local address is not known in advance, we use unspecified address
+	// which means the server is going to accept incoming packets from any address
+	// on the bind port on the server. The bind address is determined and returned by
+	// the server.
+	// https://datatracker.ietf.org/doc/html/rfc1928#section-6
+	// Whoile binding address to specific client address has its advantages, it also creates some
+	// challenges such as NAT traveral if client is behind NAT.
+	sc, bindAddr, err := c.connectAndRequest(ctx, CmdUDPAssociate, "0.0.0.0:0")
 	if err != nil {
 		return nil, err
 	}
 
-	host, port, err := net.SplitHostPort(bindAddr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse bound address: %w", err)
-	}
-
-	if ipAddr := net.ParseIP(host); ipAddr != nil && ipAddr.IsUnspecified() {
+	// If the returned bind IP address is unspecified (i.e. "0.0.0.0" or "::"),
+	// then use the IP address of the SOCKS5 server
+	if ipAddr := bindAddr.IP; ipAddr != nil && ipAddr.IsUnspecified() {
 		schost, _, err := net.SplitHostPort(sc.RemoteAddr().String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse tcp address: %w", err)
 		}
-		host = schost
+		bindAddr.IP = net.ParseIP(schost)
 	}
 
-	packetEndpoint := &transport.PacketDialerEndpoint{Dialer: c.pd, Address: net.JoinHostPort(host, port)}
-	err = c.EnablePacketListener(packetEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("failed to enable packet listener: %w", err)
-	}
-
-	proxyConn, err := c.pe.ConnectPacket(ctx)
+	packetEndpoint := &transport.PacketDialerEndpoint{Dialer: c.pd, Address: bindAddr.String()}
+	proxyConn, err := packetEndpoint.ConnectPacket(ctx)
 	if err != nil {
 		sc.Close()
 		return nil, fmt.Errorf("could not connect to packet endpoint: %w", err)
 	}
 	return &packetConn{pc: proxyConn, sc: sc, dstAddr: proxyConn.RemoteAddr()}, nil
-}
-
-func (c *Client) EnablePacketListener(endpoint transport.PacketEndpoint) error {
-	if endpoint == nil {
-		return errors.New("argument endpoint must not be nil")
-	}
-	c.pe = endpoint
-	return nil
 }
