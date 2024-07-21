@@ -27,11 +27,11 @@ func TestSanitizeConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test that a invalid cypher is rejected.
-	sanitizedConfig, err := SanitizeConfig("split:5|ss://jhvdsjkfhvkhsadvf@example.com:1234?prefix=HTTP%2F1.1%20")
+	_, err = SanitizeConfig("split:5|ss://jhvdsjkfhvkhsadvf@example.com:1234?prefix=HTTP%2F1.1%20")
 	require.Error(t, err)
 
 	// Test that a valid config is accepted and user info is redacted.
-	sanitizedConfig, err = SanitizeConfig("split:5|ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpLeTUyN2duU3FEVFB3R0JpQ1RxUnlT@example.com:1234?prefix=HTTP%2F1.1%20")
+	sanitizedConfig, err := SanitizeConfig("split:5|ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpLeTUyN2duU3FEVFB3R0JpQ1RxUnlT@example.com:1234?prefix=HTTP%2F1.1%20")
 	require.NoError(t, err)
 	require.Equal(t, "split:5|ss://REDACTED@example.com:1234?prefix=HTTP%2F1.1+", sanitizedConfig)
 
