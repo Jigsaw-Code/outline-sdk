@@ -44,9 +44,11 @@ func wrapStreamDialerWithSOCKS5(innerSD func() (transport.StreamDialer, error), 
 	return client, nil
 }
 
-func wrapPacketDialerWithSOCKS5(_ func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), configURL *url.URL) (transport.PacketDialer, error) {
-	// Use a TCP dialer to connect to the SOCKS5 server.
-	sd := &transport.TCPDialer{}
+func wrapPacketDialerWithSOCKS5(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), configURL *url.URL) (transport.PacketDialer, error) {
+	sd, err := innerSD()
+	if err != nil {
+		return nil, err
+	}
 	streamEndpoint := transport.StreamDialerEndpoint{Dialer: sd, Address: configURL.Host}
 	client, err := socks5.NewClient(&streamEndpoint)
 	if err != nil {
