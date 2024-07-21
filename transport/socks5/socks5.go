@@ -87,6 +87,29 @@ const (
 	addrTypeIPv6 = 0x04
 )
 
+// address is a SOCKS-specific address.
+// Either Name or IP is used exclusively.
+type address struct {
+	Name string // fully-qualified domain name
+	IP   net.IP
+	Port int
+}
+
+func (a *address) Network() string { return "socks5" }
+
+// Address returns a string suitable to dial; prefer returning IP-based
+// address, fallback to Name
+func (a *address) String() string {
+	if a == nil {
+		return ""
+	}
+	port := strconv.Itoa(a.Port)
+	if a.IP != nil {
+		return net.JoinHostPort(a.IP.String(), port)
+	}
+	return net.JoinHostPort(a.Name, port)
+}
+
 // appendSOCKS5Address adds the address to buffer b in SOCKS5 format,
 // as specified in https://datatracker.ietf.org/doc/html/rfc1928#section-4
 func appendSOCKS5Address(b []byte, address string) ([]byte, error) {
@@ -128,46 +151,44 @@ func appendSOCKS5Address(b []byte, address string) ([]byte, error) {
 	return b, nil
 }
 
-func readAddress(reader io.Reader) (string, int, error) {
-	// Read the address type
-	// The maximum buffer size is:
-	// 1 address type + 1 address length + 256 (max domain name length)
-	var buffer [1 + 1 + 256]byte
-	addrLen := 0
-	_, err := io.ReadFull(reader, buffer[:1])
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to read address type: %w", err)
+func readAddr(r io.Reader) (*address, error) {
+	address := &address{}
+
+	var addrType [1]byte
+	if _, err := r.Read(addrType[:]); err != nil {
+		return nil, err
 	}
-	// Read the address type
-	switch buffer[0] {
+
+	switch addrType[0] {
 	case addrTypeIPv4:
-		addrLen = 4
-	case addrTypeIPv6:
-		addrLen = 16
-	case addrTypeDomainName:
-		// Domain name's first byte is the length of the name
-		// Read domainAddrLen
-		_, err := io.ReadFull(reader, buffer[1:])
-		if err != nil {
-			return "", 0, fmt.Errorf("failed to read domain address length: %w", err)
+		addr := make(net.IP, net.IPv4len)
+		if _, err := io.ReadFull(r, addr); err != nil {
+			return nil, err
 		}
-		addrLen = int(buffer[1])
+		address.IP = addr
+	case addrTypeIPv6:
+		addr := make(net.IP, net.IPv6len)
+		if _, err := io.ReadFull(r, addr); err != nil {
+			return nil, err
+		}
+		address.IP = addr
+	case addrTypeDomainName:
+		if _, err := r.Read(addrType[:]); err != nil {
+			return nil, err
+		}
+		addrLen := int(addrType[0])
+		fqdn := make([]byte, addrLen)
+		if _, err := io.ReadFull(r, fqdn); err != nil {
+			return nil, err
+		}
+		address.Name = string(fqdn)
 	default:
-		return "", 0, fmt.Errorf("unknown address type %#x", buffer[0])
+		return nil, errors.New("unrecognized address type")
 	}
-	// Read host address
-	_, err = io.ReadFull(reader, buffer[:addrLen])
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to read address: %w", err)
+	var port [2]byte
+	if _, err := io.ReadFull(r, port[:]); err != nil {
+		return nil, err
 	}
-	host := net.IP(buffer[:addrLen]).String()
-	// Read port number
-	_, err = io.ReadFull(reader, buffer[:2])
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to read port: %w", err)
-	}
-	p := binary.BigEndian.Uint16(buffer[:2])
-	portStr := strconv.FormatUint(uint64(p), 10)
-	addr := net.JoinHostPort(host, portStr)
-	return addr, addrLen, nil
+	address.Port = int(binary.BigEndian.Uint16(port[:]))
+	return address, nil
 }
