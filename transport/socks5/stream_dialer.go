@@ -41,7 +41,6 @@ func NewClient(streamEndpoint transport.StreamEndpoint) (*Client, error) {
 
 type Client struct {
 	se   transport.StreamEndpoint
-	pe   transport.PacketEndpoint
 	pd   transport.PacketDialer
 	cred *credentials
 }
@@ -72,18 +71,9 @@ func (c *Client) EnablePacket(packetDialer transport.PacketDialer) {
 	c.pd = packetDialer
 }
 
-func (c *Client) request(ctx context.Context, cmd byte, dstAddr string) (transport.StreamConn, string, error) {
-	proxyConn, err := c.se.ConnectStream(ctx)
-	if err != nil {
-		return nil, "", fmt.Errorf("could not connect to SOCKS5 proxy: %w", err)
-	}
-	dialSuccess := false
-	defer func() {
-		if !dialSuccess {
-			proxyConn.Close()
-		}
-	}()
-
+// request sends a SOCKS5 request to the server to perform a command (e.g., connect, udp associate),
+// performs authentication (if provided), returns the bound address.
+func (c *Client) request(conn io.ReadWriter, cmd byte, dstAddr string) (*address, error) {
 	// For protocol details, see https://datatracker.ietf.org/doc/html/rfc1928#section-3
 	// Creating a single buffer for method selection, authentication, and connection request
 	// Buffer large enough for method, auth, and connect requests with a domain name address.
@@ -129,17 +119,17 @@ func (c *Client) request(ctx context.Context, cmd byte, dstAddr string) (transpo
 	// +----+-----+-------+------+----------+----------+
 	b = append(b, 5, cmd, 0)
 	// TODO: Probably more memory efficient if remoteAddr is added to the buffer directly.
-	b, err = appendSOCKS5Address(b, dstAddr)
+	b, err := appendSOCKS5Address(b, dstAddr)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to create SOCKS5 address: %w", err)
+		return nil, fmt.Errorf("failed to create SOCKS5 address: %w", err)
 	}
 
 	// We merge the method and CMD requests and only perform one write
 	// because we send a single authentication method, so there's no point
 	// in waiting for the response. This eliminates a roundtrip.
-	_, err = proxyConn.Write(b)
+	_, err = conn.Write(b)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to write combined SOCKS5 request: %w", err)
+		return nil, fmt.Errorf("failed to write combined SOCKS5 request: %w", err)
 	}
 
 	// Reading the response:
@@ -151,11 +141,11 @@ func (c *Client) request(ctx context.Context, cmd byte, dstAddr string) (transpo
 	// +----+--------+
 	// buffer[0]: VER, buffer[1]: METHOD
 	// Reuse buffer for better performance.
-	if _, err = io.ReadFull(proxyConn, buffer[:2]); err != nil {
-		return nil, "", fmt.Errorf("failed to read method server response: %w", err)
+	if _, err = io.ReadFull(conn, buffer[:2]); err != nil {
+		return nil, fmt.Errorf("failed to read method server response: %w", err)
 	}
 	if buffer[0] != 5 {
-		return nil, "", fmt.Errorf("invalid protocol version %v. Expected 5", buffer[0])
+		return nil, fmt.Errorf("invalid protocol version %v. Expected 5", buffer[0])
 	}
 
 	switch buffer[1] {
@@ -171,17 +161,17 @@ func (c *Client) request(ctx context.Context, cmd byte, dstAddr string) (transpo
 		// +----+--------+
 		// VER = 1 means the server should be expecting username/password authentication.
 		// buffer[2]: VER, buffer[3]: STATUS
-		if _, err = io.ReadFull(proxyConn, buffer[2:4]); err != nil {
-			return nil, "", fmt.Errorf("failed to read authentication version and status: %w", err)
+		if _, err = io.ReadFull(conn, buffer[2:4]); err != nil {
+			return nil, fmt.Errorf("failed to read authentication version and status: %w", err)
 		}
 		if buffer[2] != 1 {
-			return nil, "", fmt.Errorf("invalid authentication version %v. Expected 1", buffer[2])
+			return nil, fmt.Errorf("invalid authentication version %v. Expected 1", buffer[2])
 		}
 		if buffer[3] != 0 {
-			return nil, "", fmt.Errorf("authentication failed: %v", buffer[3])
+			return nil, fmt.Errorf("authentication failed: %v", buffer[3])
 		}
 	default:
-		return nil, "", fmt.Errorf("unsupported SOCKS authentication method %v. Expected 2", buffer[1])
+		return nil, fmt.Errorf("unsupported SOCKS authentication method %v. Expected 2", buffer[1])
 	}
 
 	// 3. Read connect response (VER, REP, RSV, ATYP, BND.ADDR, BND.PORT).
@@ -195,26 +185,48 @@ func (c *Client) request(ctx context.Context, cmd byte, dstAddr string) (transpo
 	// buffer[1]: REP
 	// buffer[2]: RSV
 	// buffer[3]: ATYP
-	if _, err = io.ReadFull(proxyConn, buffer[:3]); err != nil {
-		return nil, "", fmt.Errorf("failed to read connect server response: %w", err)
+	if _, err = io.ReadFull(conn, buffer[:3]); err != nil {
+		return nil, fmt.Errorf("failed to read connect server response: %w", err)
 	}
 
 	if buffer[0] != 5 {
-		return nil, "", fmt.Errorf("invalid protocol version %v. Expected 5", buffer[0])
+		return nil, fmt.Errorf("invalid protocol version %v. Expected 5", buffer[0])
 	}
 
 	// if REP is not 0, it means the server returned an error.
 	if buffer[1] != 0 {
-		return nil, "", ReplyCode(buffer[1])
+		return nil, ReplyCode(buffer[1])
 	}
 
 	// 4. Read BND.ADDR.
-	bindAddr, _, err := readAddress(proxyConn)
+	bindAddr, err := readAddr(conn)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to read bound address: %w", err)
+		return nil, fmt.Errorf("failed to read bound address: %w", err)
 	}
 
-	dialSuccess = true
+	return bindAddr, nil
+}
+
+// connectAndRequest manages the connection lifecycle and delegates the SOCKS5 communication to the request function.
+func (c *Client) connectAndRequest(ctx context.Context, cmd byte, dstAddr string) (transport.StreamConn, *address, error) {
+	proxyConn, err := c.se.ConnectStream(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not connect to SOCKS5 proxy: %w", err)
+	}
+
+	// Close the connection if an error occurs in any subsequent steps
+	// to avoid keeping the connection open.
+	defer func(conn transport.StreamConn) {
+		if conn != nil && err != nil {
+			conn.Close()
+		}
+	}(proxyConn)
+
+	bindAddr, err := c.request(proxyConn, cmd, dstAddr)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return proxyConn, bindAddr, nil
 }
 
@@ -224,7 +236,7 @@ func (c *Client) request(ctx context.Context, cmd byte, dstAddr string) (transpo
 // The returned [error] will be of type [ReplyCode] if the server sends a SOCKS error reply code, which
 // you can check against the error constants in this package using [errors.Is].
 func (c *Client) DialStream(ctx context.Context, dstAddr string) (transport.StreamConn, error) {
-	proxyConn, _, err := c.request(ctx, CmdConnect, dstAddr)
+	proxyConn, _, err := c.connectAndRequest(ctx, CmdConnect, dstAddr)
 	if err != nil {
 		return nil, err
 	}
