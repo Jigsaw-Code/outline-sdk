@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"strconv"
 )
 
@@ -91,20 +92,18 @@ const (
 // Either Name or IP is used exclusively.
 type address struct {
 	Name string // fully-qualified domain name
-	IP   net.IP
-	Port int
+	IP   netip.Addr
+	Port uint16
 }
-
-func (a *address) Network() string { return "socks5" }
 
 // Address returns a string suitable to dial; prefer returning IP-based
 // address, fallback to Name
-func (a *address) String() string {
+func addrToString(a *address) string {
 	if a == nil {
 		return ""
 	}
-	port := strconv.Itoa(a.Port)
-	if a.IP != nil {
+	port := strconv.Itoa(int(a.Port))
+	if a.IP.IsValid() {
 		return net.JoinHostPort(a.IP.String(), port)
 	}
 	return net.JoinHostPort(a.Name, port)
@@ -161,17 +160,17 @@ func readAddr(r io.Reader) (*address, error) {
 
 	switch addrType[0] {
 	case addrTypeIPv4:
-		addr := make(net.IP, net.IPv4len)
-		if _, err := io.ReadFull(r, addr); err != nil {
+		var addr [4]byte
+		if _, err := io.ReadFull(r, addr[:]); err != nil {
 			return nil, err
 		}
-		address.IP = addr
+		address.IP = netip.AddrFrom4(addr)
 	case addrTypeIPv6:
-		addr := make(net.IP, net.IPv6len)
-		if _, err := io.ReadFull(r, addr); err != nil {
+		var addr [16]byte
+		if _, err := io.ReadFull(r, addr[:]); err != nil {
 			return nil, err
 		}
-		address.IP = addr
+		address.IP = netip.AddrFrom16(addr)
 	case addrTypeDomainName:
 		if _, err := r.Read(addrType[:]); err != nil {
 			return nil, err
@@ -189,6 +188,6 @@ func readAddr(r io.Reader) (*address, error) {
 	if _, err := io.ReadFull(r, port[:]); err != nil {
 		return nil, err
 	}
-	address.Port = int(binary.BigEndian.Uint16(port[:]))
+	address.Port = binary.BigEndian.Uint16(port[:])
 	return address, nil
 }
