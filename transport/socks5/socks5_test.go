@@ -16,7 +16,8 @@ package socks5
 
 import (
 	"bytes"
-	"net"
+	"io"
+	"net/netip"
 	"strings"
 	"testing"
 
@@ -33,31 +34,57 @@ func TestReadAddr(t *testing.T) {
 
 		{
 			name:    "IPv4 Example",
-			input:   append([]byte{addrTypeIPv4}, append(net.IPv4(192, 168, 1, 1).To4(), []byte{0x01, 0xF4}...)...),
-			want:    &address{IP: net.IPv4(192, 168, 1, 1), Port: 500},
+			input:   []byte{addrTypeIPv4, 192, 168, 1, 1, 0x01, 0xF4},
+			want:    &address{IP: netip.AddrFrom4([4]byte{192, 168, 1, 1}), Port: 500},
 			wantErr: false,
 		},
 		{
-			name:    "IPv6 Full",
-			input:   append([]byte{addrTypeIPv6}, append(net.ParseIP("2001:db8::1").To16(), []byte{0x04, 0xD2}...)...),
-			want:    &address{IP: net.ParseIP("2001:db8::1"), Port: 1234},
+			name: "IPv6 Full",
+			input: []byte{
+				addrTypeIPv6,
+				0x20, 0x01, 0x0d, 0xb8, // first 4 bytes of the IPv6 address
+				0x00, 0x00, 0x00, 0x00, // middle zeroes are often omitted in shorthand notation
+				0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x01, // last segment with the "1"
+				0x04, 0xD2, // port number 1234
+			},
+			want:    &address{IP: netip.MustParseAddr("2001:db8::1"), Port: 1234},
 			wantErr: false,
 		},
 		{
-			name:    "IPv6 Compressed",
-			input:   append([]byte{addrTypeIPv6}, append(net.ParseIP("fe80::204:61ff:fe9d:f156").To16(), []byte{0x00, 0x50}...)...),
-			want:    &address{IP: net.ParseIP("fe80::204:61ff:fe9d:f156"), Port: 80},
+			name: "IPv6 Compressed",
+			input: []byte{
+				addrTypeIPv6,
+				0xfe, 0x80, 0x00, 0x00, // first 4 bytes with "fe80", and then three zeroed segments
+				0x00, 0x00, 0x00, 0x00,
+				0x02, 0x04, 0x61, 0xff, // "0204:61ff"
+				0xfe, 0x9d, 0xf1, 0x56, // "fe9d:f156"
+				0x00, 0x50, // port number 80 in hexadecimal
+			},
+			want:    &address{IP: netip.MustParseAddr("fe80::204:61ff:fe9d:f156"), Port: 80},
 			wantErr: false,
 		},
 		{
-			name:    "IPv6 Loopback",
-			input:   append([]byte{addrTypeIPv6}, append(net.IPv6loopback.To16(), []byte{0x1F, 0x90}...)...),
-			want:    &address{IP: net.IPv6loopback, Port: 8080},
+			name: "IPv6 Loopback",
+			input: []byte{
+				addrTypeIPv6,
+				0x00, 0x00, 0x00, 0x00, // eight zeroed-out segments
+				0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x01, // last segment is "0001"
+				0x1F, 0x90, // port number 8080 in hexadecimal
+			},
+			want:    &address{IP: netip.IPv6Loopback(), Port: 8080},
 			wantErr: false,
 		},
 		{
-			name:    "Domain Short",
-			input:   append([]byte{addrTypeDomainName, 0x0b}, append([]byte("example.com"), []byte{0x23, 0x28}...)...),
+			name: "Domain Short",
+			input: []byte{
+				addrTypeDomainName,                                    // Address type for domain name
+				0x0b,                                                  // Length of the domain name "example.com" which is 11 characters
+				'e', 'x', 'a', 'm', 'p', 'l', 'e', '.', 'c', 'o', 'm', // The domain name "example.com"
+				0x23, 0x28, // Port number 9000 in hexadecimal
+			},
 			want:    &address{Name: "example.com", Port: 9000},
 			wantErr: false,
 		},
@@ -98,11 +125,45 @@ func TestReadAddr(t *testing.T) {
 	}
 }
 
+func BenchmarkReadAddr(b *testing.B) {
+	tests := []struct {
+		name  string
+		input []byte
+	}{
+		{
+			name:  "IPv4",
+			input: append([]byte{addrTypeIPv4}, append(netip.AddrFrom4([4]byte{192, 168, 1, 1}).AsSlice(), []byte{0x00, 0x50}...)...),
+		},
+		{
+			name:  "IPv6",
+			input: append([]byte{addrTypeIPv6}, append(netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}).AsSlice(), []byte{0x1F, 0x90}...)...),
+		},
+		{
+			name:  "Domain",
+			input: append([]byte{addrTypeDomainName, 0x0b}, append([]byte("example.com"), []byte{0x23, 0x28}...)...),
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			reader := bytes.NewReader(tt.input)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				reader.Seek(0, io.SeekStart)
+				_, err := readAddr(reader)
+				if err != nil {
+					b.Error("readAddr failed:", err)
+				}
+			}
+		})
+	}
+}
+
 func compareAddresses(a1, a2 *address) bool {
 	if a1 == nil || a2 == nil {
 		return a1 == a2
 	}
-	if a1.IP != nil && !a1.IP.Equal(a2.IP) || a1.Name != a2.Name || a1.Port != a2.Port {
+	if (a1.IP != netip.Addr{}) && a1.IP != a2.IP || a1.Name != a2.Name || a1.Port != a2.Port {
 		return false
 	}
 	return true
