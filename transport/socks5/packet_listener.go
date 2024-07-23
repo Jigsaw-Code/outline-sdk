@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/internal/slicepool"
@@ -34,19 +35,14 @@ const clientUDPBufferSize = 16 * 1024
 var udpPool = slicepool.MakePool(clientUDPBufferSize)
 
 type packetConn struct {
-	dstAddr net.Addr
-	pc      net.Conn
-	sc      transport.StreamConn
+	pc net.Conn
+	sc io.Closer
 }
 
 var _ net.PacketConn = (*packetConn)(nil)
 
 func (p *packetConn) LocalAddr() net.Addr {
 	return p.pc.LocalAddr()
-}
-
-func (p *packetConn) RemoteAddr() net.Addr {
-	return p.dstAddr
 }
 
 func (p *packetConn) SetDeadline(t time.Time) error {
@@ -105,7 +101,7 @@ func (p *packetConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	}
 
 	// Convert the address to a net.Addr
-	addr, err := transport.MakeNetAddr("udp", address.String())
+	addr, err := transport.MakeNetAddr("udp", addrToString(address))
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to convert address: %w", err)
 	}
@@ -121,7 +117,7 @@ func (p *packetConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	return payloadLength, addr, nil
 }
 
-// Writeto encapsulates the payload in a SOCKS5 UDP packet as specified in
+// WriteTo encapsulates the payload in a SOCKS5 UDP packet as specified in
 // https://datatracker.ietf.org/doc/html/rfc1928#section-7
 // and write it to the SOCKS5 server via the underlying connection.
 func (p *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
@@ -166,19 +162,22 @@ func (c *Client) ListenPacket(ctx context.Context) (net.PacketConn, error) {
 
 	// If the returned bind IP address is unspecified (i.e. "0.0.0.0" or "::"),
 	// then use the IP address of the SOCKS5 server
-	if ipAddr := bindAddr.IP; ipAddr != nil && ipAddr.IsUnspecified() {
+	if ipAddr := bindAddr.IP; ipAddr.IsValid() && ipAddr.IsUnspecified() {
 		schost, _, err := net.SplitHostPort(sc.RemoteAddr().String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse tcp address: %w", err)
 		}
-		bindAddr.IP = net.ParseIP(schost)
+
+		bindAddr.IP, err = netip.ParseAddr(schost)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse bind address: %w", err)
+		}
 	}
 
-	packetEndpoint := &transport.PacketDialerEndpoint{Dialer: c.pd, Address: bindAddr.String()}
-	proxyConn, err := packetEndpoint.ConnectPacket(ctx)
+	proxyConn, err := c.pd.DialPacket(ctx, addrToString(bindAddr))
 	if err != nil {
 		sc.Close()
 		return nil, fmt.Errorf("could not connect to packet endpoint: %w", err)
 	}
-	return &packetConn{pc: proxyConn, sc: sc, dstAddr: proxyConn.RemoteAddr()}, nil
+	return &packetConn{pc: proxyConn, sc: sc}, nil
 }
