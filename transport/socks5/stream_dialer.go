@@ -214,16 +214,9 @@ func (c *Client) connectAndRequest(ctx context.Context, cmd byte, dstAddr string
 		return nil, nil, fmt.Errorf("could not connect to SOCKS5 proxy: %w", err)
 	}
 
-	// Close the connection if an error occurs in any subsequent steps
-	// to avoid keeping the connection open.
-	defer func(conn transport.StreamConn) {
-		if conn != nil && err != nil {
-			conn.Close()
-		}
-	}(proxyConn)
-
 	bindAddr, err := c.request(proxyConn, cmd, dstAddr)
 	if err != nil {
+		proxyConn.Close()
 		return nil, nil, err
 	}
 
