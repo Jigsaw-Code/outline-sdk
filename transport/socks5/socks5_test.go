@@ -90,7 +90,7 @@ func TestReadAddr(t *testing.T) {
 		},
 		{
 			name:    "Domain Long",
-			input:   append([]byte{addrTypeDomainName, 0x3B}, append([]byte("very-long-domain-name-used-for-testing-purposes.example.com"), []byte{0x00, 0x50}...)...),
+			input:   append([]byte{addrTypeDomainName, 0x3B}, append([]byte("very-long-domain-name-used-for-testing-purposes.example.com"), 0x00, 0x50)...),
 			want:    &address{Name: "very-long-domain-name-used-for-testing-purposes.example.com", Port: 80},
 			wantErr: false,
 		},
