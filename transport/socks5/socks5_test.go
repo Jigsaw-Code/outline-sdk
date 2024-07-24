@@ -35,7 +35,7 @@ func TestReadAddr(t *testing.T) {
 		{
 			name:    "IPv4 Example",
 			input:   []byte{addrTypeIPv4, 192, 168, 1, 1, 0x01, 0xF4},
-			want:    &address{IP: netip.AddrFrom4([4]byte{192, 168, 1, 1}), Port: 500},
+			want:    &address{IP: netip.MustParseAddr("192.168.1.1"), Port: 500},
 			wantErr: false,
 		},
 		{
