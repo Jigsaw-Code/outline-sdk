@@ -177,7 +177,7 @@ func readAddr(r io.Reader) (*address, error) {
 		}
 		addrLen := int(addrType[0])
 		if addrLen > 255 {
-			return nil, fmt.Errorf("domain name length = %v is over 255", addrLen)
+			return nil, fmt.Errorf("domain name length %v is over 255", addrLen)
 		}
 		fqdn := make([]byte, addrLen)
 		if _, err := io.ReadFull(r, fqdn); err != nil {
