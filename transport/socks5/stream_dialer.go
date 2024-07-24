@@ -30,7 +30,7 @@ type credentials struct {
 	password []byte
 }
 
-// NewDialer creates a [transport.StreamDialer] that routes connections to a SOCKS5
+// NewClient creates a SOCKS5 client that routes connections to a SOCKS5
 // proxy listening at the given [transport.StreamEndpoint].
 func NewClient(streamEndpoint transport.StreamEndpoint) (*Client, error) {
 	if streamEndpoint == nil {
