@@ -70,7 +70,7 @@ func (p *packetConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	}
 	// Minimum packet size
 	if n < 10 {
-		return 0, nil, fmt.Errorf("invalid SOCKS5 UDP packet: too short")
+		return 0, nil, errors.New("invalid SOCKS5 UDP packet: too short")
 	}
 
 	// Using bytes.Buffer to handle data
