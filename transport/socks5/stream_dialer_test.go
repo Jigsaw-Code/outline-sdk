@@ -218,8 +218,10 @@ func TestConnectWithAuth(t *testing.T) {
 		defer listener.Close()
 		require.NoError(t, err)
 	}()
-	// wait for server to start
-	time.Sleep(10 * time.Millisecond)
+	// wait for server to start.
+	ready := make(chan bool, 1)
+	go waitUntilServerReady(address, ready)
+	<-ready
 
 	dialer, err := NewClient(&transport.TCPEndpoint{Address: address})
 	require.NotNil(t, dialer)

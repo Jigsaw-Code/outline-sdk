@@ -19,7 +19,7 @@ func TestSOCKS5Associate(t *testing.T) {
 	// message with "pong" response
 	locIP := net.ParseIP("127.0.0.1")
 	// Create a local listener
-	echoServerAddr := &net.UDPAddr{IP: locIP, Port: 12199}
+	echoServerAddr := &net.UDPAddr{IP: locIP, Port: 0}
 	echoServer := setupUDPEchoServer(t, echoServerAddr)
 	defer echoServer.Close()
 
@@ -29,17 +29,25 @@ func TestSOCKS5Associate(t *testing.T) {
 	}}
 	proxySrv := socks5.NewServer(
 		socks5.WithAuthMethods([]socks5.Authenticator{cator}),
-		//socks5.WithLogger(socks5.NewLogger(log.New(os.Stdout, "socks5: ", log.LstdFlags))),
 	)
-	// Start listening
-	proxyServerAddress := "127.0.0.1:12355"
+
+	// Create SOCKS5 proxy on localhost with a random port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	proxyServerAddress := listener.Addr().String()
+
 	go func() {
-		err := proxySrv.ListenAndServe("tcp", proxyServerAddress)
+		err := proxySrv.Serve(listener)
+		defer listener.Close()
 		require.NoError(t, err)
 	}()
-	time.Sleep(10 * time.Millisecond)
 
-	// Connect, auth and connec to local server
+	// Wait until the server is ready.
+	ready := make(chan bool, 1)
+	go waitUntilServerReady(proxyServerAddress, ready)
+	<-ready
+
+	// Connect to local proxy, auth and start the PacketConn.
 	client, err := NewClient(&transport.TCPEndpoint{Address: proxyServerAddress})
 	require.NotNil(t, client)
 	require.NoError(t, err)
@@ -50,29 +58,27 @@ func TestSOCKS5Associate(t *testing.T) {
 	require.NoError(t, err)
 	defer conn.Close()
 
-	// Send "ping" message
-	_, err = conn.WriteTo([]byte("ping"), echoServerAddr)
+	// Send "ping" message.
+	_, err = conn.WriteTo([]byte("ping"), echoServer.LocalAddr())
 	require.NoError(t, err)
-	// max wait time for response
+	// Max wait time for response.
 	conn.SetDeadline(time.Now().Add(time.Second))
 	response := make([]byte, 1024)
 	n, addr, err := conn.ReadFrom(response)
-	require.Equal(t, echoServerAddr, addr)
-	//conn.SetDeadline(time.Time{})
+	require.Equal(t, echoServer.LocalAddr().String(), addr.String())
 	require.NoError(t, err)
 	require.Equal(t, []byte("pong"), response[:n])
 }
 
 func TestUDPLoopBack(t *testing.T) {
-	// Create a local listener
+	// Create a local listener.
 	locIP := net.ParseIP("127.0.0.1")
-	// Create a local listener
-	echoServerAddr := &net.UDPAddr{IP: locIP, Port: 12199}
+	echoServerAddr := &net.UDPAddr{IP: locIP, Port: 0}
 	echoServer := setupUDPEchoServer(t, echoServerAddr)
 	defer echoServer.Close()
 
 	packDialer := transport.UDPDialer{}
-	conn, err := packDialer.DialPacket(context.Background(), echoServerAddr.String())
+	conn, err := packDialer.DialPacket(context.Background(), echoServer.LocalAddr().String())
 	require.NoError(t, err)
 	conn.Write([]byte("ping"))
 	response := make([]byte, 1024)
@@ -89,10 +95,8 @@ func setupUDPEchoServer(t *testing.T, serverAddr *net.UDPAddr) *net.UDPConn {
 		for {
 			n, remote, err := server.ReadFrom(buf)
 			if err != nil {
-				//log.Printf("Error reading: %v", err)
 				return
 			}
-			//log.Printf("Received %s from %s\n", buf[:n], remote.String())
 			if bytes.Equal(buf[:n], []byte("ping")) {
 				server.WriteTo([]byte("pong"), remote)
 			}
@@ -104,4 +108,16 @@ func setupUDPEchoServer(t *testing.T, serverAddr *net.UDPAddr) *net.UDPConn {
 	})
 
 	return server
+}
+
+func waitUntilServerReady(addr string, ready chan<- bool) {
+	for {
+		conn, err := net.Dial("tcp", addr)
+		if err == nil {
+			conn.Close()
+			ready <- true
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
