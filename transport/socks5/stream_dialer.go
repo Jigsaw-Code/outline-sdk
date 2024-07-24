@@ -67,6 +67,7 @@ func (c *Client) SetCredentials(username, password []byte) error {
 	return nil
 }
 
+// EnablePacket enables the use of the [Client] as a [transport.PacketListener]. It takes the [transport.PacketDialer] used to connect to the SOCKS5 packet endpoint.
 func (c *Client) EnablePacket(packetDialer transport.PacketDialer) {
 	c.pd = packetDialer
 }
