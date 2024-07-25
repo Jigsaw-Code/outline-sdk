@@ -34,7 +34,6 @@ func TestSOCKS5Associate(t *testing.T) {
 	// Create SOCKS5 proxy on localhost with a random port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	defer listener.Close()
 	proxyServerAddress := listener.Addr().String()
 
 	go func() {
