@@ -14,16 +14,16 @@ import (
 )
 
 func TestSOCKS5Associate(t *testing.T) {
-	// Create a local listener
+	// Create a local listener.
 	// This creates a UDP server that responded to "ping"
-	// message with "pong" response
+	// message with "pong" response.
 	locIP := net.ParseIP("127.0.0.1")
 	// Create a local listener
 	echoServerAddr := &net.UDPAddr{IP: locIP, Port: 0}
 	echoServer := setupUDPEchoServer(t, echoServerAddr)
 	defer echoServer.Close()
 
-	// Create a socks server to proxy "ping" message
+	// Create a socks server to proxy "ping" message.
 	cator := socks5.UserPassAuthenticator{Credentials: socks5.StaticCredentials{
 		"testusername": "testpassword",
 	}}
@@ -31,7 +31,7 @@ func TestSOCKS5Associate(t *testing.T) {
 		socks5.WithAuthMethods([]socks5.Authenticator{cator}),
 	)
 
-	// Create SOCKS5 proxy on localhost with a random port
+	// Create SOCKS5 proxy on localhost with a random port.
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	proxyServerAddress := listener.Addr().String()
@@ -41,11 +41,6 @@ func TestSOCKS5Associate(t *testing.T) {
 		defer listener.Close()
 		require.NoError(t, err)
 	}()
-
-	// Wait until the server is ready.
-	ready := make(chan bool, 1)
-	go waitUntilServerReady(proxyServerAddress, ready)
-	<-ready
 
 	// Connect to local proxy, auth and start the PacketConn.
 	client, err := NewClient(&transport.TCPEndpoint{Address: proxyServerAddress})
@@ -108,16 +103,4 @@ func setupUDPEchoServer(t *testing.T, serverAddr *net.UDPAddr) *net.UDPConn {
 	})
 
 	return server
-}
-
-func waitUntilServerReady(addr string, ready chan<- bool) {
-	for {
-		conn, err := net.Dial("tcp", addr)
-		if err == nil {
-			conn.Close()
-			ready <- true
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
 }
