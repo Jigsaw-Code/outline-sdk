@@ -175,10 +175,9 @@ func readAddr(r io.Reader) (*address, error) {
 		if _, err := r.Read(addrType[:]); err != nil {
 			return nil, err
 		}
-		addrLen := int(addrType[0])
-		if addrLen > 255 {
-			return nil, fmt.Errorf("domain name length %v is over 255", addrLen)
-		}
+		addrLen := addrType[0]
+		// addrLen btye type maximum value is 255 which
+		// prevents passing larger then 255 values for domain names.
 		fqdn := make([]byte, addrLen)
 		if _, err := io.ReadFull(r, fqdn); err != nil {
 			return nil, err
