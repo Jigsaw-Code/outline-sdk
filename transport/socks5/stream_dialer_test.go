@@ -23,7 +23,6 @@ import (
 	"sync"
 	"testing"
 	"testing/iotest"
-	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/stretchr/testify/assert"
@@ -168,10 +167,10 @@ func testExchange(tb testing.TB, listener *net.TCPListener, destAddr string, req
 }
 
 func TestConnectWithoutAuth(t *testing.T) {
-	// Create a SOCKS5 server
+	// Create a SOCKS5 server.
 	server := socks5.NewServer()
 
-	// Create SOCKS5 proxy on localhost with a random port
+	// Create SOCKS5 proxy on localhost with a random port.
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
@@ -182,12 +181,9 @@ func TestConnectWithoutAuth(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	// wait for server to start
-	time.Sleep(10 * time.Millisecond)
-
 	address := listener.Addr().String()
 
-	// Create a SOCKS5 client
+	// Create a SOCKS5 client.
 	client, err := NewClient(&transport.TCPEndpoint{Address: address})
 	require.NotNil(t, client)
 	require.NoError(t, err)
@@ -207,7 +203,7 @@ func TestConnectWithAuth(t *testing.T) {
 		socks5.WithAuthMethods([]socks5.Authenticator{cator}),
 	)
 
-	// Create SOCKS5 proxy on localhost with a random port
+	// Create SOCKS5 proxy on localhost with a random port.
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	address := listener.Addr().String()
@@ -218,10 +214,6 @@ func TestConnectWithAuth(t *testing.T) {
 		defer listener.Close()
 		require.NoError(t, err)
 	}()
-	// wait for server to start.
-	ready := make(chan bool, 1)
-	go waitUntilServerReady(address, ready)
-	<-ready
 
 	dialer, err := NewClient(&transport.TCPEndpoint{Address: address})
 	require.NotNil(t, dialer)
@@ -231,7 +223,7 @@ func TestConnectWithAuth(t *testing.T) {
 	_, err = dialer.DialStream(context.Background(), address)
 	require.NoError(t, err)
 
-	// Try to connect with incorrect credentials
+	// Try to connect with incorrect credentials.
 	err = dialer.SetCredentials([]byte("testusername"), []byte("wrongpassword"))
 	require.NoError(t, err)
 	_, err = dialer.DialStream(context.Background(), address)
