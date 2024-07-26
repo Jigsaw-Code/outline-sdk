@@ -1,3 +1,5 @@
+github.com/Jigsaw-Code/outline-sdk v0.0.15 h1:2OfYum4vllfIgoDa/X9drA2I57knXFPREv4kMZkjTuI=
+github.com/Jigsaw-Code/outline-sdk v0.0.15/go.mod h1:e1oQZbSdLJBBuHgfeQsgEkvkuyIePPwstUeZRGq0KO8=
 github.com/Jigsaw-Code/outline-sdk v0.0.17-0.20240708052545-4f51b366fe75 h1:1t6cnyP4liW9hjmnVrDn6Bc5m2qlAcjPurf9UEye4Hg=
 github.com/Jigsaw-Code/outline-sdk v0.0.17-0.20240708052545-4f51b366fe75/go.mod h1:e1oQZbSdLJBBuHgfeQsgEkvkuyIePPwstUeZRGq0KO8=
 filippo.io/bigmod v0.0.1 h1:OaEqDr3gEbofpnHbGqZweSL/bLMhy1pb54puiCDeuOA=
