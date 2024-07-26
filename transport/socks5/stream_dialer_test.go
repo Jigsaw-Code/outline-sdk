@@ -173,12 +173,14 @@ func TestConnectWithoutAuth(t *testing.T) {
 	// Create SOCKS5 proxy on localhost with a random port.
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
+	defer listener.Close()
 
 	go func() {
 		err := server.Serve(listener)
-		defer listener.Close()
 		t.Log("server is listening...")
-		require.NoError(t, err)
+		if !errors.Is(err, net.ErrClosed) && err != nil {
+			require.NoError(t, err) // Assert no error if it's not the expected close error
+		}
 	}()
 
 	address := listener.Addr().String()
@@ -206,13 +208,15 @@ func TestConnectWithAuth(t *testing.T) {
 	// Create SOCKS5 proxy on localhost with a random port.
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
+	defer listener.Close()
 	address := listener.Addr().String()
 
 	// Create SOCKS5 proxy on localhost port 8001
 	go func() {
 		err := server.Serve(listener)
-		defer listener.Close()
-		require.NoError(t, err)
+		if !errors.Is(err, net.ErrClosed) && err != nil {
+			require.NoError(t, err) // Assert no error if it's not the expected close error
+		}
 	}()
 
 	dialer, err := NewClient(&transport.TCPEndpoint{Address: address})

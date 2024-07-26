@@ -3,6 +3,7 @@ package socks5
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net"
 	"testing"
 	"time"
@@ -34,12 +35,14 @@ func TestSOCKS5Associate(t *testing.T) {
 	// Create SOCKS5 proxy on localhost with a random port.
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
+	defer listener.Close()
 	proxyServerAddress := listener.Addr().String()
 
 	go func() {
 		err := proxySrv.Serve(listener)
-		defer listener.Close()
-		require.NoError(t, err)
+		if !errors.Is(err, net.ErrClosed) && err != nil {
+			require.NoError(t, err) // Assert no error if it's not the expected close error
+		}
 	}()
 
 	// Connect to local proxy, auth and start the PacketConn.
