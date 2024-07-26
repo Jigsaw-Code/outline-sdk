@@ -60,7 +60,8 @@ func TestSOCKS5Associate(t *testing.T) {
 	_, err = conn.WriteTo([]byte("ping"), echoServer.LocalAddr())
 	require.NoError(t, err)
 	// Max wait time for response.
-	conn.SetDeadline(time.Now().Add(time.Second))
+	err = conn.SetDeadline(time.Now().Add(time.Second))
+	require.NoError(t, err)
 	response := make([]byte, 1024)
 	n, addr, err := conn.ReadFrom(response)
 	require.Equal(t, echoServer.LocalAddr().String(), addr.String())
@@ -78,7 +79,8 @@ func TestUDPLoopBack(t *testing.T) {
 	packDialer := transport.UDPDialer{}
 	conn, err := packDialer.DialPacket(context.Background(), echoServer.LocalAddr().String())
 	require.NoError(t, err)
-	conn.Write([]byte("ping"))
+	_, err = conn.Write([]byte("ping"))
+	require.NoError(t, err)
 	response := make([]byte, 1024)
 	n, err := conn.Read(response)
 	require.NoError(t, err)
@@ -96,7 +98,10 @@ func setupUDPEchoServer(t *testing.T, serverAddr *net.UDPAddr) *net.UDPConn {
 				return
 			}
 			if bytes.Equal(buf[:n], []byte("ping")) {
-				server.WriteTo([]byte("pong"), remote)
+				_, err := server.WriteTo([]byte("pong"), remote)
+				if err != nil {
+					return
+				}
 			}
 		}
 	}()

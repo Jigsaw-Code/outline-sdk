@@ -149,9 +149,10 @@ func BenchmarkReadAddr(b *testing.B) {
 			reader := bytes.NewReader(tt.input)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				reader.Seek(0, io.SeekStart)
-				_, err := readAddr(reader)
-				if err != nil {
+				if _, err := reader.Seek(0, io.SeekStart); err != nil {
+					b.Error("Seek failed:", err)
+				}
+				if _, err := readAddr(reader); err != nil {
 					b.Error("readAddr failed:", err)
 				}
 			}
