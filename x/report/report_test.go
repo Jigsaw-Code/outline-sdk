@@ -26,6 +26,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 type ConnectivitySetup struct {
@@ -74,11 +76,7 @@ func TestIsSuccess(t *testing.T) {
 		t.Error("Report is expected to implement HasSuccess interface, but it does not")
 	}
 	// since report does not have Error field, it should be successful
-	if v.IsSuccess() {
-		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
-	} else {
-		t.Errorf("Expected true, but got: %v", v.IsSuccess())
-	}
+	require.True(t, v.IsSuccess())
 }
 
 // TODO(fortuna): Make this work without the external service.
@@ -104,7 +102,7 @@ func TestIsSuccess(t *testing.T) {
 // 	var r Report = testReport
 // 	v, ok := r.(HasSuccess)
 // 	if ok {
-// 		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
+// 		t.Logf("The test report shows success: %v\n", v.IsSuccess())
 // 	}
 // 	u, err := url.Parse("https://script.google.com/macros/s/AKfycbzoMBmftQaR9Aw4jzTB-w4TwkDjLHtSfBCFhh4_2NhTEZAUdj85Qt8uYCKCNOEAwCg4/exec")
 // 	if err != nil {
@@ -130,7 +128,7 @@ func TestSendReportUnsuccessfully(t *testing.T) {
 	var r Report = testReport
 	v, ok := r.(HasSuccess)
 	if ok {
-		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
+		t.Logf("The test report shows success: %v\n", v.IsSuccess())
 	}
 	u, err := url.Parse("https://google.com")
 	if err != nil {
@@ -161,7 +159,7 @@ func TestSamplingCollector(t *testing.T) {
 	var r Report = testReport
 	v, ok := r.(HasSuccess)
 	if ok {
-		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
+		t.Logf("The test report shows success: %v\n", v.IsSuccess())
 	}
 	u, err := url.Parse("https://example.com")
 	if err != nil {
@@ -230,7 +228,7 @@ func TestFallbackCollector(t *testing.T) {
 	var r Report = testReport
 	v, ok := r.(HasSuccess)
 	if ok {
-		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
+		t.Logf("The test report shows success: %v\n", v.IsSuccess())
 	}
 	u1, err := url.Parse("https://example.com")
 	if err != nil {
@@ -267,7 +265,7 @@ func TestRetryCollector(t *testing.T) {
 	var r Report = testReport
 	v, ok := r.(HasSuccess)
 	if ok {
-		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
+		t.Logf("The test report shows success: %v\n", v.IsSuccess())
 	}
 	u, err := url.Parse("https://google.com")
 	if err != nil {
@@ -298,7 +296,7 @@ func TestWriteCollector(t *testing.T) {
 	var r Report = testReport
 	v, ok := r.(HasSuccess)
 	if ok {
-		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
+		t.Logf("The test report shows success: %v\n", v.IsSuccess())
 	}
 	c := WriteCollector{
 		Writer: io.Discard,
@@ -319,7 +317,7 @@ func TestWriteCollectorToFile(t *testing.T) {
 	var r Report = testReport
 	v, ok := r.(HasSuccess)
 	if ok {
-		fmt.Printf("The test report shows success: %v\n", v.IsSuccess())
+		t.Logf("The test report shows success: %v\n", v.IsSuccess())
 	}
 	f, err := os.CreateTemp("", "test")
 	if err != nil {
