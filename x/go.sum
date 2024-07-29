@@ -1,7 +1,3 @@
-github.com/Jigsaw-Code/outline-sdk v0.0.15 h1:2OfYum4vllfIgoDa/X9drA2I57knXFPREv4kMZkjTuI=
-github.com/Jigsaw-Code/outline-sdk v0.0.15/go.mod h1:e1oQZbSdLJBBuHgfeQsgEkvkuyIePPwstUeZRGq0KO8=
-github.com/Jigsaw-Code/outline-sdk v0.0.17-0.20240708052545-4f51b366fe75 h1:1t6cnyP4liW9hjmnVrDn6Bc5m2qlAcjPurf9UEye4Hg=
-github.com/Jigsaw-Code/outline-sdk v0.0.17-0.20240708052545-4f51b366fe75/go.mod h1:e1oQZbSdLJBBuHgfeQsgEkvkuyIePPwstUeZRGq0KO8=
 filippo.io/bigmod v0.0.1 h1:OaEqDr3gEbofpnHbGqZweSL/bLMhy1pb54puiCDeuOA=
 filippo.io/bigmod v0.0.1/go.mod h1:KyzqAbH7bRH6MOuOF1TPfUjvLoi0mRF2bIyD2ouRNQI=
 filippo.io/keygen v0.0.0-20230306160926-5201437acf8e h1:+xwUCyMiCWKWsI0RowhzB4sngpUdMHgU6lLuWJCX5Dg=
@@ -10,6 +6,8 @@ github.com/AndreasBriese/bbloom v0.0.0-20170702084017-28f7e881ca57 h1:CVuXDbdzPW
 github.com/AndreasBriese/bbloom v0.0.0-20170702084017-28f7e881ca57/go.mod h1:bOvUY6CB00SOBii9/FifXqc0awNKxLFCL/+pkDPuyl8=
 github.com/BurntSushi/toml v1.3.2 h1:o7IhLm0Msx3BaB+n3Ag7L8EVlByGnpq14C4YWiu/gL8=
 github.com/BurntSushi/toml v1.3.2/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
+github.com/Jigsaw-Code/outline-sdk v0.0.17-0.20240725231648-0d4ef7719592 h1:32i7krnS7FD7MxDy2TeLdEZimsVhKVZ4vlNU1dLl/4A=
+github.com/Jigsaw-Code/outline-sdk v0.0.17-0.20240725231648-0d4ef7719592/go.mod h1:e1oQZbSdLJBBuHgfeQsgEkvkuyIePPwstUeZRGq0KO8=
 github.com/Psiphon-Inc/rotate-safe-writer v0.0.0-20210303140923-464a7a37606e h1:NPfqIbzmijrl0VclX2t8eO5EPBhqe47LLGKpRrcVjXk=
 github.com/Psiphon-Inc/rotate-safe-writer v0.0.0-20210303140923-464a7a37606e/go.mod h1:ZdY5pBfat/WVzw3eXbIf7N1nZN0XD5H5+X8ZMDWbCs4=
 github.com/Psiphon-Labs/bolt v0.0.0-20200624191537-23cedaef7ad7 h1:Hx/NCZTnvoKZuIBwSmxE58KKoNLXIGG6hBJYN7pj9Ag=
