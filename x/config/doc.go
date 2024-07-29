@@ -40,7 +40,7 @@ Shadowsocks proxy (compatible with Outline's access keys, package [github.com/Ji
 
 	ss://[USERINFO]@[HOST]:[PORT]?prefix=[PREFIX]
 
-SOCKS5 proxy (currently streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/socks5])
+SOCKS5 proxy (works with both stream and packet dialers, package [github.com/Jigsaw-Code/outline-sdk/transport/socks5])
 
 	socks5://[USERINFO]@[HOST]:[PORT]
 

@@ -30,23 +30,25 @@ type credentials struct {
 	password []byte
 }
 
-// NewStreamDialer creates a [transport.StreamDialer] that routes connections to a SOCKS5
+// NewClient creates a SOCKS5 client that routes connections to a SOCKS5
 // proxy listening at the given [transport.StreamEndpoint].
-func NewStreamDialer(endpoint transport.StreamEndpoint) (*StreamDialer, error) {
-	if endpoint == nil {
+func NewClient(streamEndpoint transport.StreamEndpoint) (*Client, error) {
+	if streamEndpoint == nil {
 		return nil, errors.New("argument endpoint must not be nil")
 	}
-	return &StreamDialer{proxyEndpoint: endpoint, cred: nil}, nil
+	return &Client{se: streamEndpoint, cred: nil}, nil
 }
 
-type StreamDialer struct {
-	proxyEndpoint transport.StreamEndpoint
-	cred          *credentials
+type Client struct {
+	se   transport.StreamEndpoint
+	pd   transport.PacketDialer
+	cred *credentials
 }
 
-var _ transport.StreamDialer = (*StreamDialer)(nil)
+var _ transport.StreamDialer = (*Client)(nil)
+var _ transport.PacketListener = (*Client)(nil)
 
-func (c *StreamDialer) SetCredentials(username, password []byte) error {
+func (c *Client) SetCredentials(username, password []byte) error {
 	if len(username) > 255 {
 		return errors.New("username exceeds 255 bytes")
 	}
@@ -65,23 +67,14 @@ func (c *StreamDialer) SetCredentials(username, password []byte) error {
 	return nil
 }
 
-// DialStream implements [transport.StreamDialer].DialStream using SOCKS5.
-// It will send the auth method, auth credentials (if auth is chosen), and
-// the connect requests in one packet, to avoid an additional roundtrip.
-// The returned [error] will be of type [ReplyCode] if the server sends a SOCKS error reply code, which
-// you can check against the error constants in this package using [errors.Is].
-func (c *StreamDialer) DialStream(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
-	proxyConn, err := c.proxyEndpoint.ConnectStream(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("could not connect to SOCKS5 proxy: %w", err)
-	}
-	dialSuccess := false
-	defer func() {
-		if !dialSuccess {
-			proxyConn.Close()
-		}
-	}()
+// EnablePacket enables the use of the [Client] as a [transport.PacketListener]. It takes the [transport.PacketDialer] used to connect to the SOCKS5 packet endpoint.
+func (c *Client) EnablePacket(packetDialer transport.PacketDialer) {
+	c.pd = packetDialer
+}
 
+// request sends a SOCKS5 request to the server to perform a command (e.g., connect, udp associate),
+// performs authentication (if provided), returns the bound address.
+func (c *Client) request(conn io.ReadWriter, cmd byte, dstAddr string) (*address, error) {
 	// For protocol details, see https://datatracker.ietf.org/doc/html/rfc1928#section-3
 	// Creating a single buffer for method selection, authentication, and connection request
 	// Buffer large enough for method, auth, and connect requests with a domain name address.
@@ -118,24 +111,24 @@ func (c *StreamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		b = append(b, c.cred.password...)
 	}
 
-	// Connect request:
-	// VER = 5, CMD = 1 (connect), RSV = 0, DST.ADDR, DST.PORT
+	// CMD Request:
+	// VER = 5, CMD = cmd, RSV = 0, DST.ADDR, DST.PORT
 	// +----+-----+-------+------+----------+----------+
 	// |VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
 	// +----+-----+-------+------+----------+----------+
 	// | 1  |  1  | X'00' |  1   | Variable |    2     |
 	// +----+-----+-------+------+----------+----------+
-	b = append(b, 5, 1, 0)
+	b = append(b, 5, cmd, 0)
 	// TODO: Probably more memory efficient if remoteAddr is added to the buffer directly.
-	b, err = appendSOCKS5Address(b, remoteAddr)
+	b, err := appendSOCKS5Address(b, dstAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SOCKS5 address: %w", err)
 	}
 
-	// We merge the method and connect requests and only perform one write
+	// We merge the method and CMD requests and only perform one write
 	// because we send a single authentication method, so there's no point
 	// in waiting for the response. This eliminates a roundtrip.
-	_, err = proxyConn.Write(b)
+	_, err = conn.Write(b)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write combined SOCKS5 request: %w", err)
 	}
@@ -149,7 +142,7 @@ func (c *StreamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	// +----+--------+
 	// buffer[0]: VER, buffer[1]: METHOD
 	// Reuse buffer for better performance.
-	if _, err = io.ReadFull(proxyConn, buffer[:2]); err != nil {
+	if _, err = io.ReadFull(conn, buffer[:2]); err != nil {
 		return nil, fmt.Errorf("failed to read method server response: %w", err)
 	}
 	if buffer[0] != 5 {
@@ -169,7 +162,7 @@ func (c *StreamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		// +----+--------+
 		// VER = 1 means the server should be expecting username/password authentication.
 		// buffer[2]: VER, buffer[3]: STATUS
-		if _, err = io.ReadFull(proxyConn, buffer[2:4]); err != nil {
+		if _, err = io.ReadFull(conn, buffer[2:4]); err != nil {
 			return nil, fmt.Errorf("failed to read authentication version and status: %w", err)
 		}
 		if buffer[2] != 1 {
@@ -193,7 +186,7 @@ func (c *StreamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 	// buffer[1]: REP
 	// buffer[2]: RSV
 	// buffer[3]: ATYP
-	if _, err = io.ReadFull(proxyConn, buffer[:4]); err != nil {
+	if _, err = io.ReadFull(conn, buffer[:3]); err != nil {
 		return nil, fmt.Errorf("failed to read connect server response: %w", err)
 	}
 
@@ -206,32 +199,40 @@ func (c *StreamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		return nil, ReplyCode(buffer[1])
 	}
 
-	// 4. Read address and length
-	var bndAddrLen int
-	switch buffer[3] {
-	case addrTypeIPv4:
-		bndAddrLen = 4
-	case addrTypeIPv6:
-		bndAddrLen = 16
-	case addrTypeDomainName:
-		// buffer[8]: length of the domain name
-		_, err := io.ReadFull(proxyConn, buffer[:1])
-		if err != nil {
-			return nil, fmt.Errorf("failed to read address length in connect response: %w", err)
-		}
-		bndAddrLen = int(buffer[0])
-	default:
-		return nil, fmt.Errorf("invalid address type %v", buffer[3])
-	}
-	// 5. Reads the bound address and port, but we currently ignore them.
-	// TODO(fortuna): Should we expose the remote bound address as the net.Conn.LocalAddr()?
-	if _, err := io.ReadFull(proxyConn, buffer[:bndAddrLen]); err != nil {
+	// 4. Read BND.ADDR.
+	bindAddr, err := readAddr(conn)
+	if err != nil {
 		return nil, fmt.Errorf("failed to read bound address: %w", err)
 	}
-	// We read but ignore the remote bound port number: BND.PORT
-	if _, err = io.ReadFull(proxyConn, buffer[:2]); err != nil {
-		return nil, fmt.Errorf("failed to read bound port: %w", err)
+
+	return bindAddr, nil
+}
+
+// connectAndRequest manages the connection lifecycle and delegates the SOCKS5 communication to the request function.
+func (c *Client) connectAndRequest(ctx context.Context, cmd byte, dstAddr string) (transport.StreamConn, *address, error) {
+	proxyConn, err := c.se.ConnectStream(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not connect to SOCKS5 proxy: %w", err)
 	}
-	dialSuccess = true
+
+	bindAddr, err := c.request(proxyConn, cmd, dstAddr)
+	if err != nil {
+		proxyConn.Close()
+		return nil, nil, err
+	}
+
+	return proxyConn, bindAddr, nil
+}
+
+// DialStream implements [transport.StreamDialer].DialStream using SOCKS5.
+// It will send the auth method, auth credentials (if auth is chosen), and
+// the connect requests in one packet, to avoid an additional roundtrip.
+// The returned [error] will be of type [ReplyCode] if the server sends a SOCKS error reply code, which
+// you can check against the error constants in this package using [errors.Is].
+func (c *Client) DialStream(ctx context.Context, dstAddr string) (transport.StreamConn, error) {
+	proxyConn, _, err := c.connectAndRequest(ctx, CmdConnect, dstAddr)
+	if err != nil {
+		return nil, err
+	}
 	return proxyConn, nil
 }

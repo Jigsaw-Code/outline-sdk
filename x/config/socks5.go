@@ -27,7 +27,7 @@ func wrapStreamDialerWithSOCKS5(innerSD func() (transport.StreamDialer, error), 
 		return nil, err
 	}
 	endpoint := transport.StreamDialerEndpoint{Dialer: sd, Address: configURL.Host}
-	dialer, err := socks5.NewStreamDialer(&endpoint)
+	client, err := socks5.NewClient(&endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -35,10 +35,40 @@ func wrapStreamDialerWithSOCKS5(innerSD func() (transport.StreamDialer, error), 
 	if userInfo != nil {
 		username := userInfo.Username()
 		password, _ := userInfo.Password()
-		err := dialer.SetCredentials([]byte(username), []byte(password))
+		err := client.SetCredentials([]byte(username), []byte(password))
 		if err != nil {
 			return nil, err
 		}
 	}
-	return dialer, nil
+
+	return client, nil
+}
+
+func wrapPacketDialerWithSOCKS5(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), configURL *url.URL) (transport.PacketDialer, error) {
+	sd, err := innerSD()
+	if err != nil {
+		return nil, err
+	}
+	streamEndpoint := transport.StreamDialerEndpoint{Dialer: sd, Address: configURL.Host}
+	client, err := socks5.NewClient(&streamEndpoint)
+	if err != nil {
+		return nil, err
+	}
+	userInfo := configURL.User
+	if userInfo != nil {
+		username := userInfo.Username()
+		password, _ := userInfo.Password()
+		err := client.SetCredentials([]byte(username), []byte(password))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	pd, err := innerPD()
+	if err != nil {
+		return nil, err
+	}
+	client.EnablePacket(pd)
+	packetDialer := transport.PacketListenerDialer{Listener: client}
+	return packetDialer, nil
 }
