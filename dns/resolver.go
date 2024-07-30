@@ -268,6 +268,11 @@ func NewUDPResolver(pd transport.PacketDialer, resolverAddr string) Resolver {
 			return nil, &nestedError{ErrDial, err}
 		}
 		defer conn.Close()
+		// force close connection is context is done/cancelled.
+		go func() {
+			<-ctx.Done()
+			conn.Close()
+		}()
 		if deadline, ok := ctx.Deadline(); ok {
 			conn.SetDeadline(deadline)
 		}
@@ -391,3 +396,14 @@ func NewHTTPSResolver(sd transport.StreamDialer, resolverAddr string, url string
 		return &msg, nil
 	})
 }
+
+// func wrappErrors(err1, err2 error) error {
+// 	switch {
+// 	case err1 == nil:
+// 		return err2
+// 	case err2 == nil:
+// 		return err1
+// 	default:
+// 		return fmt.Errorf("%v: %w", err1, err2)
+// 	}
+// }
