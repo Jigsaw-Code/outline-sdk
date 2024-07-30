@@ -306,13 +306,6 @@ func main() {
 				}
 				r.Result.Attempts = append(r.Result.Attempts, cj)
 			}
-			//fmt.Println("setting selected address...")
-			// if testResult.SelectedAddress != "" {
-			// 	selectedAddressJSON, err := newAddressJSON(testResult.SelectedAddress)
-			// 	if err == nil {
-			// 		r.SelectedAddress = &selectedAddressJSON
-			// 	}
-			// }
 
 			if reportCollector != nil && r.Result.Attempts != nil {
 				// do not report if there are no attempts
