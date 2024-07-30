@@ -180,8 +180,8 @@ func main() {
 	if *verboseFlag {
 		debugLog = *log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 	}
-
-	baseDialer, err := config.NewDefaultConfigParser().WrapStreamDialer(&transport.TCPDialer{}, *baseTransportFlag)
+	configToDialer := config.NewDefaultConfigToDialer()
+	baseDialer, err := configToDialer.NewStreamDialer(*baseTransportFlag)
 	if err != nil {
 		log.Fatalf("Could not create dialer: %v\n", err)
 	}
@@ -235,7 +235,6 @@ func main() {
 	success := false
 	jsonEncoder := json.NewEncoder(os.Stdout)
 	jsonEncoder.SetEscapeHTML(false)
-	configToDialer := config.NewDefaultConfigToDialer()
 	for _, resolverHost := range strings.Split(*resolverFlag, ",") {
 		resolverHost := strings.TrimSpace(resolverHost)
 		resolverAddress := net.JoinHostPort(resolverHost, "53")
@@ -246,21 +245,23 @@ func main() {
 			startTime := time.Now()
 			switch proto {
 			case "tcp":
-				base, err := configParser.WrapStreamDialer(&transport.TCPDialer{}, *baseTransportFlag)
+				base, err := configToDialer.NewStreamDialer(*baseTransportFlag)
 				if err != nil {
 					log.Fatalf("Could not create base dialer: %v\n", err)
 				}
 				wrap := func(baseDialer transport.StreamDialer) (transport.StreamDialer, error) {
-					return config.WrapStreamDialer(baseDialer, *transportFlag)
+					configToDialer.BaseStreamDialer = baseDialer
+					return configToDialer.NewStreamDialer(*transportFlag)
 				}
 				testResult, testErr = connectivity.TestStreamConnectivityWithDNS(context.Background(), base, wrap, resolverAddress, *domainFlag)
 			case "udp":
-				base, err := configParser.WrapPacketDialer(&transport.UDPDialer{}, *baseTransportFlag)
+				base, err := configToDialer.NewPacketDialer(*baseTransportFlag)
 				if err != nil {
 					log.Fatalf("Could not create base dialer: %v\n", err)
 				}
 				wrap := func(baseDialer transport.PacketDialer) (transport.PacketDialer, error) {
-					return config.WrapPacketDialer(baseDialer, *transportFlag)
+					configToDialer.BasePacketDialer = baseDialer
+					return configToDialer.NewPacketDialer(*transportFlag)
 				}
 				testResult, testErr = connectivity.TestPacketConnectivityWithDNS(context.Background(), base, wrap, resolverAddress, *domainFlag)
 			default:
