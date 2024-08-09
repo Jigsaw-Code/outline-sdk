@@ -50,7 +50,7 @@ type connectivityReport struct {
 	Result connectivityResult `json:"result"`
 
 	// Observations
-	Time       time.Time  `json:"time"`
+	StartTime  time.Time  `json:"start_time"`
 	DurationMs int64      `json:"duration_ms"`
 	Error      *errorJSON `json:"error"`
 }
@@ -62,7 +62,7 @@ type connectivityResult struct {
 
 type connectionAttemptJSON struct {
 	Address    *addressJSON `json:"address,omitempty"`
-	Time       time.Time    `json:"time"`
+	StartTime  time.Time    `json:"start_time"`
 	DurationMs int64        `json:"duration_ms"`
 	Error      *errorJSON   `json:"error"`
 }
@@ -283,9 +283,9 @@ func main() {
 				log.Fatalf("Failed to sanitize config: %v", err)
 			}
 			r := connectivityReport{
-				Resolver: resolverAddress,
-				Proto:    proto,
-				Time:     startTime.UTC().Truncate(time.Second),
+				Resolver:  resolverAddress,
+				Proto:     proto,
+				StartTime: startTime.UTC().Truncate(time.Second),
 				// TODO(fortuna): Add sanitized config:
 				Transport:  sanitizedConfig,
 				DurationMs: testDuration.Milliseconds(),
@@ -301,7 +301,7 @@ func main() {
 				if err == nil {
 					cj.Address = &addressJSON
 				}
-				cj.Time = cr.StartTime.UTC().Truncate(time.Second)
+				cj.StartTime = cr.StartTime.UTC().Truncate(time.Second)
 				cj.DurationMs = cr.Duration.Milliseconds()
 				if cr.Error != nil {
 					cj.Error = makeErrorRecord(cr.Error)
