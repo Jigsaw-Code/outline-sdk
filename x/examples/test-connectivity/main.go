@@ -250,8 +250,9 @@ func main() {
 					log.Fatalf("Could not create base dialer: %v\n", err)
 				}
 				wrap := func(baseDialer transport.StreamDialer) (transport.StreamDialer, error) {
-					configToDialer.BaseStreamDialer = baseDialer
-					return configToDialer.NewStreamDialer(*transportFlag)
+					c := config.NewDefaultConfigToDialer()
+					c.BaseStreamDialer = baseDialer
+					return c.NewStreamDialer(*transportFlag)
 				}
 				testResult, testErr = connectivity.TestStreamConnectivityWithDNS(context.Background(), base, wrap, resolverAddress, *domainFlag)
 			case "udp":
@@ -260,8 +261,9 @@ func main() {
 					log.Fatalf("Could not create base dialer: %v\n", err)
 				}
 				wrap := func(baseDialer transport.PacketDialer) (transport.PacketDialer, error) {
-					configToDialer.BasePacketDialer = baseDialer
-					return configToDialer.NewPacketDialer(*transportFlag)
+					c := config.NewDefaultConfigToDialer()
+					c.BasePacketDialer = baseDialer
+					return c.NewPacketDialer(*transportFlag)
 				}
 				testResult, testErr = connectivity.TestPacketConnectivityWithDNS(context.Background(), base, wrap, resolverAddress, *domainFlag)
 			default:
