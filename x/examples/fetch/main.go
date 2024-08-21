@@ -17,12 +17,14 @@ package main
 import (
 	"bufio"
 	"context"
+	ctls "crypto/tls"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/textproto"
 	"os"
 	"path"
@@ -126,6 +128,35 @@ func main() {
 			req.Header.Add(name, value)
 		}
 	}
+
+	// Variables to store the timestamps
+	var startTLS, endTLS time.Time
+
+	// Create a trace to measure TLS handshake time
+	trace := &httptrace.ClientTrace{
+		DNSStart: func(info httptrace.DNSStartInfo) {
+			debugLog.Printf("DNS start: %v\n", info)
+		},
+		DNSDone: func(info httptrace.DNSDoneInfo) {
+			debugLog.Printf("DNS done: %v\n", info)
+		},
+		ConnectStart: func(network, addr string) {
+			debugLog.Printf("Connect start: %v %v\n", network, addr)
+		},
+		TLSHandshakeStart: func() {
+			startTLS = time.Now()
+		},
+		TLSHandshakeDone: func(state ctls.ConnectionState, _ error) {
+			debugLog.Printf("SNI: %v\n", state.ServerName)
+			debugLog.Printf("TLS version: %v\n", state.Version)
+			debugLog.Printf("ALPN: %v\n", state.NegotiatedProtocol)
+			endTLS = time.Now()
+		},
+	}
+
+	// Attach the trace to the context of the request
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		log.Fatalf("HTTP request failed: %v\n", err)
@@ -138,8 +169,10 @@ func main() {
 		}
 	}
 
+	debugLog.Printf("Response StatusCode: %v\n", resp.StatusCode)
+	debugLog.Printf("TLS handshake took %v seconds.\n", endTLS.Sub(startTLS).Seconds())
+
 	_, err = io.Copy(os.Stdout, resp.Body)
-	fmt.Println()
 	if err != nil {
 		log.Fatalf("Read of page body failed: %v\n", err)
 	}
