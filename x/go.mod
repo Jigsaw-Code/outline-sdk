@@ -3,7 +3,7 @@ module github.com/Jigsaw-Code/outline-sdk/x
 go 1.21
 
 require (
-	github.com/Jigsaw-Code/outline-sdk v0.0.17-0.20240726212635-470a9290ec57
+	github.com/Jigsaw-Code/outline-sdk v0.0.17-0.20240823014405-7a814abdf376
 	// Use github.com/Psiphon-Labs/psiphon-tunnel-core@staging-client as per
 	// https://github.com/Psiphon-Labs/psiphon-tunnel-core/?tab=readme-ov-file#using-psiphon-with-go-modules
 	github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20240619172145-03cade11f647
@@ -42,6 +42,7 @@ require (
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/juju/ratelimit v1.0.2 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/libp2p/go-reuseport v0.4.0 // indirect
 	github.com/miekg/dns v1.1.44-0.20210804161652-ab67aa642300 // indirect
 	github.com/mroth/weightedrand v1.0.0 // indirect
