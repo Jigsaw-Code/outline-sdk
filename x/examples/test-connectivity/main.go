@@ -100,10 +100,13 @@ func init() {
 
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
+	testTypeFlag := flag.String("test-type", "do53-tcp,do53-udp,doh,dot,http", "Type of test to run")
 	transportFlag := flag.String("transport", "", "Transport config")
-	domainFlag := flag.String("domain", "example.com.", "Domain name to resolve in the test")
+	domainFlag := flag.String("domain", "example.com.", "Domain name to resolve in the DNS test and to fetch in the HTTP test")
+	methodFlag := flag.String("method", "GET", "HTTP method to use in the HTTP test")
+	timeoutFlag := flag.Duration("timeout", 10*time.Second, "Timeout for the test; default is 10s")
 	resolverFlag := flag.String("resolver", "8.8.8.8,2001:4860:4860::8888", "Comma-separated list of addresses of DNS resolver to use for the test")
-	protoFlag := flag.String("proto", "tcp,udp", "Comma-separated list of the protocols to test. Must be \"tcp\", \"udp\", or a combination of them")
+	resolverNameFlag := flag.String("resolver-name", "one.one.one.one", "Name of the resolver to use for the test")
 	reportToFlag := flag.String("report-to", "", "URL to send JSON error reports to")
 	reportSuccessFlag := flag.Float64("report-success-rate", 0.1, "Report success to collector with this probability - must be between 0 and 1")
 	reportFailureFlag := flag.Float64("report-failure-rate", 1, "Report failure to collector with this probability - must be between 0 and 1")
@@ -162,45 +165,90 @@ func main() {
 	jsonEncoder := json.NewEncoder(os.Stdout)
 	jsonEncoder.SetEscapeHTML(false)
 	configToDialer := config.NewDefaultConfigToDialer()
+	ctx := connectivity.AddLoggerTrace(context.Background())
 	for _, resolverHost := range strings.Split(*resolverFlag, ",") {
 		resolverHost := strings.TrimSpace(resolverHost)
-		resolverAddress := net.JoinHostPort(resolverHost, "53")
-		for _, proto := range strings.Split(*protoFlag, ",") {
-			proto = strings.TrimSpace(proto)
+		var result *connectivity.ConnectivityError
+		var resolverAddress string
+		for _, testType := range strings.Split(*testTypeFlag, ",") {
+			testType = strings.TrimSpace(testType)
 			var resolver dns.Resolver
-			switch proto {
-			case "tcp":
+			var Protocol string
+			startTime := time.Now()
+			switch testType {
+			case "do53-tcp":
+				Protocol = "tcp"
 				streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create StreamDialer: %v", err)
 				}
+				resolverAddress = net.JoinHostPort(resolverHost, "53")
 				resolver = dns.NewTCPResolver(streamDialer, resolverAddress)
-			case "udp":
+				result, err = connectivity.TestConnectivityWithResolver(ctx, resolver, *domainFlag)
+				if err != nil {
+					log.Fatalf("Connectivity test failed to run: %v", err)
+				}
+			case "do53-udp":
+				Protocol = "udp"
 				packetDialer, err := configToDialer.NewPacketDialer(*transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create PacketDialer: %v", err)
 				}
+				resolverAddress = net.JoinHostPort(resolverHost, "53")
 				resolver = dns.NewUDPResolver(packetDialer, resolverAddress)
+				result, err = connectivity.TestConnectivityWithResolver(ctx, resolver, *domainFlag)
+				if err != nil {
+					log.Fatalf("Connectivity test failed to run: %v", err)
+				}
+			case "doh":
+				Protocol = "tcp"
+				streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
+				if err != nil {
+					log.Fatalf("Failed to create StreamDialer: %v", err)
+				}
+				resolverAddress = net.JoinHostPort(resolverHost, "443")
+				resolver = dns.NewHTTPSResolver(streamDialer, resolverAddress, "https://"+resolverAddress+"/dns-query")
+				result, err = connectivity.TestConnectivityWithResolver(ctx, resolver, *domainFlag)
+				if err != nil {
+					log.Fatalf("Connectivity test failed to run: %v", err)
+				}
+			case "dot":
+				Protocol = "tcp"
+				streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
+				if err != nil {
+					log.Fatalf("Failed to create StreamDialer: %v", err)
+				}
+				resolverAddress = net.JoinHostPort(resolverHost, "853")
+				resolver = dns.NewTLSResolver(streamDialer, resolverAddress, *resolverNameFlag)
+				result, err = connectivity.TestConnectivityWithResolver(ctx, resolver, *domainFlag)
+				if err != nil {
+					log.Fatalf("Connectivity test failed to run: %v", err)
+				}
+			case "http":
+				Protocol = "tcp"
+				streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
+				if err != nil {
+					log.Fatalf("Failed to create StreamDialer: %v", err)
+				}
+				result, err = connectivity.TestStreamConnectivitywithHTTP(ctx, streamDialer, *domainFlag, *timeoutFlag, *methodFlag)
+				if err != nil {
+					log.Fatalf("Connectivity test failed to run: %v", err)
+				}
 			default:
-				log.Fatalf(`Invalid proto %v. Must be "tcp" or "udp"`, proto)
-			}
-			startTime := time.Now()
-			result, err := connectivity.TestConnectivityWithResolver(context.Background(), resolver, *domainFlag)
-			if err != nil {
-				log.Fatalf("Connectivity test failed to run: %v", err)
+				log.Fatalf(`Invalid Test Type %v. Must be "tcp" or "udp"`, testType)
 			}
 			testDuration := time.Since(startTime)
 			if result == nil {
 				success = true
 			}
-			debugLog.Printf("Test %v %v result: %v", proto, resolverAddress, result)
+			debugLog.Printf("Test Type: %v Resolver Address: %v domain: %v result: %v", testType, resolverAddress, *domainFlag, result)
 			sanitizedConfig, err := config.SanitizeConfig(*transportFlag)
 			if err != nil {
 				log.Fatalf("Failed to sanitize config: %v", err)
 			}
 			var r report.Report = connectivityReport{
 				Resolver: resolverAddress,
-				Proto:    proto,
+				Proto:    Protocol, // change this
 				Time:     startTime.UTC().Truncate(time.Second),
 				// TODO(fortuna): Add sanitized config:
 				Transport:  sanitizedConfig,
