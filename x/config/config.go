@@ -251,7 +251,7 @@ func SanitizeConfig(transportConfig string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-		case "override", "split", "tls", "tlsfrag":
+		case "override", "split", "tls", "tlsfrag", "do53", "doh", "ws":
 			// No sanitization needed
 			textParts[i] = u.String()
 		default:
