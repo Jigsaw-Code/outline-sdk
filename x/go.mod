@@ -3,7 +3,7 @@ module github.com/Jigsaw-Code/outline-sdk/x
 go 1.21
 
 require (
-	github.com/Jigsaw-Code/outline-sdk v0.0.17-0.20240823014405-7a814abdf376
+	github.com/Jigsaw-Code/outline-sdk v0.0.17-0.20240823034737-9e667cbfec73
 	// Use github.com/Psiphon-Labs/psiphon-tunnel-core@staging-client as per
 	// https://github.com/Psiphon-Labs/psiphon-tunnel-core/?tab=readme-ov-file#using-psiphon-with-go-modules
 	github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20240619172145-03cade11f647
