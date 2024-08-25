@@ -146,7 +146,7 @@ func formatConfig(transportConfig string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return constructShadowsocksSessionConfig(fetched), nil
+		return constructShadowsocksSessionConfig(fetched)
 	default:
 		return "", errors.New("config must start with 'ss://' or 'ssconf://'")
 	}
