@@ -46,11 +46,18 @@ type OutlineDevice struct {
 var configToDialer = config.NewDefaultConfigToDialer()
 
 func NewOutlineDevice(transportConfig string) (od *OutlineDevice, err error) {
-	transportConfig, err = formatConfig(transportConfig)
+	if err := validateConfig(transportConfig); err != nil {
+		return nil, err
+	}
+	parsed, err := url.Parse(transportConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse config URL: %w", err)
+	}
+	transportConfig, err = formatConfig(parsed)
 	if err != nil {
 		return nil, err
 	}
-	ip, err := resolveShadowsocksServerIPFromConfig(transportConfig)
+	ip, err := resolveShadowsocksServerIPFromHostname(parsed.Hostname())
 	if err != nil {
 		return nil, err
 	}
@@ -107,13 +114,9 @@ func constructShadowsocksSessionConfig(resp []byte) (string, error) {
 }
 
 func fetchShadowsocksSessionConfig(transportConfig string) ([]byte, error) {
-	parsed, err := url.Parse(transportConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse config URL: %w", err)
-	}
-	parsed.Scheme = "https"
+	transportConfig = "https" + strings.TrimPrefix(transportConfig, "ssconf")
 
-	resp, err := http.Get(parsed.String())
+	resp, err := http.Get(transportConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch config from ssconf: %w", err)
 	}
@@ -126,23 +129,12 @@ func fetchShadowsocksSessionConfig(transportConfig string) ([]byte, error) {
 	return body, nil
 }
 
-func formatConfig(transportConfig string) (string, error) {
-	if strings.Contains(transportConfig, "|") {
-		return "", errors.New("multi-part config is not supported")
-	}
-	if transportConfig = strings.TrimSpace(transportConfig); transportConfig == "" {
-		return "", errors.New("config is required")
-	}
-	parsed, err := url.Parse(transportConfig)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse config URL: %w", err)
-	}
-
-	switch parsed.Scheme {
+func formatConfig(transportConfigURL *url.URL) (string, error) {
+	switch transportConfigURL.Scheme {
 	case "ss":
-		return transportConfig, nil
+		return transportConfigURL.String(), nil
 	case "ssconf":
-		fetched, err := fetchShadowsocksSessionConfig(transportConfig)
+		fetched, err := fetchShadowsocksSessionConfig(transportConfigURL.String())
 		if err != nil {
 			return "", err
 		}
@@ -152,13 +144,18 @@ func formatConfig(transportConfig string) (string, error) {
 	}
 }
 
-func resolveShadowsocksServerIPFromConfig(transportConfig string) (net.IP, error) {
-	parsed, err := url.Parse(transportConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse config URL: %w", err)
+func validateConfig(transportConfig string) error {
+	if strings.Contains(transportConfig, "|") {
+		return errors.New("multi-part config is not supported")
 	}
+	if transportConfig = strings.TrimSpace(transportConfig); transportConfig == "" {
+		return errors.New("config is required")
+	}
+	return nil
+}
 
-	ipList, err := net.LookupIP(parsed.Hostname())
+func resolveShadowsocksServerIPFromHostname(hostname string) (net.IP, error) {
+	ipList, err := net.LookupIP(hostname)
 	if err != nil {
 		return nil, fmt.Errorf("invalid server hostname: %w", err)
 	}
