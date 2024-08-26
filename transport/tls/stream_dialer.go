@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/trace"
 )
 
 // StreamDialer is a [transport.StreamDialer] that uses TLS to wrap the inner StreamDialer.
@@ -129,7 +128,7 @@ type ClientOption func(serverName string, config *ClientConfig)
 
 // WrapConn wraps a [transport.StreamConn] in a TLS connection.
 func WrapConn(ctx context.Context, conn transport.StreamConn, serverName string, options ...ClientOption) (transport.StreamConn, error) {
-	t := trace.GetTLSClientTrace(ctx)
+	t := GetTLSClientTrace(ctx)
 	cfg := ClientConfig{ServerName: serverName, CertificateName: serverName}
 	normName := normalizeHost(serverName)
 	for _, option := range options {
