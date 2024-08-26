@@ -15,6 +15,7 @@
 package dns
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -210,7 +211,7 @@ func testDatagramExchange(t *testing.T, server func(request dnsmessage.Message, 
 	require.NoError(t, err)
 	clientDone := make(chan queryResult)
 	go func() {
-		msg, err := queryDatagram(front, *q)
+		msg, err := queryDatagram(context.Background(), front, *q)
 		clientDone <- queryResult{msg, err}
 	}()
 	// Read request.
@@ -281,7 +282,7 @@ func Test_queryDatagram(t *testing.T) {
 		require.NoError(t, err)
 		clientDone := make(chan queryResult)
 		go func() {
-			msg, err := queryDatagram(front, *q)
+			msg, err := queryDatagram(context.Background(), front, *q)
 			clientDone <- queryResult{msg, err}
 		}()
 		// Wait for queryDatagram.
@@ -295,7 +296,7 @@ func Test_queryDatagram(t *testing.T) {
 		require.NoError(t, err)
 		clientDone := make(chan queryResult)
 		go func() {
-			msg, err := queryDatagram(front, *q)
+			msg, err := queryDatagram(context.Background(), front, *q)
 			clientDone <- queryResult{msg, err}
 		}()
 		back.Read(make([]byte, 521))
@@ -313,7 +314,7 @@ func testStreamExchange(t *testing.T, server func(request dnsmessage.Message, co
 	require.NoError(t, err)
 	clientDone := make(chan queryResult)
 	go func() {
-		msg, err := queryStream(front, *q)
+		msg, err := queryStream(context.Background(), front, *q)
 		clientDone <- queryResult{msg, err}
 	}()
 	// Read request.
@@ -416,7 +417,7 @@ func Test_queryStream(t *testing.T) {
 		require.NoError(t, err)
 		clientDone := make(chan queryResult)
 		go func() {
-			msg, err := queryStream(front, *q)
+			msg, err := queryStream(context.Background(), front, *q)
 			clientDone <- queryResult{msg, err}
 		}()
 		// Wait for client.
@@ -430,7 +431,7 @@ func Test_queryStream(t *testing.T) {
 		require.NoError(t, err)
 		clientDone := make(chan queryResult)
 		go func() {
-			msg, err := queryStream(front, *q)
+			msg, err := queryStream(context.Background(), front, *q)
 			clientDone <- queryResult{msg, err}
 		}()
 		back.Read(make([]byte, 521))

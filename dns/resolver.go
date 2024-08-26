@@ -29,7 +29,6 @@ import (
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
-	"github.com/Jigsaw-Code/outline-sdk/x/trace"
 	"golang.org/x/net/dns/dnsmessage"
 )
 
@@ -169,7 +168,7 @@ func checkResponse(reqID uint16, reqQues dnsmessage.Question, respHdr dnsmessage
 
 // queryDatagram implements a DNS query over a datagram protocol.
 func queryDatagram(ctx context.Context, conn io.ReadWriter, q dnsmessage.Question) (*dnsmessage.Message, error) {
-	t := trace.GetDNSClientTrace(ctx)
+	t := GetDNSClientTrace(ctx)
 	// Reference: https://cs.opensource.google/go/go/+/master:src/net/dnsclient_unix.go?q=func:dnsPacketRoundTrip&ss=go%2Fgo
 	id := uint16(rand.Uint32())
 	buf, err := appendRequest(id, q, make([]byte, 0, maxUDPMessageSize))
@@ -222,7 +221,7 @@ func queryDatagram(ctx context.Context, conn io.ReadWriter, q dnsmessage.Questio
 
 // queryStream implements a DNS query over a stream protocol. It frames the messages by prepending them with a 2-byte length prefix.
 func queryStream(ctx context.Context, conn io.ReadWriter, q dnsmessage.Question) (*dnsmessage.Message, error) {
-	t := trace.GetDNSClientTrace(ctx)
+	t := GetDNSClientTrace(ctx)
 	// Reference: https://cs.opensource.google/go/go/+/master:src/net/dnsclient_unix.go?q=func:dnsStreamRoundTrip&ss=go%2Fgo
 	id := uint16(rand.Uint32())
 	buf, err := appendRequest(id, q, make([]byte, 2, 514))
@@ -317,7 +316,7 @@ type streamResolver struct {
 }
 
 func (r *streamResolver) Query(ctx context.Context, q dnsmessage.Question) (*dnsmessage.Message, error) {
-	t := trace.GetDNSClientTrace(ctx)
+	t := GetDNSClientTrace(ctx)
 	conn, err := r.NewConn(ctx)
 	if err != nil {
 		return nil, &nestedError{ErrDial, err}
