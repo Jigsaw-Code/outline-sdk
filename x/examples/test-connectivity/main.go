@@ -106,7 +106,7 @@ func main() {
 	methodFlag := flag.String("method", "GET", "HTTP method to use in the HTTP test")
 	timeoutFlag := flag.Duration("timeout", 10*time.Second, "Timeout for the test; default is 10s")
 	resolverFlag := flag.String("resolver", "8.8.8.8,2001:4860:4860::8888", "Comma-separated list of addresses of DNS resolver to use for the test")
-	resolverNameFlag := flag.String("resolver-name", "one.one.one.one", "Name of the resolver to use for the test")
+	resolverNameFlag := flag.String("resolver-name", "dns.google.com", "Name of the resolver to use for the test")
 	reportToFlag := flag.String("report-to", "", "URL to send JSON error reports to")
 	reportSuccessFlag := flag.Float64("report-success-rate", 0.1, "Report success to collector with this probability - must be between 0 and 1")
 	reportFailureFlag := flag.Float64("report-failure-rate", 1, "Report failure to collector with this probability - must be between 0 and 1")
@@ -165,7 +165,7 @@ func main() {
 	jsonEncoder := json.NewEncoder(os.Stdout)
 	jsonEncoder.SetEscapeHTML(false)
 	configToDialer := config.NewDefaultConfigToDialer()
-	ctx := connectivity.AddLoggerTrace(context.Background())
+	ctx := connectivity.SetupConnectivityTrace(context.Background())
 	for _, resolverHost := range strings.Split(*resolverFlag, ",") {
 		resolverHost := strings.TrimSpace(resolverHost)
 		var result *connectivity.ConnectivityError
