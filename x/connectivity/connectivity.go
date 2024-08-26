@@ -31,7 +31,7 @@ import (
 
 	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/trace"
+	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
 	"golang.org/x/net/dns/dnsmessage"
 )
 
@@ -165,8 +165,8 @@ func TestStreamConnectivitywithHTTP(ctx context.Context, baseDialer transport.St
 	return nil, nil
 }
 
-func AddLoggerTrace(ctx context.Context) context.Context {
-	t := &trace.DNSClientTrace{
+func SetupConnectivityTrace(ctx context.Context) context.Context {
+	t := &dns.DNSClientTrace{
 		QuestionSent: func(question dnsmessage.Question) {
 			fmt.Println("DNS query started for", question.Name.String())
 		},
@@ -264,7 +264,7 @@ func AddLoggerTrace(ctx context.Context) context.Context {
 		},
 	}
 
-	tlsTrace := &trace.TLSClientTrace{
+	tlsTrace := &tls.TLSClientTrace{
 		TLSHandshakeStart: func() {
 			fmt.Println("TLS handshake started")
 			startTLS = time.Now()
@@ -281,7 +281,7 @@ func AddLoggerTrace(ctx context.Context) context.Context {
 	}
 
 	ctx = httptrace.WithClientTrace(ctx, ht)
-	ctx = trace.WithDNSClientTrace(ctx, t)
-	ctx = trace.WithTLSClientTrace(ctx, tlsTrace)
+	ctx = dns.WithDNSClientTrace(ctx, t)
+	ctx = tls.WithTLSClientTrace(ctx, tlsTrace)
 	return ctx
 }
