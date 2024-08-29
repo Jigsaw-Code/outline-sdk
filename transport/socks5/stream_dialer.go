@@ -210,12 +210,29 @@ func (c *Client) request(conn io.ReadWriter, cmd byte, dstAddr string) (*address
 
 // connectAndRequest manages the connection lifecycle and delegates the SOCKS5 communication to the request function.
 func (c *Client) connectAndRequest(ctx context.Context, cmd byte, dstAddr string) (transport.StreamConn, *address, error) {
+	t := GetSOCKS5ClientTrace(ctx)
 	proxyConn, err := c.se.ConnectStream(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not connect to SOCKS5 proxy: %w", err)
 	}
 
+	if t != nil && t.RequestStarted != nil {
+		t.RequestStarted(cmd, dstAddr)
+	}
 	bindAddr, err := c.request(proxyConn, cmd, dstAddr)
+	if t != nil && t.RequestDone != nil {
+		var network string
+		addr := ""
+		if cmd == CmdConnect {
+			network = "tcp"
+		} else if cmd == CmdUDPAssociate {
+			network = "udp"
+		}
+		if bindAddr != nil {
+			addr = addrToString(bindAddr)
+		}
+		t.RequestDone(network, addr, err)
+	}
 	if err != nil {
 		proxyConn.Close()
 		return nil, nil, err
