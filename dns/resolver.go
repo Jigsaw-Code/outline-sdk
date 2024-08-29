@@ -215,6 +215,9 @@ func queryDatagram(ctx context.Context, conn io.ReadWriter, q dnsmessage.Questio
 			returnErr = errors.Join(returnErr, err)
 			continue
 		}
+		if t != nil && t.ResponsDone != nil {
+			t.ResponsDone(q, &msg, nil)
+		}
 		return &msg, nil
 	}
 }
