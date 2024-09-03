@@ -215,8 +215,8 @@ func queryDatagram(ctx context.Context, conn io.ReadWriter, q dnsmessage.Questio
 			returnErr = errors.Join(returnErr, err)
 			continue
 		}
-		if t != nil && t.ResponsDone != nil {
-			t.ResponsDone(q, &msg, nil)
+		if t != nil && t.ResponseDone != nil {
+			t.ResponseDone(q, &msg, nil)
 		}
 		return &msg, nil
 	}
@@ -302,11 +302,18 @@ func ensurePort(address string, defaultPort string) string {
 func NewUDPResolver(pd transport.PacketDialer, resolverAddr string) Resolver {
 	resolverAddr = ensurePort(resolverAddr, "53")
 	return FuncResolver(func(ctx context.Context, q dnsmessage.Question) (*dnsmessage.Message, error) {
+		t := GetDNSClientTrace(ctx)
 		conn, err := pd.DialPacket(ctx, resolverAddr)
 		if err != nil {
 			return nil, &nestedError{ErrDial, err}
 		}
 		defer conn.Close()
+		if t != nil && t.ResolverSetup != nil {
+			t.ResolverSetup("do53-udp", conn.RemoteAddr().Network(), conn.RemoteAddr().String())
+		}
+		if t != nil && t.QuestionReady != nil {
+			t.QuestionReady(q)
+		}
 		if deadline, ok := ctx.Deadline(); ok {
 			conn.SetDeadline(deadline)
 		}
@@ -324,21 +331,18 @@ func (r *streamResolver) Query(ctx context.Context, q dnsmessage.Question) (*dns
 	if err != nil {
 		return nil, &nestedError{ErrDial, err}
 	}
-	if t != nil && t.ConnectDone != nil {
-		t.ConnectDone(conn.RemoteAddr().Network(), conn.RemoteAddr().String(), err)
-	}
 	// TODO: reuse connection, as per https://datatracker.ietf.org/doc/html/rfc7766#section-6.2.1.
 	defer conn.Close()
 	if deadline, ok := ctx.Deadline(); ok {
 		conn.SetDeadline(deadline)
 	}
-	if t != nil && t.QuestionSent != nil {
-		t.QuestionSent(q)
+	if t != nil && t.QuestionReady != nil {
+		t.QuestionReady(q)
 	}
 
 	response, err := queryStream(ctx, conn, q)
-	if t != nil && t.ResponsDone != nil {
-		t.ResponsDone(q, response, err)
+	if t != nil && t.ResponseDone != nil {
+		t.ResponseDone(q, response, err)
 	}
 
 	return response, err
@@ -353,6 +357,10 @@ func NewTCPResolver(sd transport.StreamDialer, resolverAddr string) Resolver {
 	resolverAddr = ensurePort(resolverAddr, "53")
 	return &streamResolver{
 		NewConn: func(ctx context.Context) (transport.StreamConn, error) {
+			t := GetDNSClientTrace(ctx)
+			if t != nil && t.ResolverSetup != nil {
+				t.ResolverSetup("do53-tcp", "tcp", resolverAddr)
+			}
 			return sd.DialStream(ctx, resolverAddr)
 		},
 	}
@@ -367,6 +375,10 @@ func NewTLSResolver(sd transport.StreamDialer, resolverAddr string, resolverName
 	resolverAddr = ensurePort(resolverAddr, "853")
 	return &streamResolver{
 		NewConn: func(ctx context.Context) (transport.StreamConn, error) {
+			t := GetDNSClientTrace(ctx)
+			if t != nil && t.ResolverSetup != nil {
+				t.ResolverSetup("dot", "tcp", resolverAddr)
+			}
 			baseConn, err := sd.DialStream(ctx, resolverAddr)
 			if err != nil {
 				return nil, err
@@ -384,9 +396,13 @@ func NewTLSResolver(sd transport.StreamDialer, resolverAddr string, resolverName
 func NewHTTPSResolver(sd transport.StreamDialer, resolverAddr string, url string) Resolver {
 	resolverAddr = ensurePort(resolverAddr, "443")
 	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		t := GetDNSClientTrace(ctx)
 		if !strings.HasPrefix(network, "tcp") {
 			// TODO: Support UDP for QUIC.
 			return nil, fmt.Errorf("protocol not supported: %v", network)
+		}
+		if t != nil && t.ResolverSetup != nil {
+			t.ResolverSetup("doh", "tcp", resolverAddr)
 		}
 		conn, err := sd.DialStream(ctx, resolverAddr)
 		if err != nil {
@@ -405,6 +421,7 @@ func NewHTTPSResolver(sd transport.StreamDialer, resolverAddr string, url string
 		},
 	}
 	return FuncResolver(func(ctx context.Context, q dnsmessage.Question) (*dnsmessage.Message, error) {
+		t := GetDNSClientTrace(ctx)
 		// Prepare request.
 		buf, err := appendRequest(0, q, make([]byte, 0, 512))
 		if err != nil {
@@ -435,10 +452,21 @@ func NewHTTPSResolver(sd transport.StreamDialer, resolverAddr string, url string
 		// Process response.
 		var msg dnsmessage.Message
 		if err = msg.Unpack(response); err != nil {
-			return nil, &nestedError{ErrBadResponse, fmt.Errorf("failed to unpack DNS response: %w", err)}
+			err = &nestedError{ErrBadResponse, fmt.Errorf("failed to unpack DNS response: %w", err)}
+			if t != nil && t.ResponseDone != nil {
+				t.ResponseDone(q, &msg, err)
+			}
+			return nil, err
 		}
 		if err := checkResponse(0, q, msg.Header, msg.Questions); err != nil {
-			return nil, &nestedError{ErrBadResponse, err}
+			err = &nestedError{ErrBadResponse, err}
+			if t != nil && t.ResponseDone != nil {
+				t.ResponseDone(q, &msg, err)
+			}
+			return nil, err
+		}
+		if t != nil && t.ResponseDone != nil {
+			t.ResponseDone(q, &msg, nil)
 		}
 		return &msg, nil
 	})
