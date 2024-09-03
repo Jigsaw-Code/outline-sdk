@@ -46,6 +46,37 @@ type ConnectivityError struct {
 	Err error
 }
 
+type ConnectInfo struct {
+	Network   string
+	IP        string
+	Port      string
+	Error     error
+	StartTime time.Time
+	Duration  time.Duration
+	ConnError *ConnectivityError
+}
+
+type DNSInfo struct {
+	Host         string
+	Resolver     string
+	Network      string
+	ResolverType string
+	IPs          []net.IPAddr
+	RSCodes      []dnsmessage.RCode
+	Error        error
+	StartTime    time.Time
+	Duration     time.Duration
+	ConnError    *ConnectivityError
+}
+
+type SystemDNSInfo struct {
+	Host      string
+	IPs       []net.IPAddr
+	Error     error
+	StartTime time.Time
+	Duration  time.Duration
+}
+
 var _ error = (*ConnectivityError)(nil)
 
 func (err *ConnectivityError) Error() string {
