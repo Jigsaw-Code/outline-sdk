@@ -3,7 +3,7 @@ module github.com/Jigsaw-Code/outline-sdk/x
 go 1.21
 
 require (
-	github.com/Jigsaw-Code/outline-sdk v0.0.17-0.20240826190058-5064ae235109
+	github.com/Jigsaw-Code/outline-sdk v0.0.17-0.20240903075814-a94cb7362779
 	// Use github.com/Psiphon-Labs/psiphon-tunnel-core@staging-client as per
 	// https://github.com/Psiphon-Labs/psiphon-tunnel-core/?tab=readme-ov-file#using-psiphon-with-go-modules
 	github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20240619172145-03cade11f647
@@ -14,6 +14,8 @@ require (
 	golang.org/x/net v0.25.0
 	golang.org/x/sys v0.20.0
 )
+
+require github.com/quic-go/quic-go v0.46.0
 
 require (
 	filippo.io/bigmod v0.0.1 // indirect
@@ -57,7 +59,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
-	github.com/quic-go/quic-go v0.46.0 // indirect
 	github.com/refraction-networking/conjure v0.7.11-0.20240130155008-c8df96195ab2 // indirect
 	github.com/refraction-networking/ed25519 v0.1.2 // indirect
 	github.com/refraction-networking/gotapdance v1.7.10 // indirect
