@@ -21,11 +21,11 @@ import (
 )
 
 type DNSClientTrace struct {
-	QuestionSent func(question dnsmessage.Question)
-	ResponsDone  func(question dnsmessage.Question, response *dnsmessage.Message, err error)
-	ConnectDone  func(network, addr string, err error)
-	WroteDone    func(err error)
-	ReadDone     func(err error)
+	ResolverSetup func(resolverType string, network string, address string)
+	QuestionReady func(question dnsmessage.Question)
+	ResponseDone  func(question dnsmessage.Question, response *dnsmessage.Message, err error)
+	WroteDone     func(err error)
+	ReadDone      func(err error)
 }
 type contextKey struct{}
 
