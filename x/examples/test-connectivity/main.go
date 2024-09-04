@@ -62,9 +62,11 @@ type testReport struct {
 }
 
 type dnsReport struct {
-	QueryName string   `json:"query_name"`
-	AnswerIPs []string `json:"answer_ips"`
-	Error     string   `json:"error"`
+	QueryName  string    `json:"query_name"`
+	Time       time.Time `json:"time"`
+	DurationMs int64     `json:"duration_ms"`
+	AnswerIPs  []string  `json:"answer_ips"`
+	Error      string    `json:"error"`
 }
 
 type tcpReport struct {
@@ -198,10 +200,16 @@ func main() {
 					if err != nil {
 						return nil, err
 					}
+					var dnsStart time.Time
 					ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+						DNSStart: func(di httptrace.DNSStartInfo) {
+							dnsStart = time.Now()
+						},
 						DNSDone: func(di httptrace.DNSDoneInfo) {
 							report := dnsReport{
-								QueryName: hostname,
+								QueryName:  hostname,
+								Time:       dnsStart.UTC().Truncate(time.Second),
+								DurationMs: time.Since(dnsStart).Milliseconds(),
 							}
 							if di.Err != nil {
 								report.Error = di.Err.Error()
@@ -242,10 +250,16 @@ func main() {
 					if err != nil {
 						return nil, err
 					}
+					var dnsStart time.Time
 					ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+						DNSStart: func(di httptrace.DNSStartInfo) {
+							dnsStart = time.Now()
+						},
 						DNSDone: func(di httptrace.DNSDoneInfo) {
 							report := dnsReport{
-								QueryName: hostname,
+								QueryName:  hostname,
+								Time:       dnsStart.UTC().Truncate(time.Second),
+								DurationMs: time.Since(dnsStart).Milliseconds(),
 							}
 							if di.Err != nil {
 								report.Error = di.Err.Error()
