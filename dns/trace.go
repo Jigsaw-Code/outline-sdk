@@ -24,8 +24,8 @@ type DNSClientTrace struct {
 	ResolverSetup func(resolverType string, network string, address string)
 	QuestionReady func(question dnsmessage.Question)
 	ResponseDone  func(question dnsmessage.Question, response *dnsmessage.Message, err error)
-	WroteDone     func(err error)
-	ReadDone      func(err error)
+	WroteDone     func(question dnsmessage.Question, err error)
+	ReadDone      func(question dnsmessage.Question, err error)
 }
 type contextKey struct{}
 
