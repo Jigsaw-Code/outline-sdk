@@ -46,37 +46,6 @@ type ConnectivityError struct {
 	Err error
 }
 
-type ConnectInfo struct {
-	Network   string
-	IP        string
-	Port      string
-	Error     error
-	StartTime time.Time
-	Duration  time.Duration
-	ConnError *ConnectivityError
-}
-
-type DNSInfo struct {
-	Host         string
-	Resolver     string
-	Network      string
-	ResolverType string
-	IPs          []net.IPAddr
-	RSCodes      []dnsmessage.RCode
-	Error        error
-	StartTime    time.Time
-	Duration     time.Duration
-	ConnError    *ConnectivityError
-}
-
-type SystemDNSInfo struct {
-	Host      string
-	IPs       []net.IPAddr
-	Error     error
-	StartTime time.Time
-	Duration  time.Duration
-}
-
 var _ error = (*ConnectivityError)(nil)
 
 func (err *ConnectivityError) Error() string {
@@ -92,7 +61,7 @@ func isTimeout(err error) bool {
 	return errors.As(err, &timeErr) && timeErr.Timeout()
 }
 
-func makeConnectivityError(op string, err error) *ConnectivityError {
+func MakeConnectivityError(op string, err error) *ConnectivityError {
 	// An early close on the connection may cause an "unexpected EOF" error. That's an application-layer error,
 	// not triggered by a syscall error so we don't capture an error code.
 	// TODO: figure out how to standardize on those errors.
@@ -132,16 +101,16 @@ func TestConnectivityWithResolver(ctx context.Context, resolver dns.Resolver, te
 		return nil, err
 	}
 	if errors.Is(err, dns.ErrDial) {
-		return makeConnectivityError("connect", err), nil
+		return MakeConnectivityError("connect", err), nil
 	} else if errors.Is(err, dns.ErrSend) {
-		return makeConnectivityError("send", err), nil
+		return MakeConnectivityError("send", err), nil
 	} else if errors.Is(err, dns.ErrReceive) {
-		return makeConnectivityError("receive", err), nil
+		return MakeConnectivityError("receive", err), nil
 	}
 	return nil, nil
 }
 
-func TestStreamConnectivitywithHTTP(ctx context.Context, baseDialer transport.StreamDialer, domain string, timeout time.Duration, method string) (*ConnectivityError, error) {
+func TestStreamConnectivitywithHTTP(ctx context.Context, baseDialer transport.StreamDialer, domain string, timeout time.Duration, method string) error {
 	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
 		host, port, err := net.SplitHostPort(addr)
 		if err != nil {
@@ -179,7 +148,7 @@ func TestStreamConnectivitywithHTTP(ctx context.Context, baseDialer transport.St
 	req = req.WithContext(ctx)
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
+		return fmt.Errorf("HTTP request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -194,10 +163,10 @@ func TestStreamConnectivitywithHTTP(ctx context.Context, baseDialer transport.St
 		log.Fatalf("Read of page body failed: %v\n", err)
 	}
 
-	return nil, nil
+	return nil
 }
 
-func TestPacketConnectivitywithHTTP3(ctx context.Context, baseDialer transport.PacketDialer, domain string, timeout time.Duration, method string) (*ConnectivityError, error) {
+func TestPacketConnectivitywithHTTP3(ctx context.Context, baseDialer transport.PacketDialer, domain string, timeout time.Duration, method string) error {
 
 	// Setup HTTP/3 RoundTripper
 	http3RoundTripper := &http3.RoundTripper{
@@ -247,7 +216,7 @@ func TestPacketConnectivitywithHTTP3(ctx context.Context, baseDialer transport.P
 	req = req.WithContext(ctx)
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
+		return fmt.Errorf("HTTP request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -262,5 +231,5 @@ func TestPacketConnectivitywithHTTP3(ctx context.Context, baseDialer transport.P
 		log.Fatalf("Read of page body failed: %v\n", err)
 	}
 
-	return nil, nil
+	return nil
 }
