@@ -217,6 +217,7 @@ func main() {
 							for _, ip := range di.Addrs {
 								report.AnswerIPs = append(report.AnswerIPs, ip.IP.String())
 							}
+							// TODO(fortuna): Use a Mutex.
 							dnsReports = append(dnsReports, report)
 						},
 						ConnectDone: func(network, addr string, connErr error) {
@@ -232,6 +233,7 @@ func main() {
 							if connErr != nil {
 								report.Error = connErr.Error()
 							}
+							// TODO(fortuna): Use a Mutex.
 							tcpReports = append(tcpReports, report)
 						},
 					})
@@ -267,6 +269,7 @@ func main() {
 							for _, ip := range di.Addrs {
 								report.AnswerIPs = append(report.AnswerIPs, ip.IP.String())
 							}
+							// TODO(fortuna): Use a Mutex.
 							dnsReports = append(dnsReports, report)
 						},
 					})
