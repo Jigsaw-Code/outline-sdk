@@ -17,7 +17,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -39,136 +38,6 @@ import (
 var debugLog log.Logger = *log.New(io.Discard, "", 0)
 
 // var errorLog log.Logger = *log.New(os.Stderr, "[ERROR] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
-
-type JSONConnectivityEvents struct {
-	ConnectInfo   []*JSONConnectInfo   `json:"connect_info,omitempty"`
-	DnsInfo       []*JSONDNSInfo       `json:"dns_info,omitempty"`
-	SystemDNSInfo []*JSONSystemDNSInfo `json:"system_dns_info,omitempty"`
-}
-
-type JSONConnectInfo struct {
-	Network   string        `json:"network"`
-	IP        string        `json:"ip"`
-	Port      string        `json:"port"`
-	Error     string        `json:"error,omitempty"`
-	StartTime time.Time     `json:"start_time"`
-	Duration  time.Duration `json:"duration_ms"`
-	ConnError *errorJSON    `json:"conn_error,omitempty"`
-}
-
-type JSONDNSInfo struct {
-	Host         string        `json:"host"`
-	Resolver     string        `json:"resolver"`
-	Network      string        `json:"network"`
-	ResolverType string        `json:"resolver_type"`
-	IPs          []string      `json:"ips"`
-	RSCodes      []string      `json:"rs_codes"`
-	Error        string        `json:"error,omitempty"`
-	StartTime    time.Time     `json:"start_time"`
-	Duration     time.Duration `json:"duration_ms"`
-	ConnError    *errorJSON    `json:"conn_error,omitempty"`
-}
-
-type JSONSystemDNSInfo struct {
-	Host      string        `json:"host"`
-	IPs       []string      `json:"ips"`
-	Error     string        `json:"error,omitempty"`
-	StartTime time.Time     `json:"start_time"`
-	Duration  time.Duration `json:"duration_ms"`
-}
-
-type errorJSON struct {
-	Op         string `json:"op,omitempty"`
-	PosixError string `json:"posix_error,omitempty"`
-	Msg        string `json:"msg,omitempty"`
-}
-
-// Function to convert ConnectivityEvents to JSON-friendly structure
-func ConvertToJSONFriendly(events *connectivity.ConnectivityEvents) *JSONConnectivityEvents {
-	jsonEvents := &JSONConnectivityEvents{
-		ConnectInfo:   make([]*JSONConnectInfo, len(events.ConnectInfo)),
-		DnsInfo:       make([]*JSONDNSInfo, len(events.DnsInfo)),
-		SystemDNSInfo: make([]*JSONSystemDNSInfo, len(events.SystemDNSInfo)),
-	}
-
-	for i, ci := range events.ConnectInfo {
-		jsonEvents.ConnectInfo[i] = &JSONConnectInfo{
-			Network:   ci.Network,
-			IP:        ci.IP,
-			Port:      ci.Port,
-			StartTime: ci.StartTime,
-			Duration:  time.Duration(ci.Duration.Milliseconds()),
-			ConnError: makeErrorRecord(ci.ConnError),
-		}
-		if ci.Error != nil {
-			jsonEvents.ConnectInfo[i].Error = ci.Error.Error()
-		}
-	}
-
-	for i, di := range events.DnsInfo {
-		ips := make([]string, len(di.IPs))
-		for j, ip := range di.IPs {
-			ips[j] = ip.IP.String()
-		}
-		rsCodes := make([]string, len(di.RSCodes))
-		for j, code := range di.RSCodes {
-			rsCodes[j] = code.String()
-		}
-		jsonEvents.DnsInfo[i] = &JSONDNSInfo{
-			Host:         di.Host,
-			Resolver:     di.Resolver,
-			Network:      di.Network,
-			ResolverType: di.ResolverType,
-			IPs:          ips,
-			RSCodes:      rsCodes,
-			StartTime:    di.StartTime,
-			Duration:     time.Duration(di.Duration.Milliseconds()),
-			ConnError:    makeErrorRecord(di.ConnError),
-		}
-		if di.Error != nil {
-			jsonEvents.DnsInfo[i].Error = di.Error.Error()
-		}
-	}
-
-	for i, sdi := range events.SystemDNSInfo {
-		ips := make([]string, len(sdi.IPs))
-		for j, ip := range sdi.IPs {
-			ips[j] = ip.IP.String()
-		}
-		jsonEvents.SystemDNSInfo[i] = &JSONSystemDNSInfo{
-			Host:      sdi.Host,
-			IPs:       ips,
-			StartTime: sdi.StartTime,
-			Duration:  time.Duration(sdi.Duration.Milliseconds()),
-		}
-		if sdi.Error != nil {
-			jsonEvents.SystemDNSInfo[i].Error = sdi.Error.Error()
-		}
-	}
-
-	return jsonEvents
-}
-
-func makeErrorRecord(result *connectivity.ConnectivityError) *errorJSON {
-	if result == nil {
-		return nil
-	}
-	var record = new(errorJSON)
-	record.Op = result.Op
-	record.PosixError = result.PosixError
-	record.Msg = unwrapAll(result.Err).Error()
-	return record
-}
-
-func unwrapAll(err error) error {
-	for {
-		unwrapped := errors.Unwrap(err)
-		if unwrapped == nil {
-			return err
-		}
-		err = unwrapped
-	}
-}
 
 // func (r connectivityReport) IsSuccess() bool {
 // 	if r.Error == nil {
@@ -248,14 +117,12 @@ func main() {
 	// - Server IPv4 dial support
 	// - Server IPv6 dial support
 
-	success := false
 	jsonEncoder := json.NewEncoder(os.Stdout)
 	jsonEncoder.SetEscapeHTML(false)
 	configToDialer := config.NewDefaultConfigToDialer()
-	ctx, connectivityEvents := connectivity.SetupConnectivityTrace(context.Background())
+	ctx, connectivityEvents := SetupConnectivityTrace(context.Background())
 	for _, resolverHost := range strings.Split(*resolverFlag, ",") {
 		resolverHost := strings.TrimSpace(resolverHost)
-		var result *connectivity.ConnectivityError
 		var resolverAddress string
 		for _, testType := range strings.Split(*testTypeFlag, ",") {
 			testType = strings.TrimSpace(testType)
@@ -268,7 +135,7 @@ func main() {
 				}
 				resolverAddress = net.JoinHostPort(resolverHost, "53")
 				resolver = dns.NewTCPResolver(streamDialer, resolverAddress)
-				result, err = connectivity.TestConnectivityWithResolver(ctx, resolver, *domainFlag)
+				_, err = connectivity.TestConnectivityWithResolver(ctx, resolver, *domainFlag)
 				if err != nil {
 					log.Fatalf("Connectivity test failed to run: %v", err)
 				}
@@ -279,7 +146,7 @@ func main() {
 				}
 				resolverAddress = net.JoinHostPort(resolverHost, "53")
 				resolver = dns.NewUDPResolver(packetDialer, resolverAddress)
-				result, err = connectivity.TestConnectivityWithResolver(ctx, resolver, *domainFlag)
+				_, err = connectivity.TestConnectivityWithResolver(ctx, resolver, *domainFlag)
 				if err != nil {
 					log.Fatalf("Connectivity test failed to run: %v", err)
 				}
@@ -290,7 +157,7 @@ func main() {
 				}
 				resolverAddress = net.JoinHostPort(resolverHost, "443")
 				resolver = dns.NewHTTPSResolver(streamDialer, resolverAddress, "https://"+resolverAddress+"/dns-query")
-				result, err = connectivity.TestConnectivityWithResolver(ctx, resolver, *domainFlag)
+				_, err = connectivity.TestConnectivityWithResolver(ctx, resolver, *domainFlag)
 				if err != nil {
 					log.Fatalf("Connectivity test failed to run: %v", err)
 				}
@@ -301,7 +168,7 @@ func main() {
 				}
 				resolverAddress = net.JoinHostPort(resolverHost, "853")
 				resolver = dns.NewTLSResolver(streamDialer, resolverAddress, *resolverNameFlag)
-				result, err = connectivity.TestConnectivityWithResolver(ctx, resolver, *domainFlag)
+				_, err = connectivity.TestConnectivityWithResolver(ctx, resolver, *domainFlag)
 				if err != nil {
 					log.Fatalf("Connectivity test failed to run: %v", err)
 				}
@@ -310,7 +177,7 @@ func main() {
 				if err != nil {
 					log.Fatalf("Failed to create StreamDialer: %v", err)
 				}
-				result, err = connectivity.TestStreamConnectivitywithHTTP(ctx, streamDialer, *domainFlag, *timeoutFlag, *methodFlag)
+				err = connectivity.TestStreamConnectivitywithHTTP(ctx, streamDialer, *domainFlag, *timeoutFlag, *methodFlag)
 				if err != nil {
 					log.Fatalf("Connectivity test failed to run: %v", err)
 				}
@@ -319,34 +186,30 @@ func main() {
 				if err != nil {
 					log.Fatalf("Failed to create PacketDialer: %v", err)
 				}
-				result, err = connectivity.TestPacketConnectivitywithHTTP3(ctx, packetDialer, *domainFlag, *timeoutFlag, *methodFlag)
+				err = connectivity.TestPacketConnectivitywithHTTP3(ctx, packetDialer, *domainFlag, *timeoutFlag, *methodFlag)
 				if err != nil {
 					log.Fatalf("Connectivity test failed to run: %v", err)
 				}
 			default:
 				log.Fatalf(`Invalid Test Type %v.`, testType)
 			}
-			if result == nil {
-				success = true
+			sanitizedConfig, err := config.SanitizeConfig(*transportFlag)
+			if err != nil {
+				log.Fatalf("Failed to sanitize config: %v", err)
 			}
-			debugLog.Printf("Test Type: %v Resolver Address: %v domain: %v result: %v", testType, resolverAddress, *domainFlag, result)
-			//sanitizedConfig, err := config.SanitizeConfig(*transportFlag)
-			// if err != nil {
-			// 	log.Fatalf("Failed to sanitize config: %v", err)
-			// }
 
-			fmt.Printf("Connectivity Events: %+v\n", connectivityEvents)
-			jsonFriendlyEvents := ConvertToJSONFriendly(connectivityEvents)
-			var r report.Report = jsonFriendlyEvents
+			connReport := &ConnectivityReport{
+				TestType:           testType,
+				Transport:          sanitizedConfig,
+				ConnectivityEvents: connectivityEvents,
+			}
+			var r report.Report = connReport
 			if reportCollector != nil {
 				err := reportCollector.Collect(context.Background(), r)
 				if err != nil {
 					debugLog.Printf("Failed to collect report: %v\n", err)
 				}
 			}
-		}
-		if !success {
-			os.Exit(1)
 		}
 	}
 }
