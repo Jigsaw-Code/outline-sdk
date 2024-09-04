@@ -178,12 +178,12 @@ func queryDatagram(ctx context.Context, conn io.ReadWriter, q dnsmessage.Questio
 	if _, err := conn.Write(buf); err != nil {
 		err = &nestedError{ErrSend, err}
 		if t != nil && t.WroteDone != nil {
-			t.WroteDone(err)
+			t.WroteDone(q, err)
 		}
 		return nil, err
 	}
 	if t != nil && t.WroteDone != nil {
-		t.WroteDone(nil)
+		t.WroteDone(q, nil)
 	}
 
 	buf = buf[:cap(buf)]
@@ -197,13 +197,13 @@ func queryDatagram(ctx context.Context, conn io.ReadWriter, q dnsmessage.Questio
 		if err != nil {
 			err = &nestedError{ErrReceive, errors.Join(returnErr, fmt.Errorf("read message failed: %w", err))}
 			if t != nil && t.ReadDone != nil {
-				t.ReadDone(err)
+				t.ReadDone(q, err)
 			}
 			return nil, err
 		}
 		// we are going to get a buncg of ReadDone here...
 		if t != nil && t.ReadDone != nil {
-			t.ReadDone(nil)
+			t.ReadDone(q, nil)
 		}
 		var msg dnsmessage.Message
 		if err := msg.Unpack(buf[:n]); err != nil {
@@ -241,19 +241,19 @@ func queryStream(ctx context.Context, conn io.ReadWriter, q dnsmessage.Question)
 	if _, err := conn.Write(buf); err != nil {
 		err = &nestedError{ErrSend, err}
 		if t != nil && t.WroteDone != nil {
-			t.WroteDone(err)
+			t.WroteDone(q, err)
 		}
 		return nil, err
 	}
 	if t != nil && t.WroteDone != nil {
-		t.WroteDone(nil)
+		t.WroteDone(q, nil)
 	}
 
 	var msgLen uint16
 	if err := binary.Read(conn, binary.BigEndian, &msgLen); err != nil {
 		err = &nestedError{ErrReceive, fmt.Errorf("read message length failed: %w", err)}
 		if t != nil && t.ReadDone != nil {
-			t.ReadDone(err)
+			t.ReadDone(q, err)
 		}
 		return nil, err
 	}
@@ -265,12 +265,12 @@ func queryStream(ctx context.Context, conn io.ReadWriter, q dnsmessage.Question)
 	if _, err = io.ReadFull(conn, buf); err != nil {
 		err = &nestedError{ErrReceive, fmt.Errorf("read message failed: %w", err)}
 		if t != nil && t.ReadDone != nil {
-			t.ReadDone(err)
+			t.ReadDone(q, err)
 		}
 		return nil, err
 	}
 	if t != nil && t.ReadDone != nil {
-		t.ReadDone(nil)
+		t.ReadDone(q, nil)
 	}
 
 	var msg dnsmessage.Message
@@ -441,6 +441,12 @@ func NewHTTPSResolver(sd transport.StreamDialer, resolverAddr string, url string
 			return nil, &nestedError{ErrReceive, fmt.Errorf("failed to get HTTP response: %w", err)}
 		}
 		defer httpResp.Body.Close()
+
+		// if we call this before request is send, ResolveSetup has not yet been called
+		if t != nil && t.QuestionReady != nil {
+			t.QuestionReady(q)
+		}
+
 		if httpResp.StatusCode != http.StatusOK {
 			return nil, &nestedError{ErrReceive, fmt.Errorf("got HTTP status %v", httpResp.StatusCode)}
 		}
