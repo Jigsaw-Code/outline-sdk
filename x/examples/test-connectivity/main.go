@@ -24,6 +24,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	"path"
@@ -31,6 +32,7 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/dns"
+	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
 	"github.com/Jigsaw-Code/outline-sdk/x/report"
@@ -41,6 +43,12 @@ var debugLog log.Logger = *log.New(io.Discard, "", 0)
 // var errorLog log.Logger = *log.New(os.Stderr, "[ERROR] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
 type connectivityReport struct {
+	Test           testReport  `json:"test"`
+	DNSQueries     []dnsReport `json:"dns_queries,omitempty"`
+	TCPConnections []tcpReport `json:"tcp_connections,omitempty"`
+}
+
+type testReport struct {
 	// Inputs
 	Resolver string `json:"resolver"`
 	Proto    string `json:"proto"`
@@ -51,6 +59,19 @@ type connectivityReport struct {
 	Time       time.Time  `json:"time"`
 	DurationMs int64      `json:"duration_ms"`
 	Error      *errorJSON `json:"error"`
+}
+
+type dnsReport struct {
+	QueryName string   `json:"query_name"`
+	AnswerIPs []string `json:"answer_ips"`
+	Error     string   `json:"error"`
+}
+
+type tcpReport struct {
+	Hostname string `json:"hostname"`
+	IP       string `json:"ip"`
+	Port     string `json:"port"`
+	Error    string `json:"error"`
 }
 
 type errorJSON struct {
@@ -84,7 +105,7 @@ func unwrapAll(err error) error {
 }
 
 func (r connectivityReport) IsSuccess() bool {
-	if r.Error == nil {
+	if r.Test.Error == nil {
 		return true
 	} else {
 		return false
@@ -161,21 +182,82 @@ func main() {
 	success := false
 	jsonEncoder := json.NewEncoder(os.Stdout)
 	jsonEncoder.SetEscapeHTML(false)
-	configToDialer := config.NewDefaultConfigToDialer()
 	for _, resolverHost := range strings.Split(*resolverFlag, ",") {
 		resolverHost := strings.TrimSpace(resolverHost)
 		resolverAddress := net.JoinHostPort(resolverHost, "53")
 		for _, proto := range strings.Split(*protoFlag, ",") {
 			proto = strings.TrimSpace(proto)
 			var resolver dns.Resolver
+			dnsReports := make([]dnsReport, 0)
+			tcpReports := make([]tcpReport, 0)
 			switch proto {
 			case "tcp":
+				configToDialer := config.NewDefaultConfigToDialer()
+				configToDialer.BaseStreamDialer = transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+					hostname, _, err := net.SplitHostPort(addr)
+					if err != nil {
+						return nil, err
+					}
+					ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+						DNSDone: func(di httptrace.DNSDoneInfo) {
+							report := dnsReport{
+								QueryName: hostname,
+							}
+							if di.Err != nil {
+								report.Error = di.Err.Error()
+							}
+							for _, ip := range di.Addrs {
+								report.AnswerIPs = append(report.AnswerIPs, ip.IP.String())
+							}
+							dnsReports = append(dnsReports, report)
+						},
+						ConnectDone: func(network, addr string, connErr error) {
+							ip, port, err := net.SplitHostPort(addr)
+							if err != nil {
+								return
+							}
+							report := tcpReport{
+								Hostname: hostname,
+								IP:       ip,
+								Port:     port,
+							}
+							if connErr != nil {
+								report.Error = connErr.Error()
+							}
+							tcpReports = append(tcpReports, report)
+						},
+					})
+					return (&transport.TCPDialer{}).DialStream(ctx, addr)
+				})
 				streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create StreamDialer: %v", err)
 				}
 				resolver = dns.NewTCPResolver(streamDialer, resolverAddress)
+
 			case "udp":
+				configToDialer := config.NewDefaultConfigToDialer()
+				configToDialer.BasePacketDialer = transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+					hostname, _, err := net.SplitHostPort(addr)
+					if err != nil {
+						return nil, err
+					}
+					ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+						DNSDone: func(di httptrace.DNSDoneInfo) {
+							report := dnsReport{
+								QueryName: hostname,
+							}
+							if di.Err != nil {
+								report.Error = di.Err.Error()
+							}
+							for _, ip := range di.Addrs {
+								report.AnswerIPs = append(report.AnswerIPs, ip.IP.String())
+							}
+							dnsReports = append(dnsReports, report)
+						},
+					})
+					return (&transport.UDPDialer{}).DialPacket(ctx, addr)
+				})
 				packetDialer, err := configToDialer.NewPacketDialer(*transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create PacketDialer: %v", err)
@@ -199,13 +281,17 @@ func main() {
 				log.Fatalf("Failed to sanitize config: %v", err)
 			}
 			var r report.Report = connectivityReport{
-				Resolver: resolverAddress,
-				Proto:    proto,
-				Time:     startTime.UTC().Truncate(time.Second),
-				// TODO(fortuna): Add sanitized config:
-				Transport:  sanitizedConfig,
-				DurationMs: testDuration.Milliseconds(),
-				Error:      makeErrorRecord(result),
+				Test: testReport{
+					Resolver: resolverAddress,
+					Proto:    proto,
+					Time:     startTime.UTC().Truncate(time.Second),
+					// TODO(fortuna): Add sanitized config:
+					Transport:  sanitizedConfig,
+					DurationMs: testDuration.Milliseconds(),
+					Error:      makeErrorRecord(result),
+				},
+				DNSQueries:     dnsReports,
+				TCPConnections: tcpReports,
 			}
 			if reportCollector != nil {
 				err = reportCollector.Collect(context.Background(), r)
