@@ -254,7 +254,7 @@ func main() {
 					if err != nil {
 						return nil, err
 					}
-					ctx = setupTraceContext(ctx, r, hostname)
+					ctx = getReportFromTrace(ctx, r, hostname)
 					return (&transport.TCPDialer{}).DialStream(ctx, addr)
 				})
 				streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
@@ -270,7 +270,7 @@ func main() {
 					if err != nil {
 						return nil, err
 					}
-					ctx = setupTraceContext(ctx, r, hostname)
+					ctx = getReportFromTrace(ctx, r, hostname)
 					return (&transport.UDPDialer{}).DialPacket(ctx, addr)
 				})
 				packetDialer, err := configToDialer.NewPacketDialer(*transportFlag)
