@@ -177,7 +177,6 @@ func TestConnectWithoutAuth(t *testing.T) {
 
 	go func() {
 		err := server.Serve(listener)
-		t.Log("server is listening...")
 		if !errors.Is(err, net.ErrClosed) && err != nil {
 			require.NoError(t, err) // Assert no error if it's not the expected close error
 		}
