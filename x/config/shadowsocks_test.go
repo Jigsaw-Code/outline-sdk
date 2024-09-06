@@ -15,6 +15,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"net/url"
 	"testing"
 
@@ -35,4 +36,88 @@ func Test_sanitizeShadowsocksURL_withPrefix(t *testing.T) {
 	sanitized, err := sanitizeShadowsocksURL(ssURL)
 	require.NoError(t, err)
 	require.Equal(t, "ss://REDACTED@192.168.100.1:8888?prefix=foo", sanitized)
+}
+
+func TestParseShadowsocksURLFullyEncoded(t *testing.T) {
+	encoded := base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte("aes-256-gcm:1234567@example.com:1234?prefix=HTTP%2F1.1%20"))
+	urls, err := parseConfig("ss://" + string(encoded) + "#outline-123")
+	require.NoError(t, err)
+	require.Equal(t, 1, len(urls))
+
+	config, err := parseShadowsocksURL(urls[0])
+
+	require.NoError(t, err)
+	require.Equal(t, "example.com:1234", config.serverAddress)
+	require.Equal(t, "HTTP/1.1 ", string(config.prefix))
+}
+
+func TestParseShadowsocksURLUserInfoEncoded(t *testing.T) {
+	encoded := base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte("aes-256-gcm:1234567"))
+	urls, err := parseConfig("ss://" + string(encoded) + "@example.com:1234?prefix=HTTP%2F1.1%20" + "#outline-123")
+	require.NoError(t, err)
+	require.Equal(t, 1, len(urls))
+
+	config, err := parseShadowsocksURL(urls[0])
+
+	require.NoError(t, err)
+	require.Equal(t, "example.com:1234", config.serverAddress)
+	require.Equal(t, "HTTP/1.1 ", string(config.prefix))
+}
+
+func TestParseShadowsocksURLNoEncoding(t *testing.T) {
+	configString := "ss://aes-256-gcm:1234567@example.com:1234"
+	urls, err := parseConfig(configString)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(urls))
+
+	config, err := parseShadowsocksURL(urls[0])
+
+	require.NoError(t, err)
+	require.Equal(t, "example.com:1234", config.serverAddress)
+}
+
+func TestParseShadowsocksURLInvalidCipherInfoFails(t *testing.T) {
+	configString := "ss://aes-256-gcm1234567@example.com:1234"
+	urls, err := parseConfig(configString)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(urls))
+
+	_, err = parseShadowsocksURL(urls[0])
+
+	require.Error(t, err)
+}
+
+func TestParseShadowsocksURLUnsupportedCypherFails(t *testing.T) {
+	configString := "ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwnTpLeTUyN2duU3FEVFB3R0JpQ1RxUnlT@example.com:1234"
+	urls, err := parseConfig(configString)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(urls))
+
+	_, err = parseShadowsocksURL(urls[0])
+
+	require.Error(t, err)
+}
+
+func TestParseShadowsocksLegacyBase64URL(t *testing.T) {
+	encoded := base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte("aes-256-gcm:1234567@example.com:1234?prefix=HTTP%2F1.1%20"))
+	urls, err := parseConfig("ss://" + string(encoded) + "#outline-123")
+	require.NoError(t, err)
+	require.Equal(t, 1, len(urls))
+
+	config, err := parseShadowsocksLegacyBase64URL(urls[0])
+
+	require.NoError(t, err)
+	require.Equal(t, "example.com:1234", config.serverAddress)
+	require.Equal(t, "HTTP/1.1 ", string(config.prefix))
+}
+
+func TestParseShadowsocksSIP002URLUnsuccessful(t *testing.T) {
+	encoded := base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte("aes-256-gcm:1234567@example.com:1234?prefix=HTTP%2F1.1%20"))
+	urls, err := parseConfig("ss://" + string(encoded) + "#outline-123")
+	require.NoError(t, err)
+	require.Equal(t, 1, len(urls))
+
+	_, err = parseShadowsocksSIP002URL(urls[0])
+
+	require.Error(t, err)
 }

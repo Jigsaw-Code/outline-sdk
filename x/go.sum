@@ -6,8 +6,8 @@ github.com/AndreasBriese/bbloom v0.0.0-20170702084017-28f7e881ca57 h1:CVuXDbdzPW
 github.com/AndreasBriese/bbloom v0.0.0-20170702084017-28f7e881ca57/go.mod h1:bOvUY6CB00SOBii9/FifXqc0awNKxLFCL/+pkDPuyl8=
 github.com/BurntSushi/toml v1.3.2 h1:o7IhLm0Msx3BaB+n3Ag7L8EVlByGnpq14C4YWiu/gL8=
 github.com/BurntSushi/toml v1.3.2/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
-github.com/Jigsaw-Code/outline-sdk v0.0.16 h1:WbHmv80FKDIpzEmR3GehTbq5CibYTLvcxIIpMMILiEs=
-github.com/Jigsaw-Code/outline-sdk v0.0.16/go.mod h1:e1oQZbSdLJBBuHgfeQsgEkvkuyIePPwstUeZRGq0KO8=
+github.com/Jigsaw-Code/outline-sdk v0.0.17-0.20240726212635-470a9290ec57 h1:XNSV0dGW48J8DmdmCnk/txGHf9glAPqa6Xme/rFWn7c=
+github.com/Jigsaw-Code/outline-sdk v0.0.17-0.20240726212635-470a9290ec57/go.mod h1:e1oQZbSdLJBBuHgfeQsgEkvkuyIePPwstUeZRGq0KO8=
 github.com/Psiphon-Inc/rotate-safe-writer v0.0.0-20210303140923-464a7a37606e h1:NPfqIbzmijrl0VclX2t8eO5EPBhqe47LLGKpRrcVjXk=
 github.com/Psiphon-Inc/rotate-safe-writer v0.0.0-20210303140923-464a7a37606e/go.mod h1:ZdY5pBfat/WVzw3eXbIf7N1nZN0XD5H5+X8ZMDWbCs4=
 github.com/Psiphon-Labs/bolt v0.0.0-20200624191537-23cedaef7ad7 h1:Hx/NCZTnvoKZuIBwSmxE58KKoNLXIGG6hBJYN7pj9Ag=
@@ -18,8 +18,8 @@ github.com/Psiphon-Labs/goptlib v0.0.0-20200406165125-c0e32a7a3464 h1:VmnMMMheFX
 github.com/Psiphon-Labs/goptlib v0.0.0-20200406165125-c0e32a7a3464/go.mod h1:Pe5BqN2DdIdChorAXl6bDaQd/wghpCleJfid2NoSli0=
 github.com/Psiphon-Labs/psiphon-tls v0.0.0-20240424193802-52b2602ec60c h1:+SEszyxW7yu+smufzSlAszj/WmOYJ054DJjb5jllulc=
 github.com/Psiphon-Labs/psiphon-tls v0.0.0-20240424193802-52b2602ec60c/go.mod h1:AaKKoshr8RI1LZTheeNDtNuZ39qNVPWVK4uir2c2XIs=
-github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20240522172529-8fcc4b9a51cf h1:qXrGUIY9MMXIWqOmWv84qjVa8XLLjcOb+S5TEpZjFpA=
-github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20240522172529-8fcc4b9a51cf/go.mod h1:Z5txHi6IF67uDg206QnSxkgE1I3FJUDDJ3n0pa+bKRs=
+github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20240619172145-03cade11f647 h1:YhpvDo++9Q3FiBuaAUhrFEzEWC6es3zFohjofEwO6xg=
+github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20240619172145-03cade11f647/go.mod h1:Z5txHi6IF67uDg206QnSxkgE1I3FJUDDJ3n0pa+bKRs=
 github.com/Psiphon-Labs/quic-go v0.0.0-20240424181006-45545f5e1536 h1:pM5ex1QufkHV8lDR6Tc1Crk1bW5lYZjrFIJGZNBWE9k=
 github.com/Psiphon-Labs/quic-go v0.0.0-20240424181006-45545f5e1536/go.mod h1:2MTiPsgoOqWs3Bo6Xr3ElMBX6zzfjd3YkDFpQJLwHdQ=
 github.com/andybalholm/brotli v1.0.5 h1:8uQZIdzKmjc/iuPu7O2ioW48L81FgatrcpfFmiq/cCs=
