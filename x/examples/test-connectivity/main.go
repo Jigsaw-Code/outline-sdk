@@ -120,6 +120,29 @@ func init() {
 		flag.PrintDefaults()
 	}
 }
+func newTCPTraceDialer(
+	onDNS func(ctx context.Context, domain string) func(di httptrace.DNSDoneInfo),
+	onDial func(ctx context.Context, network, addr string, connErr error)) transport.StreamDialer {
+	dialer := &transport.TCPDialer{}
+	var onDNSDone func(di httptrace.DNSDoneInfo)
+	return transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+		ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+			DNSStart: func(di httptrace.DNSStartInfo) {
+				onDNSDone = onDNS(ctx, di.Host)
+			},
+			DNSDone: func(di httptrace.DNSDoneInfo) {
+				if onDNSDone != nil {
+					onDNSDone(di)
+					onDNSDone = nil
+				}
+			},
+			ConnectDone: func(network, addr string, connErr error) {
+				onDial(ctx, network, addr, connErr)
+			},
+		})
+		return dialer.DialStream(ctx, addr)
+	})
+}
 
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
@@ -200,12 +223,9 @@ func main() {
 					if err != nil {
 						return nil, err
 					}
-					var dnsStart time.Time
-					ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
-						DNSStart: func(di httptrace.DNSStartInfo) {
-							dnsStart = time.Now()
-						},
-						DNSDone: func(di httptrace.DNSDoneInfo) {
+					onDNS := func(ctx context.Context, domain string) func(di httptrace.DNSDoneInfo) {
+						dnsStart := time.Now()
+						return func(di httptrace.DNSDoneInfo) {
 							report := dnsReport{
 								QueryName:  hostname,
 								Time:       dnsStart.UTC().Truncate(time.Second),
@@ -219,25 +239,25 @@ func main() {
 							}
 							// TODO(fortuna): Use a Mutex.
 							dnsReports = append(dnsReports, report)
-						},
-						ConnectDone: func(network, addr string, connErr error) {
-							ip, port, err := net.SplitHostPort(addr)
-							if err != nil {
-								return
-							}
-							report := tcpReport{
-								Hostname: hostname,
-								IP:       ip,
-								Port:     port,
-							}
-							if connErr != nil {
-								report.Error = connErr.Error()
-							}
-							// TODO(fortuna): Use a Mutex.
-							tcpReports = append(tcpReports, report)
-						},
-					})
-					return (&transport.TCPDialer{}).DialStream(ctx, addr)
+						}
+					}
+					onDial := func(ctx context.Context, network, addr string, connErr error) {
+						ip, port, err := net.SplitHostPort(addr)
+						if err != nil {
+							return
+						}
+						report := tcpReport{
+							Hostname: hostname,
+							IP:       ip,
+							Port:     port,
+						}
+						if connErr != nil {
+							report.Error = connErr.Error()
+						}
+						// TODO(fortuna): Use a Mutex.
+						tcpReports = append(tcpReports, report)
+					}
+					return newTCPTraceDialer(onDNS, onDial).DialStream(ctx, addr)
 				})
 				streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
 				if err != nil {
