@@ -167,15 +167,18 @@ func testExchange(tb testing.TB, listener *net.TCPListener, destAddr string, req
 }
 
 func TestConnectWithoutAuth(t *testing.T) {
+	var running sync.WaitGroup
+	running.Add(1)
 	// Create a SOCKS5 server.
 	server := socks5.NewServer()
 
 	// Create SOCKS5 proxy on localhost with a random port.
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	defer listener.Close()
+	//defer listener.Close()
 
 	go func() {
+		defer running.Done()
 		err := server.Serve(listener)
 		if !errors.Is(err, net.ErrClosed) && err != nil {
 			require.NoError(t, err) // Assert no error if it's not the expected close error
@@ -191,9 +194,15 @@ func TestConnectWithoutAuth(t *testing.T) {
 
 	_, err = client.DialStream(context.Background(), address)
 	require.NoError(t, err)
+	// Forcefully close the listener to stop the server
+	// Otherwise defer listener.Close() will never be called
+	listener.Close()
+	running.Wait()
 }
 
 func TestConnectWithAuth(t *testing.T) {
+	var running sync.WaitGroup
+	running.Add(1)
 	// Create a SOCKS5 server
 	cator := socks5.UserPassAuthenticator{
 		Credentials: socks5.StaticCredentials{
@@ -207,11 +216,11 @@ func TestConnectWithAuth(t *testing.T) {
 	// Create SOCKS5 proxy on localhost with a random port.
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	defer listener.Close()
 	address := listener.Addr().String()
 
 	// Create SOCKS5 proxy on localhost port 8001
 	go func() {
+		defer running.Done()
 		err := server.Serve(listener)
 		if !errors.Is(err, net.ErrClosed) && err != nil {
 			require.NoError(t, err) // Assert no error if it's not the expected close error
@@ -231,4 +240,7 @@ func TestConnectWithAuth(t *testing.T) {
 	require.NoError(t, err)
 	_, err = dialer.DialStream(context.Background(), address)
 	require.Error(t, err)
+	// Close the listener. This will stop the server also.
+	listener.Close()
+	running.Wait()
 }
