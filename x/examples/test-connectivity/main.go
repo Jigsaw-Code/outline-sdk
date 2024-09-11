@@ -70,10 +70,12 @@ type dnsReport struct {
 }
 
 type tcpReport struct {
-	Hostname string `json:"hostname"`
-	IP       string `json:"ip"`
-	Port     string `json:"port"`
-	Error    string `json:"error"`
+	Hostname string    `json:"hostname"`
+	IP       string    `json:"ip"`
+	Port     string    `json:"port"`
+	Error    string    `json:"error"`
+	Time     time.Time `json:"time"`
+	Duration int64     `json:"duration_ms"`
 }
 
 type errorJSON struct {
@@ -122,7 +124,9 @@ func init() {
 }
 func newTCPTraceDialer(
 	onDNS func(ctx context.Context, domain string) func(di httptrace.DNSDoneInfo),
-	onDial func(ctx context.Context, network, addr string, connErr error)) transport.StreamDialer {
+	onDial func(ctx context.Context, network, addr string, connErr error),
+	onDialStart func(ctx context.Context, network, addr string),
+) transport.StreamDialer {
 	dialer := &transport.TCPDialer{}
 	var onDNSDone func(di httptrace.DNSDoneInfo)
 	return transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
@@ -136,11 +140,35 @@ func newTCPTraceDialer(
 					onDNSDone = nil
 				}
 			},
+			ConnectStart: func(network, addr string) {
+				onDialStart(ctx, network, addr)
+			},
 			ConnectDone: func(network, addr string, connErr error) {
 				onDial(ctx, network, addr, connErr)
 			},
 		})
 		return dialer.DialStream(ctx, addr)
+	})
+}
+
+func newUDPTraceDialer(
+	onDNS func(ctx context.Context, domain string) func(di httptrace.DNSDoneInfo),
+) transport.PacketDialer {
+	dialer := &transport.UDPDialer{}
+	var onDNSDone func(di httptrace.DNSDoneInfo)
+	return transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+		ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+			DNSStart: func(di httptrace.DNSStartInfo) {
+				onDNSDone = onDNS(ctx, di.Host)
+			},
+			DNSDone: func(di httptrace.DNSDoneInfo) {
+				if onDNSDone != nil {
+					onDNSDone(di)
+					onDNSDone = nil
+				}
+			},
+		})
+		return dialer.DialPacket(ctx, addr)
 	})
 }
 
@@ -213,6 +241,7 @@ func main() {
 		for _, proto := range strings.Split(*protoFlag, ",") {
 			proto = strings.TrimSpace(proto)
 			var resolver dns.Resolver
+			var connectStart = make(map[string]time.Time)
 			dnsReports := make([]dnsReport, 0)
 			tcpReports := make([]tcpReport, 0)
 			switch proto {
@@ -241,6 +270,9 @@ func main() {
 							dnsReports = append(dnsReports, report)
 						}
 					}
+					onDialStart := func(ctx context.Context, network, addr string) {
+						connectStart[network+"|"+addr] = time.Now()
+					}
 					onDial := func(ctx context.Context, network, addr string, connErr error) {
 						ip, port, err := net.SplitHostPort(addr)
 						if err != nil {
@@ -250,6 +282,8 @@ func main() {
 							Hostname: hostname,
 							IP:       ip,
 							Port:     port,
+							Time:     connectStart[network+"|"+addr].UTC().Truncate(time.Second),
+							Duration: time.Since(connectStart[network+"|"+addr]).Milliseconds(),
 						}
 						if connErr != nil {
 							report.Error = connErr.Error()
@@ -257,7 +291,7 @@ func main() {
 						// TODO(fortuna): Use a Mutex.
 						tcpReports = append(tcpReports, report)
 					}
-					return newTCPTraceDialer(onDNS, onDial).DialStream(ctx, addr)
+					return newTCPTraceDialer(onDNS, onDial, onDialStart).DialStream(ctx, addr)
 				})
 				streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
 				if err != nil {
@@ -267,22 +301,21 @@ func main() {
 
 			case "udp":
 				configToDialer := config.NewDefaultConfigToDialer()
+				//fmt.Println("UDP Test")
 				configToDialer.BasePacketDialer = transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 					hostname, _, err := net.SplitHostPort(addr)
 					if err != nil {
 						return nil, err
 					}
-					var dnsStart time.Time
-					ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
-						DNSStart: func(di httptrace.DNSStartInfo) {
-							dnsStart = time.Now()
-						},
-						DNSDone: func(di httptrace.DNSDoneInfo) {
+					onDNS := func(ctx context.Context, domain string) func(di httptrace.DNSDoneInfo) {
+						dnsStart := time.Now()
+						return func(di httptrace.DNSDoneInfo) {
 							report := dnsReport{
 								QueryName:  hostname,
 								Time:       dnsStart.UTC().Truncate(time.Second),
 								DurationMs: time.Since(dnsStart).Milliseconds(),
 							}
+							//fmt.Printf("DNS Done Info: %+v\n", di)
 							if di.Err != nil {
 								report.Error = di.Err.Error()
 							}
@@ -291,9 +324,10 @@ func main() {
 							}
 							// TODO(fortuna): Use a Mutex.
 							dnsReports = append(dnsReports, report)
-						},
-					})
-					return (&transport.UDPDialer{}).DialPacket(ctx, addr)
+						}
+					}
+					return newUDPTraceDialer(onDNS).DialPacket(ctx, addr)
+					//return (&transport.UDPDialer{}).DialPacket(ctx, addr)
 				})
 				packetDialer, err := configToDialer.NewPacketDialer(*transportFlag)
 				if err != nil {
