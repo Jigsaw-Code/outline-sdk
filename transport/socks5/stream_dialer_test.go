@@ -167,17 +167,23 @@ func testExchange(tb testing.TB, listener *net.TCPListener, destAddr string, req
 }
 
 func TestConnectWithoutAuth(t *testing.T) {
+
 	// Create a SOCKS5 server.
 	server := socks5.NewServer()
 
+	var running sync.WaitGroup
 	// Create SOCKS5 proxy on localhost with a random port.
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	defer listener.Close()
+	defer func() {
+		listener.Close()
+		running.Wait()
+	}()
 
+	running.Add(1)
 	go func() {
+		defer running.Done()
 		err := server.Serve(listener)
-		t.Log("server is listening...")
 		if !errors.Is(err, net.ErrClosed) && err != nil {
 			require.NoError(t, err) // Assert no error if it's not the expected close error
 		}
@@ -205,14 +211,20 @@ func TestConnectWithAuth(t *testing.T) {
 		socks5.WithAuthMethods([]socks5.Authenticator{cator}),
 	)
 
+	var running sync.WaitGroup
 	// Create SOCKS5 proxy on localhost with a random port.
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	defer listener.Close()
 	address := listener.Addr().String()
+	defer func() {
+		listener.Close()
+		running.Wait()
+	}()
 
+	running.Add(1)
 	// Create SOCKS5 proxy on localhost port 8001
 	go func() {
+		defer running.Done()
 		err := server.Serve(listener)
 		if !errors.Is(err, net.ErrClosed) && err != nil {
 			require.NoError(t, err) // Assert no error if it's not the expected close error
