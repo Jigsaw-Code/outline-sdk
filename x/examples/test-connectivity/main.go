@@ -29,6 +29,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/dns"
@@ -50,9 +51,8 @@ type connectivityReport struct {
 
 type testReport struct {
 	// Inputs
-	Resolver string `json:"resolver"`
-	Proto    string `json:"proto"`
-	// TODO(fortuna): add sanitized transport config.
+	Resolver  string `json:"resolver"`
+	Proto     string `json:"proto"`
 	Transport string `json:"transport"`
 
 	// Observations
@@ -86,6 +86,9 @@ type errorJSON struct {
 	// TODO: remove IP addresses
 	Msg string `json:"msg,omitempty"`
 }
+
+// Declare a mutex for thread-safe access to slices
+var mutex sync.Mutex
 
 func makeErrorRecord(result *connectivity.ConnectivityError) *errorJSON {
 	if result == nil {
@@ -244,91 +247,91 @@ func main() {
 			var connectStart = make(map[string]time.Time)
 			dnsReports := make([]dnsReport, 0)
 			tcpReports := make([]tcpReport, 0)
+			configToDialer := config.NewDefaultConfigToDialer()
+			configToDialer.BaseStreamDialer = transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+				hostname, _, err := net.SplitHostPort(addr)
+				if err != nil {
+					return nil, err
+				}
+				onDNS := func(ctx context.Context, domain string) func(di httptrace.DNSDoneInfo) {
+					dnsStart := time.Now()
+					return func(di httptrace.DNSDoneInfo) {
+						report := dnsReport{
+							QueryName:  hostname,
+							Time:       dnsStart.UTC().Truncate(time.Second),
+							DurationMs: time.Since(dnsStart).Milliseconds(),
+						}
+						if di.Err != nil {
+							report.Error = di.Err.Error()
+						}
+						for _, ip := range di.Addrs {
+							report.AnswerIPs = append(report.AnswerIPs, ip.IP.String())
+						}
+						mutex.Lock()
+						dnsReports = append(dnsReports, report)
+						mutex.Unlock()
+					}
+				}
+				onDialStart := func(ctx context.Context, network, addr string) {
+					connectStart[network+"|"+addr] = time.Now()
+				}
+				onDial := func(ctx context.Context, network, addr string, connErr error) {
+					ip, port, err := net.SplitHostPort(addr)
+					if err != nil {
+						return
+					}
+					report := tcpReport{
+						Hostname: hostname,
+						IP:       ip,
+						Port:     port,
+						Time:     connectStart[network+"|"+addr].UTC().Truncate(time.Second),
+						Duration: time.Since(connectStart[network+"|"+addr]).Milliseconds(),
+					}
+					if connErr != nil {
+						report.Error = connErr.Error()
+					}
+					mutex.Lock()
+					tcpReports = append(tcpReports, report)
+					mutex.Unlock()
+				}
+				return newTCPTraceDialer(onDNS, onDial, onDialStart).DialStream(ctx, addr)
+			})
+			configToDialer.BasePacketDialer = transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+				hostname, _, err := net.SplitHostPort(addr)
+				if err != nil {
+					return nil, err
+				}
+				onDNS := func(ctx context.Context, domain string) func(di httptrace.DNSDoneInfo) {
+					dnsStart := time.Now()
+					return func(di httptrace.DNSDoneInfo) {
+						report := dnsReport{
+							QueryName:  hostname,
+							Time:       dnsStart.UTC().Truncate(time.Second),
+							DurationMs: time.Since(dnsStart).Milliseconds(),
+						}
+						//fmt.Printf("DNS Done Info: %+v\n", di)
+						if di.Err != nil {
+							report.Error = di.Err.Error()
+						}
+						for _, ip := range di.Addrs {
+							report.AnswerIPs = append(report.AnswerIPs, ip.IP.String())
+						}
+						mutex.Lock()
+						dnsReports = append(dnsReports, report)
+						mutex.Unlock()
+					}
+				}
+				return newUDPTraceDialer(onDNS).DialPacket(ctx, addr)
+				//return (&transport.UDPDialer{}).DialPacket(ctx, addr)
+			})
 			switch proto {
 			case "tcp":
-				configToDialer := config.NewDefaultConfigToDialer()
-				configToDialer.BaseStreamDialer = transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
-					hostname, _, err := net.SplitHostPort(addr)
-					if err != nil {
-						return nil, err
-					}
-					onDNS := func(ctx context.Context, domain string) func(di httptrace.DNSDoneInfo) {
-						dnsStart := time.Now()
-						return func(di httptrace.DNSDoneInfo) {
-							report := dnsReport{
-								QueryName:  hostname,
-								Time:       dnsStart.UTC().Truncate(time.Second),
-								DurationMs: time.Since(dnsStart).Milliseconds(),
-							}
-							if di.Err != nil {
-								report.Error = di.Err.Error()
-							}
-							for _, ip := range di.Addrs {
-								report.AnswerIPs = append(report.AnswerIPs, ip.IP.String())
-							}
-							// TODO(fortuna): Use a Mutex.
-							dnsReports = append(dnsReports, report)
-						}
-					}
-					onDialStart := func(ctx context.Context, network, addr string) {
-						connectStart[network+"|"+addr] = time.Now()
-					}
-					onDial := func(ctx context.Context, network, addr string, connErr error) {
-						ip, port, err := net.SplitHostPort(addr)
-						if err != nil {
-							return
-						}
-						report := tcpReport{
-							Hostname: hostname,
-							IP:       ip,
-							Port:     port,
-							Time:     connectStart[network+"|"+addr].UTC().Truncate(time.Second),
-							Duration: time.Since(connectStart[network+"|"+addr]).Milliseconds(),
-						}
-						if connErr != nil {
-							report.Error = connErr.Error()
-						}
-						// TODO(fortuna): Use a Mutex.
-						tcpReports = append(tcpReports, report)
-					}
-					return newTCPTraceDialer(onDNS, onDial, onDialStart).DialStream(ctx, addr)
-				})
 				streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create StreamDialer: %v", err)
 				}
 				resolver = dns.NewTCPResolver(streamDialer, resolverAddress)
-
 			case "udp":
-				configToDialer := config.NewDefaultConfigToDialer()
-				//fmt.Println("UDP Test")
-				configToDialer.BasePacketDialer = transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-					hostname, _, err := net.SplitHostPort(addr)
-					if err != nil {
-						return nil, err
-					}
-					onDNS := func(ctx context.Context, domain string) func(di httptrace.DNSDoneInfo) {
-						dnsStart := time.Now()
-						return func(di httptrace.DNSDoneInfo) {
-							report := dnsReport{
-								QueryName:  hostname,
-								Time:       dnsStart.UTC().Truncate(time.Second),
-								DurationMs: time.Since(dnsStart).Milliseconds(),
-							}
-							//fmt.Printf("DNS Done Info: %+v\n", di)
-							if di.Err != nil {
-								report.Error = di.Err.Error()
-							}
-							for _, ip := range di.Addrs {
-								report.AnswerIPs = append(report.AnswerIPs, ip.IP.String())
-							}
-							// TODO(fortuna): Use a Mutex.
-							dnsReports = append(dnsReports, report)
-						}
-					}
-					return newUDPTraceDialer(onDNS).DialPacket(ctx, addr)
-					//return (&transport.UDPDialer{}).DialPacket(ctx, addr)
-				})
 				packetDialer, err := configToDialer.NewPacketDialer(*transportFlag)
 				if err != nil {
 					log.Fatalf("Failed to create PacketDialer: %v", err)
@@ -353,10 +356,9 @@ func main() {
 			}
 			var r report.Report = connectivityReport{
 				Test: testReport{
-					Resolver: resolverAddress,
-					Proto:    proto,
-					Time:     startTime.UTC().Truncate(time.Second),
-					// TODO(fortuna): Add sanitized config:
+					Resolver:   resolverAddress,
+					Proto:      proto,
+					Time:       startTime.UTC().Truncate(time.Second),
 					Transport:  sanitizedConfig,
 					DurationMs: testDuration.Milliseconds(),
 					Error:      makeErrorRecord(result),
