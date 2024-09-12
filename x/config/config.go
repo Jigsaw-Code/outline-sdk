@@ -56,6 +56,9 @@ func NewDefaultConfigToDialer() *ConfigToDialer {
 	p.RegisterStreamDialerType("override", wrapStreamDialerWithOverride)
 	p.RegisterPacketDialerType("override", wrapPacketDialerWithOverride)
 
+	p.RegisterStreamDialerType("proxyproto", wrapStreamDialerWithProxyProto)
+	p.RegisterPacketDialerType("proxyproto", wrapPacketDialerWithProxyProto)
+
 	p.RegisterStreamDialerType("socks5", wrapStreamDialerWithSOCKS5)
 	p.RegisterPacketDialerType("socks5", wrapPacketDialerWithSOCKS5)
 
