@@ -105,7 +105,7 @@ func (p *ConfigToDialer) RegisterPacketDialerType(subtype string, newDialer NewP
 	}
 
 	if _, found := p.pdBuilders[subtype]; found {
-		return fmt.Errorf("config parser %v for StreamDialer added twice", subtype)
+		return fmt.Errorf("config parser %v for PacketDialer added twice", subtype)
 	}
 	p.pdBuilders[subtype] = newDialer
 	return nil
