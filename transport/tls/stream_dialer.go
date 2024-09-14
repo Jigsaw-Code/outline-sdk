@@ -128,13 +128,20 @@ type ClientOption func(serverName string, config *ClientConfig)
 
 // WrapConn wraps a [transport.StreamConn] in a TLS connection.
 func WrapConn(ctx context.Context, conn transport.StreamConn, serverName string, options ...ClientOption) (transport.StreamConn, error) {
+	t := GetTLSClientTrace(ctx)
 	cfg := ClientConfig{ServerName: serverName, CertificateName: serverName}
 	normName := normalizeHost(serverName)
 	for _, option := range options {
 		option(normName, &cfg)
 	}
 	tlsConn := tls.Client(conn, cfg.toStdConfig())
+	if t != nil && t.TLSHandshakeStart != nil {
+		t.TLSHandshakeStart()
+	}
 	err := tlsConn.HandshakeContext(ctx)
+	if t != nil && t.TLSHandshakeDone != nil {
+		t.TLSHandshakeDone(tlsConn.ConnectionState(), err)
+	}
 	if err != nil {
 		return nil, err
 	}

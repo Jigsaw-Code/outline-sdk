@@ -167,7 +167,8 @@ func checkResponse(reqID uint16, reqQues dnsmessage.Question, respHdr dnsmessage
 }
 
 // queryDatagram implements a DNS query over a datagram protocol.
-func queryDatagram(conn io.ReadWriter, q dnsmessage.Question) (*dnsmessage.Message, error) {
+func queryDatagram(ctx context.Context, conn io.ReadWriter, q dnsmessage.Question) (*dnsmessage.Message, error) {
+	t := GetDNSClientTrace(ctx)
 	// Reference: https://cs.opensource.google/go/go/+/master:src/net/dnsclient_unix.go?q=func:dnsPacketRoundTrip&ss=go%2Fgo
 	id := uint16(rand.Uint32())
 	buf, err := appendRequest(id, q, make([]byte, 0, maxUDPMessageSize))
@@ -175,8 +176,16 @@ func queryDatagram(conn io.ReadWriter, q dnsmessage.Question) (*dnsmessage.Messa
 		return nil, &nestedError{ErrBadRequest, fmt.Errorf("append request failed: %w", err)}
 	}
 	if _, err := conn.Write(buf); err != nil {
-		return nil, &nestedError{ErrSend, err}
+		err = &nestedError{ErrSend, err}
+		if t != nil && t.WroteDone != nil {
+			t.WroteDone(q, err)
+		}
+		return nil, err
 	}
+	if t != nil && t.WroteDone != nil {
+		t.WroteDone(q, nil)
+	}
+
 	buf = buf[:cap(buf)]
 	var returnErr error
 	for {
@@ -186,7 +195,15 @@ func queryDatagram(conn io.ReadWriter, q dnsmessage.Question) (*dnsmessage.Messa
 			err = nil
 		}
 		if err != nil {
-			return nil, &nestedError{ErrReceive, errors.Join(returnErr, fmt.Errorf("read message failed: %w", err))}
+			err = &nestedError{ErrReceive, errors.Join(returnErr, fmt.Errorf("read message failed: %w", err))}
+			if t != nil && t.ReadDone != nil {
+				t.ReadDone(q, err)
+			}
+			return nil, err
+		}
+		// we are going to get a buncg of ReadDone here...
+		if t != nil && t.ReadDone != nil {
+			t.ReadDone(q, nil)
 		}
 		var msg dnsmessage.Message
 		if err := msg.Unpack(buf[:n]); err != nil {
@@ -198,12 +215,16 @@ func queryDatagram(conn io.ReadWriter, q dnsmessage.Question) (*dnsmessage.Messa
 			returnErr = errors.Join(returnErr, err)
 			continue
 		}
+		if t != nil && t.ResponseDone != nil {
+			t.ResponseDone(q, &msg, nil)
+		}
 		return &msg, nil
 	}
 }
 
 // queryStream implements a DNS query over a stream protocol. It frames the messages by prepending them with a 2-byte length prefix.
-func queryStream(conn io.ReadWriter, q dnsmessage.Question) (*dnsmessage.Message, error) {
+func queryStream(ctx context.Context, conn io.ReadWriter, q dnsmessage.Question) (*dnsmessage.Message, error) {
+	t := GetDNSClientTrace(ctx)
 	// Reference: https://cs.opensource.google/go/go/+/master:src/net/dnsclient_unix.go?q=func:dnsStreamRoundTrip&ss=go%2Fgo
 	id := uint16(rand.Uint32())
 	buf, err := appendRequest(id, q, make([]byte, 2, 514))
@@ -218,12 +239,23 @@ func queryStream(conn io.ReadWriter, q dnsmessage.Question) (*dnsmessage.Message
 
 	// TODO: Consider writer.ReadFrom(net.Buffers) in case the writer is a TCPConn.
 	if _, err := conn.Write(buf); err != nil {
-		return nil, &nestedError{ErrSend, err}
+		err = &nestedError{ErrSend, err}
+		if t != nil && t.WroteDone != nil {
+			t.WroteDone(q, err)
+		}
+		return nil, err
+	}
+	if t != nil && t.WroteDone != nil {
+		t.WroteDone(q, nil)
 	}
 
 	var msgLen uint16
 	if err := binary.Read(conn, binary.BigEndian, &msgLen); err != nil {
-		return nil, &nestedError{ErrReceive, fmt.Errorf("read message length failed: %w", err)}
+		err = &nestedError{ErrReceive, fmt.Errorf("read message length failed: %w", err)}
+		if t != nil && t.ReadDone != nil {
+			t.ReadDone(q, err)
+		}
+		return nil, err
 	}
 	if int(msgLen) <= cap(buf) {
 		buf = buf[:msgLen]
@@ -231,7 +263,14 @@ func queryStream(conn io.ReadWriter, q dnsmessage.Question) (*dnsmessage.Message
 		buf = make([]byte, msgLen)
 	}
 	if _, err = io.ReadFull(conn, buf); err != nil {
-		return nil, &nestedError{ErrReceive, fmt.Errorf("read message failed: %w", err)}
+		err = &nestedError{ErrReceive, fmt.Errorf("read message failed: %w", err)}
+		if t != nil && t.ReadDone != nil {
+			t.ReadDone(q, err)
+		}
+		return nil, err
+	}
+	if t != nil && t.ReadDone != nil {
+		t.ReadDone(q, nil)
 	}
 
 	var msg dnsmessage.Message
@@ -263,15 +302,22 @@ func ensurePort(address string, defaultPort string) string {
 func NewUDPResolver(pd transport.PacketDialer, resolverAddr string) Resolver {
 	resolverAddr = ensurePort(resolverAddr, "53")
 	return FuncResolver(func(ctx context.Context, q dnsmessage.Question) (*dnsmessage.Message, error) {
+		t := GetDNSClientTrace(ctx)
 		conn, err := pd.DialPacket(ctx, resolverAddr)
 		if err != nil {
 			return nil, &nestedError{ErrDial, err}
 		}
 		defer conn.Close()
+		if t != nil && t.ResolverSetup != nil {
+			t.ResolverSetup("do53-udp", conn.RemoteAddr().Network(), conn.RemoteAddr().String())
+		}
+		if t != nil && t.QuestionReady != nil {
+			t.QuestionReady(q)
+		}
 		if deadline, ok := ctx.Deadline(); ok {
 			conn.SetDeadline(deadline)
 		}
-		return queryDatagram(conn, q)
+		return queryDatagram(ctx, conn, q)
 	})
 }
 
@@ -280,6 +326,7 @@ type streamResolver struct {
 }
 
 func (r *streamResolver) Query(ctx context.Context, q dnsmessage.Question) (*dnsmessage.Message, error) {
+	t := GetDNSClientTrace(ctx)
 	conn, err := r.NewConn(ctx)
 	if err != nil {
 		return nil, &nestedError{ErrDial, err}
@@ -289,7 +336,16 @@ func (r *streamResolver) Query(ctx context.Context, q dnsmessage.Question) (*dns
 	if deadline, ok := ctx.Deadline(); ok {
 		conn.SetDeadline(deadline)
 	}
-	return queryStream(conn, q)
+	if t != nil && t.QuestionReady != nil {
+		t.QuestionReady(q)
+	}
+
+	response, err := queryStream(ctx, conn, q)
+	if t != nil && t.ResponseDone != nil {
+		t.ResponseDone(q, response, err)
+	}
+
+	return response, err
 }
 
 // NewTCPResolver creates a [Resolver] that implements the [DNS-over-TCP] protocol, using a [transport.StreamDialer] for transport.
@@ -301,6 +357,10 @@ func NewTCPResolver(sd transport.StreamDialer, resolverAddr string) Resolver {
 	resolverAddr = ensurePort(resolverAddr, "53")
 	return &streamResolver{
 		NewConn: func(ctx context.Context) (transport.StreamConn, error) {
+			t := GetDNSClientTrace(ctx)
+			if t != nil && t.ResolverSetup != nil {
+				t.ResolverSetup("do53-tcp", "tcp", resolverAddr)
+			}
 			return sd.DialStream(ctx, resolverAddr)
 		},
 	}
@@ -315,6 +375,10 @@ func NewTLSResolver(sd transport.StreamDialer, resolverAddr string, resolverName
 	resolverAddr = ensurePort(resolverAddr, "853")
 	return &streamResolver{
 		NewConn: func(ctx context.Context) (transport.StreamConn, error) {
+			t := GetDNSClientTrace(ctx)
+			if t != nil && t.ResolverSetup != nil {
+				t.ResolverSetup("dot", "tcp", resolverAddr)
+			}
 			baseConn, err := sd.DialStream(ctx, resolverAddr)
 			if err != nil {
 				return nil, err
@@ -332,9 +396,13 @@ func NewTLSResolver(sd transport.StreamDialer, resolverAddr string, resolverName
 func NewHTTPSResolver(sd transport.StreamDialer, resolverAddr string, url string) Resolver {
 	resolverAddr = ensurePort(resolverAddr, "443")
 	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		t := GetDNSClientTrace(ctx)
 		if !strings.HasPrefix(network, "tcp") {
 			// TODO: Support UDP for QUIC.
 			return nil, fmt.Errorf("protocol not supported: %v", network)
+		}
+		if t != nil && t.ResolverSetup != nil {
+			t.ResolverSetup("doh", "tcp", resolverAddr)
 		}
 		conn, err := sd.DialStream(ctx, resolverAddr)
 		if err != nil {
@@ -353,6 +421,7 @@ func NewHTTPSResolver(sd transport.StreamDialer, resolverAddr string, url string
 		},
 	}
 	return FuncResolver(func(ctx context.Context, q dnsmessage.Question) (*dnsmessage.Message, error) {
+		t := GetDNSClientTrace(ctx)
 		// Prepare request.
 		buf, err := appendRequest(0, q, make([]byte, 0, 512))
 		if err != nil {
@@ -372,6 +441,12 @@ func NewHTTPSResolver(sd transport.StreamDialer, resolverAddr string, url string
 			return nil, &nestedError{ErrReceive, fmt.Errorf("failed to get HTTP response: %w", err)}
 		}
 		defer httpResp.Body.Close()
+
+		// if we call this before request is send, ResolveSetup has not yet been called
+		if t != nil && t.QuestionReady != nil {
+			t.QuestionReady(q)
+		}
+
 		if httpResp.StatusCode != http.StatusOK {
 			return nil, &nestedError{ErrReceive, fmt.Errorf("got HTTP status %v", httpResp.StatusCode)}
 		}
@@ -383,10 +458,21 @@ func NewHTTPSResolver(sd transport.StreamDialer, resolverAddr string, url string
 		// Process response.
 		var msg dnsmessage.Message
 		if err = msg.Unpack(response); err != nil {
-			return nil, &nestedError{ErrBadResponse, fmt.Errorf("failed to unpack DNS response: %w", err)}
+			err = &nestedError{ErrBadResponse, fmt.Errorf("failed to unpack DNS response: %w", err)}
+			if t != nil && t.ResponseDone != nil {
+				t.ResponseDone(q, &msg, err)
+			}
+			return nil, err
 		}
 		if err := checkResponse(0, q, msg.Header, msg.Questions); err != nil {
-			return nil, &nestedError{ErrBadResponse, err}
+			err = &nestedError{ErrBadResponse, err}
+			if t != nil && t.ResponseDone != nil {
+				t.ResponseDone(q, &msg, err)
+			}
+			return nil, err
+		}
+		if t != nil && t.ResponseDone != nil {
+			t.ResponseDone(q, &msg, nil)
 		}
 		return &msg, nil
 	})
