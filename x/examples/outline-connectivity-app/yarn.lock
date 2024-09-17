@@ -617,7 +617,7 @@ __metadata:
     shared_backend: "workspace:^"
     shared_frontend: "workspace:^"
     typescript: "npm:^4.6.4"
-    vite: "npm:^3.0.7"
+    vite: "npm:^3.2.11"
   languageName: unknown
   linkType: soft
 
@@ -3474,9 +3474,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"vite@npm:^3.0.7":
-  version: 3.2.7
-  resolution: "vite@npm:3.2.7"
+"vite@npm:^3.2.11":
+  version: 3.2.11
+  resolution: "vite@npm:3.2.11"
   dependencies:
     esbuild: "npm:^0.15.9"
     fsevents: "npm:~2.3.2"
@@ -3508,7 +3508,7 @@ __metadata:
       optional: true
   bin:
     vite: bin/vite.js
-  checksum: 932b700db206708e2d8161db32c36a4754a5d686cbbefcdf102933a480f03dc6fe3c44f058cc1c29ca5a0b601494fe33c55e33a16b80571e6fc913bd97b6ce1b
+  checksum: 3933d93165235001e79c99b69434a91a85404572d698c5160e910237d9ae3833ecea0dcfe1ca2967543e6bf28b419f90c3cb4899782ec9d43bf17ca2accaf361
   languageName: node
   linkType: hard
 
