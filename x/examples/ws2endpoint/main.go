@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 	"golang.org/x/net/websocket"
 )
 
@@ -60,7 +60,7 @@ func main() {
 	defer listener.Close()
 	log.Printf("Proxy listening on %v\n", listener.Addr().String())
 
-	config2Dialer := config.NewDefaultConfigToDialer()
+	config2Dialer := configurl.NewDefaultConfigToDialer()
 	mux := http.NewServeMux()
 	if *tcpPathFlag != "" {
 		dialer, err := config2Dialer.NewStreamDialer(*transportFlag)

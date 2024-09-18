@@ -145,4 +145,4 @@ where wrapStreamDialerWithCustom and wrapPacketDialerWithCustom implement [NewPa
 
 [Onion Routing]: https://en.wikipedia.org/wiki/Onion_routing
 */
-package config
+package configurl
