@@ -17,7 +17,6 @@ package report
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -79,92 +78,85 @@ func TestIsSuccess(t *testing.T) {
 	require.True(t, v.IsSuccess())
 }
 
-// TODO(fortuna): Make this work without the external service.
-// func TestSendReportSuccessfully(t *testing.T) {
-// 	var testSetup = ConnectivitySetup{
-// 		Proxy:    "testProxy",
-// 		Resolver: "8.8.8.8",
-// 		Proto:    "udp",
-// 		Prefix:   "HTTP1/1",
-// 	}
-// 	var testErr = ConnectivityError{
-// 		Op:         "read",
-// 		PosixError: "ETIMEDOUT",
-// 		Msg:        "i/o timeout",
-// 	}
-// 	var testReport = ConnectivityReport{
-// 		Connection: testSetup,
-// 		Time:       time.Now().UTC().Truncate(time.Second),
-// 		DurationMs: 1,
-// 		Error:      testErr,
-// 	}
+func TestSendReportSuccessfully(t *testing.T) {
+	var requestBody []byte
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var err error
+		requestBody, err = io.ReadAll(r.Body)
+		require.NoError(t, err)
+		fmt.Fprintln(w, "OK")
+	}))
+	defer ts.Close()
+	u, err := url.Parse(ts.URL)
+	require.NoError(t, err)
 
-// 	var r Report = testReport
-// 	v, ok := r.(HasSuccess)
-// 	if ok {
-// 		t.Logf("The test report shows success: %v\n", v.IsSuccess())
-// 	}
-// 	u, err := url.Parse("https://script.google.com/macros/s/AKfycbzoMBmftQaR9Aw4jzTB-w4TwkDjLHtSfBCFhh4_2NhTEZAUdj85Qt8uYCKCNOEAwCg4/exec")
-// 	if err != nil {
-// 		t.Errorf("Expected no error, but got: %v", err)
-// 	}
-// 	c := RemoteCollector{
-// 		CollectorURL: u,
-// 		HttpClient:   &http.Client{Timeout: 10 * time.Second},
-// 	}
-// 	err = c.Collect(context.Background(), r)
-// 	if err != nil {
-// 		t.Errorf("Expected no error, but got: %v", err)
-// 	}
-// }
-
-func TestSendReportUnsuccessfully(t *testing.T) {
+	var testSetup = ConnectivitySetup{
+		Proxy:    "testProxy",
+		Resolver: "8.8.8.8",
+		Proto:    "udp",
+		Prefix:   "HTTP1/1",
+	}
+	var testErr = ConnectivityError{
+		Op:         "read",
+		PosixError: "ETIMEDOUT",
+		Msg:        "i/o timeout",
+	}
 	var testReport = ConnectivityReport{
-		Connection: nil,
+		Connection: testSetup,
 		Time:       time.Now().UTC().Truncate(time.Second),
 		DurationMs: 1,
+		Error:      testErr,
 	}
-	var e *BadRequestError
-	var r Report = testReport
-	v, ok := r.(HasSuccess)
-	if ok {
-		t.Logf("The test report shows success: %v\n", v.IsSuccess())
-	}
-	u, err := url.Parse("https://google.com")
-	if err != nil {
-		t.Errorf("Expected no error, but got: %v", err)
-	}
+
 	c := RemoteCollector{
 		CollectorURL: u,
 		HttpClient:   &http.Client{Timeout: 10 * time.Second},
 	}
-	err = c.Collect(context.Background(), r)
-	if err == nil {
-		t.Errorf("Expected 405 error no error occurred!")
-	} else {
-		if errors.As(err, &e) {
-			fmt.Printf("Error was expected: %v\n", err)
-		} else {
-			t.Errorf("Expected 405 error, but got: %v", err)
-		}
-	}
+	err = c.Collect(context.Background(), testReport)
+	require.NoError(t, err)
+
+	expected, err := json.Marshal(testReport)
+	require.NoError(t, err)
+	require.Equal(t, string(expected), string(requestBody))
 }
 
-func TestSamplingCollector(t *testing.T) {
+func TestSendReportUnsuccessfully(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(400)
+	}))
+	defer ts.Close()
+
+	u, err := url.Parse(ts.URL)
+	require.NoError(t, err)
+
+	c := RemoteCollector{
+		CollectorURL: u,
+		HttpClient:   &http.Client{Timeout: 10 * time.Second},
+	}
+
 	var testReport = ConnectivityReport{
 		Connection: nil,
 		Time:       time.Now().UTC().Truncate(time.Second),
 		DurationMs: 1,
 	}
-	var r Report = testReport
-	v, ok := r.(HasSuccess)
-	if ok {
-		t.Logf("The test report shows success: %v\n", v.IsSuccess())
+
+	err = c.Collect(context.Background(), testReport)
+	if err == nil {
+		t.Errorf("Expected 405 error no error occurred!")
+	} else {
+		var e *BadRequestError
+		require.ErrorAs(t, err, &e)
 	}
-	u, err := url.Parse("https://example.com")
-	if err != nil {
-		t.Errorf("Expected no error, but got: %v", err)
-	}
+}
+
+func TestSamplingCollector(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "OK")
+	}))
+	defer ts.Close()
+	u, err := url.Parse(ts.URL)
+	require.NoError(t, err)
+
 	c := SamplingCollector{
 		Collector: &RemoteCollector{
 			CollectorURL: u,
@@ -173,7 +165,14 @@ func TestSamplingCollector(t *testing.T) {
 		SuccessFraction: 0.5,
 		FailureFraction: 0.1,
 	}
-	err = c.Collect(context.Background(), r)
+
+	var testReport = ConnectivityReport{
+		Connection: nil,
+		Time:       time.Now().UTC().Truncate(time.Second),
+		DurationMs: 1,
+	}
+
+	err = c.Collect(context.Background(), testReport)
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
 	}
@@ -220,24 +219,22 @@ func TestSendJSONToServer(t *testing.T) {
 }
 
 func TestFallbackCollector(t *testing.T) {
-	var testReport = ConnectivityReport{
-		Connection: nil,
-		Time:       time.Now().UTC().Truncate(time.Second),
-		DurationMs: 1,
-	}
-	var r Report = testReport
-	v, ok := r.(HasSuccess)
-	if ok {
-		t.Logf("The test report shows success: %v\n", v.IsSuccess())
-	}
-	u1, err := url.Parse("https://example.com")
-	if err != nil {
-		t.Errorf("Expected no error, but got: %v", err)
-	}
-	u2, err := url.Parse("https://google.com")
-	if err != nil {
-		t.Errorf("Expected no error, but got: %v", err)
-	}
+	// Create test server that always fails
+	ts1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(400)
+	}))
+	defer ts1.Close()
+	u1, err := url.Parse(ts1.URL)
+	require.NoError(t, err)
+
+	// Create test server that always succeeds.
+	ts2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "OK")
+	}))
+	defer ts2.Close()
+	u2, err := url.Parse(ts2.URL)
+	require.NoError(t, err)
+
 	c := FallbackCollector{
 		Collectors: []Collector{
 			&RemoteCollector{
@@ -250,6 +247,13 @@ func TestFallbackCollector(t *testing.T) {
 			},
 		},
 	}
+
+	var testReport = ConnectivityReport{
+		Connection: nil,
+		Time:       time.Now().UTC().Truncate(time.Second),
+		DurationMs: 1,
+	}
+	var r Report = testReport
 	err = c.Collect(context.Background(), r)
 	if err != nil {
 		t.Errorf("Expected no error, but got: %v", err)
@@ -280,11 +284,7 @@ func TestRetryCollector(t *testing.T) {
 		InitialDelay: 1 * time.Second,
 	}
 	err = c.Collect(context.Background(), r)
-	if err == nil {
-		t.Errorf("max retry error expcted not got none!")
-	} else {
-		fmt.Printf("Error was expected: %v\n", err)
-	}
+	require.NoError(t, err)
 }
 
 func TestWriteCollector(t *testing.T) {
