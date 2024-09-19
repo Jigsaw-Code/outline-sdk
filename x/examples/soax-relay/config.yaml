@@ -1,0 +1,14 @@
+server:
+  address: 127.0.0.1
+  port: 1080
+
+soax:
+  package: package-000000-
+  password: XXXXXXXX
+  address: proxy.soax.com:5000
+
+credentials:
+  foo: bar
+  exampleuser: examplepass
+
+udp_timeout: 1m
