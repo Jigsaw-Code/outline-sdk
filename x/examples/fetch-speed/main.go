@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 )
 
 var debugLog log.Logger = *log.New(io.Discard, "", 0)
@@ -58,7 +58,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	dialer, err := config.NewDefaultConfigToDialer().NewStreamDialer(*transportFlag)
+	dialer, err := configurl.NewDefaultConfigToDialer().NewStreamDialer(*transportFlag)
 	if err != nil {
 		log.Fatalf("Could not create dialer: %v\n", err)
 	}

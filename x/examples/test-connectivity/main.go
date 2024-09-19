@@ -31,7 +31,7 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/dns"
-	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
 	"github.com/Jigsaw-Code/outline-sdk/x/report"
 )
@@ -161,7 +161,7 @@ func main() {
 	success := false
 	jsonEncoder := json.NewEncoder(os.Stdout)
 	jsonEncoder.SetEscapeHTML(false)
-	configToDialer := config.NewDefaultConfigToDialer()
+	configToDialer := configurl.NewDefaultConfigToDialer()
 	for _, resolverHost := range strings.Split(*resolverFlag, ",") {
 		resolverHost := strings.TrimSpace(resolverHost)
 		resolverAddress := net.JoinHostPort(resolverHost, "53")
@@ -194,7 +194,7 @@ func main() {
 				success = true
 			}
 			debugLog.Printf("Test %v %v result: %v", proto, resolverAddress, result)
-			sanitizedConfig, err := config.SanitizeConfig(*transportFlag)
+			sanitizedConfig, err := configurl.SanitizeConfig(*transportFlag)
 			if err != nil {
 				log.Fatalf("Failed to sanitize config: %v", err)
 			}

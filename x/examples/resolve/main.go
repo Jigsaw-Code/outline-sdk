@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/dns"
-	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 	"golang.org/x/net/dns/dnsmessage"
 )
 
@@ -66,7 +66,7 @@ func main() {
 	resolverAddr := *resolverFlag
 
 	var resolver dns.Resolver
-	configToDialer := config.NewDefaultConfigToDialer()
+	configToDialer := configurl.NewDefaultConfigToDialer()
 	if *tcpFlag {
 		streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
 		if err != nil {

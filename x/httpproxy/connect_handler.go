@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 )
 
 type sanitizeErrorDialer struct {
@@ -52,7 +52,7 @@ func (d *sanitizeErrorDialer) DialStream(ctx context.Context, addr string) (tran
 
 type connectHandler struct {
 	dialer       *sanitizeErrorDialer
-	dialerConfig *config.ConfigToDialer
+	dialerConfig *configurl.ConfigToDialer
 }
 
 var _ http.Handler = (*connectHandler)(nil)
@@ -140,7 +140,7 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 // the requests using the given [transport.StreamDialer].
 //
 // Clients can specify a Transport header with a value of a transport config as specified in
-// the [config] package to specify the transport for a given request.
+// the [configurl] package to specify the transport for a given request.
 //
 // The resulting handler is currently vulnerable to probing attacks. It's ok as a localhost proxy
 // but it may be vulnerable if used as a public proxy.
@@ -149,7 +149,7 @@ func NewConnectHandler(dialer transport.StreamDialer) http.Handler {
 	// of the base dialer (e.g. access key credentials) to the user.
 	sd := &sanitizeErrorDialer{dialer}
 	// TODO(fortuna): Inject the config parser
-	dialerConfig := config.NewDefaultConfigToDialer()
+	dialerConfig := configurl.NewDefaultConfigToDialer()
 	dialerConfig.BaseStreamDialer = sd
 	return &connectHandler{sd, dialerConfig}
 }

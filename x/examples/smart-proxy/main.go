@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
 	"github.com/Jigsaw-Code/outline-sdk/x/smart"
 )
@@ -86,7 +86,7 @@ func main() {
 		log.Fatalf("Could not read config: %v", err)
 	}
 
-	configToDialer := config.NewDefaultConfigToDialer()
+	configToDialer := configurl.NewDefaultConfigToDialer()
 	packetDialer, err := configToDialer.NewPacketDialer(*transportFlag)
 	if err != nil {
 		log.Fatalf("Could not create packet dialer: %v", err)

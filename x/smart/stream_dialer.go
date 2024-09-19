@@ -28,7 +28,7 @@ import (
 
 	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 )
 
 // To test one strategy:
@@ -231,7 +231,7 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 	if len(tlsConfig) == 0 {
 		return nil, errors.New("config for TLS is empty. Please specify at least one transport")
 	}
-	var configToDialer = config.NewDefaultConfigToDialer()
+	var configToDialer = configurl.NewDefaultConfigToDialer()
 	configToDialer.BaseStreamDialer = baseDialer
 
 	ctx, searchDone := context.WithCancel(ctx)
