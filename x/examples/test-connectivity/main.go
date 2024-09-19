@@ -47,6 +47,7 @@ type connectivityReport struct {
 	Test           testReport  `json:"test"`
 	DNSQueries     []dnsReport `json:"dns_queries,omitempty"`
 	TCPConnections []tcpReport `json:"tcp_connections,omitempty"`
+	UPDConnections []udpReport `json:"udp_connections,omitempty"`
 }
 
 type testReport struct {
@@ -76,6 +77,14 @@ type tcpReport struct {
 	Error    string    `json:"error"`
 	Time     time.Time `json:"time"`
 	Duration int64     `json:"duration_ms"`
+}
+
+type udpReport struct {
+	Hostname string    `json:"hostname"`
+	IP       string    `json:"ip"`
+	Port     string    `json:"port"`
+	Error    string    `json:"error"`
+	Time     time.Time `json:"time"`
 }
 
 type errorJSON struct {
@@ -156,6 +165,7 @@ func newTCPTraceDialer(
 
 func newUDPTraceDialer(
 	onDNS func(ctx context.Context, domain string) func(di httptrace.DNSDoneInfo),
+	onDial func(ctx context.Context, network, addr string, connErr error),
 ) transport.PacketDialer {
 	dialer := &transport.UDPDialer{}
 	var onDNSDone func(di httptrace.DNSDoneInfo)
@@ -169,6 +179,9 @@ func newUDPTraceDialer(
 					onDNSDone(di)
 					onDNSDone = nil
 				}
+			},
+			ConnectDone: func(network, addr string, connErr error) {
+				onDial(ctx, network, addr, connErr)
 			},
 		})
 		return dialer.DialPacket(ctx, addr)
@@ -247,6 +260,7 @@ func main() {
 			var connectStart = make(map[string]time.Time)
 			dnsReports := make([]dnsReport, 0)
 			tcpReports := make([]tcpReport, 0)
+			udpReports := make([]udpReport, 0)
 			configToDialer := config.NewDefaultConfigToDialer()
 			configToDialer.BaseStreamDialer = transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
 				hostname, _, err := net.SplitHostPort(addr)
@@ -321,8 +335,25 @@ func main() {
 						mutex.Unlock()
 					}
 				}
-				return newUDPTraceDialer(onDNS).DialPacket(ctx, addr)
-				//return (&transport.UDPDialer{}).DialPacket(ctx, addr)
+				onDial := func(ctx context.Context, network, addr string, connErr error) {
+					ip, port, err := net.SplitHostPort(addr)
+					if err != nil {
+						return
+					}
+					report := udpReport{
+						Hostname: hostname,
+						IP:       ip,
+						Port:     port,
+						Time:     connectStart[network+"|"+addr].UTC().Truncate(time.Second),
+					}
+					if connErr != nil {
+						report.Error = connErr.Error()
+					}
+					mutex.Lock()
+					udpReports = append(udpReports, report)
+					mutex.Unlock()
+				}
+				return newUDPTraceDialer(onDNS, onDial).DialPacket(ctx, addr)
 			})
 			switch proto {
 			case "tcp":
@@ -365,6 +396,7 @@ func main() {
 				},
 				DNSQueries:     dnsReports,
 				TCPConnections: tcpReports,
+				UPDConnections: udpReports,
 			}
 			if reportCollector != nil {
 				err = reportCollector.Collect(context.Background(), r)
