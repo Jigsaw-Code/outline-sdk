@@ -261,20 +261,19 @@ func TestFallbackCollector(t *testing.T) {
 }
 
 func TestRetryCollector(t *testing.T) {
-	var testReport = ConnectivityReport{
-		Connection: nil,
-		Time:       time.Now().UTC().Truncate(time.Second),
-		DurationMs: 1,
-	}
-	var r Report = testReport
-	v, ok := r.(HasSuccess)
-	if ok {
-		t.Logf("The test report shows success: %v\n", v.IsSuccess())
-	}
-	u, err := url.Parse("https://google.com")
-	if err != nil {
-		t.Errorf("Expected no error, but got: %v", err)
-	}
+	requestCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if requestCount <= 2 {
+			w.WriteHeader(500)
+		} else {
+			fmt.Fprintln(w, "OK")
+		}
+		requestCount++
+	}))
+	defer ts.Close()
+	u, err := url.Parse(ts.URL)
+	require.NoError(t, err)
+
 	c := RetryCollector{
 		Collector: &RemoteCollector{
 			CollectorURL: u,
@@ -283,7 +282,14 @@ func TestRetryCollector(t *testing.T) {
 		MaxRetry:     3,
 		InitialDelay: 1 * time.Second,
 	}
-	err = c.Collect(context.Background(), r)
+
+	var testReport = ConnectivityReport{
+		Connection: nil,
+		Time:       time.Now().UTC().Truncate(time.Second),
+		DurationMs: 1,
+	}
+
+	err = c.Collect(context.Background(), testReport)
 	require.NoError(t, err)
 }
 
