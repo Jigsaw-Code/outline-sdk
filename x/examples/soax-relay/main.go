@@ -24,7 +24,6 @@ import (
 	"net/netip"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	csocks5 "github.com/Jigsaw-Code/outline-sdk/transport/socks5"
@@ -35,7 +34,7 @@ import (
 
 // CustomAuthenticator handles authentication based on username prefix and extracts the suffix
 type CustomAuthenticator struct {
-	PrefixCredentials CredentialStore // Store for validating the prefix part of the username
+	credentials map[string]string
 }
 
 // GetCode implements the `GetCode` method for the `Authenticator` interface
@@ -71,10 +70,9 @@ func (a CustomAuthenticator) Authenticate(reader io.Reader, writer io.Writer, us
 	usernamePrefix := parts[0] // Prefix (e.g., "jane")
 	usernameSuffix := parts[1] // Suffix (e.g., "-country-ir")
 
-	log.Printf("Attempting authentication with prefix: %s and suffix: %s", usernamePrefix, usernameSuffix)
-
+	storedPassword, exists := a.credentials[usernamePrefix]
 	// Validate the prefix and password against stored credentials
-	if !a.PrefixCredentials.Valid(usernamePrefix, password, userAddr) {
+	if !exists || storedPassword != password {
 		// Authentication failed
 		if _, err := writer.Write([]byte{statute.UserPassAuthVersion, statute.AuthFailure}); err != nil {
 			return nil, err
@@ -97,45 +95,24 @@ func (a CustomAuthenticator) Authenticate(reader io.Reader, writer io.Writer, us
 	}, nil
 }
 
-// CredentialStore is an interface to validate prefix-based credentials
-type CredentialStore interface {
-	Valid(username, password, userAddr string) bool
-}
+func udpAssociateHandler(ctx context.Context, writer io.Writer, request *socks5.Request, config *Config) error {
 
-// StaticCredentialStore is a simple credential store that holds a map of valid prefixes and passwords
-type StaticCredentialStore struct {
-	credentials map[string]string // Maps username/prefix to password
-}
-
-// Valid checks if the provided prefix and password are valid
-func (s *StaticCredentialStore) Valid(prefix, password, userAddr string) bool {
-	storedPassword, exists := s.credentials[prefix]
-	return exists && storedPassword == password
-}
-
-func udpAssociateHandler(ctx context.Context, writer io.Writer, request *socks5.Request) error {
 	// Extract the suffix from the auth context
 	suffix, ok := request.AuthContext.Payload["suffix"]
 	if !ok {
 		return errors.New("no suffix found in auth context")
 	}
 
-	soaxPackage := viper.GetString("soax.package")
-	soaxPassword := viper.GetString("soax.password")
-	soaxAddress := viper.GetString("soax.address")
-
 	// Construct the upstream soax username by concatenating
 	// the soax package name with the suffix
-	soaxUsername := soaxPackage + suffix
-	log.Printf("Sending associate command with username: %s\n", soaxUsername)
-
-	streamEndpoint := transport.StreamDialerEndpoint{Dialer: &transport.TCPDialer{}, Address: soaxAddress}
+	soaxUsername := config.SOAX.PackageID + suffix
+	streamEndpoint := transport.StreamDialerEndpoint{Dialer: &transport.TCPDialer{}, Address: config.SOAX.Address}
 	client, err := csocks5.NewClient(&streamEndpoint)
 	if err != nil {
 		return err
 	}
 
-	err = client.SetCredentials([]byte(soaxUsername), []byte(soaxPassword))
+	err = client.SetCredentials([]byte(soaxUsername), []byte(config.SOAX.PackageKey))
 	if err != nil {
 		return err
 	}
@@ -147,11 +124,11 @@ func udpAssociateHandler(ctx context.Context, writer io.Writer, request *socks5.
 		return err
 	}
 
-	// Start a goroutine to close the connection after a timeout
+	// Start a goroutine to monitor the client's TCP connection.
+	// When the client's TCP connection is closed,
+	// close the upstream TCP connection as well.
 	go func() {
-		timeout := viper.GetDuration("udp_timeout")
-		<-time.After(timeout)
-		log.Println("Closing UDP associate connection after timeout")
+		_, _ = io.Copy(io.Discard, request.Reader)
 		conn.Close()
 	}()
 
@@ -184,30 +161,58 @@ func convertToNetAddr(network string, ip netip.Addr, port uint16) net.Addr {
 	return nil
 }
 
-func loadConfig() error {
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
-
-	if err := viper.ReadInConfig(); err != nil {
-		return fmt.Errorf("failed to read config file: %w", err)
+type Config struct {
+	Server struct {
+		ListenAddress string `mapstructure:"listen_address"`
 	}
-	return nil
+	SOAX struct {
+		PackageID  string `mapstructure:"package_id"`
+		PackageKey string `mapstructure:"package_key"`
+		Address    string `mapstructure:"address"`
+	}
+	Credentials map[string]string `mapstructure:"credentials"`
+}
+
+func loadConfig() (*Config, error) {
+	v := viper.New()
+	v.SetConfigName("config")
+	v.SetConfigType("yaml")
+	v.AddConfigPath(".")
+
+	if err := v.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	var config Config
+	if err := v.Unmarshal(&config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	config.SOAX.PackageID = "package-" + config.SOAX.PackageID + "-"
+
+	if config.SOAX.Address == "" {
+		config.SOAX.Address = "proxy.soax.com:5000"
+	}
+
+	return &config, nil
 }
 
 func main() {
 
-	if err := loadConfig(); err != nil {
+	config, err := loadConfig()
+	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
-	}
-
-	creds := &StaticCredentialStore{
-		credentials: viper.GetStringMapString("credentials"),
 	}
 
 	// Create the custom authenticator
 	customAuth := CustomAuthenticator{
-		PrefixCredentials: creds,
+		credentials: config.Credentials,
+	}
+
+	streamEndpoint := transport.StreamDialerEndpoint{Dialer: &transport.TCPDialer{}, Address: config.SOAX.Address}
+	client, err := csocks5.NewClient(&streamEndpoint)
+	if err != nil {
+		return
 	}
 
 	server := socks5.NewServer(
@@ -224,36 +229,21 @@ func main() {
 				return nil, errors.New("no suffix found in auth context")
 			}
 
-			soaxpackage := viper.GetString("soax.package")
-			soaxPassword := viper.GetString("soax.password")
-			soaxAddress := viper.GetString("soax.address")
-
 			// Construct the upstream username by concatenating the base username with the suffix
-			soaxUsername := soaxpackage + suffix // e.g., "package-189365-country-ir-seesionid-..."
-
-			switch network {
-			case "tcp", "tcp4", "tcp6":
-				streamEndpoint := transport.StreamDialerEndpoint{Dialer: &transport.TCPDialer{}, Address: soaxAddress}
-				client, err := csocks5.NewClient(&streamEndpoint)
-				if err != nil {
-					return nil, err
-				}
-
-				err = client.SetCredentials([]byte(soaxUsername), []byte(soaxPassword))
-				if err != nil {
-					return nil, err
-				}
-				return client.DialStream(ctx, addr)
-			default:
-				return nil, fmt.Errorf("unsupported network: %s", network)
+			soaxUsername := config.SOAX.PackageID + suffix // e.g., "package-123456-country-ir-seesionid-..."
+			err = client.SetCredentials([]byte(soaxUsername), []byte(config.SOAX.PackageKey))
+			if err != nil {
+				return nil, err
 			}
+			return client.DialStream(ctx, addr)
 		}),
-		socks5.WithAssociateHandle(udpAssociateHandler),
+		socks5.WithAssociateHandle(func(ctx context.Context, writer io.Writer, request *socks5.Request) error {
+			return udpAssociateHandler(ctx, writer, request, config)
+		}),
 	)
 
 	// Run SOCKS5 proxy on the specified address and port
-	listeningAddr := fmt.Sprintf("%s:%s", viper.GetString("server.address"), viper.GetString("server.port"))
-	if err := server.ListenAndServe("tcp", listeningAddr); err != nil {
+	if err := server.ListenAndServe("tcp", config.Server.ListenAddress); err != nil {
 		panic(err)
 	}
 
