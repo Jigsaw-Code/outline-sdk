@@ -1,14 +1,10 @@
 server:
-  address: 127.0.0.1
-  port: 1080
+  listen_address: 127.0.0.1:1080
 
 soax:
-  package: package-000000-
-  password: XXXXXXXX
-  address: proxy.soax.com:5000
+  package_id: 123456
+  package_key: MySoaxPackageKey
 
 credentials:
-  foo: bar
-  exampleuser: examplepass
-
-udp_timeout: 1m
+  user1: password1
+  user2: password2
