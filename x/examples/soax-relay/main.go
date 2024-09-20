@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/netip"
 	"strings"
+	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	csocks5 "github.com/Jigsaw-Code/outline-sdk/transport/socks5"
@@ -128,6 +129,8 @@ func udpAssociateHandler(ctx context.Context, writer io.Writer, request *socks5.
 	// close the upstream TCP connection as well.
 	go func() {
 		_, _ = io.Copy(io.Discard, request.Reader)
+		// let's see if this fixes the udp issue on remote server
+		time.Sleep(5 * time.Second)
 		conn.Close()
 	}()
 
