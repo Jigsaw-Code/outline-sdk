@@ -11,34 +11,11 @@ The proxy relay works as follows:
 3. For authenticated connections, it relays requests to the SOAX proxy server.
 4. It supports both TCP and UDP traffic.
 
-#### Key components:
-
-- **CustomAuthenticator**: Handles authentication based on username prefix and extracts the suffix which includes connection parameters such as country, city, ISP, etc.
-- **StaticCredentialStore**: Stores and validates user credentials.
-- **UDP Associate Handler**: Manages UDP connections by relaying the SOAX bind address back to the client.
-
 ## Usage
 
 ### Configuration
 
-The program uses a YAML configuration file (`config.yaml`) for settings. Example configuration:
-
-```yaml
-server:
-  address: "127.0.0.1"
-  port: "1080"
-
-upstream:
-  prefix: "package-xxxxx-"
-  password: "YourSOAXPassword"
-  address: "proxy.soax.com:5000"
-
-credentials:
-  foo: "bar"
-  jane: "password123"
-
-udp_timeout: 1m
-```
+The program uses a YAML configuration file (`config.yaml`) for settings. Please refer to the example config file.
 
 ### Authentication
 Users connect to the relay using the following format:
@@ -53,43 +30,23 @@ where any part that goes after username-country-{cc_code} is optional. For more 
 
 <b>Example Username:</b>
 
-outline-country-ru-sessionid-12-sessionlength-600
+`outline-country-ru-sessionid-12-sessionlength-600` where `outline` is the username and parameters that goes after configured the soax proxy
 
 The relay will use the SOAX package ID and password to connect to the SOAX server, appending the country, sessionid, and sessionlength from the user's input.
 
 ### Setup and Running
 
 Ensure you have Go installed on your system.
-Clone the repository:
-
-```bash
-git clone <repository-url>
-cd <repository-directory>
-```
-
-Install dependencies:
-```bash
-go mod tidy
-```
 
 Create a `config.yaml` file in the project directory with your SOAX credentials and desired settings.
 
-Build the program:
-
 ```bash
-go build -o socks5relay
+go run github.com/Jigsaw-Code/outline-sdk/x/examples/soax-relay@latest
 ```
-
-Run the program:
-
-```bash
-./socks5relay
-```
-
 
 The relay will start and listen for incoming connections on the specified address and port.
 
-SOAX Sticky Sessions:
+### SOAX Sticky Sessions
 
 This relay supports SOAX sticky sessions. Users can specify:
 
@@ -123,9 +80,10 @@ The relay will forward these parameters to SOAX, allowing users to benefit from 
 
 ### Security Considerations
 
-This relay is intended for testing purposes only.
-Ensure the relay is run in a secure environment, as it handles sensitive SOAX credentials.
-Regularly update the credentials in the config file to maintain security.
+- This relay is intended for testing purposes only.
+- Ensure the relay is run in a secure environment, as it handles sensitive SOAX credentials.
+- Regularly update the credentials in the config file to maintain security.
+- SOCKS5 traffic is not encrypted.
 
 
 
