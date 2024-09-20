@@ -145,7 +145,7 @@ func (p *packetConn) Close() error {
 	return errors.Join(p.sc.Close(), p.pc.Close())
 }
 
-// ListenPacket creates a [net.PacketConn] for dialing to SOCKS5 server.
+// ListenPacket creates a [net.PacketConn] for UDP communication via the SOCKS5 server.
 func (c *Client) ListenPacket(ctx context.Context) (net.PacketConn, error) {
 	// Connect to the SOCKS5 server and perform UDP association
 	// Since local address is not known in advance, we use unspecified address
