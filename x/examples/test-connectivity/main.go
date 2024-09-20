@@ -33,7 +33,7 @@ import (
 
 	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
 	"github.com/Jigsaw-Code/outline-sdk/x/report"
 	"github.com/lmittmann/tint"
@@ -220,7 +220,7 @@ func main() {
 			var mu sync.Mutex
 			dnsReports := make([]dnsReport, 0)
 			tcpReports := make([]tcpReport, 0)
-			configToDialer := config.NewDefaultConfigToDialer()
+			configToDialer := configurl.NewDefaultConfigToDialer()
 			configToDialer.BaseStreamDialer = transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
 				hostname, _, err := net.SplitHostPort(addr)
 				if err != nil {
@@ -324,7 +324,7 @@ func main() {
 				success = true
 			}
 			slog.Debug("Test done", "proto", proto, "resolver", resolverAddress, "result", result)
-			sanitizedConfig, err := config.SanitizeConfig(*transportFlag)
+			sanitizedConfig, err := configurl.SanitizeConfig(*transportFlag)
 			if err != nil {
 				slog.Error("Failed to sanitize config", "error", err)
 				os.Exit(1)
