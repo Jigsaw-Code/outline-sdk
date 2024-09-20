@@ -20,8 +20,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptrace"
@@ -37,11 +36,9 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
 	"github.com/Jigsaw-Code/outline-sdk/x/report"
+	"github.com/lmittmann/tint"
+	"golang.org/x/term"
 )
-
-var debugLog log.Logger = *log.New(io.Discard, "", 0)
-
-// var errorLog log.Logger = *log.New(os.Stderr, "[ERROR] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
 type connectivityReport struct {
 	Test           testReport  `json:"test"`
@@ -157,28 +154,34 @@ func main() {
 
 	flag.Parse()
 
+	logLevel := slog.LevelInfo
+	if *verboseFlag {
+		logLevel = slog.LevelDebug
+	}
+	slog.SetDefault(slog.New(tint.NewHandler(
+		os.Stderr,
+		&tint.Options{NoColor: !term.IsTerminal(int(os.Stderr.Fd())), Level: logLevel},
+	)))
+
 	// Perform custom range validation for sampling rate
 	if *reportSuccessFlag < 0.0 || *reportSuccessFlag > 1.0 {
-		fmt.Println("Error: report-success-rate must be between 0 and 1.")
+		slog.Error("Error: report-success-rate must be between 0 and 1.", "report-success-rate", *reportSuccessFlag)
 		flag.Usage()
-		return
+		os.Exit(1)
 	}
 
 	if *reportFailureFlag < 0.0 || *reportFailureFlag > 1.0 {
-		fmt.Println("Error: report-failure-rate must be between 0 and 1.")
+		slog.Error("Error: report-failure-rate must be between 0 and 1.", "report-failure-rate", *reportFailureFlag)
 		flag.Usage()
-		return
-	}
-
-	if *verboseFlag {
-		debugLog = *log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
+		os.Exit(1)
 	}
 
 	var reportCollector report.Collector
 	if *reportToFlag != "" {
 		collectorURL, err := url.Parse(*reportToFlag)
 		if err != nil {
-			debugLog.Printf("Failed to parse collector URL: %v", err)
+			slog.Error("Failed to parse collector URL", "url", err)
+			os.Exit(1)
 		}
 		remoteCollector := &report.RemoteCollector{
 			CollectorURL: collectorURL,
@@ -294,32 +297,37 @@ func main() {
 			case "tcp":
 				streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
 				if err != nil {
-					log.Fatalf("Failed to create StreamDialer: %v", err)
+					slog.Error("Failed to create StreamDialer", "error", err)
+					os.Exit(1)
 				}
 				resolver = dns.NewTCPResolver(streamDialer, resolverAddress)
 
 			case "udp":
 				packetDialer, err := configToDialer.NewPacketDialer(*transportFlag)
 				if err != nil {
-					log.Fatalf("Failed to create PacketDialer: %v", err)
+					slog.Error("Failed to create PacketDialer", "error", err)
+					os.Exit(1)
 				}
 				resolver = dns.NewUDPResolver(packetDialer, resolverAddress)
 			default:
-				log.Fatalf(`Invalid proto %v. Must be "tcp" or "udp"`, proto)
+				slog.Error(`Invalid proto. Must be "tcp" or "udp"`, "proto", proto)
+				os.Exit(1)
 			}
 			startTime := time.Now()
 			result, err := connectivity.TestConnectivityWithResolver(context.Background(), resolver, *domainFlag)
 			if err != nil {
-				log.Fatalf("Connectivity test failed to run: %v", err)
+				slog.Error("Connectivity test failed to run", "error", err)
+				os.Exit(1)
 			}
 			testDuration := time.Since(startTime)
 			if result == nil {
 				success = true
 			}
-			debugLog.Printf("Test %v %v result: %v", proto, resolverAddress, result)
+			slog.Debug("Test done", "proto", proto, "resolver", resolverAddress, "result", result)
 			sanitizedConfig, err := config.SanitizeConfig(*transportFlag)
 			if err != nil {
-				log.Fatalf("Failed to sanitize config: %v", err)
+				slog.Error("Failed to sanitize config", "error", err)
+				os.Exit(1)
 			}
 			var r report.Report = connectivityReport{
 				Test: testReport{
@@ -337,7 +345,7 @@ func main() {
 			if reportCollector != nil {
 				err = reportCollector.Collect(context.Background(), r)
 				if err != nil {
-					debugLog.Printf("Failed to collect report: %v\n", err)
+					slog.Warn("Failed to collect report", "error", err)
 				}
 			}
 		}
