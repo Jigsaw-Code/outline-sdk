@@ -155,7 +155,7 @@ func (c *Client) ListenPacket(ctx context.Context) (net.PacketConn, error) {
 	// https://datatracker.ietf.org/doc/html/rfc1928#section-6
 	// Whoile binding address to specific client address has its advantages, it also creates some
 	// challenges such as NAT traveral if client is behind NAT.
-	sc, bindAddr, err := c.connectAndRequest(ctx, CmdUDPAssociate, "0.0.0.0:0")
+	sc, bindAddr, err := c.ConnectAndRequest(ctx, CmdUDPAssociate, "0.0.0.0:0")
 	if err != nil {
 		return nil, err
 	}

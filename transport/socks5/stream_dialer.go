@@ -209,7 +209,7 @@ func (c *Client) request(conn io.ReadWriter, cmd byte, dstAddr string) (*address
 }
 
 // connectAndRequest manages the connection lifecycle and delegates the SOCKS5 communication to the request function.
-func (c *Client) connectAndRequest(ctx context.Context, cmd byte, dstAddr string) (transport.StreamConn, *address, error) {
+func (c *Client) ConnectAndRequest(ctx context.Context, cmd byte, dstAddr string) (transport.StreamConn, *address, error) {
 	proxyConn, err := c.se.ConnectStream(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not connect to SOCKS5 proxy: %w", err)
@@ -230,7 +230,7 @@ func (c *Client) connectAndRequest(ctx context.Context, cmd byte, dstAddr string
 // The returned [error] will be of type [ReplyCode] if the server sends a SOCKS error reply code, which
 // you can check against the error constants in this package using [errors.Is].
 func (c *Client) DialStream(ctx context.Context, dstAddr string) (transport.StreamConn, error) {
-	proxyConn, _, err := c.connectAndRequest(ctx, CmdConnect, dstAddr)
+	proxyConn, _, err := c.ConnectAndRequest(ctx, CmdConnect, dstAddr)
 	if err != nil {
 		return nil, err
 	}
