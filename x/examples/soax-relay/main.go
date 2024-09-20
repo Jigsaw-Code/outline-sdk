@@ -124,8 +124,12 @@ func udpAssociateHandler(ctx context.Context, writer io.Writer, request *socks5.
 	}
 	defer upstreamConn.Close()
 
-	// Create a local UDP listener for the client
-	clientListener, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
+	// Start listening on the client UDP address
+	clientListenAddr, err := transport.MakeNetAddr("udp", config.Server.UDPListenAddress)
+	if err != nil {
+		return err
+	}
+	clientListener, err := net.ListenUDP("udp", clientListenAddr.(*net.UDPAddr))
 	if err != nil {
 		return err
 	}
@@ -218,7 +222,8 @@ func convertToNetAddr(ip netip.Addr, port uint16) *net.UDPAddr {
 
 type Config struct {
 	Server struct {
-		ListenAddress string `mapstructure:"listen_address"`
+		TCPListenAddress string `mapstructure:"tcp_listen_address"`
+		UDPListenAddress string `mapstructure:"udp_listen_address"`
 	}
 	SOAX struct {
 		PackageID  string `mapstructure:"package_id"`
@@ -297,7 +302,7 @@ func main() {
 	)
 
 	// Run SOCKS5 proxy on the specified address and port
-	if err := server.ListenAndServe("tcp", config.Server.ListenAddress); err != nil {
+	if err := server.ListenAndServe("tcp", config.Server.TCPListenAddress); err != nil {
 		panic(err)
 	}
 

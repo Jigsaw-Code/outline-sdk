@@ -1,5 +1,6 @@
 server:
-  listen_address: 127.0.0.1:1080
+  tcp_listen_address: 0.0.0.0:1080
+  udp_listen_address: 0.0.0.0:9000
 
 soax:
   package_id: 123456
