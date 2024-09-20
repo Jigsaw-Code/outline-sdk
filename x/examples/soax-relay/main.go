@@ -22,7 +22,6 @@ import (
 	"log"
 	"net"
 	"net/netip"
-	"os"
 	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -217,7 +216,6 @@ func main() {
 
 	server := socks5.NewServer(
 		socks5.WithAuthMethods([]socks5.Authenticator{customAuth}),
-		socks5.WithLogger(socks5.NewLogger(log.New(os.Stdout, "socks5: ", log.LstdFlags))),
 		socks5.WithDialAndRequest(func(ctx context.Context, network, addr string, req *socks5.Request) (net.Conn, error) {
 			authContext := req.AuthContext
 			if authContext == nil {
