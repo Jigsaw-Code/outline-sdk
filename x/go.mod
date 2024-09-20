@@ -7,12 +7,14 @@ require (
 	// Use github.com/Psiphon-Labs/psiphon-tunnel-core@staging-client as per
 	// https://github.com/Psiphon-Labs/psiphon-tunnel-core/?tab=readme-ov-file#using-psiphon-with-go-modules
 	github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20240619172145-03cade11f647
+	github.com/lmittmann/tint v1.0.5
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/stretchr/testify v1.9.0
 	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/mobile v0.0.0-20240520174638-fa72addaaa1b
 	golang.org/x/net v0.25.0
 	golang.org/x/sys v0.20.0
+	golang.org/x/term v0.20.0
 )
 
 require (
