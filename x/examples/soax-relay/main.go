@@ -230,7 +230,7 @@ type Config struct {
 
 func loadConfig() (*Config, error) {
 	v := viper.New()
-	v.SetConfigName("config-valid")
+	v.SetConfigName("config")
 	v.SetConfigType("yaml")
 	v.AddConfigPath(".")
 
