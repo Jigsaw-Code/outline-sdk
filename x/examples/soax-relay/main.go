@@ -23,7 +23,7 @@ import (
 	"net"
 	"net/netip"
 	"strings"
-	"time"
+	"sync"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	csocks5 "github.com/Jigsaw-Code/outline-sdk/transport/socks5"
@@ -106,61 +106,114 @@ func udpAssociateHandler(ctx context.Context, writer io.Writer, request *socks5.
 	// Construct the upstream soax username by concatenating
 	// the soax package name with the suffix
 	soaxUsername := config.SOAX.PackageID + suffix
+
 	streamEndpoint := transport.StreamDialerEndpoint{Dialer: &transport.TCPDialer{}, Address: config.SOAX.Address}
 	client, err := csocks5.NewClient(&streamEndpoint)
 	if err != nil {
 		return err
 	}
-
 	err = client.SetCredentials([]byte(soaxUsername), []byte(config.SOAX.PackageKey))
 	if err != nil {
 		return err
 	}
 
 	client.EnablePacket(&transport.UDPDialer{})
-
-	conn, bindAddr, err := client.ConnectAndRequest(ctx, csocks5.CmdUDPAssociate, "0.0.0.0:0")
+	upstreamConn, upstreamBindAddr, err := client.ConnectAndRequest(ctx, csocks5.CmdUDPAssociate, "0.0.0.0:0")
 	if err != nil {
 		return err
 	}
+	defer upstreamConn.Close()
 
-	// Start a goroutine to monitor the client's TCP connection.
-	// When the client's TCP connection is closed,
-	// close the upstream TCP connection as well.
-	go func() {
-		_, _ = io.Copy(io.Discard, request.Reader)
-		// let's see if this fixes the udp issue on remote server
-		time.Sleep(5 * time.Second)
-		conn.Close()
-	}()
+	// Create a local UDP listener for the client
+	clientListener, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
+	if err != nil {
+		return err
+	}
+	defer clientListener.Close()
 
-	if err = socks5.SendReply(writer, statute.RepSuccess, convertToNetAddr("udp", bindAddr.IP, bindAddr.Port)); err != nil {
+	// Send the local UDP address back to the client
+	if err = socks5.SendReply(writer, statute.RepSuccess, clientListener.LocalAddr()); err != nil {
 		return err
 	}
 
+	// Create a connection to the upstream server
+	upstreamUDPConn, err := net.DialUDP("udp", nil, convertToNetAddr(upstreamBindAddr.IP, upstreamBindAddr.Port))
+	if err != nil {
+		return err
+	}
+	defer upstreamUDPConn.Close()
+
+	// Start UDP relay
+	errCh := make(chan error, 3)
+	go relayUDP(clientListener, upstreamUDPConn, errCh)
+
+	// Monitor client TCP connection
+	go func() {
+		_, _ = io.Copy(io.Discard, request.Reader)
+		errCh <- errors.New("client TCP connection closed")
+	}()
+
+	// Wait for any error or connection close
+	err = <-errCh
+	log.Printf("UDP Associate ended: %v", err)
 	return nil
 }
 
-func convertToNetAddr(network string, ip netip.Addr, port uint16) net.Addr {
-	// Convert netip.Addr to net.IP
-	netIP := ip.AsSlice()
-	switch network {
-	case "tcp", "tcp4", "tcp6":
-		// Create a net.TCPAddr
-		tcpAddr := &net.TCPAddr{
-			IP:   netIP,
-			Port: int(port),
+func relayUDP(clientConn *net.UDPConn, upstreamConn *net.UDPConn, errCh chan<- error) {
+	var clientAddr *net.UDPAddr
+	var clientAddrMu sync.Mutex
+
+	// Client to upstream
+	go func() {
+		buf := make([]byte, 64*1024)
+		for {
+			n, addr, err := clientConn.ReadFromUDP(buf)
+			if err != nil {
+				errCh <- fmt.Errorf("error reading from client UDP: %v", err)
+				return
+			}
+
+			clientAddrMu.Lock()
+			if clientAddr == nil {
+				clientAddr = addr
+			}
+			clientAddrMu.Unlock()
+
+			_, err = upstreamConn.Write(buf[:n])
+			if err != nil {
+				errCh <- fmt.Errorf("error writing to upstream UDP: %v", err)
+				return
+			}
 		}
-		return tcpAddr
-	case "udp", "udp4", "udp6":
-		// Create a net.UDPAddr
-		udpAddr := &net.UDPAddr{
-			IP:   netIP,
-			Port: int(port),
+	}()
+
+	// Upstream to client
+	go func() {
+		buf := make([]byte, 64*1024)
+		for {
+			n, err := upstreamConn.Read(buf)
+			if err != nil {
+				errCh <- fmt.Errorf("error reading from upstream UDP: %v", err)
+				return
+			}
+
+			clientAddrMu.Lock()
+			if clientAddr != nil {
+				_, err = clientConn.WriteToUDP(buf[:n], clientAddr)
+				if err != nil {
+					errCh <- fmt.Errorf("error writing to client UDP: %v", err)
+					return
+				}
+			}
+			clientAddrMu.Unlock()
 		}
-		return udpAddr
+	}()
+}
+func convertToNetAddr(ip netip.Addr, port uint16) *net.UDPAddr {
+	return &net.UDPAddr{
+		IP:   ip.AsSlice(),
+		Port: int(port),
 	}
-	return nil
 }
 
 type Config struct {
@@ -177,7 +230,7 @@ type Config struct {
 
 func loadConfig() (*Config, error) {
 	v := viper.New()
-	v.SetConfigName("config")
+	v.SetConfigName("config-valid")
 	v.SetConfigType("yaml")
 	v.AddConfigPath(".")
 
