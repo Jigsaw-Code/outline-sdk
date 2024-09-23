@@ -108,17 +108,17 @@ func udpAssociateHandler(ctx context.Context, writer io.Writer, request *socks5.
 	soaxUsername := config.SOAX.PackageID + suffix
 
 	streamEndpoint := transport.StreamDialerEndpoint{Dialer: &transport.TCPDialer{}, Address: config.SOAX.Address}
-	client, err := csocks5.NewClient(&streamEndpoint)
+	upstreamClient, err := csocks5.NewClient(&streamEndpoint)
 	if err != nil {
 		return err
 	}
-	err = client.SetCredentials([]byte(soaxUsername), []byte(config.SOAX.PackageKey))
+	err = upstreamClient.SetCredentials([]byte(soaxUsername), []byte(config.SOAX.PackageKey))
 	if err != nil {
 		return err
 	}
 
-	client.EnablePacket(&transport.UDPDialer{})
-	upstreamConn, upstreamBindAddr, err := client.ConnectAndRequest(ctx, csocks5.CmdUDPAssociate, "0.0.0.0:0")
+	upstreamClient.EnablePacket(&transport.UDPDialer{})
+	upstreamConn, upstreamBindAddr, err := upstreamClient.ConnectAndRequest(ctx, csocks5.CmdUDPAssociate, "0.0.0.0:0")
 	if err != nil {
 		return err
 	}
@@ -149,6 +149,8 @@ func udpAssociateHandler(ctx context.Context, writer io.Writer, request *socks5.
 
 	// Start UDP relay
 	errCh := make(chan error, 3)
+
+	// Relay packets between client and upstream
 	go relayUDP(clientListener, upstreamUDPConn, errCh)
 
 	// Monitor client TCP connection
@@ -268,12 +270,7 @@ func main() {
 	customAuth := CustomAuthenticator{
 		credentials: config.Credentials,
 	}
-
 	streamEndpoint := transport.StreamDialerEndpoint{Dialer: &transport.TCPDialer{}, Address: config.SOAX.Address}
-	client, err := csocks5.NewClient(&streamEndpoint)
-	if err != nil {
-		return
-	}
 
 	server := socks5.NewServer(
 		socks5.WithAuthMethods([]socks5.Authenticator{customAuth}),
@@ -290,6 +287,10 @@ func main() {
 
 			// Construct the upstream username by concatenating the base username with the suffix
 			soaxUsername := config.SOAX.PackageID + suffix // e.g., "package-123456-country-ir-seesionid-..."
+			client, err := csocks5.NewClient(&streamEndpoint)
+			if err != nil {
+				return nil, err
+			}
 			err = client.SetCredentials([]byte(soaxUsername), []byte(config.SOAX.PackageKey))
 			if err != nil {
 				return nil, err
