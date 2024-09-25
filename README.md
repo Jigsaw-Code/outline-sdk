@@ -88,9 +88,12 @@ The Outline Client uses a **generated mobile library** on Android, iOS and macOS
 
 Below we provide more details on each integration approach. For more details about setting up and using Outline SDK features, see the [Discussions tab](https://github.com/Jigsaw-Code/outline-sdk/discussions).
 
+
 ### Generated Mobile Library
 
-To integrate the SDK into a mobile app, follow these steps:
+See our [MobileProxy page](./x/mobileproxy/) to learn about the easiest way to integrate the Outline SDK into a mobile app. It runs a local forward proxy that implements resillience strategies that you can use to configure your app's networking libraries.
+
+For advanced users, it is possible to generate your own mobile library, following these steps:
 
 1. **Create a Go library**: Create a Go package that wraps the SDK functionalities you need.
 1. **Generate mobile library**: Use [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile) to generate Android Archives (AAR) and Apple Frameworks with Java and Objective-C bindings.
@@ -100,8 +103,6 @@ To integrate the SDK into a mobile app, follow these steps:
 
 > **Note**: You must use `gomobile bind` on the package you create, not directly on the SDK packages.
 
-An easy way to integrate with the SDK in a mobile app is by using the [`x/mobileproxy` library](./x/mobileproxy/)
-to run a local web proxy that you can use to configure your app's networking libraries.
 
 ### Side Service
 
