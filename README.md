@@ -144,7 +144,7 @@ They all take a `-transport` flag with a config that specifies what transport sh
 The config format can be found in [x/config](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config).
 
 
-### DNS Query
+### Resolve a Domain Name
 
 The [`resolve` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examples/resolve) resolves a domain name, similar to `dig`:
 
@@ -157,7 +157,7 @@ $ go run github.com/Jigsaw-Code/outline-sdk/x/examples/resolve@latest -type A -t
 ```
 
 
-### HTTP Fetch
+### Fetch a Web Page
 
 The [`fetch` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examples/fetch) fetches
 a URL, similar to `curl`. The example below would bypass blocking of `meduza.io` in Russia:
@@ -177,7 +177,7 @@ $ go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch@latest -transport "
 [DEBUG] 2023/12/28 18:44:56.491273 main.go:105: Cf-Cache-Status: [DYNAMIC]
 ```
 
-### Local Proxy Forwarder
+### Run a Local Forward Proxy
 
 The [`http2transport` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examples/http2transport) runs a local proxy that creates connections according to the transport. It's effectively a circumvention tool.
 
@@ -210,7 +210,7 @@ cf-ray: 83cdb579bbec4376-EWR
 alt-svc: h3=":443"; ma=86400
 ```
 
-### Proxy Connectivity Test
+### Test Proxy Connectivity
 
 The [`test-connectivity` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examples/test-connectivity) is useful to test connectivity to a proxy. It uses DNS resolutions over TCP and UDP using the transport to test if there is stream and datagram connectivity.
 
@@ -223,7 +223,7 @@ $ go run github.com/Jigsaw-Code/outline-sdk/x/examples/test-connectivity@latest 
 success
 ```
 
-### Speed Test
+### Test Download Speed
 
 The [`fetch-speed` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examples/fetch-speed) fetches
 a URL, similar to `curl` and calculates the download speed. It could be used for troubleshooting.
