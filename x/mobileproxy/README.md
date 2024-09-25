@@ -8,7 +8,7 @@ This package enables the use Go Mobile to generate a mobile library to run a loc
 **Content app with MobileProxy:**
 ![image](https://github.com/user-attachments/assets/8b07c0b6-7948-4b61-a6b2-fe2fafdb1a33)
 
-The integration typically consists of 3 steps:
+The integration typically consists of the following steps:
 1. Build the mobile native library using Go Mobile.
 1. Add the library to your application.
 1. Configure and run MobileProxy within your app.
