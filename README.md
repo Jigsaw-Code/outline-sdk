@@ -8,7 +8,8 @@
 <img src="https://github.com/Jigsaw-Code/outline-brand/blob/main/assets/powered_by_outline/color/logo.png?raw=true" width=400pt />
 </p>
 
-> ⚠️ **Warning**: This code is in early stages and is not guaranteed to be stable. If you are
+> [!Note]
+> This code is under active development and not guaranteed to be stable. If you are
 > interested in integrating with it, we'd love your [feedback](https://github.com/Jigsaw-Code/outline-sdk/issues/new).
 
 The Outline SDK allows you to:
