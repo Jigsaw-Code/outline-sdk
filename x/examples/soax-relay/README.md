@@ -74,7 +74,17 @@ Region name. Example: new+york
 
 ISP name. Please use this parameter together with the country information. 
 
-For more information on the format for values please check out [this document](https://helpcenter.soax.com/en/articles/6723733-sticky-sessions) on soax support page.
+For more information on the format for values please check out [this document](https://helpcenter.soax.com/en/articles/6723733-sticky-sessions) on soax support page. Here's a list of supported ISPs for Iran and Russia. For ISPs with space in name, please replace space with `%20`:
+
+Russia Mobile ISPs:
+```
+["pjsc megafon","mts pjsc","bee line cable","tele2 russia","rostelecom","tbank jsc","t-mob","ekaterinburg-2000","edinos","tattelecom","jsc vainah telecom","s.u.e. dpr republic operator of networks","sberbank-telecom","k-telekom","llc sp abaza telecom","mcs","edinos ltd.","jv a-mobile","ozyorsk telecom cjsc.","mobile trend","innovation solutions center ltd.","zao aquafon-gsm","isp balzer-telecom","invest mobile","dom.ru","ooo vtc-mobile","mts ojsc","main radio meteorological centre (mrmc)","novokuznetsk telecom"]
+```
+
+Iran Mobile ISPs:
+```
+["mobile communication company of iran","mtn irancell","rightel communication service company pjs","aria shatel pjsc","rightel","pardis fanvari partak","aria shatel company ltd"]
+```
 
 The relay will forward these parameters to SOAX, allowing users to benefit from sticky sessions without direct access to SOAX credentials.
 
