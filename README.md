@@ -15,7 +15,8 @@
 The Outline SDK allows you to:
 
 - Create tools to protect against network-level interference.
-- Add network-level interference protection to existing apps, such as content or communication apps.
+- [Add network-level interference protection to existing apps](#add-the-sdk-to-your-app), such as content or communication apps.
+- Troubleshoot connectivity and measure interference with a collection of [command-line tools](#command-line-tools).
 
 ## Advantages
 
