@@ -8,8 +8,6 @@ This package enables the use Go Mobile to generate a mobile library to run a loc
 **Content app with MobileProxy:**
 ![image](https://github.com/user-attachments/assets/8b07c0b6-7948-4b61-a6b2-fe2fafdb1a33)
 
-
-
 ## Build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
 
 From the `x/` directory:
