@@ -1,6 +1,18 @@
-# Mobileproxy: Local Proxy Library for Mobile Apps
+# MobileProxy: Local Proxy Library for Mobile Apps
 
 This package enables the use Go Mobile to generate a mobile library to run a local proxy and configure your app networking libraries.
+
+**Content app without MobileProxy:**
+![image](https://github.com/user-attachments/assets/d96b209c-2198-4382-8bba-12efd8f75dbb)
+
+**Content app with MobileProxy:**
+![image](https://github.com/user-attachments/assets/8b07c0b6-7948-4b61-a6b2-fe2fafdb1a33)
+
+The integration typically consists of the following steps:
+1. Build the mobile native library using Go Mobile.
+1. Add the library to your application.
+1. Configure and run MobileProxy within your app.
+1. Update your networking code to proxy traffic through the local MobileProxy.
 
 ## Build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
 
