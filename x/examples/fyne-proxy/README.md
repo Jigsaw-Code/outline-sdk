@@ -1,6 +1,9 @@
 # Local Proxy with Fyne
 
 This folder has a graphical application that runs a local proxy given a address and configuration.
+
+It also automatically configures system-wide web proxy settings using [sysproxy package](https://github.com/Jigsaw-Code/outline-sdk/tree/main/x/sysproxy) to tunnel web traffic (specially web browser traffic) through the local proxy server.
+
 It uses [Fyne](https://fyne.io/) for the UI.
 
 
