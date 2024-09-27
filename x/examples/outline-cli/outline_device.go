@@ -15,9 +15,13 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -42,7 +46,18 @@ type OutlineDevice struct {
 var configToDialer = configurl.NewDefaultConfigToDialer()
 
 func NewOutlineDevice(transportConfig string) (od *OutlineDevice, err error) {
-	ip, err := resolveShadowsocksServerIPFromConfig(transportConfig)
+	if err := validateConfig(transportConfig); err != nil {
+		return nil, err
+	}
+	parsed, err := url.Parse(transportConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse config URL: %w", err)
+	}
+	transportConfig, err = formatConfig(parsed)
+	if err != nil {
+		return nil, err
+	}
+	ip, err := resolveShadowsocksServerIPFromHostname(parsed.Hostname())
 	if err != nil {
 		return nil, err
 	}
@@ -75,21 +90,72 @@ func (d *OutlineDevice) GetServerIP() net.IP {
 	return d.svrIP
 }
 
-func resolveShadowsocksServerIPFromConfig(transportConfig string) (net.IP, error) {
+// based on ssconf spec: https://reddit.com/r/outlinevpn/w/index/dynamic_access_keys
+func constructShadowsocksSessionConfig(resp []byte) (string, error) {
+	var cfg struct {
+		Server     string `json:"server"`
+		ServerPort string `json:"server_port"`
+		Password   string `json:"password"`
+		Method     string `json:"method"`
+		Prefix     string `json:"prefix,omitempty"` // optional
+	}
+
+	if err := json.Unmarshal([]byte(resp), &cfg); err != nil {
+		return "", fmt.Errorf("failed to parse response JSON: %w", err)
+	}
+
+	// TODO: unsure what to do with prefix field
+	var cfgURL url.URL
+	cfgURL.Scheme = "ss"
+	cfgURL.User = url.User(base64.StdEncoding.EncodeToString([]byte(cfg.Method + ":" + cfg.Password)))
+	cfgURL.Host = cfg.Server + ":" + cfg.ServerPort
+
+	return cfgURL.String(), nil
+}
+
+func fetchShadowsocksSessionConfig(transportConfig string) ([]byte, error) {
+	transportConfig = "https" + strings.TrimPrefix(transportConfig, "ssconf")
+
+	resp, err := http.Get(transportConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch config from ssconf: %w", err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to ready body from request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	return body, nil
+}
+
+func formatConfig(transportConfigURL *url.URL) (string, error) {
+	switch transportConfigURL.Scheme {
+	case "ss":
+		return transportConfigURL.String(), nil
+	case "ssconf":
+		fetched, err := fetchShadowsocksSessionConfig(transportConfigURL.String())
+		if err != nil {
+			return "", err
+		}
+		return constructShadowsocksSessionConfig(fetched)
+	default:
+		return "", errors.New("config must start with 'ss://' or 'ssconf://'")
+	}
+}
+
+func validateConfig(transportConfig string) error {
 	if strings.Contains(transportConfig, "|") {
-		return nil, errors.New("multi-part config is not supported")
+		return errors.New("multi-part config is not supported")
 	}
 	if transportConfig = strings.TrimSpace(transportConfig); transportConfig == "" {
-		return nil, errors.New("config is required")
+		return errors.New("config is required")
 	}
-	url, err := url.Parse(transportConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse config: %w", err)
-	}
-	if url.Scheme != "ss" {
-		return nil, errors.New("config must start with 'ss://'")
-	}
-	ipList, err := net.LookupIP(url.Hostname())
+	return nil
+}
+
+func resolveShadowsocksServerIPFromHostname(hostname string) (net.IP, error) {
+	ipList, err := net.LookupIP(hostname)
 	if err != nil {
 		return nil, fmt.Errorf("invalid server hostname: %w", err)
 	}
