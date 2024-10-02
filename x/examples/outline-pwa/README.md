@@ -13,10 +13,12 @@ This will update the ios and android subprojects with that site's index.html. Yo
 
 ## Strategies
 
+We'll be defining our own custom scheme - `outline://` - and loading the index.html via `outline://index.html`. Subresources that don't have their scheme defined should load via `outline://` as well.
+
 ### iOS
 
-TODO
+TODO - define a `WKURLSchemeHandler` for `outline://` and handle the traffic that way.
 
 ### Android
 
-TODO
+TODO - create a new `WebViewClient` with a `shouldOverrideUrlLoading` that handles the `outline://` scheme. Set that web client in the `BridgeActivity` that Capacitor provides.
