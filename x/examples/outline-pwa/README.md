@@ -1,4 +1,4 @@
-# Outline PWA
+# [WIP] Outline PWA
 
 > [!CAUTION]
 > This is currently a WIP placeholder for the `outline-pwa` project. It has no actual logic in it yet.
