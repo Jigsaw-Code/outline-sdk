@@ -1,0 +1,11 @@
+{
+  "appId": "org.getoutline.pwa",
+  "appName": "outline-pwa-demo",
+  "bundledWebRuntime": false,
+  "webDir": "dist",
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    }
+  }
+}
