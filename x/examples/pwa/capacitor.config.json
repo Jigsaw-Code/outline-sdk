@@ -7,5 +7,9 @@
     "SplashScreen": {
       "launchShowDuration": 0
     }
+  },
+  "server": {
+    "iosScheme": "outline",
+    "androidScheme": "outline"
   }
 }
