@@ -148,6 +148,10 @@ func parseShadowsocksSIP002URL(url *url.URL) (*shadowsocksConfig, error) {
 	// Cipher info can be optionally encoded with Base64URL.
 	encoding := base64.URLEncoding.WithPadding(base64.NoPadding)
 	decodedUserInfo, err := encoding.DecodeString(userInfo)
+	if err != nil {
+		// Try base64 decoding in legacy mode
+		decodedUserInfo, err = base64.StdEncoding.DecodeString(userInfo)
+	}
 	var cipherInfo string
 	if err == nil {
 		cipherInfo = string(decodedUserInfo)

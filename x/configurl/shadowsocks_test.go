@@ -64,6 +64,31 @@ func TestParseShadowsocksURLUserInfoEncoded(t *testing.T) {
 	require.Equal(t, "HTTP/1.1 ", string(config.prefix))
 }
 
+func TestParseShadowsocksURLUserInfoLegacyEncoded(t *testing.T) {
+	encoded := base64.StdEncoding.EncodeToString([]byte("aes-256-gcm:shadowsocks"))
+	urls, err := parseConfig("ss://" + string(encoded) + "@example.com:1234?prefix=HTTP%2F1.1%20" + "#outline-123")
+	require.NoError(t, err)
+	require.Equal(t, 1, len(urls))
+
+	config, err := parseShadowsocksURL(urls[0])
+
+	require.NoError(t, err)
+	require.Equal(t, "example.com:1234", config.serverAddress)
+	require.Equal(t, "HTTP/1.1 ", string(config.prefix))
+}
+
+func TestLegacyEncodedShadowsocksURL(t *testing.T) {
+	configString := "ss://YWVzLTEyOC1nY206c2hhZG93c29ja3M=@example.com:1234"
+	urls, err := parseConfig(configString)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(urls))
+
+	config, err := parseShadowsocksURL(urls[0])
+
+	require.NoError(t, err)
+	require.Equal(t, "example.com:1234", config.serverAddress)
+}
+
 func TestParseShadowsocksURLNoEncoding(t *testing.T) {
 	configString := "ss://aes-256-gcm:1234567@example.com:1234"
 	urls, err := parseConfig(configString)
