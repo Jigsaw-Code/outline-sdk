@@ -13,13 +13,14 @@
 // limitations under the License.
 
 export interface ConnectivityTestRequest {
-  accessKey: string;
+  transport: string;
   domain: string;
   resolvers: string[];
   protocols: {
     tcp: boolean;
     udp: boolean;
   };
+  reportTo: string | undefined;
 }
 
 export interface ConnectivityTestResult {

@@ -17,6 +17,8 @@ import { css, html, LitElement, nothing } from "lit";
 import { property } from "lit/decorators.js";
 import { sourceLocale, targetLocales } from "./generated/messages";
 import { ConnectivityTestRequest, ConnectivityTestResponse, ConnectivityTestResult, OperatingSystem, PlatformMetadata } from "./types";
+import "./popover_info";
+import "./outline_logo";
 
 export * from "./types";
 
@@ -63,8 +65,9 @@ export class ConnectivityTestPage extends LitElement {
 
     const formData = new FormData(formElement);
 
-    const accessKey = formData.get("accessKey")?.toString().trim();
+    const transport = formData.get("transport")?.toString().trim();
     const domain = formData.get("domain")?.toString().trim();
+    const reportTo = formData.get("reportTo")?.toString().trim();
     const resolvers =
       formData
         .get("resolvers")
@@ -77,16 +80,17 @@ export class ConnectivityTestPage extends LitElement {
     };
     const prefix = formData.get("prefix")?.toString();
 
-    if (!accessKey || !domain || !resolvers) {
+    if (!domain || !resolvers) {
       return null;
     }
 
     return {
-      accessKey,
+      transport,
       domain,
       resolvers,
       protocols,
       prefix,
+      reportTo,
     };
   }
 
@@ -323,6 +327,13 @@ export class ConnectivityTestPage extends LitElement {
       padding: var(--size-gap);
       padding-bottom: calc(var(--size-gap) * 6);
       margin-top: var(--size-gap);
+    }
+
+    .logo {
+      display: block;
+      margin-top: 40px;
+      max-width: 300px;
+      min-width: 250px;
     }
 
     .field {
@@ -598,22 +609,27 @@ export class ConnectivityTestPage extends LitElement {
     // TODO: move language definitions to a centralized place
     return html`<main dir="${this.locale === "fa-IR" ? "rtl" : "ltr"}">
       <header class=${this.platform?.operatingSystem === OperatingSystem.IOS ? "header--ios" : "header"}>
-        <h1 class="header-text">${msg("Outline Connectivity Test")}</h1>
+        <h1 class="header-text">${msg("Transport Tester")}</h1>
       </header>
       ${this.renderResults()}
       <form class="form" @submit=${this.testConnectivity}>
         <fieldset class="field">
           <span class="field-header">
-            <label class="field-header-label" for="accessKey">
-              ${msg("Outline Access Key")}
+            <label class="field-header-label" for="transport">
+              ${msg("Transport to Test")}
             </label>
-            <span class="field-header-label-required">*</span>
+          <info-popup> Options include <strong>ss://</strong>, <strong>split://</strong>,
+          <strong>tls://</strong>, <strong>socks5://</strong>, and/or a combination of them.
+          <p> For examples and more information check out the documentation
+          <a href='https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config'> here</a>.
+          </p>
+          </info-popup>
           </span>
           <textarea
             class="field-input-textarea"
-            name="accessKey"
-            id="accessKey"
-            required
+            name="transport"
+            id="transport"
+            ""
           ></textarea>
         </fieldset>
 
@@ -623,13 +639,8 @@ export class ConnectivityTestPage extends LitElement {
               ${msg("DNS Resolvers to Try")}
             </label>
             <span class="field-header-label-required">*</span>
-            <i
-              class="field-header-info"
-              title=${msg(
-                "A DNS resolver is an online service that returns the direct IP address of a given website domain."
-              )}
-              >ℹ️</i
-            >
+            <info-popup> Add the DNS resolvers to use for test. This is an online service
+             that returns the direct IP address of a given website domain.</info-popup>
           </span>
           <textarea
             class="field-input-textarea"
@@ -662,13 +673,10 @@ export class ConnectivityTestPage extends LitElement {
           <label class="field-header-label"
             >${msg("Protocols to Check")}
           </label>
-          <i
-            class="field-header-info"
-            title=${msg(
-              "The main difference between TCP (transmission control protocol) and UDP (user datagram protocol) is that TCP is a connection-based protocol and UDP is connectionless. While TCP is more reliable, it transfers data more slowly. UDP is less reliable but works more quickly."
-            )}
-            >ℹ️</i
-          >
+          <info-popup> TCP (transmission control protocol) is a connection-based protocol whereas UDP
+          (user datagram protocol) is connectionless.
+          While TCP is more reliable, it transfers data more slowly. UDP is less reliable but works more quickly.
+          </info-popup>
         </span>
         <fieldset class="field field-group">
           <span class="field-group-item">
@@ -696,22 +704,17 @@ export class ConnectivityTestPage extends LitElement {
 
         <fieldset class="field">
           <span class="field-header">
-            <label class="field-header-label" for="prefix">
-              ${msg("TCP Stream Prefix")}
+            <label class="field-header-label"
+            >${msg("Report Collector URL")}
             </label>
-            <i
-              class="field-header-info"
-              title=${msg(
-                "The TCP stream prefix is a plaintext string appended to the start of the encrypted TCP payload, making the data transfer appear like an acceptable method."
-              )}
-              >ℹ️</i
-            >
+            <info-popup> URL of the remote collector server to report and send the test results. </info-popup>
           </span>
-          <select class="field-input" name="prefix" id="prefix">
-            <option value="">${msg("None")}</option>
-            <option value="POST ">POST</option>
-            <option value="HTTP/1.1 ">HTTP/1.1</option>
-          </select>
+          <input
+            class="field-input"
+            name="reportTo"
+            id="reportTo"
+            value=""
+          />
         </fieldset>
 
         <input
@@ -720,7 +723,11 @@ export class ConnectivityTestPage extends LitElement {
           type="submit"
           value="${this.isSubmitting ? msg("Testing...") : msg("Run Test")}"
         />
+        <div class="logo">
+          <outline-logo></outline-logo>
+        </div>
       </form>
+
       <footer class="footer">
         <div class="footer-inner">
           <label class="footer-selector-label" for="language"
@@ -811,6 +818,13 @@ export class ConnectivityTestPage extends LitElement {
 
             <dt class="results-list-item-data-key">${msg("Time")}</dt>
             <dd class="results-list-item-data-value">${result.durationMs}ms</dd>
+
+            ${isSuccess
+              ? nothing
+              : html`
+                  <dt class="results-list-item-data-key">${msg("Error")}</dt>
+                  <dd class="results-list-item-data-value">${result.error?.message}</dd>
+                `}
           </dl>
         </li>`;
       })}

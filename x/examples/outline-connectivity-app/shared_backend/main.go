@@ -16,21 +16,19 @@ package shared_backend
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
-	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"net/url"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
+	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/x/config"
 	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
+	"github.com/Jigsaw-Code/outline-sdk/x/report"
 
 	_ "golang.org/x/mobile/bind"
 )
@@ -42,110 +40,150 @@ type ConnectivityTestProtocolConfig struct {
 
 type ConnectivityTestResult struct {
 	// Inputs
-	Proxy    string `json:"proxy"`
-	Resolver string `json:"resolver"`
-	Proto    string `json:"proto"`
-	Prefix   string `json:"prefix"`
+	Transport string `json:"transport"`
+	Resolver  string `json:"resolver"`
+	Proto     string `json:"proto"`
 	// Observations
 	Time       time.Time              `json:"time"`
 	DurationMs int64                  `json:"durationMs"`
 	Error      *ConnectivityTestError `json:"error"`
 }
 
+func (r ConnectivityTestResult) IsSuccess() bool {
+	return r.Error == nil
+}
+
 type ConnectivityTestError struct {
 	// TODO: add Shadowsocks/Transport error
-	Op string `json:"operation"`
+	Op string `json:"op,omitempty"`
 	// Posix error, when available
-	PosixError string `json:"posixError"`
+	PosixError string `json:"posixError,omitempty"`
 	// TODO: remove IP addresses
-	Msg string `json:"message"`
+	Msg string `json:"message,omitempty"`
 }
 
 type ConnectivityTestRequest struct {
-	AccessKey string                         `json:"accessKey"`
+	Transport string                         `json:"transport"`
 	Domain    string                         `json:"domain"`
 	Resolvers []string                       `json:"resolvers"`
 	Protocols ConnectivityTestProtocolConfig `json:"protocols"`
+	ReportTo  string                         `json:"reportTo"`
 }
-
-type sessionConfig struct {
-	Hostname  string
-	Port      int
-	CryptoKey *shadowsocks.EncryptionKey
-	Prefix    Prefix
-}
-
-type Prefix []byte
 
 func ConnectivityTest(request ConnectivityTestRequest) ([]ConnectivityTestResult, error) {
-	accessKeyParameters, err := parseAccessKey(request.AccessKey)
-	if err != nil {
-		return nil, err
-	}
-
-	proxyIPs, err := net.DefaultResolver.LookupIP(context.Background(), "ip", accessKeyParameters.Hostname)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: limit number of IPs. Or force an input IP?
+	var result ConnectivityTestResult
 	var results []ConnectivityTestResult
-	for _, hostIP := range proxyIPs {
-		proxyAddress := net.JoinHostPort(hostIP.String(), fmt.Sprint(accessKeyParameters.Port))
+	var conTestResult *ConnectivityTestError
+	var conError *connectivity.ConnectivityError
+	var testDuration time.Duration
 
-		for _, resolverHost := range request.Resolvers {
-			resolverHost := strings.TrimSpace(resolverHost)
-			resolverAddress := net.JoinHostPort(resolverHost, "53")
+	sanitizedConfig, err := config.SanitizeConfig(request.Transport)
+	if err != nil {
+		log.Fatalf("Failed to sanitize config: %v", err)
+	}
 
-			if request.Protocols.TCP {
-				testTime := time.Now()
-				var testErr error
-				var testDuration time.Duration
+	for _, resolverHost := range request.Resolvers {
+		resolverHost := strings.TrimSpace(resolverHost)
+		resolverAddress := net.JoinHostPort(resolverHost, "53")
 
-				streamDialer, err := config.NewStreamDialer("")
+		if request.Protocols.TCP {
+			testTime := time.Now()
+			streamDialer, err := config.NewStreamDialer(request.Transport)
+			if err != nil {
+				testDuration = time.Duration(0)
+				conTestResult = &ConnectivityTestError{Msg: err.Error()}
+			} else {
+				resolver := dns.NewTCPResolver(streamDialer, resolverAddress)
+				conError, err = connectivity.TestConnectivityWithResolver(context.Background(), resolver, request.Domain)
 				if err != nil {
-					log.Fatalf("Failed to create StreamDialer: %v", err)
+					testDuration = time.Duration(0)
+					conTestResult = &ConnectivityTestError{Msg: err.Error()}
+					log.Printf("TCP question failed: %v\n", err)
+				} else {
+					testDuration = time.Since(testTime)
+					if conError == nil {
+						conTestResult = nil
+					} else {
+						conTestResult = &ConnectivityTestError{conError.Op, conError.PosixError, unwrapAll(conError).Error()}
+					}
 				}
-				resolver := &transport.StreamDialerEndpoint{Dialer: streamDialer, Address: resolverAddress}
-				testDuration, testErr = connectivity.TestResolverStreamConnectivity(context.Background(), resolver, resolverAddress)
-
-				results = append(results, ConnectivityTestResult{
-					Proxy:      proxyAddress,
-					Resolver:   resolverAddress,
-					Proto:      "tcp",
-					Prefix:     accessKeyParameters.Prefix.String(),
-					Time:       testTime.UTC().Truncate(time.Second),
-					DurationMs: testDuration.Milliseconds(),
-					Error:      makeErrorRecord(testErr),
-				})
 			}
+			result = ConnectivityTestResult{
+				Transport:  sanitizedConfig,
+				Resolver:   resolverAddress,
+				Proto:      "tcp",
+				Time:       testTime.UTC().Truncate(time.Second),
+				DurationMs: testDuration.Milliseconds(),
+				Error:      conTestResult,
+			}
+			results = append(results, result)
+		}
 
-			if request.Protocols.UDP {
-				testTime := time.Now()
-				var testErr error
-				var testDuration time.Duration
-
-				packetDialer, err := config.NewPacketDialer("")
+		if request.Protocols.UDP {
+			testTime := time.Now()
+			packetDialer, err := config.NewPacketDialer(request.Transport)
+			if err != nil {
+				testDuration = time.Duration(0)
+				conTestResult = &ConnectivityTestError{Msg: err.Error()}
+			} else {
+				resolver := dns.NewUDPResolver(packetDialer, resolverAddress)
+				conError, err = connectivity.TestConnectivityWithResolver(context.Background(), resolver, request.Domain)
 				if err != nil {
-					log.Fatalf("Failed to create PacketDialer: %v", err)
+					log.Printf("UDP question failed: %v\n", err)
+					testDuration = time.Duration(0)
+					conTestResult = &ConnectivityTestError{Msg: err.Error()}
+				} else {
+					testDuration = time.Since(testTime)
+					if conError == nil {
+						conTestResult = nil
+					} else {
+						conTestResult = &ConnectivityTestError{conError.Op, conError.PosixError, unwrapAll(conError).Error()}
+					}
 				}
-				resolver := &transport.PacketDialerEndpoint{Dialer: packetDialer, Address: resolverAddress}
-				testDuration, testErr = connectivity.TestResolverPacketConnectivity(context.Background(), resolver, resolverAddress)
+			}
+			result = ConnectivityTestResult{
+				Transport:  sanitizedConfig,
+				Resolver:   resolverAddress,
+				Proto:      "udp",
+				Time:       testTime.UTC().Truncate(time.Second),
+				DurationMs: testDuration.Milliseconds(),
+				Error:      conTestResult,
+			}
+			results = append(results, result)
+		}
+	}
+	reportResults(results, request.ReportTo)
+	return results, nil
+}
 
-				results = append(results, ConnectivityTestResult{
-					Proxy:      proxyAddress,
-					Resolver:   resolverAddress,
-					Proto:      "udp",
-					Prefix:     accessKeyParameters.Prefix.String(),
-					Time:       testTime.UTC().Truncate(time.Second),
-					DurationMs: testDuration.Milliseconds(),
-					Error:      makeErrorRecord(testErr),
-				})
+func reportResults(results []ConnectivityTestResult, reportTo string) {
+	for _, result := range results {
+		var r report.Report = result
+		u, err := url.Parse(reportTo)
+		if err != nil {
+			log.Printf("Expected no error, but got: %v", err)
+		}
+		if u.String() != "" {
+			remoteCollector := &report.RemoteCollector{
+				CollectorURL: u,
+				HttpClient:   &http.Client{Timeout: 10 * time.Second},
+			}
+			retryCollector := &report.RetryCollector{
+				Collector:    remoteCollector,
+				MaxRetry:     3,
+				InitialDelay: 1 * time.Second,
+			}
+			c := report.SamplingCollector{
+				Collector:       retryCollector,
+				SuccessFraction: 0.1,
+				FailureFraction: 1.0,
+			}
+			err = c.Collect(context.Background(), r)
+			if err != nil {
+				log.Printf("Failed to collect report: %v\n", err)
 			}
 		}
 	}
-
-	return results, nil
 }
 
 type PlatformMetadata struct {
@@ -156,23 +194,10 @@ func Platform() PlatformMetadata {
 	return PlatformMetadata{OS: runtime.GOOS}
 }
 
-func makeErrorRecord(err error) *ConnectivityTestError {
+func unwrapAll(err error) error {
 	if err == nil {
 		return nil
 	}
-	var record = new(ConnectivityTestError)
-	var testErr *connectivity.TestError
-	if errors.As(err, &testErr) {
-		record.Op = testErr.Op
-		record.PosixError = testErr.PosixError
-		record.Msg = unwrapAll(testErr).Error()
-	} else {
-		record.Msg = err.Error()
-	}
-	return record
-}
-
-func unwrapAll(err error) error {
 	for {
 		unwrapped := errors.Unwrap(err)
 		if unwrapped == nil {
@@ -180,62 +205,4 @@ func unwrapAll(err error) error {
 		}
 		err = unwrapped
 	}
-}
-
-func (p Prefix) String() string {
-	runes := make([]rune, len(p))
-	for i, b := range p {
-		runes[i] = rune(b)
-	}
-	return string(runes)
-}
-
-func parseAccessKey(accessKey string) (*sessionConfig, error) {
-	var config sessionConfig
-	accessKeyURL, err := url.Parse(accessKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse access key: %w", err)
-	}
-	var portString string
-	// Host is a <host>:<port> string
-	config.Hostname, portString, err = net.SplitHostPort(accessKeyURL.Host)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse endpoint address: %w", err)
-	}
-	config.Port, err = strconv.Atoi(portString)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse port number: %w", err)
-	}
-	cipherInfoBytes, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(accessKeyURL.User.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode cipher info [%v]: %v", accessKeyURL.User.String(), err)
-	}
-	cipherName, secret, found := strings.Cut(string(cipherInfoBytes), ":")
-	if !found {
-		return nil, fmt.Errorf("invalid cipher info: no ':' separator")
-	}
-	config.CryptoKey, err = shadowsocks.NewEncryptionKey(cipherName, secret)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cipher: %w", err)
-	}
-	prefixStr := accessKeyURL.Query().Get("prefix")
-	if len(prefixStr) > 0 {
-		config.Prefix, err = ParseStringPrefix(prefixStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse prefix: %w", err)
-		}
-	}
-	return &config, nil
-}
-
-func ParseStringPrefix(utf8Str string) (Prefix, error) {
-	runes := []rune(utf8Str)
-	rawBytes := make([]byte, len(runes))
-	for i, r := range runes {
-		if (r & 0xFF) != r {
-			return nil, fmt.Errorf("character out of range: %d", r)
-		}
-		rawBytes[i] = byte(r)
-	}
-	return rawBytes, nil
 }
