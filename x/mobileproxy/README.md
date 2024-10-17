@@ -555,7 +555,28 @@ We are working on instructions on how use the local proxy in a Webview.
 
 On Android, you will likely have to implement [WebViewClient.shouldInterceptRequest](https://developer.android.com/reference/android/webkit/WebViewClient#shouldInterceptRequest(android.webkit.WebView,%20android.webkit.WebResourceRequest)) to fulfill requests using an HTTP client that uses the local proxy.
 
-On iOS, we are still looking for ideas. There's [WKWebViewConfiguration.setURLSchemeHandler](https://developer.apple.com/documentation/webkit/wkwebviewconfiguration/2875766-seturlschemehandler), but the documentation says it can't be used to intercept HTTPS. If you know how to use a proxy with the WKWebView, please let us know!
+As of iOS 17, you can add a proxy configuration to a `WKWebView` via its [`WKWebsiteDataStore` property](https://developer.apple.com/documentation/webkit/wkwebviewconfiguration).
+
+```swift
+let configuration = WKWebViewConfiguration()
+
+let endpoint = NWEndpoint.hostPort(
+		host: NWEndpoint.Host(proxyHost),
+		port: NWEndpoint.Port(proxyPort)!
+)
+let proxyConfig = ProxyConfiguration.init(httpCONNECTProxy: endpoint)
+
+let websiteDataStore = WKWebsiteDataStore.default()
+websiteDataStore.proxyConfigurations = [proxyConfig]
+
+// Other webview configuration options... see https://developer.apple.com/documentation/webkit/wkwebviewconfiguration
+
+let webview = WKWebView(
+	configuration: configuration,
+)
+
+// use this webview as you would normally!
+```
 
 ## Clean up
 
