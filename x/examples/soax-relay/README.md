@@ -22,9 +22,9 @@ Users connect to the relay using the following format:
 
 <b>Username:</b> 
 
-username-country-{cc_code}-sessionid-{session_id}-sessionlength-{time_in_sec}
+username-{residential, mobile}-country-{cc_code}-sessionid-{session_id}-sessionlength-{time_in_sec}
 
-where any part that goes after username-country-{cc_code} is optional. For more information on the format refer to [this document](https://helpcenter.soax.com/en/articles/6723733-sticky-sessions) on soax support page.
+where any part that goes after username-country-{cc_code} is optional. For more information on the format refer to [this document](https://helpcenter.soax.com/en/articles/6723733-sticky-sessions) on soax support page. To get a node on residential or mobile nework, use the residential- or mobile- tags.
 
 <b>Password:</b> (as defined in the credentials section of the config file)
 
