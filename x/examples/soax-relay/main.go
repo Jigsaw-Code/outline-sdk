@@ -68,7 +68,7 @@ func (a CustomAuthenticator) Authenticate(reader io.Reader, writer io.Writer, us
 	}
 
 	usernamePrefix := parts[0] // Prefix (e.g., "jane")
-	usernameSuffix := parts[1] // Suffix (e.g., "-country-ir")
+	usernameSuffix := parts[1] // Suffix (e.g., "residential-country-ir")
 
 	storedPassword, exists := a.credentials[usernamePrefix]
 	// Validate the prefix and password against stored credentials
@@ -103,16 +103,28 @@ func udpAssociateHandler(ctx context.Context, writer io.Writer, request *socks5.
 		return errors.New("no suffix found in auth context")
 	}
 
+	var soaxUsername string
+	var soaxKey string
 	// Construct the upstream soax username by concatenating
 	// the soax package name with the suffix
-	soaxUsername := config.SOAX.PackageID + suffix
+	if strings.HasPrefix(suffix, "residential") {
+		// remove the "residential-" prefix
+		soaxUsername = config.SOAX.ResidentialPackageID + strings.TrimPrefix(suffix, "residential-")
+		soaxKey = config.SOAX.ResidentialPackageKey
+	} else if strings.HasPrefix(suffix, "mobile") {
+		// remove the "mobile-" prefix
+		soaxUsername = config.SOAX.MobilePackageID + strings.TrimPrefix(suffix, "mobile-")
+		soaxKey = config.SOAX.MobilePackageKey
+	} else {
+		return errors.New("invalid package type: it must start with residential or mobile")
+	}
 
 	streamEndpoint := transport.StreamDialerEndpoint{Dialer: &transport.TCPDialer{}, Address: config.SOAX.Address}
 	upstreamClient, err := csocks5.NewClient(&streamEndpoint)
 	if err != nil {
 		return err
 	}
-	err = upstreamClient.SetCredentials([]byte(soaxUsername), []byte(config.SOAX.PackageKey))
+	err = upstreamClient.SetCredentials([]byte(soaxUsername), []byte(soaxKey))
 	if err != nil {
 		return err
 	}
@@ -228,8 +240,10 @@ type Config struct {
 		UDPListenAddress string `mapstructure:"udp_listen_address"`
 	}
 	SOAX struct {
-		PackageID  string `mapstructure:"package_id"`
-		PackageKey string `mapstructure:"package_key"`
+		MobilePackageID  string `mapstructure:"mobile_package_id"`
+		MobilePackageKey string `mapstructure:"mobile_package_key"`
+		ResidentialPackageID  string `mapstructure:"residential_package_id"`
+		ResidentialPackageKey string `mapstructure:"residential_package_key"`
 		Address    string `mapstructure:"address"`
 	}
 	Credentials map[string]string `mapstructure:"credentials"`
@@ -250,7 +264,8 @@ func loadConfig() (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	config.SOAX.PackageID = "package-" + config.SOAX.PackageID + "-"
+	config.SOAX.MobilePackageID = "package-" + config.SOAX.MobilePackageID + "-"
+	config.SOAX.ResidentialPackageID = "package-" + config.SOAX.ResidentialPackageID + "-"
 
 	if config.SOAX.Address == "" {
 		config.SOAX.Address = "proxy.soax.com:5000"
@@ -286,12 +301,26 @@ func main() {
 			}
 
 			// Construct the upstream username by concatenating the base username with the suffix
-			soaxUsername := config.SOAX.PackageID + suffix // e.g., "package-123456-country-ir-seesionid-..."
+			// if the suffix starts with "residential", use the residential package credentials
+			// otherwise, use the mobile package credentials	
+			var soaxUsername string
+			var soaxKey string
+			if strings.HasPrefix(suffix, "residential") {
+				// remove the "residential-" prefix
+				soaxUsername = config.SOAX.ResidentialPackageID + strings.TrimPrefix(suffix, "residential-")
+				soaxKey = config.SOAX.ResidentialPackageKey
+			} else if strings.HasPrefix(suffix, "mobile") {
+				// remove the "mobile-" prefix
+				soaxUsername = config.SOAX.MobilePackageID + strings.TrimPrefix(suffix, "mobile-")
+				soaxKey = config.SOAX.MobilePackageKey
+			} else {
+				return nil, errors.New("invalid package type. it must start with residential or mobile")
+			}
 			client, err := csocks5.NewClient(&streamEndpoint)
 			if err != nil {
 				return nil, err
 			}
-			err = client.SetCredentials([]byte(soaxUsername), []byte(config.SOAX.PackageKey))
+			err = client.SetCredentials([]byte(soaxUsername), []byte(soaxKey))
 			if err != nil {
 				return nil, err
 			}

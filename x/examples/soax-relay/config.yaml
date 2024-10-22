@@ -3,8 +3,10 @@ server:
   udp_listen_address: 0.0.0.0:9000
 
 soax:
-  package_id: 123456
-  package_key: MySoaxPackageKey
+  mobile_package_id: 123456
+  mobile_package_key: MobileSoaxPackageKey
+  residential_package_id: 789123
+  residential_package_key: ResidentialSoaxPackageKey
 
 credentials:
   user1: password1
