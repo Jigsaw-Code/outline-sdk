@@ -26,7 +26,7 @@ Here is an example of a JSON config:
 
 *   The `dns` field specifies a list of DNS resolvers to test.
 *   Each DNS resolver can be one of the following types:
-    *   `system`: Use the system resolver.
+    *   `system`: Use the system resolver. Specify with an empty object.
     *   `https`: Use an encrypted DNS over HTTPS (DoH) resolver.
     *   `tls`: Use an encrypted DNS over TLS (DoT) resolver.
     *   `udp`: Use a UDP resolver.
@@ -92,7 +92,7 @@ Here is an example of a JSON config:
 
 *   The `tls` field specifies a list of TLS transports to test.
 *   Each TLS transport is a string that specifies the transport to use.
-*   For example, `override:host=cloudflare.net|tlsfrag:1` specifies a transport that uses domain fronting with Cloudflare and TLS fragmentation. The available transports are defined in the `outline-sdk/x/configurl` package.&#x20;
+*   For example, `override:host=cloudflare.net|tlsfrag:1` specifies a transport that uses domain fronting with Cloudflare and TLS fragmentation. The available transports are defined in the `outline-sdk/x/configurl` package.
 
 ### Using the Smart Dialer
 
