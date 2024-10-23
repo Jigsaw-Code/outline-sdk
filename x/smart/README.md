@@ -1,5 +1,7 @@
 # Smart Dialer
 
+The **Smart Dialer** is a dialer that **automatically chooses the best way to connect** to the internet from a list of configured options.
+
 ## JSON config for the Smart Dialer
 
 The Smart Dialer uses a JSON config to dynamically find serverless strategies for circumvention. The config is used to search for a strategy that unblocks DNS and TLS for a given list of test domains.
