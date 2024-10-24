@@ -67,7 +67,7 @@ The config that the Smart Dialer takes is in a JSON format. Here is an example:
 ```json
 {
   "udp": {
-    "address": "8.8.8.8:53"
+    "address": "8.8.8.8"
   }
 }
 
