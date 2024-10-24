@@ -9,17 +9,16 @@ The config that the Smart Dialer takes is in a JSON format. Here is an example:
 ```json
 {
   "dns": [
-    {
-      "https": {
-        "name": "doh.sb"
-      }
-    }
+      {"system": {}},
+      {"https": {"name": "8.8.8.8"}},
+      {"https": {"name": "9.9.9.9"}}
   ],
   "tls": [
-    "override:host=cloudflare.net|tlsfrag:1"
+      "",
+      "split:2",
+      "tlsfrag:1"
   ]
 }
-
 ```
 
 ### DNS Configuration
