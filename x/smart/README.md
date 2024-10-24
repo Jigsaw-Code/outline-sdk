@@ -49,7 +49,7 @@ Here is an example of a JSON config:
 *   `name`: The domain name of the DoH server.
 *   `address`: The host:port of the DoH server. Defaults to `name`:443.
 
-#### TLS Resolver
+#### DNS-over-TLS Resolver (DoT)
 
 ```json
 {
