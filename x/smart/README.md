@@ -109,14 +109,14 @@ finder := &smart.StrategyFinder{
 configBytes := []byte(`
 {
   "dns": [
-    {
-      "https": {
-        "name": "doh.sb"
-      }
-    }
+      {"system": {}},
+      {"https": {"name": "8.8.8.8"}},
+      {"https": {"name": "9.9.9.9"}}
   ],
   "tls": [
-    "override:host=cloudflare.net|tlsfrag:1"
+      "",
+      "split:2",
+      "tlsfrag:1"
   ]
 }
 `)
