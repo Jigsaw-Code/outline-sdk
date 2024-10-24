@@ -1,6 +1,6 @@
 # Smart Dialer
 
-The **Smart Dialer** is a dialer that **automatically chooses the best way to connect** to the internet from a list of configured options.
+The **Smart Dialer** searches for a strategy that unblocks DNS and TLS for a given list of test domains. It takes a config describing multiple strategies, which is used to pick from.
 
 ## JSON config for the Smart Dialer
 
