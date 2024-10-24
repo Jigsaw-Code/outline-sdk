@@ -34,7 +34,7 @@ Here is an example of a JSON config:
     *   `udp`: Use a UDP resolver.
     *   `tcp`: Use a TCP resolver.
 
-#### HTTPS Resolver
+#### DNS-over-HTTPS Resolver (DoH)
 
 ```json
 {
