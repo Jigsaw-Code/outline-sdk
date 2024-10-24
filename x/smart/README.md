@@ -53,11 +53,9 @@ The config that the Smart Dialer takes is in a JSON format. Here is an example:
 {
   "tls": {
     "name": "dns.google",
-    "address": "dns.google:853"
+    "address": "8.8.8.8"
   }
 }
-
-```
 
 *   `name`: The domain name of the DoT server.
 *   `address`: The host:port of the DoT server. Defaults to `name`:853.
