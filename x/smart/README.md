@@ -37,8 +37,8 @@ The config that the Smart Dialer takes is in a JSON format. Here is an example:
 ```json
 {
   "https": {
-    "name": "doh.sb",
-    "address": "doh.sb:443"
+    "name": "dns.google",
+    "address": "8.8.8.8"
   }
 }
 
