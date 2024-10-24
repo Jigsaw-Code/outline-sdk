@@ -80,11 +80,9 @@ The config that the Smart Dialer takes is in a JSON format. Here is an example:
 ```json
 {
   "tcp": {
-    "address": "1.1.1.1:53"
+    "address": "8.8.8.8"
   }
 }
-
-```
 
 *   `address`: The host:port of the TCP resolver.
 
