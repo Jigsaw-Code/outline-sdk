@@ -1,4 +1,4 @@
-// Copyright 2024 Jigsaw Operations LLC
+// Copyright 2024 The Outline Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -55,7 +55,6 @@ func TestSetWebProxywithDomain(t *testing.T) {
 	require.Equal(t, host, h)
 	require.Equal(t, port, p)
 	require.Equal(t, e, true)
-
 
 	err = DisableWebProxy()
 	require.NoError(t, err)
