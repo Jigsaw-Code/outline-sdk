@@ -1,12 +1,10 @@
 # Smart Dialer
 
-The **Smart Dialer** searches for a strategy that unblocks DNS and TLS for a given list of test domains. It takes a config describing multiple strategies, which is used to pick from.
+The **Smart Dialer** searches for a strategy that unblocks DNS and TLS for a given list of test domains. It takes a config describing multiple strategies to pick from.
 
 ## JSON config for the Smart Dialer
 
-The Smart Dialer uses a JSON config to dynamically find serverless strategies for circumvention. The config is used to search for a strategy that unblocks DNS and TLS for a given list of test domains.
-
-Here is an example of a JSON config:
+The config that the Smart Dialer takes is in a JSON format. Here is an example:
 
 ```json
 {
