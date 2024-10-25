@@ -40,7 +40,7 @@
         {"udp": {"address": "8.8.8.8"}},
 
         {"udp": {"address": "2606:4700:4700::1111"}, "//": "Cloudflare"},
-        {"udp": {"address": "1.1.1.1"}},
+        {"udp": {"address": "1.1.1.1"}}
     ],
 
     "tls": [
