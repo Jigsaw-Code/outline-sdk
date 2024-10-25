@@ -15,23 +15,25 @@
 package configurl
 
 import (
+	"context"
 	"fmt"
-	"net/url"
 	"strconv"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/transport/split"
 )
 
-func wrapStreamDialerWithSplit(innerSD func() (transport.StreamDialer, error), _ func() (transport.PacketDialer, error), configURL *url.URL) (transport.StreamDialer, error) {
-	sd, err := innerSD()
-	if err != nil {
-		return nil, err
+func newSplitStreamDialerFactory(newSD NewStreamDialerFunc) NewStreamDialerFunc {
+	return func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		sd, err := newSD(ctx, config.BaseConfig)
+		if err != nil {
+			return nil, err
+		}
+		prefixBytesStr := config.URL.Opaque
+		prefixBytes, err := strconv.Atoi(prefixBytesStr)
+		if err != nil {
+			return nil, fmt.Errorf("prefixBytes is not a number: %v. Split config should be in split:<number> format", prefixBytesStr)
+		}
+		return split.NewStreamDialer(sd, int64(prefixBytes))
 	}
-	prefixBytesStr := configURL.Opaque
-	prefixBytes, err := strconv.Atoi(prefixBytesStr)
-	if err != nil {
-		return nil, fmt.Errorf("prefixBytes is not a number: %v. Split config should be in split:<number> format", prefixBytesStr)
-	}
-	return split.NewStreamDialer(sd, int64(prefixBytes))
 }

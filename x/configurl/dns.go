@@ -27,16 +27,27 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 )
 
-func wrapStreamDialerWithDO53(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), configURL *url.URL) (transport.StreamDialer, error) {
-	sd, err := innerSD()
-	if err != nil {
-		return nil, err
+func newDO53StreamDialerFactory(newSD NewStreamDialerFunc, newPD NewPacketDialerFunc) NewStreamDialerFunc {
+	return func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		if config == nil {
+			return nil, fmt.Errorf("emtpy do53 config")
+		}
+		sd, err := newSD(ctx, config.BaseConfig)
+		if err != nil {
+			return nil, err
+		}
+		pd, err := newPD(ctx, config.BaseConfig)
+		if err != nil {
+			return nil, err
+		}
+		resolver, err := newDO53Resolver(config.URL, sd, pd)
+
+		return dns.NewStreamDialer(resolver, sd)
 	}
-	pd, err := innerPD()
-	if err != nil {
-		return nil, err
-	}
-	query := configURL.Opaque
+}
+
+func newDO53Resolver(config url.URL, sd transport.StreamDialer, pd transport.PacketDialer) (dns.Resolver, error) {
+	query := config.Opaque
 	values, err := url.ParseQuery(query)
 	if err != nil {
 		return nil, err
@@ -75,16 +86,26 @@ func wrapStreamDialerWithDO53(innerSD func() (transport.StreamDialer, error), in
 		// See https://datatracker.ietf.org/doc/html/rfc1123#page-75.
 		return tcpResolver.Query(ctx, q)
 	})
-	return dns.NewStreamDialer(resolver, sd)
+	return resolver, nil
 }
 
-func wrapStreamDialerWithDOH(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), configURL *url.URL) (transport.StreamDialer, error) {
-	query := configURL.Opaque
-	values, err := url.ParseQuery(query)
-	if err != nil {
-		return nil, err
+func newDOHStreamDialerFactory(newSD NewStreamDialerFunc) NewStreamDialerFunc {
+	return func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		if config == nil {
+			return nil, fmt.Errorf("emtpy doh config")
+		}
+		sd, err := newSD(ctx, config.BaseConfig)
+		if err != nil {
+			return nil, err
+		}
+		resolver, err := newDOHResolver(config.URL, sd)
+		return dns.NewStreamDialer(resolver, sd)
 	}
-	sd, err := innerSD()
+}
+
+func newDOHResolver(config url.URL, sd transport.StreamDialer) (dns.Resolver, error) {
+	query := config.Opaque
+	values, err := url.ParseQuery(query)
 	if err != nil {
 		return nil, err
 	}
@@ -119,6 +140,5 @@ func wrapStreamDialerWithDOH(innerSD func() (transport.StreamDialer, error), inn
 		port = "443"
 	}
 	dohURL := url.URL{Scheme: "https", Host: net.JoinHostPort(name, port), Path: "/dns-query"}
-	resolver := dns.NewHTTPSResolver(sd, address, dohURL.String())
-	return dns.NewStreamDialer(resolver, sd)
+	return dns.NewHTTPSResolver(sd, address, dohURL.String()), nil
 }
