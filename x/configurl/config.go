@@ -131,8 +131,8 @@ func NewDefaultConfigToDialer() *ConfigToDialer {
 		return tlsfrag.NewFixedLenStreamDialer(sd, fixedLen)
 	})
 
-	p.RegisterStreamDialerType("ws", wrapStreamDialerWithWebSocket)
-	p.RegisterPacketDialerType("ws", wrapPacketDialerWithWebSocket)
+	p.RegisterStreamDialerType("ws", newWebsocketStreamDialerFactory(p.NewStreamDialer))
+	p.RegisterPacketDialerType("ws", newWebsocketPacketDialerFactory(p.NewStreamDialer))
 
 	return p
 }
