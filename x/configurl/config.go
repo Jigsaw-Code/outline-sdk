@@ -253,7 +253,7 @@ func SanitizeConfig(configStr string) (string, error) {
 		var part string
 		switch scheme {
 		case "ss":
-			part, err = sanitizeShadowsocksURL(&config.URL)
+			part, err = sanitizeShadowsocksURL(config.URL)
 			if err != nil {
 				return "", err
 			}
