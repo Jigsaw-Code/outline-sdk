@@ -1,4 +1,4 @@
-// Copyright 2023 Jigsaw Operations LLC
+// Copyright 2023 The Outline Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+package configurl
 
 import (
 	"encoding/base64"
@@ -144,11 +144,21 @@ func parseShadowsocksSIP002URL(url *url.URL) (*shadowsocksConfig, error) {
 		return nil, errors.New("host not specified")
 	}
 	config.serverAddress = url.Host
-	cipherInfoBytes, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(url.User.String())
+	userInfo := url.User.String()
+	// Cipher info can be optionally encoded with Base64URL.
+	encoding := base64.URLEncoding.WithPadding(base64.NoPadding)
+	decodedUserInfo, err := encoding.DecodeString(userInfo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode cipher info [%v]: %w", url.User.String(), err)
+		// Try base64 decoding in legacy mode
+		decodedUserInfo, err = base64.StdEncoding.DecodeString(userInfo)
 	}
-	cipherName, secret, found := strings.Cut(string(cipherInfoBytes), ":")
+	var cipherInfo string
+	if err == nil {
+		cipherInfo = string(decodedUserInfo)
+	} else {
+		cipherInfo = userInfo
+	}
+	cipherName, secret, found := strings.Cut(cipherInfo, ":")
 	if !found {
 		return nil, errors.New("invalid cipher info: no ':' separator")
 	}

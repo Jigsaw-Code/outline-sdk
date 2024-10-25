@@ -1,4 +1,4 @@
-// Copyright 2023 Jigsaw Operations LLC
+// Copyright 2023 The Outline Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
 	"github.com/Jigsaw-Code/outline-sdk/x/smart"
 )
@@ -152,7 +152,7 @@ type StreamDialer struct {
 	transport.StreamDialer
 }
 
-var configToDialer = config.NewDefaultConfigToDialer()
+var configToDialer = configurl.NewDefaultConfigToDialer()
 
 // NewStreamDialerFromConfig creates a [StreamDialer] based on the given config.
 // The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config#hdr-Config_Format.

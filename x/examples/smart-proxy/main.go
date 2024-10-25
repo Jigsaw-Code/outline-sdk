@@ -1,4 +1,4 @@
-// Copyright 2023 Jigsaw Operations LLC
+// Copyright 2023 The Outline Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
 	"github.com/Jigsaw-Code/outline-sdk/x/smart"
 )
@@ -87,7 +87,7 @@ func main() {
 		log.Fatalf("Could not read config: %v", err)
 	}
 
-	configToDialer := config.NewDefaultConfigToDialer()
+	configToDialer := configurl.NewDefaultConfigToDialer()
 	finder := smart.StrategyFinder{
 		LogWriter:   debugLog.Writer(),
 		TestTimeout: 5 * time.Second,

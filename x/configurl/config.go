@@ -1,4 +1,4 @@
-// Copyright 2023 Jigsaw Operations LLC
+// Copyright 2023 The Outline Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+package configurl
 
 import (
 	"errors"
@@ -57,6 +57,7 @@ func NewDefaultConfigToDialer() *ConfigToDialer {
 	p.RegisterPacketDialerType("override", wrapPacketDialerWithOverride)
 
 	p.RegisterStreamDialerType("socks5", wrapStreamDialerWithSOCKS5)
+	p.RegisterPacketDialerType("socks5", wrapPacketDialerWithSOCKS5)
 
 	p.RegisterStreamDialerType("split", wrapStreamDialerWithSplit)
 

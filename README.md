@@ -8,13 +8,15 @@
 <img src="https://github.com/Jigsaw-Code/outline-brand/blob/main/assets/powered_by_outline/color/logo.png?raw=true" width=400pt />
 </p>
 
-> ⚠️ **Warning**: This code is in early stages and is not guaranteed to be stable. If you are
+> [!Note]
+> This code is under active development and not guaranteed to be stable. If you are
 > interested in integrating with it, we'd love your [feedback](https://github.com/Jigsaw-Code/outline-sdk/issues/new).
 
 The Outline SDK allows you to:
 
 - Create tools to protect against network-level interference.
-- Add network-level interference protection to existing apps, such as content or communication apps.
+- [Add network-level interference protection to existing apps](#add-the-sdk-to-your-app), such as content or communication apps.
+- Troubleshoot connectivity and measure interference with a collection of [command-line tools](#command-line-tools).
 
 ## Advantages
 
@@ -86,9 +88,12 @@ The Outline Client uses a **generated mobile library** on Android, iOS and macOS
 
 Below we provide more details on each integration approach. For more details about setting up and using Outline SDK features, see the [Discussions tab](https://github.com/Jigsaw-Code/outline-sdk/discussions).
 
+
 ### Generated Mobile Library
 
-To integrate the SDK into a mobile app, follow these steps:
+See our [MobileProxy page](./x/mobileproxy/) to learn about the easiest way to integrate the Outline SDK into a mobile app. It runs a local forward proxy that implements resillience strategies that you can use to configure your app's networking libraries.
+
+For advanced users, it is possible to generate your own mobile library, following these steps:
 
 1. **Create a Go library**: Create a Go package that wraps the SDK functionalities you need.
 1. **Generate mobile library**: Use [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile) to generate Android Archives (AAR) and Apple Frameworks with Java and Objective-C bindings.
@@ -98,8 +103,6 @@ To integrate the SDK into a mobile app, follow these steps:
 
 > **Note**: You must use `gomobile bind` on the package you create, not directly on the SDK packages.
 
-An easy way to integrate with the SDK in a mobile app is by using the [`x/mobileproxy` library](./x/mobileproxy/)
-to run a local web proxy that you can use to configure your app's networking libraries.
 
 ### Side Service
 
@@ -144,7 +147,7 @@ They all take a `-transport` flag with a config that specifies what transport sh
 The config format can be found in [x/config](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config).
 
 
-### DNS Query
+### Resolve a Domain Name
 
 The [`resolve` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examples/resolve) resolves a domain name, similar to `dig`:
 
@@ -157,7 +160,7 @@ $ go run github.com/Jigsaw-Code/outline-sdk/x/examples/resolve@latest -type A -t
 ```
 
 
-### HTTP Fetch
+### Fetch a Web Page
 
 The [`fetch` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examples/fetch) fetches
 a URL, similar to `curl`. The example below would bypass blocking of `meduza.io` in Russia:
@@ -177,7 +180,7 @@ $ go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch@latest -transport "
 [DEBUG] 2023/12/28 18:44:56.491273 main.go:105: Cf-Cache-Status: [DYNAMIC]
 ```
 
-### Local Proxy Forwarder
+### Run a Local Forward Proxy
 
 The [`http2transport` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examples/http2transport) runs a local proxy that creates connections according to the transport. It's effectively a circumvention tool.
 
@@ -210,7 +213,7 @@ cf-ray: 83cdb579bbec4376-EWR
 alt-svc: h3=":443"; ma=86400
 ```
 
-### Proxy Connectivity Test
+### Test Proxy Connectivity
 
 The [`test-connectivity` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examples/test-connectivity) is useful to test connectivity to a proxy. It uses DNS resolutions over TCP and UDP using the transport to test if there is stream and datagram connectivity.
 
@@ -223,7 +226,7 @@ $ go run github.com/Jigsaw-Code/outline-sdk/x/examples/test-connectivity@latest 
 success
 ```
 
-### Speed Test
+### Test Download Speed
 
 The [`fetch-speed` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examples/fetch-speed) fetches
 a URL, similar to `curl` and calculates the download speed. It could be used for troubleshooting.

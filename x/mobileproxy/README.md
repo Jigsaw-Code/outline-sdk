@@ -1,6 +1,18 @@
-# Mobileproxy: Local Proxy Library for Mobile Apps
+# MobileProxy: Local Proxy Library for Mobile Apps
 
 This package enables the use Go Mobile to generate a mobile library to run a local proxy and configure your app networking libraries.
+
+**Content app without MobileProxy:**
+![image](https://github.com/user-attachments/assets/d96b209c-2198-4382-8bba-12efd8f75dbb)
+
+**Content app with MobileProxy:**
+![image](https://github.com/user-attachments/assets/8b07c0b6-7948-4b61-a6b2-fe2fafdb1a33)
+
+The integration typically consists of the following steps:
+1. Build the mobile native library using Go Mobile.
+1. Add the library to your application.
+1. Configure and run MobileProxy within your app.
+1. Update your networking code to proxy traffic through the local MobileProxy.
 
 ## Build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
 
@@ -543,7 +555,28 @@ We are working on instructions on how use the local proxy in a Webview.
 
 On Android, you will likely have to implement [WebViewClient.shouldInterceptRequest](https://developer.android.com/reference/android/webkit/WebViewClient#shouldInterceptRequest(android.webkit.WebView,%20android.webkit.WebResourceRequest)) to fulfill requests using an HTTP client that uses the local proxy.
 
-On iOS, we are still looking for ideas. There's [WKWebViewConfiguration.setURLSchemeHandler](https://developer.apple.com/documentation/webkit/wkwebviewconfiguration/2875766-seturlschemehandler), but the documentation says it can't be used to intercept HTTPS. If you know how to use a proxy with the WKWebView, please let us know!
+As of iOS 17, you can add a proxy configuration to a `WKWebView` via its [`WKWebsiteDataStore` property](https://developer.apple.com/documentation/webkit/wkwebviewconfiguration).
+
+```swift
+let configuration = WKWebViewConfiguration()
+
+let endpoint = NWEndpoint.hostPort(
+		host: NWEndpoint.Host(proxyHost),
+		port: NWEndpoint.Port(proxyPort)!
+)
+let proxyConfig = ProxyConfiguration.init(httpCONNECTProxy: endpoint)
+
+let websiteDataStore = WKWebsiteDataStore.default()
+websiteDataStore.proxyConfigurations = [proxyConfig]
+
+// Other webview configuration options... see https://developer.apple.com/documentation/webkit/wkwebviewconfiguration
+
+let webview = WKWebView(
+	configuration: configuration,
+)
+
+// use this webview as you would normally!
+```
 
 ## Clean up
 

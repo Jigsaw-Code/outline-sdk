@@ -1,4 +1,4 @@
-// Copyright 2023 Jigsaw Operations LLC
+// Copyright 2023 The Outline Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
 )
 
@@ -34,7 +34,7 @@ func main() {
 	urlProxyPrefixFlag := flag.String("urlProxyPrefix", "/proxy", "Path where to run the URL proxy. Set to empty (\"\") to disable it.")
 	flag.Parse()
 
-	dialer, err := config.NewDefaultConfigToDialer().NewStreamDialer(*transportFlag)
+	dialer, err := configurl.NewDefaultConfigToDialer().NewStreamDialer(*transportFlag)
 
 	if err != nil {
 		log.Fatalf("Could not create dialer: %v", err)

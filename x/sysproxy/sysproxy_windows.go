@@ -1,4 +1,4 @@
-// Copyright 2024 Jigsaw Operations LLC
+// Copyright 2024 The Outline Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -166,7 +166,7 @@ func getWebProxy() (host string, port string, enabled bool, err error) {
 		return "", "", false, err
 	}
 
-	return host, port, proxyEnable==1, nil
+	return host, port, proxyEnable == 1, nil
 }
 
 func getSOCKSProxy() (host string, port string, enabled bool, err error) {
@@ -189,5 +189,5 @@ func getSOCKSProxy() (host string, port string, enabled bool, err error) {
 		return "", "", false, err
 	}
 
-	return host, port, proxyEnable==1, nil
+	return host, port, proxyEnable == 1, nil
 }

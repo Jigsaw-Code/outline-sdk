@@ -1,4 +1,4 @@
-// Copyright 2024 Jigsaw Operations LLC
+// Copyright 2024 The Outline Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 	"golang.org/x/net/websocket"
 )
 
@@ -60,7 +60,7 @@ func main() {
 	defer listener.Close()
 	log.Printf("Proxy listening on %v\n", listener.Addr().String())
 
-	config2Dialer := config.NewDefaultConfigToDialer()
+	config2Dialer := configurl.NewDefaultConfigToDialer()
 	mux := http.NewServeMux()
 	if *tcpPathFlag != "" {
 		dialer, err := config2Dialer.NewStreamDialer(*transportFlag)

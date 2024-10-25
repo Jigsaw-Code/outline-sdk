@@ -1,4 +1,4 @@
-// Copyright 2023 Jigsaw Operations LLC
+// Copyright 2023 The Outline Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ Shadowsocks proxy (compatible with Outline's access keys, package [github.com/Ji
 
 	ss://[USERINFO]@[HOST]:[PORT]?prefix=[PREFIX]
 
-SOCKS5 proxy (currently streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/socks5])
+SOCKS5 proxy (works with both stream and packet dialers, package [github.com/Jigsaw-Code/outline-sdk/transport/socks5])
 
 	socks5://[USERINFO]@[HOST]:[PORT]
 
@@ -145,4 +145,4 @@ where wrapStreamDialerWithCustom and wrapPacketDialerWithCustom implement [NewPa
 
 [Onion Routing]: https://en.wikipedia.org/wiki/Onion_routing
 */
-package config
+package configurl
