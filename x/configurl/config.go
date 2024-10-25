@@ -116,14 +116,14 @@ func NewDefaultConfigToDialer() *ConfigToDialer {
 	p.RegisterPacketDialerType("ss", newShadowsocksPacketDialerFactory(p.NewPacketDialer))
 	p.RegisterPacketConnType("ss", newShadowsocksPacketConnFactory(p.NewPacketDialer))
 
-	p.RegisterStreamDialerType("tls", wrapStreamDialerWithTLS)
+	p.RegisterStreamDialerType("tls", newTLSStreamDialerFactory(p.NewStreamDialer))
 
-	p.RegisterStreamDialerType("tlsfrag", func(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), wrapConfig *url.URL) (transport.StreamDialer, error) {
-		sd, err := innerSD()
+	p.RegisterStreamDialerType("tlsfrag", func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		sd, err := p.NewStreamDialer(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
-		lenStr := wrapConfig.Opaque
+		lenStr := config.URL.Opaque
 		fixedLen, err := strconv.Atoi(lenStr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid tlsfrag option: %v. It should be in tlsfrag:<number> format", lenStr)
@@ -233,32 +233,6 @@ func (p *ConfigToDialer) NewPacketConn(ctx context.Context, config *Config) (net
 		return nil, fmt.Errorf("config scheme '%v' is not supported for Stream Dialers", config.URL.Scheme)
 	}
 	return newPacketConn(ctx, config)
-}
-
-// NewpacketListener creates a new [transport.PacketListener] according to the given config,
-// the config must contain only one "ss://" segment.
-// TODO: make NewPacketListener configurable.
-func NewPacketListener(transportConfig string) (transport.PacketListener, error) {
-	parts, err := parseConfig(transportConfig)
-	if err != nil {
-		return nil, err
-	}
-	if len(parts) == 0 {
-		return nil, errors.New("config is required")
-	}
-	if len(parts) > 1 {
-		return nil, errors.New("multi-part config is not supported")
-	}
-
-	url := parts[0]
-	// Please keep scheme list sorted.
-	switch strings.ToLower(url.Scheme) {
-	case "ss":
-		// TODO: support nested dialer, the last part must be "ss://"
-		return newShadowsocksPacketListenerFromURL(url)
-	default:
-		return nil, fmt.Errorf("config scheme '%v' is not supported", url.Scheme)
-	}
 }
 
 func SanitizeConfig(configStr string) (string, error) {
