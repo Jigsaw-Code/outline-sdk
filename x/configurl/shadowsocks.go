@@ -15,9 +15,11 @@
 package configurl
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 
@@ -25,52 +27,65 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 )
 
-func wrapStreamDialerWithShadowsocks(innerSD func() (transport.StreamDialer, error), _ func() (transport.PacketDialer, error), configURL *url.URL) (transport.StreamDialer, error) {
-	sd, err := innerSD()
-	if err != nil {
-		return nil, err
+func newShadowsocksStreamDialerFactory(newSD NewStreamDialerFunc) NewStreamDialerFunc {
+	return func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		sd, err := newSD(ctx, config.BaseConfig)
+		if err != nil {
+			return nil, err
+		}
+		ssConfig, err := parseShadowsocksURL(config.URL)
+		if err != nil {
+			return nil, err
+		}
+		endpoint := &transport.StreamDialerEndpoint{Dialer: sd, Address: ssConfig.serverAddress}
+		dialer, err := shadowsocks.NewStreamDialer(endpoint, ssConfig.cryptoKey)
+		if err != nil {
+			return nil, err
+		}
+		if len(ssConfig.prefix) > 0 {
+			dialer.SaltGenerator = shadowsocks.NewPrefixSaltGenerator(ssConfig.prefix)
+		}
+		return dialer, nil
 	}
-	config, err := parseShadowsocksURL(configURL)
-	if err != nil {
-		return nil, err
-	}
-	endpoint := &transport.StreamDialerEndpoint{Dialer: sd, Address: config.serverAddress}
-	dialer, err := shadowsocks.NewStreamDialer(endpoint, config.cryptoKey)
-	if err != nil {
-		return nil, err
-	}
-	if len(config.prefix) > 0 {
-		dialer.SaltGenerator = shadowsocks.NewPrefixSaltGenerator(config.prefix)
-	}
-	return dialer, nil
 }
 
-func wrapPacketDialerWithShadowsocks(_ func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), configURL *url.URL) (transport.PacketDialer, error) {
-	pd, err := innerPD()
-	if err != nil {
-		return nil, err
+func newShadowsocksPacketDialerFactory(newPD NewPacketDialerFunc) NewPacketDialerFunc {
+	return func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
+		pd, err := newPD(ctx, config.BaseConfig)
+		if err != nil {
+			return nil, err
+		}
+		ssConfig, err := parseShadowsocksURL(config.URL)
+		if err != nil {
+			return nil, err
+		}
+		endpoint := &transport.PacketDialerEndpoint{Dialer: pd, Address: ssConfig.serverAddress}
+		pl, err := shadowsocks.NewPacketListener(endpoint, ssConfig.cryptoKey)
+		if err != nil {
+			return nil, err
+		}
+		// TODO: support UDP prefix.
+		return transport.PacketListenerDialer{Listener: pl}, nil
 	}
-	config, err := parseShadowsocksURL(configURL)
-	if err != nil {
-		return nil, err
-	}
-	endpoint := &transport.PacketDialerEndpoint{Dialer: pd, Address: config.serverAddress}
-	listener, err := shadowsocks.NewPacketListener(endpoint, config.cryptoKey)
-	if err != nil {
-		return nil, err
-	}
-	dialer := transport.PacketListenerDialer{Listener: listener}
-	return dialer, nil
 }
 
-func newShadowsocksPacketListenerFromURL(configURL *url.URL) (transport.PacketListener, error) {
-	config, err := parseShadowsocksURL(configURL)
-	if err != nil {
-		return nil, err
+func newShadowsocksPacketConnFactory(newPD NewPacketDialerFunc) NewPacketConnFunc {
+	return func(ctx context.Context, config *Config) (net.PacketConn, error) {
+		pd, err := newPD(ctx, config.BaseConfig)
+		if err != nil {
+			return nil, err
+		}
+		ssConfig, err := parseShadowsocksURL(config.URL)
+		if err != nil {
+			return nil, err
+		}
+		endpoint := &transport.PacketDialerEndpoint{Dialer: pd, Address: ssConfig.serverAddress}
+		pl, err := shadowsocks.NewPacketListener(endpoint, ssConfig.cryptoKey)
+		if err != nil {
+			return nil, err
+		}
+		return pl.ListenPacket(ctx)
 	}
-	// TODO: accept an inner dialer from the caller and pass it to UDPEndpoint
-	ep := &transport.UDPEndpoint{Address: config.serverAddress}
-	return shadowsocks.NewPacketListener(ep, config.cryptoKey)
 }
 
 type shadowsocksConfig struct {
@@ -79,7 +94,7 @@ type shadowsocksConfig struct {
 	prefix        []byte
 }
 
-func parseShadowsocksURL(url *url.URL) (*shadowsocksConfig, error) {
+func parseShadowsocksURL(url url.URL) (*shadowsocksConfig, error) {
 	// attempt to decode as SIP002 URI format and
 	// fall back to legacy base64 format if decoding fails
 	config, err := parseShadowsocksSIP002URL(url)
@@ -91,7 +106,7 @@ func parseShadowsocksURL(url *url.URL) (*shadowsocksConfig, error) {
 
 // parseShadowsocksLegacyBase64URL parses URL based on legacy base64 format:
 // https://shadowsocks.org/doc/configs.html#uri-and-qr-code
-func parseShadowsocksLegacyBase64URL(url *url.URL) (*shadowsocksConfig, error) {
+func parseShadowsocksLegacyBase64URL(url url.URL) (*shadowsocksConfig, error) {
 	config := &shadowsocksConfig{}
 	if url.Host == "" {
 		return nil, errors.New("host not specified")
@@ -138,7 +153,7 @@ func parseShadowsocksLegacyBase64URL(url *url.URL) (*shadowsocksConfig, error) {
 
 // parseShadowsocksSIP002URL parses URL based on SIP002 format:
 // https://shadowsocks.org/doc/sip002.html
-func parseShadowsocksSIP002URL(url *url.URL) (*shadowsocksConfig, error) {
+func parseShadowsocksSIP002URL(url url.URL) (*shadowsocksConfig, error) {
 	config := &shadowsocksConfig{}
 	if url.Host == "" {
 		return nil, errors.New("host not specified")
@@ -188,7 +203,7 @@ func parseStringPrefix(utf8Str string) ([]byte, error) {
 	return rawBytes, nil
 }
 
-func sanitizeShadowsocksURL(u *url.URL) (string, error) {
+func sanitizeShadowsocksURL(u url.URL) (string, error) {
 	config, err := parseShadowsocksURL(u)
 	if err != nil {
 		return "", err
