@@ -46,6 +46,7 @@ func init() {
 
 type MeasurementConfig struct {
 	NumAttempts *int     `yaml:"num_attempts,omitempty"`
+	Proto       string   `yaml:"proto,omitempty"`
 	Domains     []string `yaml:"domains,omitempty"`
 	ISPProxies  []string `yaml:"isp_proxies,omitempty"`
 	Strategies  []string `yaml:"strategies,omitempty"`
@@ -197,9 +198,43 @@ func main() {
 					if transport != "" && strategy != "" {
 						transport += "|" + strategy
 					}
-					dialer, err := transportToDialer.NewStreamDialer(transport)
-					if err != nil {
-						slog.Error("Could not create dialer", "error", err)
+					var test func(context.Context, string, string) (string, string)
+					switch cfg.Proto {
+					case "":
+						fallthrough
+					case "tls":
+						dialer, err := transportToDialer.NewStreamDialer(transport)
+						if err != nil {
+							slog.Error("Could not create dialer", "error", err)
+							os.Exit(1)
+						}
+
+						test = func(ctx context.Context, domain string, ip string) (string, string) {
+							tcpConn, err := dialer.DialStream(ctx, net.JoinHostPort(ip, "443"))
+							if err != nil {
+								if err == context.Canceled {
+									err = context.Cause(ctx)
+								}
+								return "connect", makeErrorMsg(err, domain)
+							}
+							tlsConn, err := tls.WrapConn(ctx, tcpConn, domain)
+							if err != nil {
+								if err == context.Canceled {
+									err = context.Cause(ctx)
+								}
+								return "tls", makeErrorMsg(err, domain)
+							}
+							tlsConn.Close()
+							return "", ""
+						}
+					case "quic":
+						listener, err := transportToDialer.NewPacketListener(transport)
+						if err != nil {
+							slog.Error("Could not create dialer", "error", err)
+							os.Exit(1)
+						}
+					default:
+						slog.Error("protocol not supported", "proto", cfg.Proto)
 						os.Exit(1)
 					}
 					for di, domain := range cfg.Domains {
@@ -217,29 +252,9 @@ func main() {
 						if strategy == "" {
 							m.Strategy = "direct"
 						}
-						func() {
-							ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*timeoutSecFlag)*time.Second)
-							defer cancel()
-							tcpConn, err := dialer.DialStream(ctx, net.JoinHostPort(ip, "443"))
-							if err != nil {
-								if err == context.Canceled {
-									err = context.Cause(ctx)
-								}
-								m.ErrorOp = "connect"
-								m.ErrorMessage = makeErrorMsg(err, domain)
-								return
-							}
-							tlsConn, err := tls.WrapConn(ctx, tcpConn, domain)
-							if err != nil {
-								if err == context.Canceled {
-									err = context.Cause(ctx)
-								}
-								m.ErrorOp = "tls"
-								m.ErrorMessage = makeErrorMsg(err, domain)
-								return
-							}
-							tlsConn.Close()
-						}()
+						ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*timeoutSecFlag)*time.Second)
+						m.ErrorOp, m.ErrorMessage = test(ctx, domain, ip)
+						cancel()
 						if m.ErrorOp == "" {
 							m.Img = "✅"
 						} else {
