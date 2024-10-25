@@ -31,7 +31,7 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
-	"github.com/Jigsaw-Code/outline-sdk/x/config"
+	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 	"gopkg.in/yaml.v3"
 )
 
@@ -81,7 +81,7 @@ type ISPInfo struct {
 	}
 }
 
-var transportToDialer = config.NewDefaultConfigToDialer()
+var transportToDialer = configurl.NewDefaultConfigToDialer()
 
 func makeErrorMsg(err error, domain string) string {
 	return strings.ReplaceAll(err.Error(), domain, "${DOMAIN}")
