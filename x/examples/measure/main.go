@@ -1,4 +1,4 @@
-// Copyright 2024 Jigsaw Operations LLC
+// Copyright 2024 The Outline Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -32,10 +32,10 @@ import (
 
 	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
+	"github.com/lmittmann/tint"
+	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
-
-var debugLog log.Logger = *log.New(io.Discard, "", 0)
 
 func init() {
 	flag.Usage = func() {
@@ -90,7 +90,8 @@ func makeErrorMsg(err error, domain string) string {
 func newISP(ispProxy string) ISP {
 	dialer, err := transportToDialer.NewStreamDialer(ispProxy)
 	if err != nil {
-		log.Fatalln("Could not create ISP dialer:", err)
+		slog.Error("Could not create ISP dialer", "error", err)
+		os.Exit(1)
 	}
 	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
 		if !strings.HasPrefix(network, "tcp") {
@@ -107,18 +108,21 @@ func newISP(ispProxy string) ISP {
 	}
 	req, err := http.NewRequest("GET", "https://checker.soax.com/api/ipinfo", nil)
 	if err != nil {
-		log.Fatalln("Failed to create request:", err)
+		slog.Error("Failed to create request", "error", err)
+		os.Exit(1)
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		log.Fatalln("HTTP request failed:", err)
+		slog.Error("HTTP request failed", "error", err)
+		os.Exit(1)
 	}
 	var ispInfo ISPInfo
 	func() {
 		defer resp.Body.Close()
 		jsonBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
-			log.Fatalln("failed to get isp info:", err)
+			slog.Error("failed to get isp info", "error", err)
+			os.Exit(1)
 		}
 		json.Unmarshal(jsonBytes, &ispInfo)
 	}()
@@ -132,24 +136,31 @@ func main() {
 
 	flag.Parse()
 
+	logLevel := slog.LevelInfo
 	if *verboseFlag {
-		debugLog = *log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
+		logLevel = slog.LevelDebug
 	}
+	slog.SetDefault(slog.New(tint.NewHandler(
+		os.Stderr,
+		&tint.Options{NoColor: !term.IsTerminal(int(os.Stderr.Fd())), Level: logLevel},
+	)))
 
 	cfg := MeasurementConfig{}
 	configData, err := os.ReadFile(*configFlag)
 	if err != nil {
-		log.Fatalln("failed to read config:", err)
+		slog.Error("failed to read config", "error", err)
+		os.Exit(1)
 	}
 	if err := yaml.Unmarshal(configData, &cfg); err != nil {
-		log.Fatalln("Failed to parse config:", err)
+		slog.Error("Failed to parse config", "error", err)
+		os.Exit(1)
 	}
 
 	// Collect ISPs
 	isps := make([]ISP, 0, len(cfg.ISPProxies))
 	for _, ispProxy := range cfg.ISPProxies {
 		isp := newISP(ispProxy)
-		debugLog.Printf("Loaded ISP \"%v\" (country: %v)\n", isp.Name, isp.CountryCode)
+		slog.Debug("Loaded ISP", "name", isp.Name, "country", isp.CountryCode)
 		isps = append(isps, isp)
 	}
 
@@ -158,7 +169,8 @@ func main() {
 	for _, domain := range cfg.Domains {
 		ip, err := net.ResolveIPAddr("ip4", domain)
 		if err != nil {
-			log.Fatalln("failed to resolve domain", domain, ":", err)
+			slog.Error("failed to resolve domain", "domain", domain, "error", err)
+			os.Exit(1)
 		}
 		domainIP = append(domainIP, ip.String())
 	}
@@ -187,7 +199,8 @@ func main() {
 					}
 					dialer, err := transportToDialer.NewStreamDialer(transport)
 					if err != nil {
-						log.Fatalf("Could not create dialer: %v\n", err)
+						slog.Error("Could not create dialer", "error", err)
+						os.Exit(1)
 					}
 					for di, domain := range cfg.Domains {
 						domain := domain
