@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"strconv"
 	"strings"
@@ -30,17 +29,43 @@ import (
 // ConfigToDialer enables the creation of stream and packet dialers based on a config. The config is
 // extensible by registering wrappers for config subtypes.
 type ConfigToDialer struct {
-	NewBaseStreamDialer func(ctx context.Context) (transport.StreamDialer, error)
-	NewBasePacketDialer func(ctx context.Context) (transport.PacketDialer, error)
-	NewBasePacketConn   func(ctx context.Context) (net.PacketConn, error)
+	BaseStreamDialer   transport.StreamDialer
+	BasePacketDialer   transport.PacketDialer
+	BasePacketListener transport.PacketListener
 
 	sdBuilders map[string]NewStreamDialerFunc
 	pdBuilders map[string]NewPacketDialerFunc
-	pcBuilders map[string]NewPacketConnFunc
+	plBuilders map[string]NewPacketListenerFunc
 }
 
+var (
+	_ ConfigToStreamDialer   = (*ConfigToDialer)(nil)
+	_ ConfigToPacketDialer   = (*ConfigToDialer)(nil)
+	_ ConfigToPacketListener = (*ConfigToDialer)(nil)
+)
+
+// ConfigToObject creates an object from a config.
+type ConfigToObject[ObjectType any] interface {
+	NewObject(ctx context.Context, config *Config) (ObjectType, error)
+	RegisterType(subtype string, newObject func(ctx context.Context, config *Config) (ObjectType, error)) error
+}
+
+// ConfigToStreamDialer creates a [transport.StreamDialer] from a config.
 type ConfigToStreamDialer interface {
-	NewStreamDialer(ctx context.Context, config *Config) (transport.StreamDialer, error)
+	NewStreamDialerFromConfig(ctx context.Context, config *Config) (transport.StreamDialer, error)
+	RegisterStreamDialerType(subtype string, newDialer NewStreamDialerFunc) error
+}
+
+// ConfigToPacketDialer creates a [transport.PacketDialer] from a config.
+type ConfigToPacketDialer interface {
+	NewPacketDialerFromConfig(ctx context.Context, config *Config) (transport.PacketDialer, error)
+	RegisterPacketDialerType(subtype string, newDialer NewPacketDialerFunc) error
+}
+
+// ConfigToPacketListener creates a [transport.PacketListener] from a config.
+type ConfigToPacketListener interface {
+	NewPacketListenerFromConfig(ctx context.Context, config *Config) (transport.PacketListener, error)
+	RegisterPacketListenerType(subtype string, newDialer NewPacketListenerFunc) error
 }
 
 // NewStreamDialerFunc creates a [transport.StreamDialer] based on the config.
@@ -49,8 +74,8 @@ type NewStreamDialerFunc func(ctx context.Context, config *Config) (transport.St
 // NewPacketDialerFunc creates a [transport.PacketDialer] based on the config.
 type NewPacketDialerFunc func(ctx context.Context, config *Config) (transport.PacketDialer, error)
 
-// NewPacketConnFunc creates a [net.PacketConn] based on the wrapConfig. The innerSD and innerPD functions can provide a base Stream and Packet Dialers if needed.
-type NewPacketConnFunc func(ctx context.Context, config *Config) (net.PacketConn, error)
+// NewPacketListenerFunc creates a [net.PacketConn] based on the config.
+type NewPacketListenerFunc func(ctx context.Context, config *Config) (transport.PacketListener, error)
 
 // Transport config.
 type Config struct {
@@ -86,40 +111,32 @@ func ParseConfig(configText string) (*Config, error) {
 // NewDefaultConfigToDialer creates a [ConfigToDialer] with a set of default wrappers already registered.
 func NewDefaultConfigToDialer() *ConfigToDialer {
 	p := new(ConfigToDialer)
-	tcpDialer := &transport.TCPDialer{}
-	p.NewBaseStreamDialer = func(ctx context.Context) (transport.StreamDialer, error) {
-		return tcpDialer, nil
-	}
-	udpDialer := &transport.UDPDialer{}
-	p.NewBasePacketDialer = func(ctx context.Context) (transport.PacketDialer, error) {
-		return udpDialer, nil
-	}
 
-	p.NewBasePacketConn = func(ctx context.Context) (net.PacketConn, error) {
-		return net.ListenUDP("", &net.UDPAddr{})
-	}
+	p.BaseStreamDialer = &transport.TCPDialer{}
+	p.BasePacketDialer = &transport.UDPDialer{}
+	p.BasePacketListener = &transport.UDPListener{}
 
 	// Please keep the list in alphabetical order.
-	p.RegisterStreamDialerType("do53", newDO53StreamDialerFactory(p.NewStreamDialer, p.NewPacketDialer))
-	p.RegisterStreamDialerType("doh", newDOHStreamDialerFactory(p.NewStreamDialer))
+	registerDO53StreamDialer(p, "do53", p.NewStreamDialerFromConfig, p.NewPacketDialerFromConfig)
+	registerDOHStreamDialer(p, "doh", p.NewStreamDialerFromConfig)
 
-	p.RegisterStreamDialerType("override", newOverrideStreamDialerFactory(p.NewStreamDialer))
-	p.RegisterPacketDialerType("override", newOverridePacketDialerFactory(p.NewPacketDialer))
+	registerOverrideStreamDialer(p, "override", p.NewStreamDialerFromConfig)
+	registerOverridePacketDialer(p, "override", p.NewPacketDialerFromConfig)
 
-	p.RegisterStreamDialerType("socks5", newSOCKS5StreamDialerFactory(p.NewStreamDialer))
-	p.RegisterPacketDialerType("socks5", newSOCKS5PacketDialerFactory(p.NewStreamDialer, p.NewPacketDialer))
-	p.RegisterPacketConnType("socks5", newSOCKS5PacketConnFactory(p.NewStreamDialer, p.NewPacketDialer))
+	registerSOCKS5StreamDialer(p, "socks5", p.NewStreamDialerFromConfig)
+	registerSOCKS5PacketDialer(p, "socks5", p.NewStreamDialerFromConfig, p.NewPacketDialerFromConfig)
+	registerSOCKS5PacketListener(p, "socks5", p.NewStreamDialerFromConfig, p.NewPacketDialerFromConfig)
 
-	p.RegisterStreamDialerType("split", newSplitStreamDialerFactory(p.NewStreamDialer))
+	p.RegisterStreamDialerType("split", newSplitStreamDialerFactory(p.NewStreamDialerFromConfig))
 
-	p.RegisterStreamDialerType("ss", newShadowsocksStreamDialerFactory(p.NewStreamDialer))
-	p.RegisterPacketDialerType("ss", newShadowsocksPacketDialerFactory(p.NewPacketDialer))
-	p.RegisterPacketConnType("ss", newShadowsocksPacketConnFactory(p.NewPacketDialer))
+	p.RegisterStreamDialerType("ss", newShadowsocksStreamDialerFactory(p.NewStreamDialerFromConfig))
+	p.RegisterPacketDialerType("ss", newShadowsocksPacketDialerFactory(p.NewPacketDialerFromConfig))
+	p.RegisterPacketListenerType("ss", newShadowsocksPacketListenerFactory(p.NewPacketDialerFromConfig))
 
-	p.RegisterStreamDialerType("tls", newTLSStreamDialerFactory(p.NewStreamDialer))
+	p.RegisterStreamDialerType("tls", newTLSStreamDialerFactory(p.NewStreamDialerFromConfig))
 
 	p.RegisterStreamDialerType("tlsfrag", func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		sd, err := p.NewStreamDialer(ctx, config.BaseConfig)
+		sd, err := p.NewStreamDialerFromConfig(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -131,8 +148,8 @@ func NewDefaultConfigToDialer() *ConfigToDialer {
 		return tlsfrag.NewFixedLenStreamDialer(sd, fixedLen)
 	})
 
-	p.RegisterStreamDialerType("ws", newWebsocketStreamDialerFactory(p.NewStreamDialer))
-	p.RegisterPacketDialerType("ws", newWebsocketPacketDialerFactory(p.NewStreamDialer))
+	p.RegisterStreamDialerType("ws", newWebsocketStreamDialerFactory(p.NewStreamDialerFromConfig))
+	p.RegisterPacketDialerType("ws", newWebsocketPacketDialerFactory(p.NewStreamDialerFromConfig))
 
 	return p
 }
@@ -163,30 +180,35 @@ func (p *ConfigToDialer) RegisterPacketDialerType(subtype string, newDialer NewP
 	return nil
 }
 
-// RegisterPacketConnType will register a factory for packet conns under the given subtype.
-func (p *ConfigToDialer) RegisterPacketConnType(subtype string, newPacketConn NewPacketConnFunc) error {
-	if p.pcBuilders == nil {
-		p.pcBuilders = make(map[string]NewPacketConnFunc)
+// RegisterPacketListenerType will register a factory for packet listeners under the given subtype.
+func (p *ConfigToDialer) RegisterPacketListenerType(subtype string, newPacketListener NewPacketListenerFunc) error {
+	if p.plBuilders == nil {
+		p.plBuilders = make(map[string]NewPacketListenerFunc)
 	}
 
-	if _, found := p.pcBuilders[subtype]; found {
+	if _, found := p.plBuilders[subtype]; found {
 		return fmt.Errorf("config parser %v for PacketConn added twice", subtype)
 	}
-	p.pcBuilders[subtype] = newPacketConn
+	p.plBuilders[subtype] = newPacketListener
 	return nil
 }
 
-func (p *ConfigToDialer) newBaseStreamDialer(ctx context.Context) (transport.StreamDialer, error) {
-	if p.NewBaseStreamDialer == nil {
-		return nil, errors.New("base stream dialer not configured")
+// NewStreamDialer creates a [transport.StreamDialer] according to the config text.
+func (p *ConfigToDialer) NewStreamDialer(configText string) (transport.StreamDialer, error) {
+	config, err := ParseConfig(configText)
+	if err != nil {
+		return nil, err
 	}
-	return p.NewBaseStreamDialer(ctx)
+	return p.NewStreamDialerFromConfig(context.Background(), config)
 }
 
-// NewStreamDialer creates a [transport.StreamDialer] according to the config.
-func (p *ConfigToDialer) NewStreamDialer(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+// NewStreamDialerFromConfig creates a [transport.StreamDialer] according to the config.
+func (p *ConfigToDialer) NewStreamDialerFromConfig(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 	if config == nil {
-		return p.newBaseStreamDialer(ctx)
+		if p.BaseStreamDialer == nil {
+			return nil, errors.New("base stream dialer not configured")
+		}
+		return p.BaseStreamDialer, nil
 	}
 
 	newDialer, ok := p.sdBuilders[config.URL.Scheme]
@@ -196,16 +218,21 @@ func (p *ConfigToDialer) NewStreamDialer(ctx context.Context, config *Config) (t
 	return newDialer(ctx, config)
 }
 
-func (p *ConfigToDialer) newBasePacketDialer(ctx context.Context) (transport.PacketDialer, error) {
-	if p.NewBasePacketDialer == nil {
-		return nil, errors.New("base packet dialer not configured")
+// NewPacketDialer creates a [transport.PacketDialer] according to the config text.
+func (p *ConfigToDialer) NewPacketDialer(configText string) (transport.PacketDialer, error) {
+	config, err := ParseConfig(configText)
+	if err != nil {
+		return nil, err
 	}
-	return p.NewBasePacketDialer(ctx)
+	return p.NewPacketDialerFromConfig(context.Background(), config)
 }
 
-func (p *ConfigToDialer) NewPacketDialer(ctx context.Context, config *Config) (transport.PacketDialer, error) {
+func (p *ConfigToDialer) NewPacketDialerFromConfig(ctx context.Context, config *Config) (transport.PacketDialer, error) {
 	if config == nil {
-		return p.newBasePacketDialer(ctx)
+		if p.BasePacketDialer == nil {
+			return nil, errors.New("base packet dialer not configured")
+		}
+		return p.BasePacketDialer, nil
 	}
 
 	newDialer, ok := p.pdBuilders[config.URL.Scheme]
@@ -215,24 +242,28 @@ func (p *ConfigToDialer) NewPacketDialer(ctx context.Context, config *Config) (t
 	return newDialer(ctx, config)
 }
 
-func (p *ConfigToDialer) newBasePacketConn(ctx context.Context) (net.PacketConn, error) {
-	if p.NewBasePacketConn == nil {
-		return nil, errors.New("base packet conn not configured")
+// NewPacketListner creates a [transport.PacketListener] according to the config text.
+func (p *ConfigToDialer) NewPacketListener(configText string) (transport.PacketListener, error) {
+	config, err := ParseConfig(configText)
+	if err != nil {
+		return nil, err
 	}
-	return p.NewBasePacketConn(ctx)
+	return p.NewPacketListenerFromConfig(context.Background(), config)
 }
 
-// NewPacketConn creates a [net.PacketConn] according to transportConfig, using dialer as the
-// base [Dialer]. The given dialer must not be nil.
-func (p *ConfigToDialer) NewPacketConn(ctx context.Context, config *Config) (net.PacketConn, error) {
+// NewPacketListenerFromconfig creates a [transport.PacketListener] according to config.
+func (p *ConfigToDialer) NewPacketListenerFromConfig(ctx context.Context, config *Config) (transport.PacketListener, error) {
 	if config == nil {
-		return p.newBasePacketConn(ctx)
+		if p.BasePacketListener == nil {
+			return nil, errors.New("base packet listener not configured")
+		}
+		return p.BasePacketListener, nil
 	}
-	newPacketConn, ok := p.pcBuilders[config.URL.Scheme]
+	newPacketListener, ok := p.plBuilders[config.URL.Scheme]
 	if !ok {
 		return nil, fmt.Errorf("config scheme '%v' is not supported for Stream Dialers", config.URL.Scheme)
 	}
-	return newPacketConn(ctx, config)
+	return newPacketListener(ctx, config)
 }
 
 func SanitizeConfig(configStr string) (string, error) {

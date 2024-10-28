@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
 	"strings"
@@ -27,8 +28,8 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 )
 
-func newDO53StreamDialerFactory(newSD NewStreamDialerFunc, newPD NewPacketDialerFunc) NewStreamDialerFunc {
-	return func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+func registerDO53StreamDialer(c ConfigToStreamDialer, typeID string, newSD NewStreamDialerFunc, newPD NewPacketDialerFunc) {
+	c.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		if config == nil {
 			return nil, fmt.Errorf("emtpy do53 config")
 		}
@@ -36,14 +37,39 @@ func newDO53StreamDialerFactory(newSD NewStreamDialerFunc, newPD NewPacketDialer
 		if err != nil {
 			return nil, err
 		}
+		if closer, ok := sd.(io.Closer); ok {
+			defer closer.Close()
+		}
 		pd, err := newPD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
+		if closer, ok := pd.(io.Closer); ok {
+			defer closer.Close()
+		}
 		resolver, err := newDO53Resolver(config.URL, sd, pd)
-
+		if err != nil {
+			return nil, err
+		}
 		return dns.NewStreamDialer(resolver, sd)
-	}
+	})
+}
+
+func registerDOHStreamDialer(c ConfigToStreamDialer, typeID string, newSD NewStreamDialerFunc) {
+	c.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		if config == nil {
+			return nil, fmt.Errorf("emtpy doh config")
+		}
+		sd, err := newSD(ctx, config.BaseConfig)
+		if err != nil {
+			return nil, err
+		}
+		resolver, err := newDOHResolver(config.URL, sd)
+		if err != nil {
+			return nil, err
+		}
+		return dns.NewStreamDialer(resolver, sd)
+	})
 }
 
 func newDO53Resolver(config url.URL, sd transport.StreamDialer, pd transport.PacketDialer) (dns.Resolver, error) {
@@ -87,20 +113,6 @@ func newDO53Resolver(config url.URL, sd transport.StreamDialer, pd transport.Pac
 		return tcpResolver.Query(ctx, q)
 	})
 	return resolver, nil
-}
-
-func newDOHStreamDialerFactory(newSD NewStreamDialerFunc) NewStreamDialerFunc {
-	return func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		if config == nil {
-			return nil, fmt.Errorf("emtpy doh config")
-		}
-		sd, err := newSD(ctx, config.BaseConfig)
-		if err != nil {
-			return nil, err
-		}
-		resolver, err := newDOHResolver(config.URL, sd)
-		return dns.NewStreamDialer(resolver, sd)
-	}
 }
 
 func newDOHResolver(config url.URL, sd transport.StreamDialer) (dns.Resolver, error) {

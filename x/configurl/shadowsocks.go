@@ -19,7 +19,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"strings"
 
@@ -69,8 +68,8 @@ func newShadowsocksPacketDialerFactory(newPD NewPacketDialerFunc) NewPacketDiale
 	}
 }
 
-func newShadowsocksPacketConnFactory(newPD NewPacketDialerFunc) NewPacketConnFunc {
-	return func(ctx context.Context, config *Config) (net.PacketConn, error) {
+func newShadowsocksPacketListenerFactory(newPD NewPacketDialerFunc) NewPacketListenerFunc {
+	return func(ctx context.Context, config *Config) (transport.PacketListener, error) {
 		pd, err := newPD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
@@ -80,11 +79,7 @@ func newShadowsocksPacketConnFactory(newPD NewPacketDialerFunc) NewPacketConnFun
 			return nil, err
 		}
 		endpoint := &transport.PacketDialerEndpoint{Dialer: pd, Address: ssConfig.serverAddress}
-		pl, err := shadowsocks.NewPacketListener(endpoint, ssConfig.cryptoKey)
-		if err != nil {
-			return nil, err
-		}
-		return pl.ListenPacket(ctx)
+		return shadowsocks.NewPacketListener(endpoint, ssConfig.cryptoKey)
 	}
 }
 
