@@ -24,8 +24,8 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
-func registerOverrideStreamDialer(c ConfigToStreamDialer, typeID string, newSD NewStreamDialerFunc) {
-	c.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+func registerOverrideStreamDialer(r StreamDialerRegistry, typeID string, newSD NewStreamDialerFunc) {
+	r.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		sd, err := newSD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
@@ -44,8 +44,8 @@ func registerOverrideStreamDialer(c ConfigToStreamDialer, typeID string, newSD N
 	})
 }
 
-func registerOverridePacketDialer(c ConfigToPacketDialer, typeID string, newPD NewPacketDialerFunc) {
-	c.RegisterPacketDialerType(typeID, func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
+func registerOverridePacketDialer(r PacketDialerRegistry, typeID string, newPD NewPacketDialerFunc) {
+	r.RegisterPacketDialerType(typeID, func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
 		pd, err := newPD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err

@@ -40,26 +40,41 @@ type ConfigToDialer struct {
 
 var (
 	_ ConfigToStreamDialer   = (*ConfigToDialer)(nil)
+	_ StreamDialerRegistry   = (*ConfigToDialer)(nil)
 	_ ConfigToPacketDialer   = (*ConfigToDialer)(nil)
+	_ PacketDialerRegistry   = (*ConfigToDialer)(nil)
 	_ ConfigToPacketListener = (*ConfigToDialer)(nil)
+	_ PacketListenerRegistry = (*ConfigToDialer)(nil)
 )
 
 // ConfigToStreamDialer creates a [transport.StreamDialer] from a config.
 type ConfigToStreamDialer interface {
 	NewStreamDialerFromConfig(ctx context.Context, config *Config) (transport.StreamDialer, error)
-	RegisterStreamDialerType(subtype string, newDialer NewStreamDialerFunc) error
+}
+
+// StreamDialerRegistry registers [transport.StreamDialer] types.
+type StreamDialerRegistry interface {
+	RegisterStreamDialerType(subtype string, newInstance NewStreamDialerFunc) error
 }
 
 // ConfigToPacketDialer creates a [transport.PacketDialer] from a config.
 type ConfigToPacketDialer interface {
 	NewPacketDialerFromConfig(ctx context.Context, config *Config) (transport.PacketDialer, error)
-	RegisterPacketDialerType(subtype string, newDialer NewPacketDialerFunc) error
+}
+
+// PacketDialerRegistry registers [transport.PacketDialer] types.
+type PacketDialerRegistry interface {
+	RegisterPacketDialerType(subtype string, newInstance NewPacketDialerFunc) error
 }
 
 // ConfigToPacketListener creates a [transport.PacketListener] from a config.
 type ConfigToPacketListener interface {
 	NewPacketListenerFromConfig(ctx context.Context, config *Config) (transport.PacketListener, error)
-	RegisterPacketListenerType(subtype string, newDialer NewPacketListenerFunc) error
+}
+
+// PacketListenerRegistry registers [transport.PacketListener] types.
+type PacketListenerRegistry interface {
+	RegisterPacketListenerType(subtype string, newInstance NewPacketListenerFunc) error
 }
 
 // NewStreamDialerFunc creates a [transport.StreamDialer] based on the config.
@@ -127,7 +142,7 @@ func NewDefaultConfigToDialer() *ConfigToDialer {
 	registerShadowsocksPacketDialer(p, "ss", p.NewPacketDialerFromConfig)
 	registerShadowsocksPacketListener(p, "ss", p.NewPacketDialerFromConfig)
 
-	p.RegisterStreamDialerType("tls", newTLSStreamDialerFactory(p.NewStreamDialerFromConfig))
+	registerTLSStreamDialer(p, "tls", p.NewStreamDialerFromConfig)
 
 	p.RegisterStreamDialerType("tlsfrag", func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		sd, err := p.NewStreamDialerFromConfig(ctx, config.BaseConfig)

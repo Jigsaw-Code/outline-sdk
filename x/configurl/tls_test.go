@@ -15,21 +15,11 @@
 package configurl
 
 import (
-	"context"
 	"testing"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
 	"github.com/stretchr/testify/require"
 )
-
-func TestTLS(t *testing.T) {
-	config, err := ParseConfig("tls")
-	require.NoError(t, err)
-	newSD := func(context.Context, *Config) (transport.StreamDialer, error) { return &transport.TCPDialer{}, nil }
-	_, err = newTLSStreamDialerFactory(newSD)(context.Background(), config)
-	require.NoError(t, err)
-}
 
 func TestTLS_SNI(t *testing.T) {
 	tlsURL, err := ParseConfig("tls:sni=www.google.com")

@@ -28,8 +28,8 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 )
 
-func registerDO53StreamDialer(c ConfigToStreamDialer, typeID string, newSD NewStreamDialerFunc, newPD NewPacketDialerFunc) {
-	c.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+func registerDO53StreamDialer(r StreamDialerRegistry, typeID string, newSD NewStreamDialerFunc, newPD NewPacketDialerFunc) {
+	r.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		if config == nil {
 			return nil, fmt.Errorf("emtpy do53 config")
 		}
@@ -55,8 +55,8 @@ func registerDO53StreamDialer(c ConfigToStreamDialer, typeID string, newSD NewSt
 	})
 }
 
-func registerDOHStreamDialer(c ConfigToStreamDialer, typeID string, newSD NewStreamDialerFunc) {
-	c.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+func registerDOHStreamDialer(r StreamDialerRegistry, typeID string, newSD NewStreamDialerFunc) {
+	r.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		if config == nil {
 			return nil, fmt.Errorf("emtpy doh config")
 		}

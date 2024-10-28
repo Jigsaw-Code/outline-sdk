@@ -23,8 +23,8 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/split"
 )
 
-func registerSplitStreamDialer(c ConfigToStreamDialer, typeID string, newSD NewStreamDialerFunc) {
-	c.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+func registerSplitStreamDialer(r StreamDialerRegistry, typeID string, newSD NewStreamDialerFunc) {
+	r.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		sd, err := newSD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err

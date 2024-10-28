@@ -24,6 +24,20 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
 )
 
+func registerTLSStreamDialer(r StreamDialerRegistry, typeID string, newSD NewStreamDialerFunc) {
+	r.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		sd, err := newSD(ctx, config.BaseConfig)
+		if err != nil {
+			return nil, err
+		}
+		options, err := parseOptions(config.URL)
+		if err != nil {
+			return nil, err
+		}
+		return tls.NewStreamDialer(sd, options...)
+	})
+}
+
 func parseOptions(configURL url.URL) ([]tls.ClientOption, error) {
 	query := configURL.Opaque
 	values, err := url.ParseQuery(query)
@@ -49,18 +63,4 @@ func parseOptions(configURL url.URL) ([]tls.ClientOption, error) {
 		}
 	}
 	return options, nil
-}
-
-func newTLSStreamDialerFactory(newSD NewStreamDialerFunc) NewStreamDialerFunc {
-	return func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		sd, err := newSD(ctx, config.BaseConfig)
-		if err != nil {
-			return nil, err
-		}
-		options, err := parseOptions(config.URL)
-		if err != nil {
-			return nil, err
-		}
-		return tls.NewStreamDialer(sd, options...)
-	}
 }
