@@ -129,9 +129,9 @@ func NewDefaultConfigToDialer() *ConfigToDialer {
 
 	registerSplitStreamDialer(p, "split", p.NewStreamDialerFromConfig)
 
-	p.RegisterStreamDialerType("ss", newShadowsocksStreamDialerFactory(p.NewStreamDialerFromConfig))
-	p.RegisterPacketDialerType("ss", newShadowsocksPacketDialerFactory(p.NewPacketDialerFromConfig))
-	p.RegisterPacketListenerType("ss", newShadowsocksPacketListenerFactory(p.NewPacketDialerFromConfig))
+	registerShadowsocksStreamDialer(p, "ss", p.NewStreamDialerFromConfig)
+	registerShadowsocksPacketDialer(p, "ss", p.NewPacketDialerFromConfig)
+	registerShadowsocksPacketListener(p, "ss", p.NewPacketDialerFromConfig)
 
 	p.RegisterStreamDialerType("tls", newTLSStreamDialerFactory(p.NewStreamDialerFromConfig))
 

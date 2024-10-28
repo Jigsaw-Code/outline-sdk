@@ -26,8 +26,8 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 )
 
-func newShadowsocksStreamDialerFactory(newSD NewStreamDialerFunc) NewStreamDialerFunc {
-	return func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+func registerShadowsocksStreamDialer(c ConfigToStreamDialer, typeID string, newSD NewStreamDialerFunc) {
+	c.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		sd, err := newSD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
@@ -45,11 +45,11 @@ func newShadowsocksStreamDialerFactory(newSD NewStreamDialerFunc) NewStreamDiale
 			dialer.SaltGenerator = shadowsocks.NewPrefixSaltGenerator(ssConfig.prefix)
 		}
 		return dialer, nil
-	}
+	})
 }
 
-func newShadowsocksPacketDialerFactory(newPD NewPacketDialerFunc) NewPacketDialerFunc {
-	return func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
+func registerShadowsocksPacketDialer(c ConfigToPacketDialer, typeID string, newPD NewPacketDialerFunc) {
+	c.RegisterPacketDialerType(typeID, func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
 		pd, err := newPD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
@@ -65,11 +65,11 @@ func newShadowsocksPacketDialerFactory(newPD NewPacketDialerFunc) NewPacketDiale
 		}
 		// TODO: support UDP prefix.
 		return transport.PacketListenerDialer{Listener: pl}, nil
-	}
+	})
 }
 
-func newShadowsocksPacketListenerFactory(newPD NewPacketDialerFunc) NewPacketListenerFunc {
-	return func(ctx context.Context, config *Config) (transport.PacketListener, error) {
+func registerShadowsocksPacketListener(c ConfigToPacketListener, typeID string, newPD NewPacketDialerFunc) {
+	c.RegisterPacketListenerType(typeID, func(ctx context.Context, config *Config) (transport.PacketListener, error) {
 		pd, err := newPD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
@@ -80,7 +80,7 @@ func newShadowsocksPacketListenerFactory(newPD NewPacketDialerFunc) NewPacketLis
 		}
 		endpoint := &transport.PacketDialerEndpoint{Dialer: pd, Address: ssConfig.serverAddress}
 		return shadowsocks.NewPacketListener(endpoint, ssConfig.cryptoKey)
-	}
+	})
 }
 
 type shadowsocksConfig struct {
