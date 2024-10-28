@@ -44,12 +44,6 @@ var (
 	_ ConfigToPacketListener = (*ConfigToDialer)(nil)
 )
 
-// ConfigToObject creates an object from a config.
-type ConfigToObject[ObjectType any] interface {
-	NewObject(ctx context.Context, config *Config) (ObjectType, error)
-	RegisterType(subtype string, newObject func(ctx context.Context, config *Config) (ObjectType, error)) error
-}
-
 // ConfigToStreamDialer creates a [transport.StreamDialer] from a config.
 type ConfigToStreamDialer interface {
 	NewStreamDialerFromConfig(ctx context.Context, config *Config) (transport.StreamDialer, error)
