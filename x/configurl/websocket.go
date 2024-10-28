@@ -71,8 +71,8 @@ func (c *wsToStreamConn) CloseWrite() error {
 	return c.Close()
 }
 
-func newWebsocketStreamDialerFactory(newSD NewStreamDialerFunc) NewStreamDialerFunc {
-	return func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+func registerWebsocketStreamDialer(r StreamDialerRegistry, typeID string, newSD NewStreamDialerFunc) {
+	r.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		sd, err := newSD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
@@ -102,11 +102,11 @@ func newWebsocketStreamDialerFactory(newSD NewStreamDialerFunc) NewStreamDialerF
 			}
 			return &wsToStreamConn{wsConn}, nil
 		}), nil
-	}
+	})
 }
 
-func newWebsocketPacketDialerFactory(newSD NewStreamDialerFunc) NewPacketDialerFunc {
-	return func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
+func registerWebsocketPacketDialer(r PacketDialerRegistry, typeID string, newSD NewStreamDialerFunc) {
+	r.RegisterPacketDialerType(typeID, func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
 		sd, err := newSD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
@@ -136,5 +136,5 @@ func newWebsocketPacketDialerFactory(newSD NewStreamDialerFunc) NewPacketDialerF
 			}
 			return wsConn, nil
 		}), nil
-	}
+	})
 }

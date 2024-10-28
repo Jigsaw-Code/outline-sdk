@@ -19,11 +19,9 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag"
 )
 
 // ConfigToDialer enables the creation of stream and packet dialers based on a config. The config is
@@ -144,21 +142,10 @@ func NewDefaultConfigToDialer() *ConfigToDialer {
 
 	registerTLSStreamDialer(p, "tls", p.NewStreamDialerFromConfig)
 
-	p.RegisterStreamDialerType("tlsfrag", func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		sd, err := p.NewStreamDialerFromConfig(ctx, config.BaseConfig)
-		if err != nil {
-			return nil, err
-		}
-		lenStr := config.URL.Opaque
-		fixedLen, err := strconv.Atoi(lenStr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid tlsfrag option: %v. It should be in tlsfrag:<number> format", lenStr)
-		}
-		return tlsfrag.NewFixedLenStreamDialer(sd, fixedLen)
-	})
+	registerTLSFragStreamDialer(p, "tlsfrag", p.NewStreamDialerFromConfig)
 
-	p.RegisterStreamDialerType("ws", newWebsocketStreamDialerFactory(p.NewStreamDialerFromConfig))
-	p.RegisterPacketDialerType("ws", newWebsocketPacketDialerFactory(p.NewStreamDialerFromConfig))
+	registerWebsocketStreamDialer(p, "ws", p.NewStreamDialerFromConfig)
+	registerWebsocketPacketDialer(p, "ws", p.NewStreamDialerFromConfig)
 
 	return p
 }
