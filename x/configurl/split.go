@@ -23,8 +23,8 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/split"
 )
 
-func newSplitStreamDialerFactory(newSD NewStreamDialerFunc) NewStreamDialerFunc {
-	return func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+func registerSplitStreamDialer(c ConfigToStreamDialer, typeID string, newSD NewStreamDialerFunc) {
+	c.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		sd, err := newSD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
@@ -35,5 +35,5 @@ func newSplitStreamDialerFactory(newSD NewStreamDialerFunc) NewStreamDialerFunc 
 			return nil, fmt.Errorf("prefixBytes is not a number: %v. Split config should be in split:<number> format", prefixBytesStr)
 		}
 		return split.NewStreamDialer(sd, int64(prefixBytes))
-	}
+	})
 }

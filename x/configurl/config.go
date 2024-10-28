@@ -127,7 +127,7 @@ func NewDefaultConfigToDialer() *ConfigToDialer {
 	registerSOCKS5PacketDialer(p, "socks5", p.NewStreamDialerFromConfig, p.NewPacketDialerFromConfig)
 	registerSOCKS5PacketListener(p, "socks5", p.NewStreamDialerFromConfig, p.NewPacketDialerFromConfig)
 
-	p.RegisterStreamDialerType("split", newSplitStreamDialerFactory(p.NewStreamDialerFromConfig))
+	registerSplitStreamDialer(p, "split", p.NewStreamDialerFromConfig)
 
 	p.RegisterStreamDialerType("ss", newShadowsocksStreamDialerFactory(p.NewStreamDialerFromConfig))
 	p.RegisterPacketDialerType("ss", newShadowsocksPacketDialerFactory(p.NewPacketDialerFromConfig))
