@@ -91,12 +91,12 @@ type Config struct {
 }
 
 func ParseConfig(configText string) (*Config, error) {
-	config := &Config{}
 	parts := strings.Split(strings.TrimSpace(configText), "|")
 	if len(parts) == 1 && parts[0] == "" {
 		return nil, nil
 	}
 
+	var config *Config = nil
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if part == "" {
@@ -273,11 +273,10 @@ func SanitizeConfig(configStr string) (string, error) {
 		return "", nil
 	}
 
-	// Iterate through each part
-	textParts := make([]string, 0, 1)
+	var sanitized string
 	for config != nil {
-		scheme := strings.ToLower(config.URL.Scheme)
 		var part string
+		scheme := strings.ToLower(config.URL.Scheme)
 		switch scheme {
 		case "ss":
 			part, err = sanitizeShadowsocksURL(config.URL)
@@ -285,7 +284,7 @@ func SanitizeConfig(configStr string) (string, error) {
 				return "", err
 			}
 		case "socks5":
-			part, err = sanitizeSocks5URL(&config.URL)
+			part, err = sanitizeSOCKS5URL(&config.URL)
 			if err != nil {
 				return "", err
 			}
@@ -295,13 +294,17 @@ func SanitizeConfig(configStr string) (string, error) {
 		default:
 			part = scheme + "://UNKNOWN"
 		}
-		textParts = append(textParts, part)
+		if sanitized == "" {
+			sanitized = part
+		} else {
+			sanitized = part + "|" + sanitized
+		}
+		config = config.BaseConfig
 	}
-	// Join the parts back into a string
-	return strings.Join(textParts, "|"), nil
+	return sanitized, nil
 }
 
-func sanitizeSocks5URL(u *url.URL) (string, error) {
+func sanitizeSOCKS5URL(u *url.URL) (string, error) {
 	const redactedPlaceholder = "REDACTED"
 	if u.User != nil {
 		u.User = url.User(redactedPlaceholder)
