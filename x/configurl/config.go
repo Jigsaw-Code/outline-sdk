@@ -91,12 +91,12 @@ type Config struct {
 }
 
 func ParseConfig(configText string) (*Config, error) {
-	config := &Config{}
 	parts := strings.Split(strings.TrimSpace(configText), "|")
 	if len(parts) == 1 && parts[0] == "" {
 		return nil, nil
 	}
 
+	var config *Config = nil
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if part == "" {
