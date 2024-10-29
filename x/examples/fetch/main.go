@@ -17,10 +17,12 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/textproto"
@@ -30,9 +32,11 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
+	"github.com/lmittmann/tint"
+	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/http3"
+	"golang.org/x/term"
 )
-
-var debugLog log.Logger = *log.New(io.Discard, "", 0)
 
 type stringArrayFlagValue []string
 
@@ -52,8 +56,23 @@ func init() {
 	}
 }
 
+func overrideAddress(original string, newHost string, newPort string) (string, error) {
+	host, port, err := net.SplitHostPort(original)
+	if err != nil {
+		return "", fmt.Errorf("invalid address: %w", err)
+	}
+	if newHost != "" {
+		host = newHost
+	}
+	if newPort != "" {
+		port = newPort
+	}
+	return net.JoinHostPort(host, port), nil
+}
+
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
+	protoFlag := flag.String("proto", "h1", "HTTP version to use (h1, h2, h3)")
 	transportFlag := flag.String("transport", "", "Transport config")
 	addressFlag := flag.String("address", "", "Address to connect to. If empty, use the URL authority")
 	methodFlag := flag.String("method", "GET", "The HTTP method to use")
@@ -63,9 +82,15 @@ func main() {
 
 	flag.Parse()
 
+	logLevel := slog.LevelInfo
 	if *verboseFlag {
-		debugLog = *log.New(os.Stderr, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
+		logLevel = slog.LevelDebug
 	}
+	slog.SetDefault(slog.New(tint.NewHandler(
+		os.Stderr,
+		&tint.Options{NoColor: !term.IsTerminal(int(os.Stderr.Fd())), Level: logLevel},
+	)))
+
 	var overrideHost, overridePort string
 	if *addressFlag != "" {
 		var err error
@@ -84,32 +109,67 @@ func main() {
 		os.Exit(1)
 	}
 
-	dialer, err := configurl.NewDefaultConfigToDialer().NewStreamDialer(*transportFlag)
-	if err != nil {
-		log.Fatalf("Could not create dialer: %v\n", err)
-	}
-	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		host, port, err := net.SplitHostPort(addr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid address: %w", err)
-		}
-		if overrideHost != "" {
-			host = overrideHost
-		}
-		if overridePort != "" {
-			port = overridePort
-		}
-		if !strings.HasPrefix(network, "tcp") {
-			return nil, fmt.Errorf("protocol not supported: %v", network)
-		}
-		return dialer.DialStream(ctx, net.JoinHostPort(host, port))
-	}
 	httpClient := &http.Client{
-		Transport: &http.Transport{DialContext: dialContext},
-		Timeout:   time.Duration(*timeoutSecFlag) * time.Second,
+		Timeout: time.Duration(*timeoutSecFlag) * time.Second,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
+	}
+
+	configModule := configurl.NewDefaultConfigToDialer()
+	if *protoFlag == "h1" || *protoFlag == "h2" {
+		dialer, err := configModule.NewStreamDialer(*transportFlag)
+		if err != nil {
+			log.Fatalf("Could not create dialer: %v\n", err)
+		}
+		dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+			addressToDial, err := overrideAddress(addr, overrideHost, overridePort)
+			if err != nil {
+				return nil, fmt.Errorf("invalid address: %w", err)
+			}
+			if !strings.HasPrefix(network, "tcp") {
+				return nil, fmt.Errorf("protocol not supported: %v", network)
+			}
+			return dialer.DialStream(ctx, addressToDial)
+		}
+		if *protoFlag == "h1" {
+			httpClient.Transport = &http.Transport{
+				DialContext:     dialContext,
+				TLSClientConfig: &tls.Config{NextProtos: []string{"http/1.1"}},
+			}
+		} else if *protoFlag == "h2" {
+			httpClient.Transport = &http.Transport{
+				DialContext:       dialContext,
+				TLSClientConfig:   &tls.Config{NextProtos: []string{"h2"}},
+				ForceAttemptHTTP2: true,
+			}
+		}
+	} else if *protoFlag == "h3" {
+		listener, err := configModule.NewPacketListener(*transportFlag)
+		if err != nil {
+			log.Fatalf("Could not create listener: %v\n", err)
+		}
+		conn, err := listener.ListenPacket(context.Background())
+		if err != nil {
+			log.Fatalf("Could not create PacketConn: %v\n", err)
+		}
+		tr := &quic.Transport{
+			Conn: conn,
+		}
+		defer tr.Close()
+		httpClient.Transport = &http3.Transport{
+			EnableDatagrams: true,
+			Dial: func(ctx context.Context, addr string, tlsConf *tls.Config, quicConf *quic.Config) (quic.EarlyConnection, error) {
+				a, err := net.ResolveUDPAddr("udp", addr)
+				if err != nil {
+					return nil, err
+				}
+				return tr.DialEarly(ctx, a, tlsConf, quicConf)
+			},
+			Logger: slog.Default(),
+		}
+	} else {
+		log.Fatalln("Invalid HTTP protocol: ", *protoFlag)
 	}
 
 	req, err := http.NewRequest(*methodFlag, url, nil)
@@ -133,8 +193,10 @@ func main() {
 	defer resp.Body.Close()
 
 	if *verboseFlag {
+		slog.Info("HTTP Proto", "version", resp.Proto)
+		slog.Info("HTTP Status", "status", resp.Status)
 		for k, v := range resp.Header {
-			debugLog.Printf("%v: %v", k, v)
+			slog.Debug("Header", "key", k, "value", v)
 		}
 	}
 
