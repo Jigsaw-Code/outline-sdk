@@ -284,7 +284,7 @@ func SanitizeConfig(configStr string) (string, error) {
 				return "", err
 			}
 		case "socks5":
-			part, err = sanitizeSocks5URL(&config.URL)
+			part, err = sanitizeSOCKS5URL(&config.URL)
 			if err != nil {
 				return "", err
 			}
@@ -304,7 +304,7 @@ func SanitizeConfig(configStr string) (string, error) {
 	return sanitized, nil
 }
 
-func sanitizeSocks5URL(u *url.URL) (string, error) {
+func sanitizeSOCKS5URL(u *url.URL) (string, error) {
 	const redactedPlaceholder = "REDACTED"
 	if u.User != nil {
 		u.User = url.User(redactedPlaceholder)
