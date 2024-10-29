@@ -28,12 +28,7 @@ type Config struct {
 	BaseConfig *Config
 }
 
-// Provider creates an instance from a config.
-type Provider[ObjectType any] interface {
-	NewInstance(ctx context.Context, config *Config) (ObjectType, error)
-}
-
-// BuildFunc is a convenience type for functions that create a instances of ObjectType given a [Config].
+// BuildFunc is a function that creates an instance of ObjectType given a [Config].
 type BuildFunc[ObjectType any] func(ctx context.Context, config *Config) (ObjectType, error)
 
 // TypeRegistry registers config types.
@@ -41,7 +36,7 @@ type TypeRegistry[ObjectType any] interface {
 	RegisterType(subtype string, newInstance BuildFunc[ObjectType]) error
 }
 
-// ExtensibleProvider is [Provider] implementation that can be extended via its [TypeRegistry] interface.
+// ExtensibleProvider creates instances of ObjectType in a way that can be extended via its [TypeRegistry] interface.
 type ExtensibleProvider[ObjectType comparable] struct {
 	// Instance to return when config is nil.
 	BaseInstance ObjectType
@@ -49,7 +44,6 @@ type ExtensibleProvider[ObjectType comparable] struct {
 }
 
 var (
-	_ Provider[any]     = (*ExtensibleProvider[any])(nil)
 	_ BuildFunc[any]    = (*ExtensibleProvider[any])(nil).NewInstance
 	_ TypeRegistry[any] = (*ExtensibleProvider[any])(nil)
 )
