@@ -136,12 +136,16 @@ Defining custom strategies - You can define your custom strategy by implementing
 	// or
 	p := NewDefaultConfigModule()
 	// Register your custom dialer.
-	p.StreamDialers.RegisterType("custom", newStreamDialerWithCustom)
-	p.PacketDialers.RegisterType("custom", newPacketDialerWithCustom)
-	// then use it
+	p.StreamDialers.RegisterType("custom", func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+	  // Build logic
+	  // ...
+	})
+	p.PacketDialers.RegisterType("custom", func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
+	  // Build logic
+	  // ...
+	})
+	// Then use it
 	dialer, err := p.NewStreamDialer(context.Background(), "custom://config")
-
-where newStreamDialerWithCustom and newPacketDialerWithCustom implement [BuildFunc[transport.StreamDialer]] and [BuildFunc[transport.PacketDialer]].
 
 [Onion Routing]: https://en.wikipedia.org/wiki/Onion_routing
 */

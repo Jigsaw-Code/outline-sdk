@@ -22,12 +22,36 @@ import (
 	"strings"
 )
 
+// Config is a pre-parsed generic config created from pipe-separated URLs.
+type Config struct {
+	URL        url.URL
+	BaseConfig *Config
+}
+
+// Provider creates an instance from a config.
+type Provider[ObjectType any] interface {
+	NewInstance(ctx context.Context, config *Config) (ObjectType, error)
+}
+
+// BuildFunc is a convenience type for functions that create a instances of ObjectType given a [Config].
+type BuildFunc[ObjectType any] func(ctx context.Context, config *Config) (ObjectType, error)
+
+// TypeRegistry registers config types.
+type TypeRegistry[ObjectType any] interface {
+	RegisterType(subtype string, newInstance BuildFunc[ObjectType]) error
+}
+
+// ExtensibleProvider is [Provider] implementation that can be extended via its [TypeRegistry] interface.
 type ExtensibleProvider[ObjectType comparable] struct {
+	// Instance to return when config is nil.
 	BaseInstance ObjectType
 	builders     map[string]BuildFunc[ObjectType]
 }
 
-type BuildFunc[ObjectType any] func(ctx context.Context, config *Config) (ObjectType, error)
+var (
+	_ Provider[any]     = (*ExtensibleProvider[any])(nil)
+	_ TypeRegistry[any] = (*ExtensibleProvider[any])(nil)
+)
 
 func (p *ExtensibleProvider[ObjectType]) buildersMap() map[string]BuildFunc[ObjectType] {
 	if p.builders == nil {
@@ -37,16 +61,16 @@ func (p *ExtensibleProvider[ObjectType]) buildersMap() map[string]BuildFunc[Obje
 }
 
 // RegisterType will register a factory for the given subtype.
-func (p *ExtensibleProvider[ObjectType]) RegisterType(subtype string, newDialer BuildFunc[ObjectType]) error {
+func (p *ExtensibleProvider[ObjectType]) RegisterType(subtype string, newInstance BuildFunc[ObjectType]) error {
 	builders := p.buildersMap()
 	if _, found := builders[subtype]; found {
 		return fmt.Errorf("type %v registered twice", subtype)
 	}
-	builders[subtype] = newDialer
+	builders[subtype] = newInstance
 	return nil
 }
 
-// NewInstance creates a new instance according to the config.
+// NewInstance creates a new instance of ObjectType according to the config.
 func (p *ExtensibleProvider[ObjectType]) NewInstance(ctx context.Context, config *Config) (ObjectType, error) {
 	var zero ObjectType
 	if config == nil {
@@ -63,27 +87,7 @@ func (p *ExtensibleProvider[ObjectType]) NewInstance(ctx context.Context, config
 	return newDialer(ctx, config)
 }
 
-var (
-	_ Provider[any]     = (*ExtensibleProvider[any])(nil)
-	_ TypeRegistry[any] = (*ExtensibleProvider[any])(nil)
-)
-
-// Provider creates an instance from a config.
-type Provider[ObjectType any] interface {
-	NewInstance(ctx context.Context, config *Config) (ObjectType, error)
-}
-
-// TypeRegistry registers config types.
-type TypeRegistry[ObjectType any] interface {
-	RegisterType(subtype string, newInstance BuildFunc[ObjectType]) error
-}
-
-// Transport config.
-type Config struct {
-	URL        url.URL
-	BaseConfig *Config
-}
-
+// ParseConfig will parse a config given as a string and return the structured [Config].
 func ParseConfig(configText string) (*Config, error) {
 	parts := strings.Split(strings.TrimSpace(configText), "|")
 	if len(parts) == 1 && parts[0] == "" {
