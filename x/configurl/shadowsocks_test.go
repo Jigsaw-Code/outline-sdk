@@ -142,7 +142,6 @@ func TestParseShadowsocksSIP002URLUnsuccessful(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, config.BaseConfig)
 
-	_, err = parseShadowsocksURL(config.URL)
-
-	require.Error(t, err)
+	_, err = parseShadowsocksSIP002URL(config.URL)
+	require.Error(t, err, "URL is %v", config.URL.String())
 }

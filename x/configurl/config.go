@@ -273,11 +273,10 @@ func SanitizeConfig(configStr string) (string, error) {
 		return "", nil
 	}
 
-	// Iterate through each part
-	textParts := make([]string, 0, 1)
+	var sanitized string
 	for config != nil {
-		scheme := strings.ToLower(config.URL.Scheme)
 		var part string
+		scheme := strings.ToLower(config.URL.Scheme)
 		switch scheme {
 		case "ss":
 			part, err = sanitizeShadowsocksURL(config.URL)
@@ -295,10 +294,14 @@ func SanitizeConfig(configStr string) (string, error) {
 		default:
 			part = scheme + "://UNKNOWN"
 		}
-		textParts = append(textParts, part)
+		if sanitized == "" {
+			sanitized = part
+		} else {
+			sanitized = part + "|" + sanitized
+		}
+		config = config.BaseConfig
 	}
-	// Join the parts back into a string
-	return strings.Join(textParts, "|"), nil
+	return sanitized, nil
 }
 
 func sanitizeSocks5URL(u *url.URL) (string, error) {
