@@ -50,6 +50,7 @@ type ExtensibleProvider[ObjectType comparable] struct {
 
 var (
 	_ Provider[any]     = (*ExtensibleProvider[any])(nil)
+	_ BuildFunc[any]    = (*ExtensibleProvider[any])(nil).NewInstance
 	_ TypeRegistry[any] = (*ExtensibleProvider[any])(nil)
 )
 
