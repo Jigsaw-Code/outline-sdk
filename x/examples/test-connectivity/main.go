@@ -240,7 +240,7 @@ func main() {
 			var mu sync.Mutex
 			dnsReports := make([]dnsReport, 0)
 			tcpReports := make([]tcpReport, 0)
-			configToDialer := configurl.NewDefaultConfigToDialer()
+			configModule := configurl.NewDefaultConfigModule()
 			onDNS := func(ctx context.Context, domain string) func(di httptrace.DNSDoneInfo) {
 				dnsStart := time.Now()
 				return func(di httptrace.DNSDoneInfo) {
@@ -260,7 +260,7 @@ func main() {
 					mu.Unlock()
 				}
 			}
-			configToDialer.BaseStreamDialer = transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+			configModule.StreamDialers.BaseInstance = transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
 				hostname, _, err := net.SplitHostPort(addr)
 				if err != nil {
 					return nil, err
@@ -284,13 +284,13 @@ func main() {
 				}
 				return newTCPTraceDialer(onDNS, onDial).DialStream(ctx, addr)
 			})
-			configToDialer.BasePacketDialer = transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			configModule.PacketDialers.BaseInstance = transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 				return newUDPTraceDialer(onDNS).DialPacket(ctx, addr)
 			})
 
 			switch proto {
 			case "tcp":
-				streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
+				streamDialer, err := configModule.NewStreamDialer(context.Background(), *transportFlag)
 				if err != nil {
 					slog.Error("Failed to create StreamDialer", "error", err)
 					os.Exit(1)
@@ -298,7 +298,7 @@ func main() {
 				resolver = dns.NewTCPResolver(streamDialer, resolverAddress)
 
 			case "udp":
-				packetDialer, err := configToDialer.NewPacketDialer(*transportFlag)
+				packetDialer, err := configModule.NewPacketDialer(context.Background(), *transportFlag)
 				if err != nil {
 					slog.Error("Failed to create PacketDialer", "error", err)
 					os.Exit(1)

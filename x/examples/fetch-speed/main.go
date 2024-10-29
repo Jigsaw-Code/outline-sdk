@@ -58,7 +58,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	dialer, err := configurl.NewDefaultConfigToDialer().NewStreamDialer(*transportFlag)
+	dialer, err := configurl.NewDefaultConfigModule().NewStreamDialer(context.Background(), *transportFlag)
 	if err != nil {
 		log.Fatalf("Could not create dialer: %v\n", err)
 	}

@@ -24,8 +24,8 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
 )
 
-func registerTLSStreamDialer(r StreamDialerRegistry, typeID string, newSD NewStreamDialerFunc) {
-	r.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+func registerTLSStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
+	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		sd, err := newSD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err

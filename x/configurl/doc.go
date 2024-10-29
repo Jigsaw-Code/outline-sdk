@@ -13,11 +13,11 @@
 // limitations under the License.
 
 /*
-Package config provides convenience functions to create dialer objects based on a text config.
+Package configurl provides convenience functions to create network objects based on a text config.
 This is experimental and mostly for illustrative purposes at this point.
 
-Configurable transports simplifies the way you create and manage transports.
-With the config package, you can use [NewPacketDialer] and [NewStreamDialer] to create dialers using a simple text string.
+Configurable strategies simplifies the way you create and manage strategies.
+With the configurl package, you can use [NewPacketDialer], [NewStreamDialer] and [NewPacketListener] to create objects using a simple text string.
 
 Key Benefits:
 
@@ -129,19 +129,19 @@ DPI Evasion - To add packet splitting to a Shadowsocks server for enhanced DPI e
 
 	split:2|ss://[USERINFO]@[HOST]:[PORT]
 
-Defining custom transport - You can define your custom transport by implementing and registering the [NewStreamDialerFunc] and [NewPacketDialerFunc] functions:
+Defining custom strategies - You can define your custom strategy by implementing and registering [BuildFunc[ObjectType]] functions:
 
-	// create new config parser
-	// p := new(ConfigToDialer)
+	// Create new config parser.
+	// p := new(ConfigModule)
 	// or
-	p := NewDefaultConfigToDialer()
-	// register your custom dialer
-	p.RegisterPacketDialerWrapper("custom", wrapStreamDialerWithCustom)
-	p.RegisterStreamDialerWrapper("custom", wrapPacketDialerWithCustom)
+	p := NewDefaultConfigModule()
+	// Register your custom dialer.
+	p.StreamDialers.RegisterType("custom", newStreamDialerWithCustom)
+	p.PacketDialers.RegisterType("custom", newPacketDialerWithCustom)
 	// then use it
-	dialer, err := p.NewStreamDialer(innerDialer, "custom://config")
+	dialer, err := p.NewStreamDialer(context.Background(), "custom://config")
 
-where wrapStreamDialerWithCustom and wrapPacketDialerWithCustom implement [NewPacketDialerFunc] and [NewStreamDialerFunc].
+where newStreamDialerWithCustom and newPacketDialerWithCustom implement [BuildFunc[transport.StreamDialer]] and [BuildFunc[transport.PacketDialer]].
 
 [Onion Routing]: https://en.wikipedia.org/wiki/Onion_routing
 */

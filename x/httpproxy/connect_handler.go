@@ -52,7 +52,7 @@ func (d *sanitizeErrorDialer) DialStream(ctx context.Context, addr string) (tran
 
 type connectHandler struct {
 	dialer       *sanitizeErrorDialer
-	dialerConfig *configurl.ConfigToDialer
+	configModule *configurl.ConfigModule
 }
 
 var _ http.Handler = (*connectHandler)(nil)
@@ -77,7 +77,7 @@ func (h *connectHandler) ServeHTTP(proxyResp http.ResponseWriter, proxyReq *http
 
 	// Dial the target.
 	transportConfig := proxyReq.Header.Get("Transport")
-	dialer, err := h.dialerConfig.NewStreamDialer(transportConfig)
+	dialer, err := h.configModule.NewStreamDialer(proxyReq.Context(), transportConfig)
 	if err != nil {
 		// Because we sanitize the base dialer error, it's safe to return error details here.
 		http.Error(proxyResp, fmt.Sprintf("Invalid config in Transport header: %v", err), http.StatusBadRequest)
@@ -149,7 +149,7 @@ func NewConnectHandler(dialer transport.StreamDialer) http.Handler {
 	// of the base dialer (e.g. access key credentials) to the user.
 	sd := &sanitizeErrorDialer{dialer}
 	// TODO(fortuna): Inject the config parser
-	dialerConfig := configurl.NewDefaultConfigToDialer()
-	dialerConfig.BaseStreamDialer = sd
-	return &connectHandler{sd, dialerConfig}
+	configModule := configurl.NewDefaultConfigModule()
+	configModule.StreamDialers.BaseInstance = sd
+	return &connectHandler{sd, configModule}
 }
