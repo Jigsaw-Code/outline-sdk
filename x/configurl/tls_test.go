@@ -22,9 +22,9 @@ import (
 )
 
 func TestTLS_SNI(t *testing.T) {
-	tlsURL, err := ParseConfig("tls:sni=www.google.com")
+	config, err := ParseConfig("tls:sni=www.google.com")
 	require.NoError(t, err)
-	options, err := parseOptions(tlsURL.URL)
+	options, err := parseOptions(config.URL)
 	require.NoError(t, err)
 	cfg := tls.ClientConfig{ServerName: "host", CertificateName: "host"}
 	for _, option := range options {
