@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/url"
 	"strings"
@@ -37,15 +36,9 @@ func registerDO53StreamDialer(r TypeRegistry[transport.StreamDialer], typeID str
 		if err != nil {
 			return nil, err
 		}
-		if closer, ok := sd.(io.Closer); ok {
-			defer closer.Close()
-		}
 		pd, err := newPD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
-		}
-		if closer, ok := pd.(io.Closer); ok {
-			defer closer.Close()
 		}
 		resolver, err := newDO53Resolver(config.URL, sd, pd)
 		if err != nil {
