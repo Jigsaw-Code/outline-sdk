@@ -60,10 +60,10 @@ func main() {
 	defer listener.Close()
 	log.Printf("Proxy listening on %v\n", listener.Addr().String())
 
-	configModule := configurl.NewDefaultConfigModule()
+	providers := configurl.NewDefaultProviders()
 	mux := http.NewServeMux()
 	if *tcpPathFlag != "" {
-		dialer, err := configModule.NewStreamDialer(context.Background(), *transportFlag)
+		dialer, err := providers.NewStreamDialer(context.Background(), *transportFlag)
 		if err != nil {
 			log.Fatalf("Could not create stream dialer: %v", err)
 		}
@@ -90,7 +90,7 @@ func main() {
 		mux.Handle(*tcpPathFlag, http.StripPrefix(*tcpPathFlag, handler))
 	}
 	if *udpPathFlag != "" {
-		dialer, err := configModule.NewPacketDialer(context.Background(), *transportFlag)
+		dialer, err := providers.NewPacketDialer(context.Background(), *transportFlag)
 		if err != nil {
 			log.Fatalf("Could not create stream dialer: %v", err)
 		}

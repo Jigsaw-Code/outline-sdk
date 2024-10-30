@@ -40,7 +40,7 @@ type OutlineDevice struct {
 	svrIP net.IP
 }
 
-var configModule = configurl.NewDefaultConfigModule()
+var configModule = configurl.NewDefaultProviders()
 
 func NewOutlineDevice(transportConfig string) (od *OutlineDevice, err error) {
 	ip, err := resolveShadowsocksServerIPFromConfig(transportConfig)

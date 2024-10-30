@@ -22,51 +22,59 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
-// ConfigModule enables the creation of network objects based on a config. The config is
-// extensible by registering providers for config subtypes.
-type ConfigModule struct {
+// ProviderContainer contains providers for the creation of network objects based on a config. The config is
+// extensible by registering providers for different config subtypes.
+type ProviderContainer struct {
 	StreamDialers   ExtensibleProvider[transport.StreamDialer]
 	PacketDialers   ExtensibleProvider[transport.PacketDialer]
 	PacketListeners ExtensibleProvider[transport.PacketListener]
 }
 
-// NewDefaultConfigModule creates a [ConfigModule] with a set of default wrappers already registered.
-func NewDefaultConfigModule() *ConfigModule {
-	p := new(ConfigModule)
+// NewProviderContainer creates a [ProviderContainer] with the base instances properly initialized.
+func NewProviderContainer() *ProviderContainer {
+	return &ProviderContainer{
+		StreamDialers:   ExtensibleProvider[transport.StreamDialer]{BaseInstance: &transport.TCPDialer{}},
+		PacketDialers:   ExtensibleProvider[transport.PacketDialer]{BaseInstance: &transport.UDPDialer{}},
+		PacketListeners: ExtensibleProvider[transport.PacketListener]{BaseInstance: &transport.UDPListener{}},
+	}
+}
 
-	p.StreamDialers.BaseInstance = &transport.TCPDialer{}
-	p.PacketDialers.BaseInstance = &transport.UDPDialer{}
-	p.PacketListeners.BaseInstance = &transport.UDPListener{}
-
+// RegisterDefaultProviders registers a set of default providers with the providers in [ProviderContainer].
+func RegisterDefaultProviders(c *ProviderContainer) *ProviderContainer {
 	// Please keep the list in alphabetical order.
-	registerDO53StreamDialer(&p.StreamDialers, "do53", p.StreamDialers.NewInstance, p.PacketDialers.NewInstance)
-	registerDOHStreamDialer(&p.StreamDialers, "doh", p.StreamDialers.NewInstance)
+	registerDO53StreamDialer(&c.StreamDialers, "do53", c.StreamDialers.NewInstance, c.PacketDialers.NewInstance)
+	registerDOHStreamDialer(&c.StreamDialers, "doh", c.StreamDialers.NewInstance)
 
-	registerOverrideStreamDialer(&p.StreamDialers, "override", p.StreamDialers.NewInstance)
-	registerOverridePacketDialer(&p.PacketDialers, "override", p.PacketDialers.NewInstance)
+	registerOverrideStreamDialer(&c.StreamDialers, "override", c.StreamDialers.NewInstance)
+	registerOverridePacketDialer(&c.PacketDialers, "override", c.PacketDialers.NewInstance)
 
-	registerSOCKS5StreamDialer(&p.StreamDialers, "socks5", p.StreamDialers.NewInstance)
-	registerSOCKS5PacketDialer(&p.PacketDialers, "socks5", p.StreamDialers.NewInstance, p.PacketDialers.NewInstance)
-	registerSOCKS5PacketListener(&p.PacketListeners, "socks5", p.StreamDialers.NewInstance, p.PacketDialers.NewInstance)
+	registerSOCKS5StreamDialer(&c.StreamDialers, "socks5", c.StreamDialers.NewInstance)
+	registerSOCKS5PacketDialer(&c.PacketDialers, "socks5", c.StreamDialers.NewInstance, c.PacketDialers.NewInstance)
+	registerSOCKS5PacketListener(&c.PacketListeners, "socks5", c.StreamDialers.NewInstance, c.PacketDialers.NewInstance)
 
-	registerSplitStreamDialer(&p.StreamDialers, "split", p.StreamDialers.NewInstance)
+	registerSplitStreamDialer(&c.StreamDialers, "split", c.StreamDialers.NewInstance)
 
-	registerShadowsocksStreamDialer(&p.StreamDialers, "ss", p.StreamDialers.NewInstance)
-	registerShadowsocksPacketDialer(&p.PacketDialers, "ss", p.PacketDialers.NewInstance)
-	registerShadowsocksPacketListener(&p.PacketListeners, "ss", p.PacketDialers.NewInstance)
+	registerShadowsocksStreamDialer(&c.StreamDialers, "ss", c.StreamDialers.NewInstance)
+	registerShadowsocksPacketDialer(&c.PacketDialers, "ss", c.PacketDialers.NewInstance)
+	registerShadowsocksPacketListener(&c.PacketListeners, "ss", c.PacketDialers.NewInstance)
 
-	registerTLSStreamDialer(&p.StreamDialers, "tls", p.StreamDialers.NewInstance)
+	registerTLSStreamDialer(&c.StreamDialers, "tls", c.StreamDialers.NewInstance)
 
-	registerTLSFragStreamDialer(&p.StreamDialers, "tlsfrag", p.StreamDialers.NewInstance)
+	registerTLSFragStreamDialer(&c.StreamDialers, "tlsfrag", c.StreamDialers.NewInstance)
 
-	registerWebsocketStreamDialer(&p.StreamDialers, "ws", p.StreamDialers.NewInstance)
-	registerWebsocketPacketDialer(&p.PacketDialers, "ws", p.StreamDialers.NewInstance)
+	registerWebsocketStreamDialer(&c.StreamDialers, "ws", c.StreamDialers.NewInstance)
+	registerWebsocketPacketDialer(&c.PacketDialers, "ws", c.StreamDialers.NewInstance)
 
-	return p
+	return c
+}
+
+// NewDefaultProviders creates a [ProviderContainer] with a set of default providers already registered.
+func NewDefaultProviders() *ProviderContainer {
+	return RegisterDefaultProviders(NewProviderContainer())
 }
 
 // NewStreamDialer creates a [transport.StreamDialer] according to the config text.
-func (p *ConfigModule) NewStreamDialer(ctx context.Context, configText string) (transport.StreamDialer, error) {
+func (p *ProviderContainer) NewStreamDialer(ctx context.Context, configText string) (transport.StreamDialer, error) {
 	config, err := ParseConfig(configText)
 	if err != nil {
 		return nil, err
@@ -75,7 +83,7 @@ func (p *ConfigModule) NewStreamDialer(ctx context.Context, configText string) (
 }
 
 // NewPacketDialer creates a [transport.PacketDialer] according to the config text.
-func (p *ConfigModule) NewPacketDialer(ctx context.Context, configText string) (transport.PacketDialer, error) {
+func (p *ProviderContainer) NewPacketDialer(ctx context.Context, configText string) (transport.PacketDialer, error) {
 	config, err := ParseConfig(configText)
 	if err != nil {
 		return nil, err
@@ -84,7 +92,7 @@ func (p *ConfigModule) NewPacketDialer(ctx context.Context, configText string) (
 }
 
 // NewPacketListner creates a [transport.PacketListener] according to the config text.
-func (p *ConfigModule) NewPacketListener(ctx context.Context, configText string) (transport.PacketListener, error) {
+func (p *ProviderContainer) NewPacketListener(ctx context.Context, configText string) (transport.PacketListener, error) {
 	config, err := ParseConfig(configText)
 	if err != nil {
 		return nil, err
