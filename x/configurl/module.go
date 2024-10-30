@@ -92,6 +92,7 @@ func (p *ConfigModule) NewPacketListener(ctx context.Context, configText string)
 	return p.PacketListeners.NewInstance(ctx, config)
 }
 
+// SanitizeConfig removes sensitive information from the given config so it can be safely be used in logging and debugging.
 func SanitizeConfig(configStr string) (string, error) {
 	config, err := ParseConfig(configStr)
 	if err != nil {
