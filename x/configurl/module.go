@@ -65,21 +65,6 @@ func NewDefaultConfigModule() *ConfigModule {
 	return p
 }
 
-// RegisterStreamDialerType will register a factory for stream dialers under the given subtype.
-func (p *ConfigModule) RegisterStreamDialerType(subtype string, newInstance BuildFunc[transport.StreamDialer]) {
-	p.StreamDialers.RegisterType(subtype, newInstance)
-}
-
-// RegisterPacketDialerType will register a factory for packet dialers under the given subtype.
-func (p *ConfigModule) RegisterPacketDialerType(subtype string, newInstance BuildFunc[transport.PacketDialer]) {
-	p.PacketDialers.RegisterType(subtype, newInstance)
-}
-
-// RegisterPacketListenerType will register a factory for packet listeners under the given subtype.
-func (p *ConfigModule) RegisterPacketListenerType(subtype string, newInstance BuildFunc[transport.PacketListener]) {
-	p.PacketListeners.RegisterType(subtype, newInstance)
-}
-
 // NewStreamDialer creates a [transport.StreamDialer] according to the config text.
 func (p *ConfigModule) NewStreamDialer(ctx context.Context, configText string) (transport.StreamDialer, error) {
 	config, err := ParseConfig(configText)
