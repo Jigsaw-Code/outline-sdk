@@ -70,11 +70,11 @@ func (p *ExtensibleProvider[ObjectType]) NewInstance(ctx context.Context, config
 		return p.BaseInstance, nil
 	}
 
-	newDialer, ok := p.buildersMap()[config.URL.Scheme]
+	newInstance, ok := p.buildersMap()[config.URL.Scheme]
 	if !ok {
 		return zero, fmt.Errorf("config type '%v' is not registered", config.URL.Scheme)
 	}
-	return newDialer(ctx, config)
+	return newInstance(ctx, config)
 }
 
 // ParseConfig will parse a config given as a string and return the structured [Config].
