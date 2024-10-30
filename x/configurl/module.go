@@ -33,9 +33,9 @@ type ProviderContainer struct {
 // NewProviderContainer creates a [ProviderContainer] with the base instances properly initialized.
 func NewProviderContainer() *ProviderContainer {
 	return &ProviderContainer{
-		StreamDialers:   ExtensibleProvider[transport.StreamDialer]{BaseInstance: &transport.TCPDialer{}},
-		PacketDialers:   ExtensibleProvider[transport.PacketDialer]{BaseInstance: &transport.UDPDialer{}},
-		PacketListeners: ExtensibleProvider[transport.PacketListener]{BaseInstance: &transport.UDPListener{}},
+		StreamDialers:   NewExtensibleProvider[transport.StreamDialer](&transport.TCPDialer{}),
+		PacketDialers:   NewExtensibleProvider[transport.PacketDialer](&transport.UDPDialer{}),
+		PacketListeners: NewExtensibleProvider[transport.PacketListener](&transport.UDPListener{}),
 	}
 }
 

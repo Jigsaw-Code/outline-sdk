@@ -48,7 +48,15 @@ var (
 	_ TypeRegistry[any] = (*ExtensibleProvider[any])(nil)
 )
 
-func (p *ExtensibleProvider[ObjectType]) buildersMap() map[string]BuildFunc[ObjectType] {
+// NewExtensibleProvider creates an [ExtensibleProvider] with the given base instance.
+func NewExtensibleProvider[ObjectType comparable](baseInstance ObjectType) ExtensibleProvider[ObjectType] {
+	return ExtensibleProvider[ObjectType]{
+		BaseInstance: baseInstance,
+		builders:     make(map[string]BuildFunc[ObjectType]),
+	}
+}
+
+func (p *ExtensibleProvider[ObjectType]) ensureBuildersMap() map[string]BuildFunc[ObjectType] {
 	if p.builders == nil {
 		p.builders = make(map[string]BuildFunc[ObjectType])
 	}
@@ -57,7 +65,7 @@ func (p *ExtensibleProvider[ObjectType]) buildersMap() map[string]BuildFunc[Obje
 
 // RegisterType will register a factory for the given subtype.
 func (p *ExtensibleProvider[ObjectType]) RegisterType(subtype string, newInstance BuildFunc[ObjectType]) {
-	p.buildersMap()[subtype] = newInstance
+	p.ensureBuildersMap()[subtype] = newInstance
 }
 
 // NewInstance creates a new instance of ObjectType according to the config.
@@ -70,7 +78,7 @@ func (p *ExtensibleProvider[ObjectType]) NewInstance(ctx context.Context, config
 		return p.BaseInstance, nil
 	}
 
-	newInstance, ok := p.buildersMap()[config.URL.Scheme]
+	newInstance, ok := p.ensureBuildersMap()[config.URL.Scheme]
 	if !ok {
 		return zero, fmt.Errorf("config type '%v' is not registered", config.URL.Scheme)
 	}
