@@ -17,7 +17,7 @@ Package configurl provides convenience functions to create network objects based
 This is experimental and mostly for illustrative purposes at this point.
 
 Configurable strategies simplifies the way you create and manage strategies.
-With the configurl package, you can use [NewPacketDialer], [NewStreamDialer] and [NewPacketListener] to create objects using a simple text string.
+With the configurl package, you can use [ConfigModule.NewPacketDialer], [ConfigModule.NewStreamDialer] and [ConfigModule.NewPacketListener] to create objects using a simple text string.
 
 Key Benefits:
 
