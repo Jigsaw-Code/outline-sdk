@@ -179,6 +179,10 @@ func main() {
 				if err != nil {
 					return nil, err
 				}
+				// conn.WriteTo([]byte{0xcf, 0, 0, 0, 1}, a)
+				// conn.WriteTo([]byte{0xcf, 0, 0, 0, 1}, a)
+				conn.WriteTo([]byte{1, 0, 0, 0, 1}, a)
+				conn.WriteTo([]byte{1, 0, 0, 0, 1}, a)
 				return tr.DialEarly(ctx, a, tlsConf, quicConf)
 			},
 			Logger: slog.Default(),
