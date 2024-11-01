@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/url"
 	"strings"
@@ -28,8 +27,8 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 )
 
-func registerDO53StreamDialer(r StreamDialerRegistry, typeID string, newSD NewStreamDialerFunc, newPD NewPacketDialerFunc) {
-	r.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+func registerDO53StreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer], newPD BuildFunc[transport.PacketDialer]) {
+	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		if config == nil {
 			return nil, fmt.Errorf("emtpy do53 config")
 		}
@@ -37,15 +36,9 @@ func registerDO53StreamDialer(r StreamDialerRegistry, typeID string, newSD NewSt
 		if err != nil {
 			return nil, err
 		}
-		if closer, ok := sd.(io.Closer); ok {
-			defer closer.Close()
-		}
 		pd, err := newPD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
-		}
-		if closer, ok := pd.(io.Closer); ok {
-			defer closer.Close()
 		}
 		resolver, err := newDO53Resolver(config.URL, sd, pd)
 		if err != nil {
@@ -55,8 +48,8 @@ func registerDO53StreamDialer(r StreamDialerRegistry, typeID string, newSD NewSt
 	})
 }
 
-func registerDOHStreamDialer(r StreamDialerRegistry, typeID string, newSD NewStreamDialerFunc) {
-	r.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+func registerDOHStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
+	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		if config == nil {
 			return nil, fmt.Errorf("emtpy doh config")
 		}

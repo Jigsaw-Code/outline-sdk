@@ -21,14 +21,14 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/socks5"
 )
 
-func registerSOCKS5StreamDialer(r StreamDialerRegistry, typeID string, newSD NewStreamDialerFunc) {
-	r.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+func registerSOCKS5StreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
+	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		return newSOCKS5Client(ctx, *config, newSD)
 	})
 }
 
-func registerSOCKS5PacketDialer(r PacketDialerRegistry, typeID string, newSD NewStreamDialerFunc, newPD NewPacketDialerFunc) {
-	r.RegisterPacketDialerType(typeID, func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
+func registerSOCKS5PacketDialer(r TypeRegistry[transport.PacketDialer], typeID string, newSD BuildFunc[transport.StreamDialer], newPD BuildFunc[transport.PacketDialer]) {
+	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
 		client, err := newSOCKS5Client(ctx, *config, newSD)
 		if err != nil {
 			return nil, err
@@ -42,8 +42,8 @@ func registerSOCKS5PacketDialer(r PacketDialerRegistry, typeID string, newSD New
 	})
 }
 
-func registerSOCKS5PacketListener(r PacketListenerRegistry, typeID string, newSD NewStreamDialerFunc, newPD NewPacketDialerFunc) {
-	r.RegisterPacketListenerType(typeID, func(ctx context.Context, config *Config) (transport.PacketListener, error) {
+func registerSOCKS5PacketListener(r TypeRegistry[transport.PacketListener], typeID string, newSD BuildFunc[transport.StreamDialer], newPD BuildFunc[transport.PacketDialer]) {
+	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.PacketListener, error) {
 		client, err := newSOCKS5Client(ctx, *config, newSD)
 		if err != nil {
 			return nil, err
@@ -57,7 +57,7 @@ func registerSOCKS5PacketListener(r PacketListenerRegistry, typeID string, newSD
 	})
 }
 
-func newSOCKS5Client(ctx context.Context, config Config, newSD NewStreamDialerFunc) (*socks5.Client, error) {
+func newSOCKS5Client(ctx context.Context, config Config, newSD BuildFunc[transport.StreamDialer]) (*socks5.Client, error) {
 	sd, err := newSD(ctx, config.BaseConfig)
 	if err != nil {
 		return nil, err

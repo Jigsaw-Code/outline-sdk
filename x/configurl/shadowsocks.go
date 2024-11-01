@@ -26,8 +26,8 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
 )
 
-func registerShadowsocksStreamDialer(r StreamDialerRegistry, typeID string, newSD NewStreamDialerFunc) {
-	r.RegisterStreamDialerType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+func registerShadowsocksStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
+	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		sd, err := newSD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
@@ -48,8 +48,8 @@ func registerShadowsocksStreamDialer(r StreamDialerRegistry, typeID string, newS
 	})
 }
 
-func registerShadowsocksPacketDialer(r PacketDialerRegistry, typeID string, newPD NewPacketDialerFunc) {
-	r.RegisterPacketDialerType(typeID, func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
+func registerShadowsocksPacketDialer(r TypeRegistry[transport.PacketDialer], typeID string, newPD BuildFunc[transport.PacketDialer]) {
+	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
 		pd, err := newPD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
@@ -68,8 +68,8 @@ func registerShadowsocksPacketDialer(r PacketDialerRegistry, typeID string, newP
 	})
 }
 
-func registerShadowsocksPacketListener(r PacketListenerRegistry, typeID string, newPD NewPacketDialerFunc) {
-	r.RegisterPacketListenerType(typeID, func(ctx context.Context, config *Config) (transport.PacketListener, error) {
+func registerShadowsocksPacketListener(r TypeRegistry[transport.PacketListener], typeID string, newPD BuildFunc[transport.PacketDialer]) {
+	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.PacketListener, error) {
 		pd, err := newPD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err

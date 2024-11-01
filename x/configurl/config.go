@@ -20,76 +20,72 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-
-	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
-// ConfigToDialer enables the creation of stream and packet dialers based on a config. The config is
-// extensible by registering wrappers for config subtypes.
-type ConfigToDialer struct {
-	BaseStreamDialer   transport.StreamDialer
-	BasePacketDialer   transport.PacketDialer
-	BasePacketListener transport.PacketListener
-
-	sdBuilders map[string]NewStreamDialerFunc
-	pdBuilders map[string]NewPacketDialerFunc
-	plBuilders map[string]NewPacketListenerFunc
-}
-
-var (
-	_ ConfigToStreamDialer   = (*ConfigToDialer)(nil)
-	_ StreamDialerRegistry   = (*ConfigToDialer)(nil)
-	_ ConfigToPacketDialer   = (*ConfigToDialer)(nil)
-	_ PacketDialerRegistry   = (*ConfigToDialer)(nil)
-	_ ConfigToPacketListener = (*ConfigToDialer)(nil)
-	_ PacketListenerRegistry = (*ConfigToDialer)(nil)
-)
-
-// ConfigToStreamDialer creates a [transport.StreamDialer] from a config.
-type ConfigToStreamDialer interface {
-	NewStreamDialerFromConfig(ctx context.Context, config *Config) (transport.StreamDialer, error)
-}
-
-// StreamDialerRegistry registers [transport.StreamDialer] types.
-type StreamDialerRegistry interface {
-	RegisterStreamDialerType(subtype string, newInstance NewStreamDialerFunc) error
-}
-
-// ConfigToPacketDialer creates a [transport.PacketDialer] from a config.
-type ConfigToPacketDialer interface {
-	NewPacketDialerFromConfig(ctx context.Context, config *Config) (transport.PacketDialer, error)
-}
-
-// PacketDialerRegistry registers [transport.PacketDialer] types.
-type PacketDialerRegistry interface {
-	RegisterPacketDialerType(subtype string, newInstance NewPacketDialerFunc) error
-}
-
-// ConfigToPacketListener creates a [transport.PacketListener] from a config.
-type ConfigToPacketListener interface {
-	NewPacketListenerFromConfig(ctx context.Context, config *Config) (transport.PacketListener, error)
-}
-
-// PacketListenerRegistry registers [transport.PacketListener] types.
-type PacketListenerRegistry interface {
-	RegisterPacketListenerType(subtype string, newInstance NewPacketListenerFunc) error
-}
-
-// NewStreamDialerFunc creates a [transport.StreamDialer] based on the config.
-type NewStreamDialerFunc func(ctx context.Context, config *Config) (transport.StreamDialer, error)
-
-// NewPacketDialerFunc creates a [transport.PacketDialer] based on the config.
-type NewPacketDialerFunc func(ctx context.Context, config *Config) (transport.PacketDialer, error)
-
-// NewPacketListenerFunc creates a [net.PacketConn] based on the config.
-type NewPacketListenerFunc func(ctx context.Context, config *Config) (transport.PacketListener, error)
-
-// Transport config.
+// Config is a pre-parsed generic config created from pipe-separated URLs.
 type Config struct {
 	URL        url.URL
 	BaseConfig *Config
 }
 
+// BuildFunc is a function that creates an instance of ObjectType given a [Config].
+type BuildFunc[ObjectType any] func(ctx context.Context, config *Config) (ObjectType, error)
+
+// TypeRegistry registers config types.
+type TypeRegistry[ObjectType any] interface {
+	RegisterType(subtype string, newInstance BuildFunc[ObjectType])
+}
+
+// ExtensibleProvider creates instances of ObjectType in a way that can be extended via its [TypeRegistry] interface.
+type ExtensibleProvider[ObjectType comparable] struct {
+	// Instance to return when config is nil.
+	BaseInstance ObjectType
+	builders     map[string]BuildFunc[ObjectType]
+}
+
+var (
+	_ BuildFunc[any]    = (*ExtensibleProvider[any])(nil).NewInstance
+	_ TypeRegistry[any] = (*ExtensibleProvider[any])(nil)
+)
+
+// NewExtensibleProvider creates an [ExtensibleProvider] with the given base instance.
+func NewExtensibleProvider[ObjectType comparable](baseInstance ObjectType) ExtensibleProvider[ObjectType] {
+	return ExtensibleProvider[ObjectType]{
+		BaseInstance: baseInstance,
+		builders:     make(map[string]BuildFunc[ObjectType]),
+	}
+}
+
+func (p *ExtensibleProvider[ObjectType]) ensureBuildersMap() map[string]BuildFunc[ObjectType] {
+	if p.builders == nil {
+		p.builders = make(map[string]BuildFunc[ObjectType])
+	}
+	return p.builders
+}
+
+// RegisterType will register a factory for the given subtype.
+func (p *ExtensibleProvider[ObjectType]) RegisterType(subtype string, newInstance BuildFunc[ObjectType]) {
+	p.ensureBuildersMap()[subtype] = newInstance
+}
+
+// NewInstance creates a new instance of ObjectType according to the config.
+func (p *ExtensibleProvider[ObjectType]) NewInstance(ctx context.Context, config *Config) (ObjectType, error) {
+	var zero ObjectType
+	if config == nil {
+		if p.BaseInstance == zero {
+			return zero, errors.New("base instance is not configured")
+		}
+		return p.BaseInstance, nil
+	}
+
+	newInstance, ok := p.ensureBuildersMap()[config.URL.Scheme]
+	if !ok {
+		return zero, fmt.Errorf("config type '%v' is not registered", config.URL.Scheme)
+	}
+	return newInstance(ctx, config)
+}
+
+// ParseConfig will parse a config given as a string and return the structured [Config].
 func ParseConfig(configText string) (*Config, error) {
 	parts := strings.Split(strings.TrimSpace(configText), "|")
 	if len(parts) == 1 && parts[0] == "" {
@@ -113,202 +109,4 @@ func ParseConfig(configText string) (*Config, error) {
 		config = &Config{URL: *url, BaseConfig: config}
 	}
 	return config, nil
-}
-
-// NewDefaultConfigToDialer creates a [ConfigToDialer] with a set of default wrappers already registered.
-func NewDefaultConfigToDialer() *ConfigToDialer {
-	p := new(ConfigToDialer)
-
-	p.BaseStreamDialer = &transport.TCPDialer{}
-	p.BasePacketDialer = &transport.UDPDialer{}
-	p.BasePacketListener = &transport.UDPListener{}
-
-	// Please keep the list in alphabetical order.
-	registerDO53StreamDialer(p, "do53", p.NewStreamDialerFromConfig, p.NewPacketDialerFromConfig)
-	registerDOHStreamDialer(p, "doh", p.NewStreamDialerFromConfig)
-
-	registerOverrideStreamDialer(p, "override", p.NewStreamDialerFromConfig)
-	registerOverridePacketDialer(p, "override", p.NewPacketDialerFromConfig)
-
-	registerSOCKS5StreamDialer(p, "socks5", p.NewStreamDialerFromConfig)
-	registerSOCKS5PacketDialer(p, "socks5", p.NewStreamDialerFromConfig, p.NewPacketDialerFromConfig)
-	registerSOCKS5PacketListener(p, "socks5", p.NewStreamDialerFromConfig, p.NewPacketDialerFromConfig)
-
-	registerSplitStreamDialer(p, "split", p.NewStreamDialerFromConfig)
-
-	registerShadowsocksStreamDialer(p, "ss", p.NewStreamDialerFromConfig)
-	registerShadowsocksPacketDialer(p, "ss", p.NewPacketDialerFromConfig)
-	registerShadowsocksPacketListener(p, "ss", p.NewPacketDialerFromConfig)
-
-	registerTLSStreamDialer(p, "tls", p.NewStreamDialerFromConfig)
-
-	registerTLSFragStreamDialer(p, "tlsfrag", p.NewStreamDialerFromConfig)
-
-	registerWebsocketStreamDialer(p, "ws", p.NewStreamDialerFromConfig)
-	registerWebsocketPacketDialer(p, "ws", p.NewStreamDialerFromConfig)
-
-	return p
-}
-
-// RegisterStreamDialerType will register a factory for stream dialers under the given subtype.
-func (p *ConfigToDialer) RegisterStreamDialerType(subtype string, newDialer NewStreamDialerFunc) error {
-	if p.sdBuilders == nil {
-		p.sdBuilders = make(map[string]NewStreamDialerFunc)
-	}
-
-	if _, found := p.sdBuilders[subtype]; found {
-		return fmt.Errorf("config parser %v for StreamDialer added twice", subtype)
-	}
-	p.sdBuilders[subtype] = newDialer
-	return nil
-}
-
-// RegisterPacketDialerType will register a factory for packet dialers under the given subtype.
-func (p *ConfigToDialer) RegisterPacketDialerType(subtype string, newDialer NewPacketDialerFunc) error {
-	if p.pdBuilders == nil {
-		p.pdBuilders = make(map[string]NewPacketDialerFunc)
-	}
-
-	if _, found := p.pdBuilders[subtype]; found {
-		return fmt.Errorf("config parser %v for StreamDialer added twice", subtype)
-	}
-	p.pdBuilders[subtype] = newDialer
-	return nil
-}
-
-// RegisterPacketListenerType will register a factory for packet listeners under the given subtype.
-func (p *ConfigToDialer) RegisterPacketListenerType(subtype string, newPacketListener NewPacketListenerFunc) error {
-	if p.plBuilders == nil {
-		p.plBuilders = make(map[string]NewPacketListenerFunc)
-	}
-
-	if _, found := p.plBuilders[subtype]; found {
-		return fmt.Errorf("config parser %v for PacketConn added twice", subtype)
-	}
-	p.plBuilders[subtype] = newPacketListener
-	return nil
-}
-
-// NewStreamDialer creates a [transport.StreamDialer] according to the config text.
-func (p *ConfigToDialer) NewStreamDialer(configText string) (transport.StreamDialer, error) {
-	config, err := ParseConfig(configText)
-	if err != nil {
-		return nil, err
-	}
-	return p.NewStreamDialerFromConfig(context.Background(), config)
-}
-
-// NewStreamDialerFromConfig creates a [transport.StreamDialer] according to the config.
-func (p *ConfigToDialer) NewStreamDialerFromConfig(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-	if config == nil {
-		if p.BaseStreamDialer == nil {
-			return nil, errors.New("base stream dialer not configured")
-		}
-		return p.BaseStreamDialer, nil
-	}
-
-	newDialer, ok := p.sdBuilders[config.URL.Scheme]
-	if !ok {
-		return nil, fmt.Errorf("config scheme '%v' is not supported for Stream Dialers", config.URL.Scheme)
-	}
-	return newDialer(ctx, config)
-}
-
-// NewPacketDialer creates a [transport.PacketDialer] according to the config text.
-func (p *ConfigToDialer) NewPacketDialer(configText string) (transport.PacketDialer, error) {
-	config, err := ParseConfig(configText)
-	if err != nil {
-		return nil, err
-	}
-	return p.NewPacketDialerFromConfig(context.Background(), config)
-}
-
-func (p *ConfigToDialer) NewPacketDialerFromConfig(ctx context.Context, config *Config) (transport.PacketDialer, error) {
-	if config == nil {
-		if p.BasePacketDialer == nil {
-			return nil, errors.New("base packet dialer not configured")
-		}
-		return p.BasePacketDialer, nil
-	}
-
-	newDialer, ok := p.pdBuilders[config.URL.Scheme]
-	if !ok {
-		return nil, fmt.Errorf("config scheme '%v' is not supported for Packet Dialers", config.URL.Scheme)
-	}
-	return newDialer(ctx, config)
-}
-
-// NewPacketListner creates a [transport.PacketListener] according to the config text.
-func (p *ConfigToDialer) NewPacketListener(configText string) (transport.PacketListener, error) {
-	config, err := ParseConfig(configText)
-	if err != nil {
-		return nil, err
-	}
-	return p.NewPacketListenerFromConfig(context.Background(), config)
-}
-
-// NewPacketListenerFromconfig creates a [transport.PacketListener] according to config.
-func (p *ConfigToDialer) NewPacketListenerFromConfig(ctx context.Context, config *Config) (transport.PacketListener, error) {
-	if config == nil {
-		if p.BasePacketListener == nil {
-			return nil, errors.New("base packet listener not configured")
-		}
-		return p.BasePacketListener, nil
-	}
-	newPacketListener, ok := p.plBuilders[config.URL.Scheme]
-	if !ok {
-		return nil, fmt.Errorf("config scheme '%v' is not supported for Stream Dialers", config.URL.Scheme)
-	}
-	return newPacketListener(ctx, config)
-}
-
-func SanitizeConfig(configStr string) (string, error) {
-	config, err := ParseConfig(configStr)
-	if err != nil {
-		return "", err
-	}
-
-	// Do nothing if the config is empty
-	if config == nil {
-		return "", nil
-	}
-
-	var sanitized string
-	for config != nil {
-		var part string
-		scheme := strings.ToLower(config.URL.Scheme)
-		switch scheme {
-		case "ss":
-			part, err = sanitizeShadowsocksURL(config.URL)
-			if err != nil {
-				return "", err
-			}
-		case "socks5":
-			part, err = sanitizeSOCKS5URL(&config.URL)
-			if err != nil {
-				return "", err
-			}
-		case "override", "split", "tls", "tlsfrag":
-			// No sanitization needed
-			part = config.URL.String()
-		default:
-			part = scheme + "://UNKNOWN"
-		}
-		if sanitized == "" {
-			sanitized = part
-		} else {
-			sanitized = part + "|" + sanitized
-		}
-		config = config.BaseConfig
-	}
-	return sanitized, nil
-}
-
-func sanitizeSOCKS5URL(u *url.URL) (string, error) {
-	const redactedPlaceholder = "REDACTED"
-	if u.User != nil {
-		u.User = url.User(redactedPlaceholder)
-		return u.String(), nil
-	}
-	return u.String(), nil
 }

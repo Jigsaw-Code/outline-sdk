@@ -126,9 +126,9 @@ func main() {
 		defer f.Close()
 		tlsConfig.KeyLogWriter = f
 	}
-	configModule := configurl.NewDefaultConfigToDialer()
+	providers := configurl.NewDefaultProviders()
 	if *protoFlag == "h1" || *protoFlag == "h2" {
-		dialer, err := configModule.NewStreamDialer(*transportFlag)
+		dialer, err := providers.NewStreamDialer(context.Background(), *transportFlag)
 		if err != nil {
 			slog.Error("Could not create dialer", "error", err)
 			os.Exit(1)
@@ -158,7 +158,7 @@ func main() {
 			}
 		}
 	} else if *protoFlag == "h3" {
-		listener, err := configModule.NewPacketListener(*transportFlag)
+		listener, err := providers.NewPacketListener(context.Background(), *transportFlag)
 		if err != nil {
 			slog.Error("Could not create listener", "error", err)
 			os.Exit(1)
@@ -175,11 +175,15 @@ func main() {
 		httpClient.Transport = &http3.Transport{
 			TLSClientConfig: &tlsConfig,
 			Dial: func(ctx context.Context, addr string, tlsConf *tls.Config, quicConf *quic.Config) (quic.EarlyConnection, error) {
-				a, err := net.ResolveUDPAddr("udp", addr)
+				addressToDial, err := overrideAddress(addr, overrideHost, overridePort)
+				if err != nil {
+					return nil, fmt.Errorf("invalid address: %w", err)
+				}
+				udpAddr, err := net.ResolveUDPAddr("udp", addressToDial)
 				if err != nil {
 					return nil, err
 				}
-				return tr.DialEarly(ctx, a, tlsConf, quicConf)
+				return tr.DialEarly(ctx, udpAddr, tlsConf, quicConf)
 			},
 			Logger: slog.Default(),
 		}
