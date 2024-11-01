@@ -21,7 +21,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net"
 	"net/http"
@@ -104,7 +103,7 @@ func main() {
 
 	url := flag.Arg(0)
 	if url == "" {
-		log.Println("Need to pass the URL to fetch in the command-line")
+		slog.Error("Need to pass the URL to fetch in the command-line")
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -120,7 +119,8 @@ func main() {
 	if *protoFlag == "h1" || *protoFlag == "h2" {
 		dialer, err := configModule.NewStreamDialer(*transportFlag)
 		if err != nil {
-			log.Fatalf("Could not create dialer: %v\n", err)
+			slog.Error("Could not create dialer", "error", err)
+			os.Exit(1)
 		}
 		dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
 			addressToDial, err := overrideAddress(addr, overrideHost, overridePort)
@@ -147,11 +147,13 @@ func main() {
 	} else if *protoFlag == "h3" {
 		listener, err := configModule.NewPacketListener(*transportFlag)
 		if err != nil {
-			log.Fatalf("Could not create listener: %v\n", err)
+			slog.Error("Could not create listener", "error", err)
+			os.Exit(1)
 		}
 		conn, err := listener.ListenPacket(context.Background())
 		if err != nil {
-			log.Fatalf("Could not create PacketConn: %v\n", err)
+			slog.Error("Could not create PacketConn", "error", err)
+			os.Exit(1)
 		}
 		tr := &quic.Transport{
 			Conn: conn,
@@ -169,17 +171,20 @@ func main() {
 			Logger: slog.Default(),
 		}
 	} else {
-		log.Fatalln("Invalid HTTP protocol: ", *protoFlag)
+		slog.Error("Invalid HTTP protocol", "proto", *protoFlag)
+		os.Exit(1)
 	}
 
 	req, err := http.NewRequest(*methodFlag, url, nil)
 	if err != nil {
-		log.Fatalln("Failed to create request:", err)
+		slog.Error("Failed to create request", "error", err)
+		os.Exit(1)
 	}
 	headerText := strings.Join(headersFlag, "\r\n") + "\r\n\r\n"
 	h, err := textproto.NewReader(bufio.NewReader(strings.NewReader(headerText))).ReadMIMEHeader()
 	if err != nil {
-		log.Fatalf("invalid header line: %v", err)
+		slog.Error("Invalid header line", "error", err)
+		os.Exit(1)
 	}
 	for name, values := range h {
 		for _, value := range values {
@@ -188,7 +193,8 @@ func main() {
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		log.Fatalf("HTTP request failed: %v\n", err)
+		slog.Error("HTTP request failed", "error", err)
+		os.Exit(1)
 	}
 	defer resp.Body.Close()
 
@@ -203,6 +209,7 @@ func main() {
 	_, err = io.Copy(os.Stdout, resp.Body)
 	fmt.Println()
 	if err != nil {
-		log.Fatalf("Read of page body failed: %v\n", err)
+		slog.Error("Read of page body failed", "error", err)
+		os.Exit(1)
 	}
 }
