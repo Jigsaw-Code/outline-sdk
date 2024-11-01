@@ -71,6 +71,7 @@ func overrideAddress(original string, newHost string, newPort string) (string, e
 
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
+	tlsKeyLogFlag := flag.String("tls-key-log", "", "Filename to write the TLS key log to allow for decryption on Wireshark.")
 	protoFlag := flag.String("proto", "h1", "HTTP version to use (h1, h2, h3)")
 	transportFlag := flag.String("transport", "", "Transport config")
 	addressFlag := flag.String("address", "", "Address to connect to. If empty, use the URL authority")
@@ -115,6 +116,16 @@ func main() {
 		},
 	}
 
+	var tlsConfig tls.Config
+	if *tlsKeyLogFlag != "" {
+		f, err := os.Create(*tlsKeyLogFlag)
+		if err != nil {
+			slog.Error("Failed to creare TLS key log file", "error", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+		tlsConfig.KeyLogWriter = f
+	}
 	configModule := configurl.NewDefaultConfigToDialer()
 	if *protoFlag == "h1" || *protoFlag == "h2" {
 		dialer, err := configModule.NewStreamDialer(*transportFlag)
@@ -133,14 +144,16 @@ func main() {
 			return dialer.DialStream(ctx, addressToDial)
 		}
 		if *protoFlag == "h1" {
+			tlsConfig.NextProtos = []string{"http/1.1"}
 			httpClient.Transport = &http.Transport{
 				DialContext:     dialContext,
-				TLSClientConfig: &tls.Config{NextProtos: []string{"http/1.1"}},
+				TLSClientConfig: &tlsConfig,
 			}
 		} else if *protoFlag == "h2" {
+			tlsConfig.NextProtos = []string{"h2"}
 			httpClient.Transport = &http.Transport{
 				DialContext:       dialContext,
-				TLSClientConfig:   &tls.Config{NextProtos: []string{"h2"}},
+				TLSClientConfig:   &tlsConfig,
 				ForceAttemptHTTP2: true,
 			}
 		}
@@ -160,6 +173,7 @@ func main() {
 		}
 		defer tr.Close()
 		httpClient.Transport = &http3.Transport{
+			TLSClientConfig: &tlsConfig,
 			EnableDatagrams: true,
 			Dial: func(ctx context.Context, addr string, tlsConf *tls.Config, quicConf *quic.Config) (quic.EarlyConnection, error) {
 				a, err := net.ResolveUDPAddr("udp", addr)
