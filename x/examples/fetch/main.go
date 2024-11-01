@@ -174,7 +174,6 @@ func main() {
 		defer tr.Close()
 		httpClient.Transport = &http3.Transport{
 			TLSClientConfig: &tlsConfig,
-			EnableDatagrams: true,
 			Dial: func(ctx context.Context, addr string, tlsConf *tls.Config, quicConf *quic.Config) (quic.EarlyConnection, error) {
 				a, err := net.ResolveUDPAddr("udp", addr)
 				if err != nil {
