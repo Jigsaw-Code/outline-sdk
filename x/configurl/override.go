@@ -24,7 +24,47 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
-func newOverrideFromURL(configURL *url.URL) (func(string) (string, error), error) {
+func registerOverrideStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
+	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		sd, err := newSD(ctx, config.BaseConfig)
+		if err != nil {
+			return nil, err
+		}
+		override, err := newOverrideFromURL(config.URL)
+		if err != nil {
+			return nil, err
+		}
+		return transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+			addr, err := override(addr)
+			if err != nil {
+				return nil, err
+			}
+			return sd.DialStream(ctx, addr)
+		}), nil
+	})
+}
+
+func registerOverridePacketDialer(r TypeRegistry[transport.PacketDialer], typeID string, newPD BuildFunc[transport.PacketDialer]) {
+	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
+		pd, err := newPD(ctx, config.BaseConfig)
+		if err != nil {
+			return nil, err
+		}
+		override, err := newOverrideFromURL(config.URL)
+		if err != nil {
+			return nil, err
+		}
+		return transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			addr, err := override(addr)
+			if err != nil {
+				return nil, err
+			}
+			return pd.DialPacket(ctx, addr)
+		}), nil
+	})
+}
+
+func newOverrideFromURL(configURL url.URL) (func(string) (string, error), error) {
 	query := configURL.Opaque
 	values, err := url.ParseQuery(query)
 	if err != nil {
@@ -64,40 +104,4 @@ func newOverrideFromURL(configURL *url.URL) (func(string) (string, error), error
 		}
 		return net.JoinHostPort(host, port), nil
 	}, nil
-}
-
-func wrapStreamDialerWithOverride(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), configURL *url.URL) (transport.StreamDialer, error) {
-	sd, err := innerSD()
-	if err != nil {
-		return nil, err
-	}
-	override, err := newOverrideFromURL(configURL)
-	if err != nil {
-		return nil, err
-	}
-	return transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
-		addr, err := override(addr)
-		if err != nil {
-			return nil, err
-		}
-		return sd.DialStream(ctx, addr)
-	}), nil
-}
-
-func wrapPacketDialerWithOverride(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), configURL *url.URL) (transport.PacketDialer, error) {
-	pd, err := innerPD()
-	if err != nil {
-		return nil, err
-	}
-	override, err := newOverrideFromURL(configURL)
-	if err != nil {
-		return nil, err
-	}
-	return transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-		addr, err := override(addr)
-		if err != nil {
-			return nil, err
-		}
-		return pd.DialPacket(ctx, addr)
-	}), nil
 }

@@ -66,15 +66,15 @@ func main() {
 	resolverAddr := *resolverFlag
 
 	var resolver dns.Resolver
-	configToDialer := configurl.NewDefaultConfigToDialer()
+	providers := configurl.NewDefaultProviders()
 	if *tcpFlag {
-		streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
+		streamDialer, err := providers.NewStreamDialer(context.Background(), *transportFlag)
 		if err != nil {
 			log.Fatalf("Could not create stream dialer: %v", err)
 		}
 		resolver = dns.NewTCPResolver(streamDialer, resolverAddr)
 	} else {
-		packetDialer, err := configToDialer.NewPacketDialer(*transportFlag)
+		packetDialer, err := providers.NewPacketDialer(context.Background(), *transportFlag)
 		if err != nil {
 			log.Fatalf("Could not create packet dialer: %v", err)
 		}

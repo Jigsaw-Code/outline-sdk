@@ -20,20 +20,20 @@ import (
 	"strconv"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/transport/split"
+	"github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag"
 )
 
-func registerSplitStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
+func registerTLSFragStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
 	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		sd, err := newSD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
-		prefixBytesStr := config.URL.Opaque
-		prefixBytes, err := strconv.Atoi(prefixBytesStr)
+		lenStr := config.URL.Opaque
+		fixedLen, err := strconv.Atoi(lenStr)
 		if err != nil {
-			return nil, fmt.Errorf("prefixBytes is not a number: %v. Split config should be in split:<number> format", prefixBytesStr)
+			return nil, fmt.Errorf("invalid tlsfrag option: %v. It should be in tlsfrag:<number> format", lenStr)
 		}
-		return split.NewStreamDialer(sd, int64(prefixBytes))
+		return tlsfrag.NewFixedLenStreamDialer(sd, fixedLen)
 	})
 }
