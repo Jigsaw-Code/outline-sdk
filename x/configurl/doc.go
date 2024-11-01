@@ -132,7 +132,7 @@ DPI Evasion - To add packet splitting to a Shadowsocks server for enhanced DPI e
 Defining custom strategies - You can define your custom strategy by implementing and registering [BuildFunc[ObjectType]] functions:
 
 	// Create new config parser.
-	// p := configurl.NewProviderContainer
+	// p := configurl.NewProviderContainer()
 	// or
 	p := configurl.NewDefaultProviders()
 	// Register your custom dialer.
