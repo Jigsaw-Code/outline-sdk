@@ -71,7 +71,7 @@ func overrideAddress(original string, newHost string, newPort string) (string, e
 
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
-	tlsKeyLogFlag := flag.String("tls-key-log", "", "Filename to write the TLS key log to allow for decryption on Wireshark.")
+	tlsKeyLogFlag := flag.String("tls-key-log", "", "Filename to write the TLS key log to allow for decryption on Wireshark")
 	protoFlag := flag.String("proto", "h1", "HTTP version to use (h1, h2, h3)")
 	transportFlag := flag.String("transport", "", "Transport config")
 	addressFlag := flag.String("address", "", "Address to connect to. If empty, use the URL authority")
