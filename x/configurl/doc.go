@@ -134,7 +134,7 @@ Defining custom strategies - You can define your custom strategy by implementing
 	// Create new config parser.
 	// p := new(ConfigModule)
 	// or
-	p := NewDefaultConfigModule()
+	p := configurl.NewDefaultProviders()
 	// Register your custom dialer.
 	p.StreamDialers.RegisterType("custom", func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 	  // Build logic
