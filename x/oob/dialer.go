@@ -36,15 +36,13 @@ func (d *oobDialer) DialStream(ctx context.Context, remoteAddr string) (transpor
 	// this strategy only works when we set TCP as a strategy
 	tcpConn, ok := innerConn.(*net.TCPConn)
 	if !ok {
-		return nil, fmt.Errorf("split strategy only works with direct TCP connections")
+		return nil, fmt.Errorf("oob strategy only works with direct TCP connections")
 	}
 
-	file, err := tcpConn.File()
+	fd, err := getSocketDescriptor(tcpConn)
 	if err != nil {
-		return nil, fmt.Errorf("split strategy was unable to get conn fd: %w", err)
+		return nil, fmt.Errorf("oob strategy was unable to get conn fd: %w", err)
 	}
-
-	fd := int(file.Fd())
 
 	if d.disOOB {
 		err = tcpConn.SetNoDelay(true)
@@ -52,7 +50,7 @@ func (d *oobDialer) DialStream(ctx context.Context, remoteAddr string) (transpor
 			return nil, fmt.Errorf("setting tcp NO_DELAY failed: %w", err)
 		}
 
-		err = syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_TTL, 1)
+		err = setsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_TTL, 1)
 		if err != nil {
 			return nil, fmt.Errorf("setsockopt IPPROTO_IP/IP_TTL error: %w", err)
 		}

@@ -1,6 +1,7 @@
 package oob
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -14,7 +15,7 @@ type oobWriter struct {
 	conn        *net.TCPConn
 	resetTTL    sync.Once
 	oobPosition int64
-	fd          int
+	fd          SocketDescriptor
 	oobByte     byte // Byte to send as OOB
 	disOOB      bool // Flag to enable disOOB mode
 }
@@ -31,7 +32,7 @@ var _ io.ReaderFrom = (*oobWriterReaderFrom)(nil)
 // NewOOBWriter creates an [io.Writer] that sends an OOB byte at the specified "oobPosition".
 // If disOOB is enabled, it will apply the --disOOB strategy.
 // "oobByte" specifies the value of the byte to send out-of-band.
-func NewOOBWriter(conn *net.TCPConn, fd int, oobPosition int64, oobByte byte, disOOB bool) io.Writer {
+func NewOOBWriter(conn *net.TCPConn, fd SocketDescriptor, oobPosition int64, oobByte byte, disOOB bool) io.Writer {
 	return &oobWriter{conn: conn, fd: fd, oobPosition: oobPosition, oobByte: oobByte, disOOB: disOOB}
 }
 
@@ -54,7 +55,7 @@ func (w *oobWriter) Write(data []byte) (int, error) {
 		tmp := secondPart[0]
 		secondPart[0] = w.oobByte
 
-		err = w.send(firstPart, syscall.MSG_OOB)
+		err = w.send(firstPart, 0x01)
 		if err != nil {
 			return written, err
 		}
@@ -65,12 +66,12 @@ func (w *oobWriter) Write(data []byte) (int, error) {
 
 		w.resetTTL.Do(func() {
 			if w.disOOB {
-				err = syscall.SetsockoptInt(int(w.fd), syscall.IPPROTO_IP, syscall.IP_TTL, defaultTTL)
+				err = setsockoptInt(w.fd, syscall.IPPROTO_IP, syscall.IP_TTL, defaultTTL)
 			}
 		})
 
 		if err != nil {
-			return written, err
+			return written, fmt.Errorf("setsockopt IPPROTO_IP/IP_TTL error: %w", err)
 		}
 		data = secondPart
 	}
@@ -85,16 +86,19 @@ func (w *oobWriter) send(data []byte, flags int) error {
 	// Use SyscallConn to access the underlying file descriptor safely
 	rawConn, err := w.conn.SyscallConn()
 	if err != nil {
-		return err
+		return fmt.Errorf("oob strategy was unable to get raw conn: %w", err)
 	}
 
 	// Use Control to execute Sendto on the file descriptor
 	var sendErr error
 	err = rawConn.Control(func(fd uintptr) {
-		sendErr = syscall.Sendto(int(fd), data, flags, nil)
+		sendErr = sendTo(SocketDescriptor(fd), data, flags)
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("oob strategy was unable to control socket: %w", err)
 	}
-	return sendErr
+	if sendErr != nil {
+		return fmt.Errorf("oob strategy was unable to send data: %w", sendErr)
+	}
+	return nil
 }
