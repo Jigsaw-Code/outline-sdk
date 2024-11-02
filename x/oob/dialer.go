@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"net"
 	"syscall"
+
+	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
 // oobDialer is a dialer that applies the OOB and disOOB strategies.

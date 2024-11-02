@@ -5,6 +5,7 @@ import (
 	"net"
 	"sync"
 	"syscall"
+	"time"
 )
 
 var defaultTTL = 64
@@ -59,6 +60,8 @@ func (w *oobWriter) Write(data []byte) (int, error) {
 		}
 		written = int(w.oobPosition)
 		secondPart[0] = tmp
+
+		time.Sleep(200 * time.Millisecond)
 
 		w.resetTTL.Do(func() {
 			if w.disOOB {
