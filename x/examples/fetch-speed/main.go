@@ -27,6 +27,8 @@ import (
 	"strings"
 	"time"
 
+	"crypto/tls"
+
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 )
 
@@ -72,7 +74,10 @@ func main() {
 		}
 		return dialer.DialStream(ctx, net.JoinHostPort(host, port))
 	}
-	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: *timeoutFlag}
+	httpClient := &http.Client{Transport: &http.Transport{
+		DialContext:     dialContext,
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}, Timeout: *timeoutFlag}
 
 	req, err := http.NewRequest(*methodFlag, url, nil)
 	if err != nil {

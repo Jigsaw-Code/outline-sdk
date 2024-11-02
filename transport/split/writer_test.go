@@ -38,7 +38,7 @@ func (w *collectWrites) Write(data []byte) (int, error) {
 
 func TestWrite_Split(t *testing.T) {
 	var innerWriter collectWrites
-	splitWriter := NewWriter(&innerWriter, 3)
+	splitWriter := NewWriter(&innerWriter, 3, 0, 0)
 	n, err := splitWriter.Write([]byte("Request"))
 	require.NoError(t, err)
 	require.Equal(t, 7, n)
@@ -47,7 +47,7 @@ func TestWrite_Split(t *testing.T) {
 
 func TestWrite_ShortWrite(t *testing.T) {
 	var innerWriter collectWrites
-	splitWriter := NewWriter(&innerWriter, 10)
+	splitWriter := NewWriter(&innerWriter, 10, 0, 0)
 	n, err := splitWriter.Write([]byte("Request"))
 	require.NoError(t, err)
 	require.Equal(t, 7, n)
@@ -56,7 +56,7 @@ func TestWrite_ShortWrite(t *testing.T) {
 
 func TestWrite_Zero(t *testing.T) {
 	var innerWriter collectWrites
-	splitWriter := NewWriter(&innerWriter, 0)
+	splitWriter := NewWriter(&innerWriter, 0, 0, 0)
 	n, err := splitWriter.Write([]byte("Request"))
 	require.NoError(t, err)
 	require.Equal(t, 7, n)
@@ -65,7 +65,7 @@ func TestWrite_Zero(t *testing.T) {
 
 func TestWrite_NeedsTwoWrites(t *testing.T) {
 	var innerWriter collectWrites
-	splitWriter := NewWriter(&innerWriter, 5)
+	splitWriter := NewWriter(&innerWriter, 5, 0, 0)
 	n, err := splitWriter.Write([]byte("Re"))
 	require.NoError(t, err)
 	require.Equal(t, 2, n)
@@ -77,11 +77,36 @@ func TestWrite_NeedsTwoWrites(t *testing.T) {
 
 func TestWrite_Compound(t *testing.T) {
 	var innerWriter collectWrites
-	splitWriter := NewWriter(NewWriter(&innerWriter, 4), 1)
+	splitWriter := NewWriter(NewWriter(&innerWriter, 4, 0, 0), 1, 0, 0)
 	n, err := splitWriter.Write([]byte("Request"))
 	require.NoError(t, err)
 	require.Equal(t, 7, n)
 	require.Equal(t, [][]byte{[]byte("R"), []byte("equ"), []byte("est")}, innerWriter.writes)
+}
+
+func TestWrite_RepeatNumber3_SkipBytes5(t *testing.T) {
+	var innerWriter collectWrites
+	splitWriter := NewWriter(&innerWriter, 1, 3, 5)
+	n, err := splitWriter.Write([]byte("RequestRequestRequest"))
+	require.NoError(t, err)
+	require.Equal(t, 7*3, n)
+	require.Equal(t, [][]byte{
+		[]byte("R"),
+		// split 1
+		[]byte("eques"),
+		// split 2
+		[]byte("tRequ"),
+		// split 3
+		[]byte("estRequest")}, innerWriter.writes)
+}
+
+func TestWrite_RepeatNumber3_SkipBytes0(t *testing.T) {
+	var innerWriter collectWrites
+	splitWriter := NewWriter(&innerWriter, 1, 3, 0)
+	n, err := splitWriter.Write([]byte("Request"))
+	require.NoError(t, err)
+	require.Equal(t, 7, n)
+	require.Equal(t, [][]byte{[]byte("R"), []byte("equest")}, innerWriter.writes)
 }
 
 // collectReader is a [io.Reader] that appends each Read from the Reader to the reads slice.
@@ -101,7 +126,7 @@ func (r *collectReader) Read(buf []byte) (int, error) {
 }
 
 func TestReadFrom(t *testing.T) {
-	splitWriter := NewWriter(&bytes.Buffer{}, 3)
+	splitWriter := NewWriter(&bytes.Buffer{}, 3, 0, 0)
 	rf, ok := splitWriter.(io.ReaderFrom)
 	require.True(t, ok)
 
@@ -119,7 +144,7 @@ func TestReadFrom(t *testing.T) {
 }
 
 func TestReadFrom_ShortRead(t *testing.T) {
-	splitWriter := NewWriter(&bytes.Buffer{}, 10)
+	splitWriter := NewWriter(&bytes.Buffer{}, 10, 0, 0)
 	rf, ok := splitWriter.(io.ReaderFrom)
 	require.True(t, ok)
 	cr := &collectReader{Reader: bytes.NewReader([]byte("Request1"))}
@@ -138,7 +163,7 @@ func TestReadFrom_ShortRead(t *testing.T) {
 func BenchmarkReadFrom(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		reader := bytes.NewReader(make([]byte, n))
-		writer := NewWriter(io.Discard, 10)
+		writer := NewWriter(io.Discard, 10, 0, 0)
 		rf, ok := writer.(io.ReaderFrom)
 		require.True(b, ok)
 		_, err := rf.ReadFrom(reader)
