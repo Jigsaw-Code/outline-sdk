@@ -3,6 +3,7 @@ package oob
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"syscall"
@@ -57,11 +58,12 @@ func (w *oobWriter) Write(data []byte) (int, error) {
 			}
 
 			// Send the specified OOB byte using the new sendOOBByte method
+			_ = conn
 			err = w.sendOOBByte(conn)
 			if err != nil {
 				return written, err
 			}
-			data = data[written+1:] // Skip the OOB byte
+			data = data[written:] // Skip the OOB byte
 		}
 	}
 	// Write the remaining data
@@ -97,6 +99,9 @@ func (w *oobWriter) sendOOBByte(conn net.Conn) error {
 	var sendErr error
 	err = rawConn.Control(func(fd uintptr) {
 		sendErr = syscall.Sendto(int(fd), oobData, flags, nil)
+		if sendErr != nil {
+			fmt.Errorf("failed to send OOB byte: %v", sendErr)
+		}
 	})
 	if err != nil {
 		return err
