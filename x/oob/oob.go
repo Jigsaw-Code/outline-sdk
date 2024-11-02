@@ -88,7 +88,7 @@ func (w *oobWriter) send(data []byte, flags int) error {
 	// Use Control to execute Sendto on the file descriptor
 	var sendErr error
 	err = rawConn.Control(func(fd uintptr) {
-		sendErr = syscall.Sendto(int(w.fd), data, flags, nil)
+		sendErr = syscall.Sendto(int(fd), data, flags, nil)
 	})
 	if err != nil {
 		return err
