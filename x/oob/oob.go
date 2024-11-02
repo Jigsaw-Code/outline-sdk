@@ -62,7 +62,7 @@ func (w *oobWriter) Write(data []byte) (int, error) {
 
 		w.resetTTL.Do(func() {
 			if w.disOOB {
-				err = syscall.SetsockoptInt(w.fd, syscall.IPPROTO_IP, syscall.IP_TTL, defaultTTL)
+				err = syscall.SetsockoptInt(int(w.fd), syscall.IPPROTO_IP, syscall.IP_TTL, defaultTTL)
 			}
 		})
 
