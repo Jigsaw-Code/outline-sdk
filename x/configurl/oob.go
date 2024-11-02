@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/transport/oob"
+	"github.com/Jigsaw-Code/outline-sdk/x/oob"
 )
 
 func registerOOBStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
