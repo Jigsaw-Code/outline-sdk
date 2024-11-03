@@ -76,16 +76,16 @@ func (w *oobWriter) Write(data []byte) (int, error) {
 		written = int(w.oobPosition)
 		secondPart[0] = tmp
 
-		w.resetTTL.Do(func() {
-			if w.disOOB {
+		if w.disOOB {
+			w.resetTTL.Do(func() {
 				_, err = setTtl(w.conn, oldTTL)
+			})
+			if err != nil {
+				return written, fmt.Errorf("oob: setsockopt IPPROTO_IP/IP_TTL error: %w", err)
 			}
-		})
+		}
 
 		time.Sleep(w.delay)
-		if err != nil {
-			return written, fmt.Errorf("oob: setsockopt IPPROTO_IP/IP_TTL error: %w", err)
-		}
 		data = secondPart
 	}
 
