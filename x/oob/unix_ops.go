@@ -3,6 +3,7 @@
 package oob
 
 import (
+	"fmt"
 	"net"
 	"syscall"
 )
@@ -14,6 +15,7 @@ func setsockoptInt(fd SocketDescriptor, level, opt int, value int) error {
 }
 
 func sendTo(fd SocketDescriptor, data []byte, flags int) (err error) {
+	fmt.Printf("sendTo: %d, %v, %d\n", fd, data, flags)
 	return syscall.Sendto(int(fd), data, flags, nil)
 }
 
