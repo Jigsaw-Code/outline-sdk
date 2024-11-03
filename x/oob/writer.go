@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-var defaultTTL = 64
-
 type oobWriter struct {
 	conn        *net.TCPConn
 	resetTTL    sync.Once
@@ -40,7 +38,7 @@ func NewWriter(
 	disOOB bool,
 	delay time.Duration,
 ) io.Writer {
-	return &oobWriter{conn: conn, sd: sd, oobPosition: oobPosition, oobByte: oobByte, disOOB: disOOB}
+	return &oobWriter{conn: conn, sd: sd, oobPosition: oobPosition, oobByte: oobByte, disOOB: disOOB, delay: delay}
 }
 
 func (w *oobWriterReaderFrom) ReadFrom(source io.Reader) (int64, error) {

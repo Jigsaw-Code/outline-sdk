@@ -9,6 +9,8 @@ import (
 	"golang.org/x/net/ipv6"
 )
 
+var defaultTTL = 64
+
 func setTtl(conn *net.TCPConn, ttl int) (oldTTL int, err error) {
 	addr, err := netip.ParseAddrPort(conn.RemoteAddr().String())
 	if err != nil {
