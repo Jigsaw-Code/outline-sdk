@@ -32,7 +32,7 @@ func registerDisorderDialer(r TypeRegistry[transport.StreamDialer], typeID strin
 		prefixBytesStr := config.URL.Opaque
 		prefixBytes, err := strconv.Atoi(prefixBytesStr)
 		if err != nil {
-			return nil, fmt.Errorf("prefixBytes is not a number: %v. Split config should be in split:<number> format", prefixBytesStr)
+			return nil, fmt.Errorf("disoder: could not parse splice position: %v", err)
 		}
 		return disorder.NewStreamDialer(sd, int64(prefixBytes))
 	})

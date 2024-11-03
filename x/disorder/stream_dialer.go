@@ -57,7 +57,7 @@ func (d *disorderDialer) DialStream(ctx context.Context, remoteAddr string) (tra
 		return nil, err
 	}
 
-	oldTTL, err := setTtl(innerConn, 1)
+	oldTTL, err := setHopLimit(innerConn, 1)
 	if err != nil {
 		return nil, fmt.Errorf("disorder strategy: failed to change ttl: %w", err)
 	}
@@ -67,12 +67,12 @@ func (d *disorderDialer) DialStream(ctx context.Context, remoteAddr string) (tra
 	return transport.WrapConn(innerConn, innerConn, dw), nil
 }
 
-// setTtl changes the socket TTL and returns the old value
+// setHopLimit changes the socket TTL for IPv4 (or HopLimit for IPv6) and returns the old value
 // socket must be `*net.TCPConn`
-func setTtl(conn net.Conn, ttl int) (oldTTL int, err error) {
+func setHopLimit(conn net.Conn, ttl int) (oldTTL int, err error) {
 	addr, err := netip.ParseAddrPort(conn.RemoteAddr().String())
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("could not parse remote addr: %w", err)
 	}
 
 	switch {
@@ -84,6 +84,8 @@ func setTtl(conn net.Conn, ttl int) (oldTTL int, err error) {
 		conn := ipv6.NewConn(conn)
 		oldTTL, _ = conn.HopLimit()
 		err = conn.SetHopLimit(ttl)
+	default:
+		return 0, fmt.Errorf("unknown remote addr type (%v)", addr.Addr().String())
 	}
 	if err != nil {
 		return 0, fmt.Errorf("failed to change TTL: %w", err)

@@ -53,7 +53,7 @@ func (w *disorderWriter) Write(data []byte) (written int, err error) {
 		data = data[written:]
 	}
 	w.resetTTL.Do(func() {
-		_, err = setTtl(w.conn, w.oldTTL)
+		_, err = setHopLimit(w.conn, w.oldTTL)
 	})
 	if err != nil {
 		return written, fmt.Errorf("setsockopt IPPROTO_IP/IP_TTL error: %w", err)
