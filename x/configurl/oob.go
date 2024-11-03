@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/oob"
@@ -19,24 +20,29 @@ func registerOOBStreamDialer(r TypeRegistry[transport.StreamDialer], typeID stri
 		params := config.URL.Opaque
 
 		splitStr := strings.Split(params, ":")
-		if len(splitStr) != 3 {
-			return nil, fmt.Errorf("split config should be in oob:<number>:<char>:<boolean> format")
+		if len(splitStr) != 4 {
+			return nil, fmt.Errorf("oob: config should be in oob:<number>:<char>:<boolean>:<interval> format")
 		}
 
 		position, err := strconv.Atoi(splitStr[0])
 		if err != nil {
-			return nil, fmt.Errorf("position is not a number: %v. Split config should be in oob:<number>:<char>:<boolean> format", splitStr[0])
+			return nil, fmt.Errorf("oob: oob position is not a number: %v", splitStr[0])
 		}
 
 		if len(splitStr[1]) != 1 {
-			return nil, fmt.Errorf("char should be a single character: %v. Split config should be in oob:<number>:<char>:<boolean> format", splitStr[1])
+			return nil, fmt.Errorf("oob: oob byte should be a single character: %v", splitStr[1])
 		}
 		char := splitStr[1][0]
 
 		disOOB, err := strconv.ParseBool(splitStr[2])
 		if err != nil {
-			return nil, fmt.Errorf("disOOB is not a boolean: %v. Split config should be in oob:<number>:<char>:<boolean> format", splitStr[2])
+			return nil, fmt.Errorf("oob: disOOB is not a boolean: %v", splitStr[2])
 		}
-		return oob.NewStreamDialerWithOOB(sd, int64(position), char, disOOB)
+
+		delay, err := time.ParseDuration(splitStr[3])
+		if err != nil {
+			return nil, fmt.Errorf("oob: delay is not a duration: %v", splitStr[3])
+		}
+		return oob.NewStreamDialer(sd, int64(position), char, disOOB, delay)
 	})
 }

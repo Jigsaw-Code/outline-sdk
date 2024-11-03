@@ -11,7 +11,7 @@ import (
 type SocketDescriptor uintptr
 
 func setsockoptInt(fd SocketDescriptor, level, opt int, value int) error {
-	return syscall.SetsockoptInt(syscall.Handle(fd), syscall.IPPROTO_IP, syscall.IP_TTL, defaultTTL)
+	return syscall.SetsockoptInt(syscall.Handle(fd), level, opt, value)
 }
 
 func sendTo(fd SocketDescriptor, data []byte, flags int) (err error) {

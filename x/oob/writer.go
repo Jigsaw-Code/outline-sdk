@@ -5,7 +5,6 @@ import (
 	"io"
 	"net"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -15,9 +14,10 @@ type oobWriter struct {
 	conn        *net.TCPConn
 	resetTTL    sync.Once
 	oobPosition int64
-	fd          SocketDescriptor
+	sd          SocketDescriptor
 	oobByte     byte // Byte to send as OOB
 	disOOB      bool // Flag to enable disOOB mode
+	delay       time.Duration
 }
 
 var _ io.Writer = (*oobWriter)(nil)
@@ -29,11 +29,18 @@ type oobWriterReaderFrom struct {
 
 var _ io.ReaderFrom = (*oobWriterReaderFrom)(nil)
 
-// NewOOBWriter creates an [io.Writer] that sends an OOB byte at the specified "oobPosition".
+// NewWriter creates an [io.Writer] that sends an OOB byte at the specified "oobPosition".
 // If disOOB is enabled, it will apply the --disOOB strategy.
 // "oobByte" specifies the value of the byte to send out-of-band.
-func NewOOBWriter(conn *net.TCPConn, fd SocketDescriptor, oobPosition int64, oobByte byte, disOOB bool) io.Writer {
-	return &oobWriter{conn: conn, fd: fd, oobPosition: oobPosition, oobByte: oobByte, disOOB: disOOB}
+func NewWriter(
+	conn *net.TCPConn,
+	sd SocketDescriptor,
+	oobPosition int64,
+	oobByte byte,
+	disOOB bool,
+	delay time.Duration,
+) io.Writer {
+	return &oobWriter{conn: conn, sd: sd, oobPosition: oobPosition, oobByte: oobByte, disOOB: disOOB}
 }
 
 func (w *oobWriterReaderFrom) ReadFrom(source io.Reader) (int64, error) {
@@ -55,6 +62,13 @@ func (w *oobWriter) Write(data []byte) (int, error) {
 		tmp := secondPart[0]
 		secondPart[0] = w.oobByte
 
+		var oldTTL int
+		if w.disOOB {
+			oldTTL, err = setTtl(w.conn, 1)
+		}
+		if err != nil {
+			return written, fmt.Errorf("oob: setsockopt IPPROTO_IP/IP_TTL error: %w", err)
+		}
 		err = w.send(firstPart, 0x01)
 		if err != nil {
 			return written, err
@@ -66,12 +80,11 @@ func (w *oobWriter) Write(data []byte) (int, error) {
 
 		w.resetTTL.Do(func() {
 			if w.disOOB {
-				err = setsockoptInt(w.fd, syscall.IPPROTO_IP, syscall.IP_TTL, defaultTTL)
+				_, err = setTtl(w.conn, oldTTL)
 			}
 		})
-
 		if err != nil {
-			return written, fmt.Errorf("setsockopt IPPROTO_IP/IP_TTL error: %w", err)
+			return written, fmt.Errorf("oob: setsockopt IPPROTO_IP/IP_TTL error: %w", err)
 		}
 		data = secondPart
 	}

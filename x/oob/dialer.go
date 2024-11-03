@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"syscall"
+	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
@@ -16,15 +16,23 @@ type oobDialer struct {
 	oobByte     byte
 	oobPosition int64
 	disOOB      bool
+	delay       time.Duration
 }
 
-// NewStreamDialerWithOOB creates a [transport.StreamDialer] that applies OOB byte sending at "oobPosition" and supports disOOB.
+// NewStreamDialer creates a [transport.StreamDialer] that applies OOB byte sending at "oobPosition" and supports disOOB.
 // "oobByte" specifies the value of the byte to send out-of-band.
-func NewStreamDialerWithOOB(dialer transport.StreamDialer, oobPosition int64, oobByte byte, disOOB bool) (transport.StreamDialer, error) {
+func NewStreamDialer(dialer transport.StreamDialer,
+	oobPosition int64, oobByte byte, disOOB bool, delay time.Duration) (transport.StreamDialer, error) {
 	if dialer == nil {
 		return nil, errors.New("argument dialer must not be nil")
 	}
-	return &oobDialer{dialer: dialer, oobPosition: oobPosition, oobByte: oobByte, disOOB: disOOB}, nil
+	return &oobDialer{
+		dialer:      dialer,
+		oobPosition: oobPosition,
+		oobByte:     oobByte,
+		disOOB:      disOOB,
+		delay:       delay,
+	}, nil
 }
 
 // DialStream implements [transport.StreamDialer].DialStream with OOB and disOOB support.
@@ -36,27 +44,15 @@ func (d *oobDialer) DialStream(ctx context.Context, remoteAddr string) (transpor
 	// this strategy only works when we set TCP as a strategy
 	tcpConn, ok := innerConn.(*net.TCPConn)
 	if !ok {
-		return nil, fmt.Errorf("oob strategy only works with direct TCP connections")
+		return nil, fmt.Errorf("oob: only works with direct TCP connections")
 	}
 
-	fd, err := getSocketDescriptor(tcpConn)
+	sd, err := getSocketDescriptor(tcpConn)
 	if err != nil {
-		return nil, fmt.Errorf("oob strategy was unable to get conn fd: %w", err)
+		return nil, fmt.Errorf("oob: unable to get conn sd: %w", err)
 	}
 
-	if d.disOOB {
-		err = tcpConn.SetNoDelay(true)
-		if err != nil {
-			return nil, fmt.Errorf("setting tcp NO_DELAY failed: %w", err)
-		}
-
-		err = setsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_TTL, 1)
-		if err != nil {
-			return nil, fmt.Errorf("setsockopt IPPROTO_IP/IP_TTL error: %w", err)
-		}
-	}
-
-	dw := NewOOBWriter(tcpConn, fd, d.oobPosition, d.oobByte, d.disOOB)
+	dw := NewWriter(tcpConn, sd, d.oobPosition, d.oobByte, d.disOOB, d.delay)
 
 	return transport.WrapConn(innerConn, innerConn, dw), nil
 }
