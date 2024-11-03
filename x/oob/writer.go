@@ -11,6 +11,7 @@ import (
 type oobWriter struct {
 	conn        *net.TCPConn
 	resetTTL    sync.Once
+	setTTL      sync.Once
 	oobPosition int64
 	sd          SocketDescriptor
 	oobByte     byte // Byte to send as OOB
@@ -62,11 +63,14 @@ func (w *oobWriter) Write(data []byte) (int, error) {
 
 		var oldTTL int
 		if w.disOOB {
-			oldTTL, err = setTtl(w.conn, 1)
+			w.setTTL.Do(func() {
+				oldTTL, err = setTtl(w.conn, 1)
+			})
+			if err != nil {
+				return written, fmt.Errorf("oob: setsockopt IPPROTO_IP/IP_TTL error: %w", err)
+			}
 		}
-		if err != nil {
-			return written, fmt.Errorf("oob: setsockopt IPPROTO_IP/IP_TTL error: %w", err)
-		}
+
 		err = w.send(firstPart, 0x01)
 		if err != nil {
 			return written, err
