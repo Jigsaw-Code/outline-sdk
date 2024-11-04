@@ -78,7 +78,7 @@ func main() {
 	methodFlag := flag.String("method", "GET", "The HTTP method to use")
 	var headersFlag stringArrayFlagValue
 	flag.Var(&headersFlag, "H", "Raw HTTP Header line to add. It must not end in \\r\\n")
-	timeoutSecFlag := flag.Int("timeout", 100500, "Timeout in seconds")
+	timeoutSecFlag := flag.Int("timeout", 5, "Timeout in seconds")
 
 	flag.Parse()
 
