@@ -32,7 +32,7 @@ type splitDialer struct {
 var _ transport.StreamDialer = (*splitDialer)(nil)
 
 // NewStreamDialer creates a [transport.StreamDialer] that splits the outgoing stream after writing "prefixBytes" bytes
-// using [splitWriter]. If "repeatsNumber" is not 0, will split that many times, skipping "skipBytes" in between packets.
+// using the split writer. You can specify multiple sequences with the [AddSplitSequence] option.
 func NewStreamDialer(dialer transport.StreamDialer, prefixBytes int64, options ...Option) (transport.StreamDialer, error) {
 	if dialer == nil {
 		return nil, errors.New("argument dialer must not be nil")
