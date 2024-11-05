@@ -18,9 +18,15 @@ import (
 	"io"
 )
 
+type repeatedSplit struct {
+	count int
+	bytes int64
+}
+
 type splitWriter struct {
-	writer      io.Writer
-	prefixBytes int64
+	writer          io.Writer
+	nextSplitBytes  int64
+	remainingSplits []repeatedSplit
 }
 
 var _ io.Writer = (*splitWriter)(nil)
@@ -36,32 +42,69 @@ var _ io.ReaderFrom = (*splitWriterReaderFrom)(nil)
 // A write will end right after byte index prefixBytes - 1, before a write starting at byte index prefixBytes.
 // For example, if you have a write of [0123456789] and prefixBytes = 3, you will get writes [012] and [3456789].
 // If the input writer is a [io.ReaderFrom], the output writer will be too.
-func NewWriter(writer io.Writer, prefixBytes int64) io.Writer {
-	sw := &splitWriter{writer, prefixBytes}
-	if rf, ok := writer.(io.ReaderFrom); ok {
-		return &splitWriterReaderFrom{sw, rf}
+// It's possible to enable multiple splits with the [EnableRepeatSplit] option.
+// In that cases, splits will happen at positions prefixBytes + i * skipBytes, for 0 <= i < count.
+// This means that after the initial split, count splits will happen every skipBytes bytes.
+// Example:
+// prefixBytes = 1
+// count = 2
+// skipBytes = 6
+// Array of [0 1 3 2 4 5 6 7 8 9 10 11 12 13 14 15 16 ...] will become
+// [0] [1 2 3 4 5 6] [7 8 9 10 11 12] [13 14 15 16 ...]
+func NewWriter(writer io.Writer, prefixBytes int64, options ...Option) io.Writer {
+	sw := &splitWriter{writer: writer, nextSplitBytes: prefixBytes, remainingSplits: []repeatedSplit{}}
+	for _, option := range options {
+		option(sw)
+	}
+	if len(sw.remainingSplits) == 0 {
+		// TODO(fortuna): Support ReaderFrom for repeat split.
+		if rf, ok := writer.(io.ReaderFrom); ok {
+			return &splitWriterReaderFrom{sw, rf}
+		}
 	}
 	return sw
 }
 
+type Option func(w *splitWriter)
+
+// AddSplitSequence will add count splits, each of skipBytes length.
+func AddSplitSequence(count int, skipBytes int64) Option {
+	return func(w *splitWriter) {
+		if count > 0 {
+			w.remainingSplits = append(w.remainingSplits, repeatedSplit{count: count, bytes: skipBytes})
+		}
+	}
+}
+
 func (w *splitWriterReaderFrom) ReadFrom(source io.Reader) (int64, error) {
-	reader := io.MultiReader(io.LimitReader(source, w.prefixBytes), source)
+	reader := io.MultiReader(io.LimitReader(source, w.nextSplitBytes), source)
 	written, err := w.rf.ReadFrom(reader)
-	w.prefixBytes -= written
+	w.nextSplitBytes -= written
 	return written, err
 }
 
 func (w *splitWriter) Write(data []byte) (written int, err error) {
-	if 0 < w.prefixBytes && w.prefixBytes < int64(len(data)) {
-		written, err = w.writer.Write(data[:w.prefixBytes])
-		w.prefixBytes -= int64(written)
+	for 0 < w.nextSplitBytes && w.nextSplitBytes < int64(len(data)) {
+		dataToSend := data[:w.nextSplitBytes]
+		n, err := w.writer.Write(dataToSend)
+		written += n
+		w.nextSplitBytes -= int64(n)
 		if err != nil {
 			return written, err
 		}
-		data = data[written:]
+		data = data[n:]
+
+		// Split done. Update nextSplitBytes.
+		if len(w.remainingSplits) > 0 {
+			w.nextSplitBytes = w.remainingSplits[0].bytes
+			w.remainingSplits[0].count -= 1
+			if w.remainingSplits[0].count == 0 {
+				w.remainingSplits = w.remainingSplits[1:]
+			}
+		}
 	}
 	n, err := w.writer.Write(data)
 	written += n
-	w.prefixBytes -= int64(n)
+	w.nextSplitBytes -= int64(n)
 	return written, err
 }

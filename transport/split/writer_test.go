@@ -84,6 +84,30 @@ func TestWrite_Compound(t *testing.T) {
 	require.Equal(t, [][]byte{[]byte("R"), []byte("equ"), []byte("est")}, innerWriter.writes)
 }
 
+func TestWrite_RepeatNumber3_SkipBytes5(t *testing.T) {
+	var innerWriter collectWrites
+	splitWriter := NewWriter(&innerWriter, 1, AddSplitSequence(3, 5))
+	n, err := splitWriter.Write([]byte("RequestRequestRequest."))
+	require.NoError(t, err)
+	require.Equal(t, 7*3+1, n)
+	require.Equal(t, [][]byte{
+		[]byte("R"),      // prefix
+		[]byte("eques"),  // split 1
+		[]byte("tRequ"),  // split 2
+		[]byte("estRe"),  // split 3
+		[]byte("quest."), // tail
+	}, innerWriter.writes)
+}
+
+func TestWrite_RepeatNumber3_SkipBytes0(t *testing.T) {
+	var innerWriter collectWrites
+	splitWriter := NewWriter(&innerWriter, 1, AddSplitSequence(0, 3))
+	n, err := splitWriter.Write([]byte("Request"))
+	require.NoError(t, err)
+	require.Equal(t, 7, n)
+	require.Equal(t, [][]byte{[]byte("R"), []byte("equest")}, innerWriter.writes)
+}
+
 // collectReader is a [io.Reader] that appends each Read from the Reader to the reads slice.
 type collectReader struct {
 	io.Reader
