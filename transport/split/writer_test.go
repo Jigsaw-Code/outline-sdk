@@ -178,6 +178,18 @@ func TestReadFrom(t *testing.T) {
 	require.Equal(t, [][]byte{[]byte("Request2")}, cr.reads)
 }
 
+func TestReadFrom_Multi(t *testing.T) {
+	splitWriter := NewWriter(&bytes.Buffer{}, 1, AddSplitSequence(3, 2), AddSplitSequence(2, 3))
+	rf, ok := splitWriter.(io.ReaderFrom)
+	require.True(t, ok)
+
+	cr := &collectReader{Reader: bytes.NewReader([]byte("RequestRequestRequest"))}
+	n, err := rf.ReadFrom(cr)
+	require.NoError(t, err)
+	require.Equal(t, int64(21), n)
+	require.Equal(t, [][]byte{[]byte("R"), []byte("eq"), []byte("ue"), []byte("st"), []byte("Req"), []byte("ues"), []byte("tRequest")}, cr.reads)
+}
+
 func TestReadFrom_ShortRead(t *testing.T) {
 	splitWriter := NewWriter(&bytes.Buffer{}, 10)
 	rf, ok := splitWriter.(io.ReaderFrom)

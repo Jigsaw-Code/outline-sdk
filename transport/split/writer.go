@@ -56,11 +56,8 @@ func NewWriter(writer io.Writer, prefixBytes int64, options ...Option) io.Writer
 	for _, option := range options {
 		option(sw)
 	}
-	if len(sw.remainingSplits) == 0 {
-		// TODO(fortuna): Support ReaderFrom for repeat split.
-		if rf, ok := writer.(io.ReaderFrom); ok {
-			return &splitWriterReaderFrom{sw, rf}
-		}
+	if rf, ok := writer.(io.ReaderFrom); ok {
+		return &splitWriterReaderFrom{sw, rf}
 	}
 	return sw
 }
@@ -88,13 +85,27 @@ func AddSplitSequence(count int, skipBytes int64) Option {
 }
 
 func (w *splitWriterReaderFrom) ReadFrom(source io.Reader) (int64, error) {
-	reader := io.MultiReader(io.LimitReader(source, w.nextSplitBytes), source)
-	written, err := w.rf.ReadFrom(reader)
-	w.nextSplitBytes -= written
+	var written int64
+	for w.nextSplitBytes > 0 {
+		expectedBytes := w.nextSplitBytes
+		n, err := w.rf.ReadFrom(io.LimitReader(source, expectedBytes))
+		written += n
+		w.advance(n)
+		if err != nil {
+			return written, err
+		}
+		if n < expectedBytes {
+			// Source is done before the split happened. Return.
+			return written, err
+		}
+	}
+	n, err := w.rf.ReadFrom(source)
+	written += n
+	w.advance(n)
 	return written, err
 }
 
-func (w *splitWriter) advance(n int) {
+func (w *splitWriter) advance(n int64) {
 	if w.nextSplitBytes == 0 {
 		// Done with splits: return.
 		return
@@ -119,7 +130,7 @@ func (w *splitWriter) Write(data []byte) (written int, err error) {
 		dataToSend := data[:w.nextSplitBytes]
 		n, err := w.writer.Write(dataToSend)
 		written += n
-		w.advance(n)
+		w.advance(int64(n))
 		if err != nil {
 			return written, err
 		}
@@ -127,6 +138,6 @@ func (w *splitWriter) Write(data []byte) (written int, err error) {
 	}
 	n, err := w.writer.Write(data)
 	written += n
-	w.advance(n)
+	w.advance(int64(n))
 	return written, err
 }
