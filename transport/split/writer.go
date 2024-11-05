@@ -16,6 +16,7 @@ package split
 
 import (
 	"io"
+	"time"
 )
 
 type splitWriter struct {
@@ -129,6 +130,8 @@ func (w *splitWriter) Write(data []byte) (written int, err error) {
 	for 0 < w.nextSplitBytes && w.nextSplitBytes < int64(len(data)) {
 		dataToSend := data[:w.nextSplitBytes]
 		n, err := w.writer.Write(dataToSend)
+		// Sleep to ensure bytes are properly split.
+		time.Sleep(100 * time.Microsecond)
 		written += n
 		w.advance(int64(n))
 		if err != nil {
