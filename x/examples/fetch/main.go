@@ -115,6 +115,7 @@ func main() {
 			return http.ErrUseLastResponse
 		},
 	}
+	defer httpClient.CloseIdleConnections()
 
 	var tlsConfig tls.Config
 	if *tlsKeyLogFlag != "" {
@@ -168,11 +169,11 @@ func main() {
 			slog.Error("Could not create PacketConn", "error", err)
 			os.Exit(1)
 		}
-		tr := &quic.Transport{
+		quicTransport := &quic.Transport{
 			Conn: conn,
 		}
-		defer tr.Close()
-		httpClient.Transport = &http3.Transport{
+		defer quicTransport.Close()
+		httpTransport := &http3.Transport{
 			TLSClientConfig: &tlsConfig,
 			Dial: func(ctx context.Context, addr string, tlsConf *tls.Config, quicConf *quic.Config) (quic.EarlyConnection, error) {
 				addressToDial, err := overrideAddress(addr, overrideHost, overridePort)
@@ -183,10 +184,12 @@ func main() {
 				if err != nil {
 					return nil, err
 				}
-				return tr.DialEarly(ctx, udpAddr, tlsConf, quicConf)
+				return quicTransport.DialEarly(ctx, udpAddr, tlsConf, quicConf)
 			},
 			Logger: slog.Default(),
 		}
+		defer httpTransport.Close()
+		httpClient.Transport = httpTransport
 	} else {
 		slog.Error("Invalid HTTP protocol", "proto", *protoFlag)
 		os.Exit(1)
