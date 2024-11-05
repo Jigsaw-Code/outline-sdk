@@ -24,20 +24,19 @@ import (
 // splitDialer is a [transport.StreamDialer] that implements the split strategy.
 // Use [NewStreamDialer] to create new instances.
 type splitDialer struct {
-	dialer     transport.StreamDialer
-	splitPoint int64
-	options    []Option
+	dialer    transport.StreamDialer
+	nextSplit func() int64
 }
 
 var _ transport.StreamDialer = (*splitDialer)(nil)
 
 // NewStreamDialer creates a [transport.StreamDialer] that splits the outgoing stream after writing "prefixBytes" bytes
 // using the split writer. You can specify multiple sequences with the [AddSplitSequence] option.
-func NewStreamDialer(dialer transport.StreamDialer, prefixBytes int64, options ...Option) (transport.StreamDialer, error) {
+func NewStreamDialer(dialer transport.StreamDialer, prefixBytes int64, nextSplit func() int64) (transport.StreamDialer, error) {
 	if dialer == nil {
 		return nil, errors.New("argument dialer must not be nil")
 	}
-	return &splitDialer{dialer: dialer, splitPoint: prefixBytes}, nil
+	return &splitDialer{dialer: dialer, nextSplit: nextSplit}, nil
 }
 
 // DialStream implements [transport.StreamDialer].DialStream.
@@ -46,5 +45,5 @@ func (d *splitDialer) DialStream(ctx context.Context, remoteAddr string) (transp
 	if err != nil {
 		return nil, err
 	}
-	return transport.WrapConn(innerConn, innerConn, NewWriter(innerConn, d.splitPoint, d.options...)), nil
+	return transport.WrapConn(innerConn, innerConn, NewWriter(innerConn, d.nextSplit)), nil
 }

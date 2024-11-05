@@ -18,18 +18,11 @@ import (
 	"io"
 )
 
-// repeatedSplit represents a split sequence of count blocks with bytes length.
-type repeatedSplit struct {
-	count int
-	bytes int64
-}
-
 type splitWriter struct {
 	writer io.Writer
 	// Bytes until the next split. This must always be > 0, unless splits are done.
-	nextSplitBytes int64
-	// Remaining split sequences. All entries here must have count > 0 && bytes > 0.
-	remainingSplits []repeatedSplit
+	nextSplitBytes    int64
+	nextSegmentLength func() int64
 }
 
 var _ io.Writer = (*splitWriter)(nil)
@@ -41,49 +34,62 @@ type splitWriterReaderFrom struct {
 
 var _ io.ReaderFrom = (*splitWriterReaderFrom)(nil)
 
-// NewWriter creates a [io.Writer] that ensures the byte sequence is split at prefixBytes.
-// A write will end right after byte index prefixBytes - 1, before a write starting at byte index prefixBytes.
-// For example, if you have a write of [0123456789] and prefixBytes = 3, you will get writes [012] and [3456789].
-// If the input writer is a [io.ReaderFrom], the output writer will be too.
-// It's possible to enable multiple splits with the [AddSplitSequence] option, which adds count splits every skipBytes bytes.
-// Example:
-// prefixBytes = 1, AddSplitSequence(count=2, bytes=6)
-// Array of [0 1 3 2 4 5 6 7 8 9 10 11 12 13 14 15 16 ...] will become
-// [0] [1 2 3 4 5 6] [7 8 9 10 11 12] [13 14 15 16 ...]
-func NewWriter(writer io.Writer, prefixBytes int64, options ...Option) io.Writer {
-	sw := &splitWriter{writer: writer, remainingSplits: []repeatedSplit{}}
-	sw.addSplitSequence(1, prefixBytes)
-	for _, option := range options {
-		option(sw)
+// Split Iterator is a function that returns how many bytes until the next split point, or zero if there are no more splits to do.
+type SplitIterator func() int64
+
+// NewFixedSplitIterator is a helper function that returns a [SplitIterator] that returns the input number once, followed by zero.
+// This is helpful for when you want to split the stream once in a fixed position.
+func NewFixedSplitIterator(n int64) SplitIterator {
+	return func() int64 {
+		next := n
+		n = 0
+		return next
 	}
+}
+
+// RepeatedSplit represents a split sequence of count segments with bytes length.
+type RepeatedSplit struct {
+	Count int
+	Bytes int64
+}
+
+// NewRepeatedSplitIterator is a helper function that returns a [SplitIterator] that returns split points according to splits.
+// The splits input represents pairs of (count, bytes), meaning a sequence of count splits with bytes length.
+// This is helpful for when you want to split the stream repeatedly at different positions and lengths.
+func NewRepeatedSplitIterator(splits ...RepeatedSplit) SplitIterator {
+	// Make sure we don't edit the original slice.
+	cleanSplits := make([]RepeatedSplit, 0, len(splits))
+	// Remove no-op splits.
+	for _, split := range splits {
+		if split.Count > 0 && split.Bytes > 0 {
+			cleanSplits = append(cleanSplits, split)
+		}
+	}
+	return func() int64 {
+		if len(cleanSplits) == 0 {
+			return 0
+		}
+		next := cleanSplits[0].Bytes
+		cleanSplits[0].Count -= 1
+		if cleanSplits[0].Count == 0 {
+			cleanSplits = cleanSplits[1:]
+		}
+		return next
+	}
+}
+
+// NewWriter creates a split Writer that calls the nextSegmentLength [SplitIterator] to determine the number bytes until the next split
+// point until it returns zero.
+func NewWriter(writer io.Writer, nextSegmentLength SplitIterator) io.Writer {
+	sw := &splitWriter{writer: writer, nextSegmentLength: nextSegmentLength}
+	sw.nextSplitBytes = nextSegmentLength()
 	if rf, ok := writer.(io.ReaderFrom); ok {
 		return &splitWriterReaderFrom{sw, rf}
 	}
 	return sw
 }
 
-func (w *splitWriter) addSplitSequence(count int, skipBytes int64) {
-	if count == 0 || skipBytes == 0 {
-		return
-	}
-	if w.nextSplitBytes == 0 {
-		w.nextSplitBytes = skipBytes
-		count--
-	}
-	if count > 0 {
-		w.remainingSplits = append(w.remainingSplits, repeatedSplit{count: count, bytes: skipBytes})
-	}
-}
-
-type Option func(w *splitWriter)
-
-// AddSplitSequence will add count splits, each of skipBytes length.
-func AddSplitSequence(count int, skipBytes int64) Option {
-	return func(w *splitWriter) {
-		w.addSplitSequence(count, skipBytes)
-	}
-}
-
+// ReadFrom implements io.ReaderFrom.
 func (w *splitWriterReaderFrom) ReadFrom(source io.Reader) (int64, error) {
 	var written int64
 	for w.nextSplitBytes > 0 {
@@ -114,17 +120,11 @@ func (w *splitWriter) advance(n int64) {
 	if w.nextSplitBytes > 0 {
 		return
 	}
-	// Split done, set next split.
-	if len(w.remainingSplits) == 0 {
-		return
-	}
-	w.nextSplitBytes = w.remainingSplits[0].bytes
-	w.remainingSplits[0].count -= 1
-	if w.remainingSplits[0].count == 0 {
-		w.remainingSplits = w.remainingSplits[1:]
-	}
+	// Split done, set up the next split.
+	w.nextSplitBytes = w.nextSegmentLength()
 }
 
+// Write implements io.Writer.
 func (w *splitWriter) Write(data []byte) (written int, err error) {
 	for 0 < w.nextSplitBytes && w.nextSplitBytes < int64(len(data)) {
 		dataToSend := data[:w.nextSplitBytes]
