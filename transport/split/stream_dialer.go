@@ -25,14 +25,13 @@ import (
 // Use [NewStreamDialer] to create new instances.
 type splitDialer struct {
 	dialer    transport.StreamDialer
-	nextSplit func() int64
+	nextSplit SplitIterator
 }
 
 var _ transport.StreamDialer = (*splitDialer)(nil)
 
-// NewStreamDialer creates a [transport.StreamDialer] that splits the outgoing stream after writing "prefixBytes" bytes
-// using the split writer. You can specify multiple sequences with the [AddSplitSequence] option.
-func NewStreamDialer(dialer transport.StreamDialer, prefixBytes int64, nextSplit func() int64) (transport.StreamDialer, error) {
+// NewStreamDialer creates a [transport.StreamDialer] that splits the outgoing stream according to nextSplit.
+func NewStreamDialer(dialer transport.StreamDialer, nextSplit SplitIterator) (transport.StreamDialer, error) {
 	if dialer == nil {
 		return nil, errors.New("argument dialer must not be nil")
 	}
