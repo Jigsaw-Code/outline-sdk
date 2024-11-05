@@ -45,6 +45,42 @@ func TestWrite_Split(t *testing.T) {
 	require.Equal(t, [][]byte{[]byte("Req"), []byte("uest")}, innerWriter.writes)
 }
 
+func TestWrite_SplitZero(t *testing.T) {
+	var innerWriter collectWrites
+	splitWriter := NewWriter(&innerWriter, 0, AddSplitSequence(0, 1), AddSplitSequence(10, 0), AddSplitSequence(0, 2))
+	n, err := splitWriter.Write([]byte("Request"))
+	require.NoError(t, err)
+	require.Equal(t, 7, n)
+	require.Equal(t, [][]byte{[]byte("Request")}, innerWriter.writes)
+}
+
+func TestWrite_SplitZeroLong(t *testing.T) {
+	var innerWriter collectWrites
+	splitWriter := NewWriter(&innerWriter, 0, AddSplitSequence(1_000_000_000_000_000_000, 0))
+	n, err := splitWriter.Write([]byte("Request"))
+	require.NoError(t, err)
+	require.Equal(t, 7, n)
+	require.Equal(t, [][]byte{[]byte("Request")}, innerWriter.writes)
+}
+
+func TestWrite_SplitZeroPrefix(t *testing.T) {
+	var innerWriter collectWrites
+	splitWriter := NewWriter(&innerWriter, 0, AddSplitSequence(3, 2))
+	n, err := splitWriter.Write([]byte("Request"))
+	require.NoError(t, err)
+	require.Equal(t, 7, n)
+	require.Equal(t, [][]byte{[]byte("Re"), []byte("qu"), []byte("es"), []byte("t")}, innerWriter.writes)
+}
+
+func TestWrite_SplitMulti(t *testing.T) {
+	var innerWriter collectWrites
+	splitWriter := NewWriter(&innerWriter, 1, AddSplitSequence(3, 2), AddSplitSequence(2, 3))
+	n, err := splitWriter.Write([]byte("RequestRequestRequest"))
+	require.NoError(t, err)
+	require.Equal(t, 21, n)
+	require.Equal(t, [][]byte{[]byte("R"), []byte("eq"), []byte("ue"), []byte("st"), []byte("Req"), []byte("ues"), []byte("tRequest")}, innerWriter.writes)
+}
+
 func TestWrite_ShortWrite(t *testing.T) {
 	var innerWriter collectWrites
 	splitWriter := NewWriter(&innerWriter, 10)
