@@ -42,13 +42,9 @@ var _ io.ReaderFrom = (*splitWriterReaderFrom)(nil)
 // A write will end right after byte index prefixBytes - 1, before a write starting at byte index prefixBytes.
 // For example, if you have a write of [0123456789] and prefixBytes = 3, you will get writes [012] and [3456789].
 // If the input writer is a [io.ReaderFrom], the output writer will be too.
-// It's possible to enable multiple splits with the [EnableRepeatSplit] option.
-// In that cases, splits will happen at positions prefixBytes + i * skipBytes, for 0 <= i < count.
-// This means that after the initial split, count splits will happen every skipBytes bytes.
+// It's possible to enable multiple splits with the [AddSplitSequence] option, which adds count splits every skipBytes bytes.
 // Example:
-// prefixBytes = 1
-// count = 2
-// skipBytes = 6
+// prefixBytes = 1, AddSplitSequence(count=2, bytes=6)
 // Array of [0 1 3 2 4 5 6 7 8 9 10 11 12 13 14 15 16 ...] will become
 // [0] [1 2 3 4 5 6] [7 8 9 10 11 12] [13 14 15 16 ...]
 func NewWriter(writer io.Writer, prefixBytes int64, options ...Option) io.Writer {
