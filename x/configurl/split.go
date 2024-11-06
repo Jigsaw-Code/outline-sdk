@@ -34,6 +34,6 @@ func registerSplitStreamDialer(r TypeRegistry[transport.StreamDialer], typeID st
 		if err != nil {
 			return nil, fmt.Errorf("prefixBytes is not a number: %v. Split config should be in split:<number> format", prefixBytesStr)
 		}
-		return split.NewStreamDialer(sd, int64(prefixBytes))
+		return split.NewStreamDialer(sd, split.NewFixedSplitIterator(int64(prefixBytes)))
 	})
 }
