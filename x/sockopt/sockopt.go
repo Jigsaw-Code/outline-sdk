@@ -59,27 +59,33 @@ type tcpOptions struct {
 
 var _ TCPOptions = (*tcpOptions)(nil)
 
-// NewTCPOptions creates a [TCPOptions] for the given [net.TCPConn].
-func NewTCPOptions(conn *net.TCPConn) (TCPOptions, error) {
-	addr, err := netip.ParseAddrPort(conn.RemoteAddr().String())
+// newHopLimit creates a hopLimitOption from a [net.Conn]. Works for both TCP or UDP.
+func newHopLimit(conn net.Conn) (*hopLimitOption, error) {
+	addr, err := netip.ParseAddrPort(conn.LocalAddr().String())
 	if err != nil {
-		return nil, fmt.Errorf("could not parse remote addr: %w", err)
+		return nil, err
 	}
-
-	opts := &tcpOptions{}
-
+	opt := &hopLimitOption{}
 	switch {
 	case addr.Addr().Is4():
 		conn := ipv4.NewConn(conn)
-		opts.hopLimitOption.hopLimit = conn.TTL
-		opts.hopLimitOption.setHopLimit = conn.SetTTL
+		opt.hopLimit = conn.TTL
+		opt.setHopLimit = conn.SetTTL
 	case addr.Addr().Is6():
 		conn := ipv6.NewConn(conn)
-		opts.hopLimitOption.hopLimit = conn.HopLimit
-		opts.hopLimitOption.setHopLimit = conn.SetHopLimit
+		opt.hopLimit = conn.HopLimit
+		opt.setHopLimit = conn.SetHopLimit
 	default:
-		return nil, fmt.Errorf("unknown remote addr type (%v)", addr.Addr().String())
+		return nil, fmt.Errorf("address is not IPv4 or IPv6 (%v)", addr.Addr().String())
 	}
+	return opt, nil
+}
 
-	return opts, nil
+// NewTCPOptions creates a [TCPOptions] for the given [net.TCPConn].
+func NewTCPOptions(conn *net.TCPConn) (TCPOptions, error) {
+	hopLimit, err := newHopLimit(conn)
+	if err != nil {
+		return nil, err
+	}
+	return &tcpOptions{hopLimitOption: *hopLimit}, nil
 }
