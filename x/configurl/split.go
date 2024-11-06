@@ -50,7 +50,7 @@ func registerSplitStreamDialer(r TypeRegistry[transport.StreamDialer], typeID st
 				}
 				bytes, err = strconv.ParseInt(subparts[1], 10, 64)
 				if err != nil {
-					return nil, fmt.Errorf("bytes is not a number: %v", subparts[0])
+					return nil, fmt.Errorf("bytes is not a number: %v", subparts[1])
 				}
 			default:
 				return nil, fmt.Errorf("split format must be a comma-separated list of '[$COUNT*]$BYTES' (e.g. '100,5*2'). Got %v", part)

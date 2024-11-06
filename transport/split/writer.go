@@ -34,7 +34,7 @@ type splitWriterReaderFrom struct {
 
 var _ io.ReaderFrom = (*splitWriterReaderFrom)(nil)
 
-// Split Iterator is a function that returns how many bytes until the next split point, or zero if there are no more splits to do.
+// SplitIterator is a function that returns how many bytes until the next split point, or zero if there are no more splits to do.
 type SplitIterator func() int64
 
 // NewFixedSplitIterator is a helper function that returns a [SplitIterator] that returns the input number once, followed by zero.
