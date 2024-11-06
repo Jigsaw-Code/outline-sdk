@@ -91,9 +91,9 @@ These strategies manipulate packets to bypass SNI-based blocking.
 
 Stream split transport (streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/split])
 
-It takes the length of the prefix. The stream will be split when PREFIX_LENGTH bytes are first written.
+It takes a list of count*length pairs meaning splitting the sequence in count segments of the given length. If you omit "[COUNT]*", it's assumed to be 1.
 
-	split:[PREFIX_LENGTH]
+	split:[COUNT1]*[LENGTH1],[COUNT2]*[LENGTH2],...
 
 TLS fragmentation (streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag]).
 
