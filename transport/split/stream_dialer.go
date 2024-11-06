@@ -35,6 +35,9 @@ func NewStreamDialer(dialer transport.StreamDialer, nextSplit SplitIterator) (tr
 	if dialer == nil {
 		return nil, errors.New("argument dialer must not be nil")
 	}
+	if nextSplit == nil {
+		return nil, errors.New("argument nextSplit must not be nil")
+	}
 	return &splitDialer{dialer: dialer, nextSplit: nextSplit}, nil
 }
 
