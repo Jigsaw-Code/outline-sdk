@@ -68,13 +68,13 @@ func newHopLimit(conn net.Conn) (*hopLimitOption, error) {
 	opt := &hopLimitOption{}
 	switch {
 	case addr.Addr().Is4():
-		conn := ipv4.NewConn(conn)
-		opt.hopLimit = conn.TTL
-		opt.setHopLimit = conn.SetTTL
+		ipConn := ipv4.NewConn(conn)
+		opt.hopLimit = ipConn.TTL
+		opt.setHopLimit = ipConn.SetTTL
 	case addr.Addr().Is6():
-		conn := ipv6.NewConn(conn)
-		opt.hopLimit = conn.HopLimit
-		opt.setHopLimit = conn.SetHopLimit
+		ipConn := ipv6.NewConn(conn)
+		opt.hopLimit = ipConn.HopLimit
+		opt.setHopLimit = ipConn.SetHopLimit
 	default:
 		return nil, fmt.Errorf("address is not IPv4 or IPv6 (%v)", addr.Addr().String())
 	}
