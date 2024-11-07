@@ -551,9 +551,51 @@ Note that this may not fully work on Android, since it will only affect the JVM,
 
 ### Web View
 
-We are working on instructions on how use the local proxy in a Webview.
+#### Android
 
-On Android, you will likely have to implement [WebViewClient.shouldInterceptRequest](https://developer.android.com/reference/android/webkit/WebViewClient#shouldInterceptRequest(android.webkit.WebView,%20android.webkit.WebResourceRequest)) to fulfill requests using an HTTP client that uses the local proxy.
+On Android, you can create your own WebViewClient and override the [`shouldInterceptRequest`](https://developer.android.com/reference/android/webkit/WebViewClient#shouldInterceptRequest(android.webkit.WebView,%20android.webkit.WebResourceRequest)) method in order to fulfill requests with an HTTP client that uses the local proxy:
+
+```kotlin
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import java.net.HttpURLConnection
+import java.net.InetSocketAddress
+import java.net.Proxy
+import java.net.URL
+
+class MyWebViewClient() : WebViewClient() {
+	override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
+		return try {
+			val url = URL(request?.url.toString())
+			val connection = url.openConnection(
+				Proxy(
+					Proxy.Type.HTTP,
+					InetSocketAddress(/* proxyHost */, /* proxyPort */)
+				)
+			) as HttpURLConnection
+
+			WebResourceResponse(
+				connection.contentType,
+				connection.contentEncoding,
+				connection.inputStream
+			)
+		} catch (e: Exception) {
+			// TODO: handle error
+			null
+		}
+	}
+}
+```
+
+Then you simply inject that client into your activity's WebView like so:
+
+```kotlin
+this.webView.webViewClient = MyWebViewClient()
+```
+
+#### iOS
 
 As of iOS 17, you can add a proxy configuration to a `WKWebView` via its [`WKWebsiteDataStore` property](https://developer.apple.com/documentation/webkit/wkwebviewconfiguration).
 
