@@ -553,40 +553,17 @@ Note that this may not fully work on Android, since it will only affect the JVM,
 
 #### Android
 
-On Android, you can create your own WebViewClient and override the [`shouldInterceptRequest`](https://developer.android.com/reference/android/webkit/WebViewClient#shouldInterceptRequest(android.webkit.WebView,%20android.webkit.WebResourceRequest)) method in order to fulfill requests with an HTTP client that uses the local proxy:
+On Android, you can easily apply a proxy configuration to all the web views in your application with the [`androidx.webview`](https://developer.android.com/reference/androidx/webkit/ProxyController) library like so:
 
 ```kotlin
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import java.net.HttpURLConnection
-import java.net.InetSocketAddress
-import java.net.Proxy
-import java.net.URL
-
-class MyWebViewClient() : WebViewClient() {
-	override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
-		return try {
-			val url = URL(request?.url.toString())
-			val connection = url.openConnection(
-				Proxy(
-					Proxy.Type.HTTP,
-					InetSocketAddress(/* proxyHost */, /* proxyPort */)
-				)
-			) as HttpURLConnection
-
-			WebResourceResponse(
-				connection.contentType,
-				connection.contentEncoding,
-				connection.inputStream
-			)
-		} catch (e: Exception) {
-			// TODO: handle error
-			null
-		}
-	}
-}
+ProxyController.getInstance()
+		.setProxyOverride(
+				ProxyConfig.Builder()
+						.addProxyRule(this.proxy!!.address())
+						.build(),
+				{}, // execution context for the following callback
+				{} // callback to be called once the ProxyConfig is applied
+		)
 ```
 
 Then you simply inject that client into your activity's WebView like so:
