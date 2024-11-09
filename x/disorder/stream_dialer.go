@@ -19,18 +19,14 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/netip"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"golang.org/x/net/ipv4"
-	"golang.org/x/net/ipv6"
+	"github.com/Jigsaw-Code/outline-sdk/x/sockopt"
 )
 
-var defaultTTL = 64
-
 type disorderDialer struct {
-	dialer     transport.StreamDialer
-	splitPoint int64
+	dialer          transport.StreamDialer
+	disorderPacketN int
 }
 
 var _ transport.StreamDialer = (*disorderDialer)(nil)
@@ -43,11 +39,11 @@ var _ transport.StreamDialer = (*disorderDialer)(nil)
 // * The next part of data is sent normally
 // * Server notices the lost fragment and requests re-transmission
 // Currently this only works with Linux kernel (for Windows/Mac a different implementation is required)
-func NewStreamDialer(dialer transport.StreamDialer, prefixBytes int64) (transport.StreamDialer, error) {
+func NewStreamDialer(dialer transport.StreamDialer, disorderPacketN int) (transport.StreamDialer, error) {
 	if dialer == nil {
 		return nil, errors.New("argument dialer must not be nil")
 	}
-	return &disorderDialer{dialer: dialer, splitPoint: prefixBytes}, nil
+	return &disorderDialer{dialer: dialer, disorderPacketN: disorderPacketN}, nil
 }
 
 // DialStream implements [transport.StreamDialer].DialStream.
@@ -57,43 +53,21 @@ func (d *disorderDialer) DialStream(ctx context.Context, remoteAddr string) (tra
 		return nil, err
 	}
 
-	oldTTL, err := setHopLimit(innerConn, 1)
+	tcpInnerConn, ok := innerConn.(*net.TCPConn)
+	if !ok {
+		return nil, fmt.Errorf("disorder strategy: expected base dialer to return TCPConn")
+	}
+	tcpOptions, err := sockopt.NewTCPOptions(tcpInnerConn)
 	if err != nil {
-		return nil, fmt.Errorf("disorder strategy: failed to change ttl: %w", err)
+		return nil, err
 	}
 
-	dw := NewWriter(innerConn, d.splitPoint, oldTTL)
+	defaultHopLimit, err := tcpOptions.HopLimit()
+	if err != nil {
+		return nil, fmt.Errorf("disorder strategy: failed to get base connection HopLimit: %w", err)
+	}
+
+	dw := NewWriter(innerConn, tcpOptions, d.disorderPacketN, defaultHopLimit)
 
 	return transport.WrapConn(innerConn, innerConn, dw), nil
-}
-
-// setHopLimit changes the socket TTL for IPv4 (or HopLimit for IPv6) and returns the old value
-// socket must be `*net.TCPConn`
-func setHopLimit(conn net.Conn, ttl int) (oldTTL int, err error) {
-	addr, err := netip.ParseAddrPort(conn.RemoteAddr().String())
-	if err != nil {
-		return 0, fmt.Errorf("could not parse remote addr: %w", err)
-	}
-
-	switch {
-	case addr.Addr().Is4():
-		conn := ipv4.NewConn(conn)
-		oldTTL, _ = conn.TTL()
-		err = conn.SetTTL(ttl)
-	case addr.Addr().Is6():
-		conn := ipv6.NewConn(conn)
-		oldTTL, _ = conn.HopLimit()
-		err = conn.SetHopLimit(ttl)
-	default:
-		return 0, fmt.Errorf("unknown remote addr type (%v)", addr.Addr().String())
-	}
-	if err != nil {
-		return 0, fmt.Errorf("failed to change TTL: %w", err)
-	}
-
-	if oldTTL == 0 {
-		oldTTL = defaultTTL
-	}
-
-	return
 }

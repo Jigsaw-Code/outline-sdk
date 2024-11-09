@@ -17,50 +17,60 @@ package disorder
 import (
 	"fmt"
 	"io"
-	"net"
-	"sync"
+
+	"github.com/Jigsaw-Code/outline-sdk/x/sockopt"
 )
 
 type disorderWriter struct {
-	conn        net.Conn
-	resetTTL    sync.Once
-	prefixBytes int64
-	oldTTL      int
+	conn            io.Writer
+	tcpOptions      sockopt.TCPOptions
+	runAtPacketN    int
+	defaultHopLimit int
+	writeCalls      int
 }
 
 var _ io.Writer = (*disorderWriter)(nil)
 
-// TODO
-// var _ io.ReaderFrom = (*splitWriterReaderFrom)(nil)
+// Setting number of hops to 1 will lead to data to get lost on host
+var disorderHopN = 1
 
-// TODO
-func NewWriter(conn net.Conn, prefixBytes int64, oldTTL int) io.Writer {
-	// TODO support ReaderFrom
+func NewWriter(conn io.Writer, tcpOptions sockopt.TCPOptions, runAtPacketN int, defaultHopLimit int) io.Writer {
 	return &disorderWriter{
-		conn:        conn,
-		prefixBytes: prefixBytes,
-		oldTTL:      oldTTL,
+		conn:            conn,
+		tcpOptions:      tcpOptions,
+		runAtPacketN:    runAtPacketN,
+		defaultHopLimit: defaultHopLimit,
+		writeCalls:      0,
 	}
 }
 
 func (w *disorderWriter) Write(data []byte) (written int, err error) {
-	if 0 < w.prefixBytes && w.prefixBytes < int64(len(data)) {
-		written, err = w.conn.Write(data[:w.prefixBytes])
-		w.prefixBytes -= int64(written)
+	shouldDoDisorder := w.writeCalls == w.runAtPacketN
+	if shouldDoDisorder {
+		err = w.tcpOptions.SetHopLimit(disorderHopN)
 		if err != nil {
-			return written, err
+			return 0, fmt.Errorf("failed to set the hop limit to %d: %w", disorderHopN, err)
 		}
-		data = data[written:]
-	}
-	w.resetTTL.Do(func() {
-		_, err = setHopLimit(w.conn, w.oldTTL)
-	})
-	if err != nil {
-		return written, fmt.Errorf("setsockopt IPPROTO_IP/IP_TTL error: %w", err)
+
+		// The packet will get lost at the first send, since the hop limit is too low
 	}
 
 	n, err := w.conn.Write(data)
-	written += n
-	w.prefixBytes -= int64(n)
-	return written, err
+
+	// TODO: Wait for queued data to be sent by the kernel to the socket
+
+	if shouldDoDisorder {
+		// The packet with low hop limit was sent
+		// Make next calls send data normally
+		//
+		// The packet with the low hop limit will get resent by the kernel later
+		// The network filters will receive data out of order
+		err = w.tcpOptions.SetHopLimit(w.defaultHopLimit)
+		if err != nil {
+			return n, fmt.Errorf("failed to set the hop limit error %d: %w", w.defaultHopLimit, err)
+		}
+	}
+
+	w.writeCalls += 1
+	return n, err
 }

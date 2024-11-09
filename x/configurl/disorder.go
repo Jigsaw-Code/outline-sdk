@@ -29,11 +29,11 @@ func registerDisorderDialer(r TypeRegistry[transport.StreamDialer], typeID strin
 		if err != nil {
 			return nil, err
 		}
-		prefixBytesStr := config.URL.Opaque
-		prefixBytes, err := strconv.Atoi(prefixBytesStr)
+		disorderPacketNStr := config.URL.Opaque
+		disorderPacketN, err := strconv.Atoi(disorderPacketNStr)
 		if err != nil {
 			return nil, fmt.Errorf("disoder: could not parse splice position: %v", err)
 		}
-		return disorder.NewStreamDialer(sd, int64(prefixBytes))
+		return disorder.NewStreamDialer(sd, disorderPacketN)
 	})
 }
