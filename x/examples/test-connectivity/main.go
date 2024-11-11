@@ -270,7 +270,7 @@ func main() {
 			tcpReports := make([]tcpReport, 0)
 			udpReports := make([]udpReport, 0)
 			var connectStart = make(map[string]time.Time)
-			configToDialer := configurl.NewDefaultConfigToDialer()
+			providers := configurl.NewDefaultProviders()
 			onDNS := func(ctx context.Context, domain string) func(di httptrace.DNSDoneInfo) {
 				dnsStart := time.Now()
 				return func(di httptrace.DNSDoneInfo) {
@@ -323,7 +323,7 @@ func main() {
 				return newTCPTraceDialer(onDNS, onDial, onDialStart).DialStream(ctx, addr)
 			})
 
-			configToDialer.BasePacketDialer = transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			providers.PacketDialers.BaseInstance = transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 				hostname, _, err := net.SplitHostPort(addr)
 				if err != nil {
 					return nil, err
