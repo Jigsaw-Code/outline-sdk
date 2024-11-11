@@ -186,16 +186,16 @@ func queryDatagram(conn io.ReadWriter, q dnsmessage.Question) (*dnsmessage.Messa
 			err = nil
 		}
 		if err != nil {
-			return nil, &nestedError{ErrReceive, errors.Join(returnErr, fmt.Errorf("read message failed: %w", err))}
+			return nil, &nestedError{ErrReceive, wrapError(returnErr, fmt.Errorf("read message failed: %w", err))}
 		}
 		var msg dnsmessage.Message
 		if err := msg.Unpack(buf[:n]); err != nil {
-			returnErr = errors.Join(returnErr, err)
+			returnErr = wrapError(returnErr, err)
 			// Ignore invalid packets that fail to parse. It could be injected.
 			continue
 		}
 		if err := checkResponse(id, q, msg.Header, msg.Questions); err != nil {
-			returnErr = errors.Join(returnErr, err)
+			returnErr = wrapError(returnErr, err)
 			continue
 		}
 		return &msg, nil
@@ -390,4 +390,16 @@ func NewHTTPSResolver(sd transport.StreamDialer, resolverAddr string, url string
 		}
 		return &msg, nil
 	})
+}
+
+// wrapError creates a new error that wraps an existing error chain with a new error,
+// preserving the ability to unwrap through the entire chain.
+func wrapError(base error, wrap error) error {
+	if base == nil {
+		return wrap
+	}
+	if wrap == nil {
+		return base
+	}
+	return fmt.Errorf("%w: %w", base, wrap)
 }
