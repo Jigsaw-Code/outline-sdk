@@ -15,23 +15,59 @@
 package configurl
 
 import (
-	"net/url"
+	"context"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/transport/socks5"
 )
 
-func wrapStreamDialerWithSOCKS5(innerSD func() (transport.StreamDialer, error), _ func() (transport.PacketDialer, error), configURL *url.URL) (transport.StreamDialer, error) {
-	sd, err := innerSD()
+func registerSOCKS5StreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
+	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		return newSOCKS5Client(ctx, *config, newSD)
+	})
+}
+
+func registerSOCKS5PacketDialer(r TypeRegistry[transport.PacketDialer], typeID string, newSD BuildFunc[transport.StreamDialer], newPD BuildFunc[transport.PacketDialer]) {
+	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
+		client, err := newSOCKS5Client(ctx, *config, newSD)
+		if err != nil {
+			return nil, err
+		}
+		pd, err := newPD(ctx, config.BaseConfig)
+		if err != nil {
+			return nil, err
+		}
+		client.EnablePacket(pd)
+		return transport.PacketListenerDialer{Listener: client}, nil
+	})
+}
+
+func registerSOCKS5PacketListener(r TypeRegistry[transport.PacketListener], typeID string, newSD BuildFunc[transport.StreamDialer], newPD BuildFunc[transport.PacketDialer]) {
+	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.PacketListener, error) {
+		client, err := newSOCKS5Client(ctx, *config, newSD)
+		if err != nil {
+			return nil, err
+		}
+		pd, err := newPD(ctx, config.BaseConfig)
+		if err != nil {
+			return nil, err
+		}
+		client.EnablePacket(pd)
+		return client, nil
+	})
+}
+
+func newSOCKS5Client(ctx context.Context, config Config, newSD BuildFunc[transport.StreamDialer]) (*socks5.Client, error) {
+	sd, err := newSD(ctx, config.BaseConfig)
 	if err != nil {
 		return nil, err
 	}
-	endpoint := transport.StreamDialerEndpoint{Dialer: sd, Address: configURL.Host}
+	endpoint := transport.StreamDialerEndpoint{Dialer: sd, Address: config.URL.Host}
 	client, err := socks5.NewClient(&endpoint)
 	if err != nil {
 		return nil, err
 	}
-	userInfo := configURL.User
+	userInfo := config.URL.User
 	if userInfo != nil {
 		username := userInfo.Username()
 		password, _ := userInfo.Password()
@@ -40,35 +76,5 @@ func wrapStreamDialerWithSOCKS5(innerSD func() (transport.StreamDialer, error), 
 			return nil, err
 		}
 	}
-
 	return client, nil
-}
-
-func wrapPacketDialerWithSOCKS5(innerSD func() (transport.StreamDialer, error), innerPD func() (transport.PacketDialer, error), configURL *url.URL) (transport.PacketDialer, error) {
-	sd, err := innerSD()
-	if err != nil {
-		return nil, err
-	}
-	streamEndpoint := transport.StreamDialerEndpoint{Dialer: sd, Address: configURL.Host}
-	client, err := socks5.NewClient(&streamEndpoint)
-	if err != nil {
-		return nil, err
-	}
-	userInfo := configURL.User
-	if userInfo != nil {
-		username := userInfo.Username()
-		password, _ := userInfo.Password()
-		err := client.SetCredentials([]byte(username), []byte(password))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	pd, err := innerPD()
-	if err != nil {
-		return nil, err
-	}
-	client.EnablePacket(pd)
-	packetDialer := transport.PacketListenerDialer{Listener: client}
-	return packetDialer, nil
 }

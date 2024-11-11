@@ -25,7 +25,7 @@ func Test_newOverrideFromURL(t *testing.T) {
 	t.Run("Host Override", func(t *testing.T) {
 		cfgUrl, err := url.Parse("override:host=www.google.com")
 		require.NoError(t, err)
-		override, err := newOverrideFromURL(cfgUrl)
+		override, err := newOverrideFromURL(*cfgUrl)
 		require.NoError(t, err)
 		addr, err := override("www.youtube.com:443")
 		require.NoError(t, err)
@@ -34,7 +34,7 @@ func Test_newOverrideFromURL(t *testing.T) {
 	t.Run("Port Override", func(t *testing.T) {
 		cfgUrl, err := url.Parse("override:port=853")
 		require.NoError(t, err)
-		override, err := newOverrideFromURL(cfgUrl)
+		override, err := newOverrideFromURL(*cfgUrl)
 		require.NoError(t, err)
 		addr, err := override("8.8.8.8:53")
 		require.NoError(t, err)
@@ -43,7 +43,7 @@ func Test_newOverrideFromURL(t *testing.T) {
 	t.Run("Full Override", func(t *testing.T) {
 		cfgUrl, err := url.Parse("override:host=8.8.8.8&port=853")
 		require.NoError(t, err)
-		override, err := newOverrideFromURL(cfgUrl)
+		override, err := newOverrideFromURL(*cfgUrl)
 		require.NoError(t, err)
 		addr, err := override("dns.google:53")
 		require.NoError(t, err)
@@ -53,7 +53,7 @@ func Test_newOverrideFromURL(t *testing.T) {
 		t.Run("Host Override", func(t *testing.T) {
 			cfgUrl, err := url.Parse("override:host=www.google.com")
 			require.NoError(t, err)
-			override, err := newOverrideFromURL(cfgUrl)
+			override, err := newOverrideFromURL(*cfgUrl)
 			require.NoError(t, err)
 			_, err = override("foo bar")
 			require.Error(t, err)
@@ -61,7 +61,7 @@ func Test_newOverrideFromURL(t *testing.T) {
 		t.Run("Full Override", func(t *testing.T) {
 			cfgUrl, err := url.Parse("override:host=8.8.8.8&port=853")
 			require.NoError(t, err)
-			override, err := newOverrideFromURL(cfgUrl)
+			override, err := newOverrideFromURL(*cfgUrl)
 			require.NoError(t, err)
 			addr, err := override("foo bar")
 			require.NoError(t, err)

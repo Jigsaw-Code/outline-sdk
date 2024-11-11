@@ -15,25 +15,16 @@
 package configurl
 
 import (
-	"net/url"
 	"testing"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
 	"github.com/stretchr/testify/require"
 )
 
-func TestTLS(t *testing.T) {
-	tlsURL, err := url.Parse("tls")
-	require.NoError(t, err)
-	_, err = wrapStreamDialerWithTLS(func() (transport.StreamDialer, error) { return &transport.TCPDialer{}, nil }, nil, tlsURL)
-	require.NoError(t, err)
-}
-
 func TestTLS_SNI(t *testing.T) {
-	tlsURL, err := url.Parse("tls:sni=www.google.com")
+	config, err := ParseConfig("tls:sni=www.google.com")
 	require.NoError(t, err)
-	options, err := parseOptions(tlsURL)
+	options, err := parseOptions(config.URL)
 	require.NoError(t, err)
 	cfg := tls.ClientConfig{ServerName: "host", CertificateName: "host"}
 	for _, option := range options {
@@ -44,9 +35,9 @@ func TestTLS_SNI(t *testing.T) {
 }
 
 func TestTLS_NoSNI(t *testing.T) {
-	tlsURL, err := url.Parse("tls:sni=")
+	config, err := ParseConfig("tls:sni=")
 	require.NoError(t, err)
-	options, err := parseOptions(tlsURL)
+	options, err := parseOptions(config.URL)
 	require.NoError(t, err)
 	cfg := tls.ClientConfig{ServerName: "host", CertificateName: "host"}
 	for _, option := range options {
@@ -57,16 +48,16 @@ func TestTLS_NoSNI(t *testing.T) {
 }
 
 func TestTLS_MultipleSNI(t *testing.T) {
-	tlsURL, err := url.Parse("tls:sni=www.google.com&sni=second")
+	config, err := ParseConfig("tls:sni=www.google.com&sni=second")
 	require.NoError(t, err)
-	_, err = parseOptions(tlsURL)
+	_, err = parseOptions(config.URL)
 	require.Error(t, err)
 }
 
 func TestTLS_CertName(t *testing.T) {
-	tlsURL, err := url.Parse("tls:certname=www.google.com")
+	config, err := ParseConfig("tls:certname=www.google.com")
 	require.NoError(t, err)
-	options, err := parseOptions(tlsURL)
+	options, err := parseOptions(config.URL)
 	require.NoError(t, err)
 	cfg := tls.ClientConfig{ServerName: "host", CertificateName: "host"}
 	for _, option := range options {
@@ -77,9 +68,9 @@ func TestTLS_CertName(t *testing.T) {
 }
 
 func TestTLS_Combined(t *testing.T) {
-	tlsURL, err := url.Parse("tls:SNI=sni.example.com&CertName=certname.example.com")
+	config, err := ParseConfig("tls:SNI=sni.example.com&CertName=certname.example.com")
 	require.NoError(t, err)
-	options, err := parseOptions(tlsURL)
+	options, err := parseOptions(config.URL)
 	require.NoError(t, err)
 	cfg := tls.ClientConfig{ServerName: "host", CertificateName: "host"}
 	for _, option := range options {
@@ -90,8 +81,8 @@ func TestTLS_Combined(t *testing.T) {
 }
 
 func TestTLS_UnsupportedOption(t *testing.T) {
-	tlsURL, err := url.Parse("tls:unsupported")
+	config, err := ParseConfig("tls:unsupported")
 	require.NoError(t, err)
-	_, err = parseOptions(tlsURL)
+	_, err = parseOptions(config.URL)
 	require.Error(t, err)
 }

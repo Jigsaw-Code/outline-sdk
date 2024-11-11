@@ -290,7 +290,7 @@ func main() {
 					mu.Unlock()
 				}
 			}
-			configToDialer.BaseStreamDialer = transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+			providers.StreamDialers.BaseInstance = transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
 				hostname, _, err := net.SplitHostPort(addr)
 				if err != nil {
 					return nil, err
@@ -358,7 +358,7 @@ func main() {
 
 			switch proto {
 			case "tcp":
-				streamDialer, err := configToDialer.NewStreamDialer(*transportFlag)
+				streamDialer, err := providers.NewStreamDialer(context.Background(), *transportFlag)
 				if err != nil {
 					slog.Error("Failed to create StreamDialer", "error", err)
 					os.Exit(1)
@@ -366,7 +366,7 @@ func main() {
 				resolver = dns.NewTCPResolver(streamDialer, resolverAddress)
 
 			case "udp":
-				packetDialer, err := configToDialer.NewPacketDialer(*transportFlag)
+				packetDialer, err := providers.NewPacketDialer(context.Background(), *transportFlag)
 				if err != nil {
 					slog.Error("Failed to create PacketDialer", "error", err)
 					os.Exit(1)

@@ -13,11 +13,11 @@
 // limitations under the License.
 
 /*
-Package config provides convenience functions to create dialer objects based on a text config.
+Package configurl provides convenience functions to create network objects based on a text config.
 This is experimental and mostly for illustrative purposes at this point.
 
-Configurable transports simplifies the way you create and manage transports.
-With the config package, you can use [NewPacketDialer] and [NewStreamDialer] to create dialers using a simple text string.
+Configurable strategies simplifies the way you create and manage strategies.
+With the configurl package, you can use [ProviderContainer.NewPacketDialer], [ProviderContainer.NewStreamDialer] and [ProviderContainer.NewPacketListener] to create objects using a simple text string.
 
 Key Benefits:
 
@@ -91,9 +91,9 @@ These strategies manipulate packets to bypass SNI-based blocking.
 
 Stream split transport (streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/split])
 
-It takes the length of the prefix. The stream will be split when PREFIX_LENGTH bytes are first written.
+It takes a list of count*length pairs meaning splitting the sequence in count segments of the given length. If you omit "[COUNT]*", it's assumed to be 1.
 
-	split:[PREFIX_LENGTH]
+	split:[COUNT1]*[LENGTH1],[COUNT2]*[LENGTH2],...
 
 TLS fragmentation (streams only, package [github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag]).
 
@@ -129,19 +129,23 @@ DPI Evasion - To add packet splitting to a Shadowsocks server for enhanced DPI e
 
 	split:2|ss://[USERINFO]@[HOST]:[PORT]
 
-Defining custom transport - You can define your custom transport by implementing and registering the [NewStreamDialerFunc] and [NewPacketDialerFunc] functions:
+Defining custom strategies - You can define your custom strategy by implementing and registering [BuildFunc[ObjectType]] functions:
 
-	// create new config parser
-	// p := new(ConfigToDialer)
+	// Create new config parser.
+	// p := configurl.NewProviderContainer()
 	// or
-	p := NewDefaultConfigToDialer()
-	// register your custom dialer
-	p.RegisterPacketDialerWrapper("custom", wrapStreamDialerWithCustom)
-	p.RegisterStreamDialerWrapper("custom", wrapPacketDialerWithCustom)
-	// then use it
-	dialer, err := p.NewStreamDialer(innerDialer, "custom://config")
-
-where wrapStreamDialerWithCustom and wrapPacketDialerWithCustom implement [NewPacketDialerFunc] and [NewStreamDialerFunc].
+	p := configurl.NewDefaultProviders()
+	// Register your custom dialer.
+	p.StreamDialers.RegisterType("custom", func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+	  // Build logic
+	  // ...
+	})
+	p.PacketDialers.RegisterType("custom", func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
+	  // Build logic
+	  // ...
+	})
+	// Then use it
+	dialer, err := p.NewStreamDialer(context.Background(), "custom://config")
 
 [Onion Routing]: https://en.wikipedia.org/wiki/Onion_routing
 */
