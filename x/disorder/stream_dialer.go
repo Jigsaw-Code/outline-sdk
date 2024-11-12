@@ -43,6 +43,9 @@ func NewStreamDialer(dialer transport.StreamDialer, disorderPacketN int) (transp
 	if dialer == nil {
 		return nil, errors.New("argument dialer must not be nil")
 	}
+	if disorderPacketN < 0 {
+		return nil, fmt.Errorf("disorder argument must be >= 0, got %d", disorderPacketN)
+	}
 	return &disorderDialer{dialer: dialer, disorderPacketN: disorderPacketN}, nil
 }
 
@@ -62,12 +65,7 @@ func (d *disorderDialer) DialStream(ctx context.Context, remoteAddr string) (tra
 		return nil, err
 	}
 
-	defaultHopLimit, err := tcpOptions.HopLimit()
-	if err != nil {
-		return nil, fmt.Errorf("disorder strategy: failed to get base connection HopLimit: %w", err)
-	}
-
-	dw := NewWriter(innerConn, tcpOptions, d.disorderPacketN, defaultHopLimit)
+	dw := NewWriter(innerConn, tcpOptions, d.disorderPacketN)
 
 	return transport.WrapConn(innerConn, innerConn, dw), nil
 }
