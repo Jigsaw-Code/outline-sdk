@@ -31,8 +31,8 @@ type disorderDialer struct {
 
 var _ transport.StreamDialer = (*disorderDialer)(nil)
 
-// NewStreamDialer creates a [transport.StreamDialer]
-// It work like this:
+// NewStreamDialer creates a [transport.StreamDialer].
+// It works like this:
 // * Wait for disorderPacketN'th call to Write. All Write requests before and after the target packet are written normally.
 // * Send the disorderPacketN'th packet with TTL == 1.
 // * This packet is dropped somewhere in the network and never reaches the server.
