@@ -2,11 +2,12 @@ package oob
 
 import (
 	"fmt"
-	"github.com/Jigsaw-Code/outline-sdk/x/sockopt"
 	"io"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/Jigsaw-Code/outline-sdk/x/sockopt"
 )
 
 type oobWriter struct {
@@ -46,7 +47,6 @@ func (w *oobWriter) Write(data []byte) (int, error) {
 	var written int
 	var err error
 
-	fmt.Println("oobWriter, total: ", len(data))
 	if w.oobPosition > 0 && w.oobPosition < int64(len(data))-1 {
 		firstPart := data[:w.oobPosition+1]
 		secondPart := data[w.oobPosition:]
@@ -76,8 +76,6 @@ func (w *oobWriter) Write(data []byte) (int, error) {
 		written = int(w.oobPosition)
 		secondPart[0] = tmp
 
-		fmt.Printf("oobWriter: firstPart len: %d\n", len(firstPart))
-
 		if w.disOOB {
 			w.resetTTL.Do(func() {
 				err = w.opts.SetHopLimit(oldTTL)
@@ -95,7 +93,7 @@ func (w *oobWriter) Write(data []byte) (int, error) {
 	// Write the remaining data
 	n, err := w.conn.Write(data)
 	written += n
-	fmt.Printf("oobWriter: second part len: %d\n", len(data))
+
 	return written, err
 }
 
