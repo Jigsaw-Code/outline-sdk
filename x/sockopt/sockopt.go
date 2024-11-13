@@ -19,20 +19,10 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"time"
 
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
 )
-
-type HasWaitUntilBytesAreSent interface {
-	// Wait until all bytes are sent to the socket.
-	// Returns ErrUnsupported if the platform doesn't support it.
-	// May return a different error.
-	WaitUntilBytesAreSent() error
-	// Checks if the OS supports waiting until the bytes are sent
-	OsSupportsWaitingUntilBytesAreSent() bool
-}
 
 // HasHopLimit enables manipulation of the hop limit option.
 type HasHopLimit interface {
@@ -60,50 +50,14 @@ var _ HasHopLimit = (*hopLimitOption)(nil)
 
 // TCPOptions represents options for TCP connections.
 type TCPOptions interface {
-	HasWaitUntilBytesAreSent
 	HasHopLimit
 }
 
 type tcpOptions struct {
 	hopLimitOption
-
-	conn *net.TCPConn
-
-	// Timeout after which we return an error
-	waitingTimeout time.Duration
-	// Delay between checking the socket
-	waitingDelay time.Duration
 }
 
 var _ TCPOptions = (*tcpOptions)(nil)
-
-func (o *tcpOptions) SetWaitingTimeout(timeout time.Duration) {
-	o.waitingTimeout = timeout
-}
-
-func (o *tcpOptions) SetWaitingDelay(delay time.Duration) {
-	o.waitingDelay = delay
-}
-
-func (o *tcpOptions) OsSupportsWaitingUntilBytesAreSent() bool {
-	return isConnectionSendingBytesImplemented()
-}
-
-func (o *tcpOptions) WaitUntilBytesAreSent() error {
-	startTime := time.Now()
-	for time.Since(startTime) < o.waitingTimeout {
-		isSendingBytes, err := isConnectionSendingBytes(o.conn)
-		if err != nil {
-			return err
-		}
-		if !isSendingBytes {
-			return nil
-		}
-
-		time.Sleep(o.waitingDelay)
-	}
-	return fmt.Errorf("waiting for socket to send all bytes: timeout exceeded")
-}
 
 // newHopLimit creates a hopLimitOption from a [net.Conn]. Works for both TCP or UDP.
 func newHopLimit(conn net.Conn) (*hopLimitOption, error) {
@@ -133,10 +87,5 @@ func NewTCPOptions(conn *net.TCPConn) (TCPOptions, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &tcpOptions{
-		hopLimitOption: *hopLimit,
-		conn:           conn,
-		waitingTimeout: 10 * time.Millisecond,
-		waitingDelay:   100 * time.Microsecond,
-	}, nil
+	return &tcpOptions{hopLimitOption: *hopLimit}, nil
 }

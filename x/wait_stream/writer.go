@@ -18,32 +18,62 @@ import (
 	"errors"
 	"fmt"
 	"io"
-
-	"github.com/Jigsaw-Code/outline-sdk/x/sockopt"
+	"net"
+	"time"
 )
 
 type waitStreamWriter struct {
-	conn       io.Writer
-	tcpOptions sockopt.TCPOptions
+	conn *net.TCPConn
+
+	waitingTimeout time.Duration
+	waitingDelay   time.Duration
 }
 
 var _ io.Writer = (*waitStreamWriter)(nil)
 
-func NewWriter(conn io.Writer, tcpOptions sockopt.TCPOptions) io.Writer {
+func NewWriter(conn *net.TCPConn, waitingTimeout time.Duration, waitingDelay time.Duration) io.Writer {
 	return &waitStreamWriter{
-		conn:       conn,
-		tcpOptions: tcpOptions,
+		conn:           conn,
+		waitingTimeout: waitingTimeout,
+		waitingDelay:   waitingDelay,
 	}
 }
 
-func (w *waitStreamWriter) Write(data []byte) (written int, err error) {
-	written, err = w.conn.Write(data)
+func isConnectionSendingBytes(conn *net.TCPConn) (result bool, err error) {
+	syscallConn, err := conn.SyscallConn()
+	if err != nil {
+		return false, err
+	}
+	syscallConn.Control(func(fd uintptr) {
+		result, err = isSocketFdSendingBytes(int(fd))
+	})
+	return
+}
 
+func waitUntilBytesAreSent(conn *net.TCPConn, waitingTimeout time.Duration, waitingDelay time.Duration) error {
+	startTime := time.Now()
+	for time.Since(startTime) < waitingTimeout {
+		isSendingBytes, err := isConnectionSendingBytes(conn)
+		if err != nil {
+			return err
+		}
+		if !isSendingBytes {
+			return nil
+		}
+
+		time.Sleep(waitingDelay)
+	}
+	// not sure about the right behaviour here: fail or give up waiting?
+	// giving up feels safer, and matches byeDPI behavior
+	return nil
+}
+
+func (w *waitStreamWriter) Write(data []byte) (written int, err error) {
 	// This may not be implemented, so it's best effort really.
-	waitUntilBytesAreSentErr := w.tcpOptions.WaitUntilBytesAreSent()
+	waitUntilBytesAreSentErr := waitUntilBytesAreSent(w.conn, w.waitingTimeout, w.waitingDelay)
 	if waitUntilBytesAreSentErr != nil && !errors.Is(waitUntilBytesAreSentErr, errors.ErrUnsupported) {
-		return written, fmt.Errorf("error when waiting for stream to send all bytes: %w", waitUntilBytesAreSentErr)
+		return 0, fmt.Errorf("error when waiting for stream to send all bytes: %w", waitUntilBytesAreSentErr)
 	}
 
-	return
+	return w.conn.Write(data)
 }

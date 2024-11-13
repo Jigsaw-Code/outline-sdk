@@ -1,17 +1,12 @@
 //go:build !linux
 
-package sockopt
+package wait_stream
 
 import (
 	"errors"
 	"fmt"
-	"net"
 )
 
-func isConnectionSendingBytesImplemented() bool {
-	return false
-}
-
-func isConnectionSendingBytes(_ *net.TCPConn) (bool, error) {
+func isSocketFdSendingBytes(_ int) (bool, error) {
 	return false, fmt.Errorf("%w: checking if socket is sending bytes is not implemented on this platform", errors.ErrUnsupported)
 }

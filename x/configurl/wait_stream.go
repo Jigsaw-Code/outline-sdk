@@ -16,6 +16,9 @@ package configurl
 
 import (
 	"context"
+	"fmt"
+	"net/url"
+	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/wait_stream"
@@ -27,6 +30,33 @@ func registerWaitStreamDialer(r TypeRegistry[transport.StreamDialer], typeID str
 		if err != nil {
 			return nil, err
 		}
-		return wait_stream.NewStreamDialer(sd)
+
+		queryUrlParameters, err := url.ParseQuery(config.URL.Opaque)
+		if err != nil {
+			return nil, fmt.Errorf("waitstream: failed to parse URL parameters: %w", err)
+		}
+
+		resultStreamDialer, err := wait_stream.NewStreamDialer(sd)
+		if err != nil {
+			return nil, err
+		}
+
+		if queryUrlParameters.Has("timeout") {
+			timeout, err := time.ParseDuration(queryUrlParameters.Get("timeout"))
+			if err != nil {
+				return nil, fmt.Errorf("waitstream: failed to parse timeout parameter: %w", err)
+			}
+			resultStreamDialer.SetWaitingTimeout(timeout)
+		}
+
+		if queryUrlParameters.Has("delay") {
+			delay, err := time.ParseDuration(queryUrlParameters.Get("delay"))
+			if err != nil {
+				return nil, fmt.Errorf("waitstream: failed to parse delay parameter: %w", err)
+			}
+			resultStreamDialer.SetWaitingDelay(delay)
+		}
+
+		return resultStreamDialer, err
 	})
 }

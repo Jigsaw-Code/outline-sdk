@@ -18,25 +18,48 @@ import (
 	"context"
 	"errors"
 	"net"
+	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/sockopt"
 )
 
-type waitStreamDialer struct {
+type WaitStreamDialer struct {
 	dialer transport.StreamDialer
+
+	// Stop waiting on a packet after this timeout
+	waitingTimeout time.Duration
+	// Check if socket is sending bytes that often
+	waitingDelay time.Duration
 }
 
-var _ transport.StreamDialer = (*waitStreamDialer)(nil)
+var _ transport.StreamDialer = (*WaitStreamDialer)(nil)
 
-func NewStreamDialer(dialer transport.StreamDialer) (transport.StreamDialer, error) {
+// byeDPI uses a default delay of 500ms with 1ms sleep
+// We might reconsider the defaults later, if needed.
+// https://github.com/hufrea/byedpi/blob/main/desync.c#L90
+var defaultTimeout = time.Millisecond * 10
+var defaultDelay = time.Microsecond * 1
+
+func NewStreamDialer(dialer transport.StreamDialer) (*WaitStreamDialer, error) {
 	if dialer == nil {
 		return nil, errors.New("argument dialer must not be nil")
 	}
-	return &waitStreamDialer{dialer: dialer}, nil
+	return &WaitStreamDialer{
+		dialer:         dialer,
+		waitingTimeout: defaultTimeout,
+		waitingDelay:   defaultDelay,
+	}, nil
 }
 
-func (d *waitStreamDialer) DialStream(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
+func (d *WaitStreamDialer) SetWaitingTimeout(timeout time.Duration) {
+	d.waitingTimeout = timeout
+}
+
+func (d *WaitStreamDialer) SetWaitingDelay(timeout time.Duration) {
+	d.waitingDelay = timeout
+}
+
+func (d *WaitStreamDialer) DialStream(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
 	innerConn, err := d.dialer.DialStream(ctx, remoteAddr)
 	if err != nil {
 		return nil, err
@@ -47,12 +70,7 @@ func (d *waitStreamDialer) DialStream(ctx context.Context, remoteAddr string) (t
 		return nil, errors.New("wait_stream strategy: expected base dialer to return TCPConn")
 	}
 
-	tcpOptions, err := sockopt.NewTCPOptions(tcpInnerConn)
-	if err != nil {
-		return nil, err
-	}
-
-	dw := NewWriter(innerConn, tcpOptions)
+	dw := NewWriter(tcpInnerConn, d.waitingTimeout, d.waitingDelay)
 
 	return transport.WrapConn(innerConn, innerConn, dw), nil
 }
