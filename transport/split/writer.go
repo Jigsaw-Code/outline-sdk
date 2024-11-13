@@ -19,8 +19,10 @@ import (
 )
 
 type splitWriter struct {
-	writer      io.Writer
-	prefixBytes int64
+	writer io.Writer
+	// Bytes until the next split. This must always be > 0, unless splits are done.
+	nextSplitBytes    int64
+	nextSegmentLength func() int64
 }
 
 var _ io.Writer = (*splitWriter)(nil)
@@ -32,36 +34,110 @@ type splitWriterReaderFrom struct {
 
 var _ io.ReaderFrom = (*splitWriterReaderFrom)(nil)
 
-// NewWriter creates a [io.Writer] that ensures the byte sequence is split at prefixBytes.
-// A write will end right after byte index prefixBytes - 1, before a write starting at byte index prefixBytes.
-// For example, if you have a write of [0123456789] and prefixBytes = 3, you will get writes [012] and [3456789].
-// If the input writer is a [io.ReaderFrom], the output writer will be too.
-func NewWriter(writer io.Writer, prefixBytes int64) io.Writer {
-	sw := &splitWriter{writer, prefixBytes}
+// SplitIterator is a function that returns how many bytes until the next split point, or zero if there are no more splits to do.
+type SplitIterator func() int64
+
+// NewFixedSplitIterator is a helper function that returns a [SplitIterator] that returns the input number once, followed by zero.
+// This is helpful for when you want to split the stream once in a fixed position.
+func NewFixedSplitIterator(n int64) SplitIterator {
+	return func() int64 {
+		next := n
+		n = 0
+		return next
+	}
+}
+
+// RepeatedSplit represents a split sequence of count segments with bytes length.
+type RepeatedSplit struct {
+	Count int
+	Bytes int64
+}
+
+// NewRepeatedSplitIterator is a helper function that returns a [SplitIterator] that returns split points according to splits.
+// The splits input represents pairs of (count, bytes), meaning a sequence of count splits with bytes length.
+// This is helpful for when you want to split the stream repeatedly at different positions and lengths.
+func NewRepeatedSplitIterator(splits ...RepeatedSplit) SplitIterator {
+	// Make sure we don't edit the original slice.
+	cleanSplits := make([]RepeatedSplit, 0, len(splits))
+	// Remove no-op splits.
+	for _, split := range splits {
+		if split.Count > 0 && split.Bytes > 0 {
+			cleanSplits = append(cleanSplits, split)
+		}
+	}
+	return func() int64 {
+		if len(cleanSplits) == 0 {
+			return 0
+		}
+		next := cleanSplits[0].Bytes
+		cleanSplits[0].Count -= 1
+		if cleanSplits[0].Count == 0 {
+			cleanSplits = cleanSplits[1:]
+		}
+		return next
+	}
+}
+
+// NewWriter creates a split Writer that calls the nextSegmentLength [SplitIterator] to determine the number bytes until the next split
+// point until it returns zero.
+func NewWriter(writer io.Writer, nextSegmentLength SplitIterator) io.Writer {
+	sw := &splitWriter{writer: writer, nextSegmentLength: nextSegmentLength}
+	sw.nextSplitBytes = nextSegmentLength()
 	if rf, ok := writer.(io.ReaderFrom); ok {
 		return &splitWriterReaderFrom{sw, rf}
 	}
 	return sw
 }
 
+// ReadFrom implements io.ReaderFrom.
 func (w *splitWriterReaderFrom) ReadFrom(source io.Reader) (int64, error) {
-	reader := io.MultiReader(io.LimitReader(source, w.prefixBytes), source)
-	written, err := w.rf.ReadFrom(reader)
-	w.prefixBytes -= written
-	return written, err
-}
-
-func (w *splitWriter) Write(data []byte) (written int, err error) {
-	if 0 < w.prefixBytes && w.prefixBytes < int64(len(data)) {
-		written, err = w.writer.Write(data[:w.prefixBytes])
-		w.prefixBytes -= int64(written)
+	var written int64
+	for w.nextSplitBytes > 0 {
+		expectedBytes := w.nextSplitBytes
+		n, err := w.rf.ReadFrom(io.LimitReader(source, expectedBytes))
+		written += n
+		w.advance(n)
 		if err != nil {
 			return written, err
 		}
-		data = data[written:]
+		if n < expectedBytes {
+			// Source is done before the split happened. Return.
+			return written, err
+		}
+	}
+	n, err := w.rf.ReadFrom(source)
+	written += n
+	w.advance(n)
+	return written, err
+}
+
+func (w *splitWriter) advance(n int64) {
+	if w.nextSplitBytes == 0 {
+		// Done with splits: return.
+		return
+	}
+	w.nextSplitBytes -= int64(n)
+	if w.nextSplitBytes > 0 {
+		return
+	}
+	// Split done, set up the next split.
+	w.nextSplitBytes = w.nextSegmentLength()
+}
+
+// Write implements io.Writer.
+func (w *splitWriter) Write(data []byte) (written int, err error) {
+	for 0 < w.nextSplitBytes && w.nextSplitBytes < int64(len(data)) {
+		dataToSend := data[:w.nextSplitBytes]
+		n, err := w.writer.Write(dataToSend)
+		written += n
+		w.advance(int64(n))
+		if err != nil {
+			return written, err
+		}
+		data = data[n:]
 	}
 	n, err := w.writer.Write(data)
 	written += n
-	w.prefixBytes -= int64(n)
+	w.advance(int64(n))
 	return written, err
 }
