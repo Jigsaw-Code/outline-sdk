@@ -48,7 +48,7 @@ func (w *disorderWriter) Write(data []byte) (written int, err error) {
 		// Setting number of hops to 1 will lead to data to get lost on host.
 		err = w.tcpOptions.SetHopLimit(1)
 		if err != nil {
-			return 0, fmt.Errorf("failed to set the hop limit to %d: %w", disorderHopN, err)
+			return 0, fmt.Errorf("failed to set the hop limit to 1: %w", err)
 		}
 
 		defer func() {
@@ -59,7 +59,7 @@ func (w *disorderWriter) Write(data []byte) (written int, err error) {
 			// The network filters will receive data out of order.
 			err = w.tcpOptions.SetHopLimit(defaultHopLimit)
 			if err != nil {
-				err = fmt.Errorf("failed to set the hop limit error %d: %w", defaultHopLimit, err)
+				err = fmt.Errorf("failed to set the hop limit %d: %w", defaultHopLimit, err)
 			}
 		}()
 	}
