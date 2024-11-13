@@ -29,9 +29,6 @@ type disorderWriter struct {
 
 var _ io.Writer = (*disorderWriter)(nil)
 
-// Setting number of hops to 1 will lead to data to get lost on host.
-var disorderHopN = 1
-
 func NewWriter(conn io.Writer, tcpOptions sockopt.TCPOptions, runAtPacketN int) io.Writer {
 	// TODO: Support ReadFrom.
 	return &disorderWriter{
@@ -48,7 +45,8 @@ func (w *disorderWriter) Write(data []byte) (written int, err error) {
 			return 0, fmt.Errorf("failed to get the hop limit: %w", err)
 		}
 
-		err = w.tcpOptions.SetHopLimit(disorderHopN)
+		// Setting number of hops to 1 will lead to data to get lost on host.
+		err = w.tcpOptions.SetHopLimit(1)
 		if err != nil {
 			return 0, fmt.Errorf("failed to set the hop limit to %d: %w", disorderHopN, err)
 		}
