@@ -90,7 +90,6 @@ func (w *oobWriter) Write(data []byte) (int, error) {
 		time.Sleep(w.delay)
 	}
 
-	// Write the remaining data
 	n, err := w.conn.Write(data)
 	written += n
 
