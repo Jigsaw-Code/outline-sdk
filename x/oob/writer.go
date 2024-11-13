@@ -2,6 +2,7 @@ package oob
 
 import (
 	"fmt"
+	"github.com/Jigsaw-Code/outline-sdk/x/sockopt"
 	"io"
 	"net"
 	"sync"
@@ -10,6 +11,7 @@ import (
 
 type oobWriter struct {
 	conn        *net.TCPConn
+	opts        sockopt.TCPOptions
 	resetTTL    sync.Once
 	setTTL      sync.Once
 	oobPosition int64
@@ -26,34 +28,26 @@ type oobWriterReaderFrom struct {
 	rf io.ReaderFrom
 }
 
-var _ io.ReaderFrom = (*oobWriterReaderFrom)(nil)
-
 // NewWriter creates an [io.Writer] that sends an OOB byte at the specified "oobPosition".
 // If disOOB is enabled, it will apply the --disOOB strategy.
 // "oobByte" specifies the value of the byte to send out-of-band.
 func NewWriter(
 	conn *net.TCPConn,
-	sd SocketDescriptor,
+	opts sockopt.TCPOptions,
 	oobPosition int64,
 	oobByte byte,
 	disOOB bool,
 	delay time.Duration,
 ) io.Writer {
-	return &oobWriter{conn: conn, sd: sd, oobPosition: oobPosition, oobByte: oobByte, disOOB: disOOB, delay: delay}
-}
-
-func (w *oobWriterReaderFrom) ReadFrom(source io.Reader) (int64, error) {
-	reader := io.MultiReader(io.LimitReader(source, w.oobPosition), source)
-	written, err := w.rf.ReadFrom(reader)
-	w.oobPosition -= written
-	return written, err
+	return &oobWriter{conn: conn, opts: opts, oobPosition: oobPosition, oobByte: oobByte, disOOB: disOOB, delay: delay}
 }
 
 func (w *oobWriter) Write(data []byte) (int, error) {
 	var written int
 	var err error
 
-	if w.oobPosition > 0 && w.oobPosition < int64(len(data)) {
+	fmt.Println("oobWriter, total: ", len(data))
+	if w.oobPosition > 0 && w.oobPosition < int64(len(data))-1 {
 		firstPart := data[:w.oobPosition+1]
 		secondPart := data[w.oobPosition:]
 
@@ -64,36 +58,44 @@ func (w *oobWriter) Write(data []byte) (int, error) {
 		var oldTTL int
 		if w.disOOB {
 			w.setTTL.Do(func() {
-				oldTTL, err = setTtl(w.conn, 1)
+				oldTTL, err = w.opts.HopLimit()
+				if err != nil {
+					return
+				}
+				err = w.opts.SetHopLimit(0)
 			})
 			if err != nil {
-				return written, fmt.Errorf("oob: setsockopt IPPROTO_IP/IP_TTL error: %w", err)
+				return written, fmt.Errorf("oob: new hop limit set error: %w", err)
 			}
 		}
 
-		err = w.send(firstPart, 0x01)
+		err = w.send(firstPart, MSG_OOB)
 		if err != nil {
 			return written, err
 		}
 		written = int(w.oobPosition)
 		secondPart[0] = tmp
 
+		fmt.Printf("oobWriter: firstPart len: %d\n", len(firstPart))
+
 		if w.disOOB {
 			w.resetTTL.Do(func() {
-				_, err = setTtl(w.conn, oldTTL)
+				err = w.opts.SetHopLimit(oldTTL)
 			})
 			if err != nil {
-				return written, fmt.Errorf("oob: setsockopt IPPROTO_IP/IP_TTL error: %w", err)
+				return written, fmt.Errorf("oob: old hop limit set error: %w", err)
 			}
 		}
 
-		time.Sleep(w.delay)
 		data = secondPart
+
+		time.Sleep(w.delay)
 	}
 
 	// Write the remaining data
-	err = w.send(data, 0)
-	written += len(data)
+	n, err := w.conn.Write(data)
+	written += n
+	fmt.Printf("oobWriter: second part len: %d\n", len(data))
 	return written, err
 }
 

@@ -8,11 +8,13 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/x/sockopt"
 )
 
 // oobDialer is a dialer that applies the OOB and disOOB strategies.
 type oobDialer struct {
 	dialer      transport.StreamDialer
+	opts        sockopt.TCPOptions
 	oobByte     byte
 	oobPosition int64
 	disOOB      bool
@@ -47,12 +49,12 @@ func (d *oobDialer) DialStream(ctx context.Context, remoteAddr string) (transpor
 		return nil, fmt.Errorf("oob: only works with direct TCP connections")
 	}
 
-	sd, err := getSocketDescriptor(tcpConn)
+	opts, err := sockopt.NewTCPOptions(tcpConn)
 	if err != nil {
-		return nil, fmt.Errorf("oob: unable to get conn sd: %w", err)
+		return nil, fmt.Errorf("oob: unable to get TCP options: %w", err)
 	}
 
-	dw := NewWriter(tcpConn, sd, d.oobPosition, d.oobByte, d.disOOB, d.delay)
+	dw := NewWriter(tcpConn, opts, d.oobPosition, d.oobByte, d.disOOB, d.delay)
 
 	return transport.WrapConn(innerConn, innerConn, dw), nil
 }

@@ -8,11 +8,9 @@ import (
 	"syscall"
 )
 
-type SocketDescriptor uintptr
+const MSG_OOB = windows.MSG_OOB
 
-func setsockoptInt(fd SocketDescriptor, level, opt int, value int) error {
-	return syscall.SetsockoptInt(syscall.Handle(fd), level, opt, value)
-}
+type SocketDescriptor uintptr
 
 func sendTo(fd SocketDescriptor, data []byte, flags int) (err error) {
 	var wsaBuf [1]syscall.WSABuf
