@@ -32,13 +32,13 @@ type disorderDialer struct {
 var _ transport.StreamDialer = (*disorderDialer)(nil)
 
 // NewStreamDialer creates a [transport.StreamDialer]
-// It work almost the same as the other split dialer, however, it also manipulates socket TTL:
-// * Before sending the first prefixBytes TTL is set to 1
-// * This packet is dropped somewhere in the network and never reaches the server
-// * TTL is restored
-// * The next part of data is sent normally
-// * Server notices the lost fragment and requests re-transmission
-// Currently this only works with Linux kernel (for Windows/Mac a different implementation is required)
+// It work like this:
+// * Wait for disorderPacketN'th call to Write. All Write requests before and after the target packet are written normally.
+// * Send the disorderPacketN'th packet with TTL == 1.
+// * This packet is dropped somewhere in the network and never reaches the server.
+// * TTL is restored.
+// * The next part of data is sent normally.
+// * Server notices the lost fragment and requests re-transmission of lost packet.
 func NewStreamDialer(dialer transport.StreamDialer, disorderPacketN int) (transport.StreamDialer, error) {
 	if dialer == nil {
 		return nil, errors.New("argument dialer must not be nil")

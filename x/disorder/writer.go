@@ -29,7 +29,7 @@ type disorderWriter struct {
 
 var _ io.Writer = (*disorderWriter)(nil)
 
-// Setting number of hops to 1 will lead to data to get lost on host
+// Setting number of hops to 1 will lead to data to get lost on host.
 var disorderHopN = 1
 
 func NewWriter(conn io.Writer, tcpOptions sockopt.TCPOptions, runAtPacketN int) io.Writer {
@@ -54,11 +54,11 @@ func (w *disorderWriter) Write(data []byte) (written int, err error) {
 		}
 
 		defer func() {
-			// The packet with low hop limit was sent
-			// Make next calls send data normally
+			// The packet with low hop limit was sent.
+			// Make next calls send data normally.
 			//
-			// The packet with the low hop limit will get resent by the kernel later
-			// The network filters will receive data out of order
+			// The packet with the low hop limit will get resent by the kernel later.
+			// The network filters will receive data out of order.
 			err = w.tcpOptions.SetHopLimit(defaultHopLimit)
 			if err != nil {
 				err = fmt.Errorf("failed to set the hop limit error %d: %w", defaultHopLimit, err)
@@ -66,11 +66,13 @@ func (w *disorderWriter) Write(data []byte) (written int, err error) {
 		}()
 	}
 
-	// The packet will get lost at the first send, since the hop limit is too low
+	// The packet will get lost at the first send, since the hop limit is too low.
 	n, err := w.conn.Write(data)
 
-	// TODO: Wait for queued data to be sent by the kernel to the socket
+	// TODO: Wait for queued data to be sent by the kernel to the socket.
 
-	w.writesToDisorder -= 1
+	if w.writesToDisorder > -1 {
+		w.writesToDisorder -= 1
+	}
 	return n, err
 }
