@@ -64,6 +64,11 @@ type packetConn struct {
 
 var _ net.PacketConn = (*packetConn)(nil)
 
+// NewPacketConn wraps a [net.Conn] and returns a [net.PacketConn] that encrypts/decrypts
+// packets before writing/reading them to/from the underlying connection using the provided
+// encryption key.
+//
+// Closing the returned [net.PacketConn] will also close the underlying [net.Conn].
 func NewPacketConn(conn net.Conn, key *EncryptionKey) net.PacketConn {
 	return &packetConn{Conn: conn, key: key}
 }
