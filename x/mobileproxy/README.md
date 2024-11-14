@@ -551,9 +551,28 @@ Note that this may not fully work on Android, since it will only affect the JVM,
 
 ### Web View
 
-We are working on instructions on how use the local proxy in a Webview.
+#### Android
 
-On Android, you will likely have to implement [WebViewClient.shouldInterceptRequest](https://developer.android.com/reference/android/webkit/WebViewClient#shouldInterceptRequest(android.webkit.WebView,%20android.webkit.WebResourceRequest)) to fulfill requests using an HTTP client that uses the local proxy.
+On Android, you can easily apply a proxy configuration to all the web views in your application with the [`androidx.webview`](https://developer.android.com/reference/androidx/webkit/ProxyController) library like so:
+
+```kotlin
+ProxyController.getInstance()
+		.setProxyOverride(
+				ProxyConfig.Builder()
+						.addProxyRule(this.proxy!!.address())
+						.build(),
+				{}, // execution context for the following callback - do anything needed here once the proxy is applied, like refreshing web views 
+				{} // callback to be called once the ProxyConfig is applied
+		)
+```
+
+Then you simply inject that client into your activity's WebView like so:
+
+```kotlin
+this.webView.webViewClient = MyWebViewClient()
+```
+
+#### iOS
 
 As of iOS 17, you can add a proxy configuration to a `WKWebView` via its [`WKWebsiteDataStore` property](https://developer.apple.com/documentation/webkit/wkwebviewconfiguration).
 
