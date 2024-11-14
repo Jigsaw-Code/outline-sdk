@@ -561,7 +561,7 @@ ProxyController.getInstance()
 				ProxyConfig.Builder()
 						.addProxyRule(this.proxy!!.address())
 						.build(),
-				{}, // execution context for the following callback
+				{}, // execution context for the following callback - do anything needed here once the proxy is applied, like refreshing web views 
 				{} // callback to be called once the ProxyConfig is applied
 		)
 ```
