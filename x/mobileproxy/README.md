@@ -566,12 +566,6 @@ ProxyController.getInstance()
 		)
 ```
 
-Then you simply inject that client into your activity's WebView like so:
-
-```kotlin
-this.webView.webViewClient = MyWebViewClient()
-```
-
 #### iOS
 
 As of iOS 17, you can add a proxy configuration to a `WKWebView` via its [`WKWebsiteDataStore` property](https://developer.apple.com/documentation/webkit/wkwebviewconfiguration).
