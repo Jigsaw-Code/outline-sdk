@@ -1,0 +1,16 @@
+{
+  "appId": "org.getoutline.pwa",
+  "appName": "outline-pwa-demo",
+  "bundledWebRuntime": false,
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    }
+  },
+  "server": {
+    "url": "https://www.radiozamaneh.com/"
+  },
+  "ios": {
+    "limitsNavigationsToAppBoundDomains": true
+  }
+}
