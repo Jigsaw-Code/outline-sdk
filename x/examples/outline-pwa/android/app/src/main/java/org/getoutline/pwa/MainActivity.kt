@@ -1,7 +1,10 @@
 package org.getoutline.pwa
 
 import android.os.Bundle
+import android.view.WindowInsets
 import com.getcapacitor.BridgeActivity
+import kotlin.math.min
+import kotlin.math.max
 
 import mobileproxy.*
 
@@ -9,7 +12,6 @@ import androidx.webkit.ProxyConfig
 import androidx.webkit.ProxyController
 import androidx.webkit.WebViewFeature
 
-// TODO: resize webview so the web content is not occluded by the device UI
 class MainActivity : BridgeActivity() {
     private var proxy: Proxy? = null;
 
@@ -41,6 +43,25 @@ class MainActivity : BridgeActivity() {
                     },
                     {}
                 )
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+
+        val rootWindowInsets = this.window.decorView.rootView.rootWindowInsets
+
+        if (rootWindowInsets != null) {
+            val statusBarInsets = rootWindowInsets.getInsets(WindowInsets.Type.statusBars())
+            val cutoutInsets = rootWindowInsets.getInsets(WindowInsets.Type.displayCutout())
+
+            val top = max(statusBarInsets.top, cutoutInsets.top).toFloat()
+            val left = max(statusBarInsets.left, cutoutInsets.left).toFloat()
+//            val bottom = min(statusBarInsets.bottom, cutoutInsets.bottom).toFloat()
+//            val right = min(statusBarInsets.right, cutoutInsets.right).toFloat()
+
+            this.bridge.webView.x = left
+            this.bridge.webView.y = top
         }
     }
 
