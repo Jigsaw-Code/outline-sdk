@@ -1,9 +1,13 @@
 package org.getoutline.pwa
 
+import android.content.res.Resources
+import android.graphics.Color
 import android.os.Bundle
+import android.util.Log
+import android.view.View
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import android.view.WindowInsets
 import com.getcapacitor.BridgeActivity
-import kotlin.math.min
 import kotlin.math.max
 
 import mobileproxy.*
@@ -17,6 +21,9 @@ class MainActivity : BridgeActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        Log.d("DIMENSIONS", this.bridge.webView.layoutParams.width.toString())
+        Log.d("DIMENSIONS", this.bridge.webView.layoutParams.height.toString())
 
         if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
             this.proxy = Mobileproxy.runProxy(
@@ -49,19 +56,28 @@ class MainActivity : BridgeActivity() {
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
 
-        val rootWindowInsets = this.window.decorView.rootView.rootWindowInsets
+        val rootView = this.window.decorView.rootView
+        rootView.setBackgroundColor(Color.parseColor("#000000"))
 
+        this.bridge.webView.overScrollMode = View.OVER_SCROLL_NEVER
+
+        val rootWindowInsets = rootView.rootWindowInsets
         if (rootWindowInsets != null) {
-            val statusBarInsets = rootWindowInsets.getInsets(WindowInsets.Type.statusBars())
+            val systemBarInsets = rootWindowInsets.getInsets(WindowInsets.Type.systemBars())
             val cutoutInsets = rootWindowInsets.getInsets(WindowInsets.Type.displayCutout())
 
-            val top = max(statusBarInsets.top, cutoutInsets.top).toFloat()
-            val left = max(statusBarInsets.left, cutoutInsets.left).toFloat()
-//            val bottom = min(statusBarInsets.bottom, cutoutInsets.bottom).toFloat()
-//            val right = min(statusBarInsets.right, cutoutInsets.right).toFloat()
+            val top = max(systemBarInsets.top, cutoutInsets.top)
+            val left = max(systemBarInsets.left, cutoutInsets.left)
+            val bottom = max(systemBarInsets.bottom, cutoutInsets.bottom)
+            val right = max(systemBarInsets.right, cutoutInsets.right)
 
-            this.bridge.webView.x = left
-            this.bridge.webView.y = top
+            this.bridge.webView.x = left.toFloat()
+            this.bridge.webView.y = top.toFloat()
+
+            this.bridge.webView.layoutParams = CoordinatorLayout.LayoutParams(
+                Resources.getSystem().displayMetrics.widthPixels - right - left,
+                Resources.getSystem().displayMetrics.heightPixels - bottom - top
+            )
         }
     }
 
