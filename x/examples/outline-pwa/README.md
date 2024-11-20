@@ -79,7 +79,17 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
 
 ### iOS Integration
   * Add the compiled `mobileproxy` static library to your Xcode project.
-  * In `OutlineBridgeViewController.swift`, override the `webView` method to inject the proxy configuration:
+  * Create a new file called `OutlineBridgeViewController.swift` that looks like the following:
+  ```swift
+  import UIKit
+  import Capacitor
+
+  class OutlineBridgeViewController: CAPBridgeViewController {
+      private let proxyHost: String = "127.0.0.1"
+      private let proxyPort: String = "8080"      
+  }
+  ```
+  * Override the `webView` method to inject the proxy configuration:
 
     ```swift
     override func webView(with frame: CGRect, configuration: WKWebViewConfiguration) -> WKWebView {
@@ -100,7 +110,18 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
     }
     ```
 
-  * In `AppDelegate.swift`, set up the dialer and start the proxy in `applicationDidBecomeActive`:
+  * In `AppDelegate.swift`, set the `rootViewController` to your new `OutlineBridgeViewController`:
+
+    ```swift
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+
+      self.window?.rootViewController = OutlineBridgeViewController()
+
+      return true
+    }
+    ```
+
+  * Then, set up the dialer and start the proxy in `applicationDidBecomeActive`:
 
     ```swift
     func applicationDidBecomeActive(_ application: UIApplication) {
@@ -167,7 +188,7 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
     }
     ```
 
-  * Proxy all app requests using `ProxyController`:
+  * Proxy all app requests after the proxy is initialized using `ProxyController`:
 
     ```kotlin
     // NOTE: This affects all requests in the application
