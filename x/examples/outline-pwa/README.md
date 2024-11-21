@@ -4,29 +4,34 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
 
 **Prerequisites:**
 
-* Node.js and npm installed
-* Android Studio with Kotlin support installed
-* Xcode installed
 * An existing PWA
+* [Node.js](https://nodejs.org/en/)
+* [GoLang](https://go.dev/)
+* [Android Studio](https://developer.android.com/studio/)
+* [XCode](https://developer.apple.com/xcode/) and [cocoapods](https://cocoapods.org/)
+* [Wireshark](https://www.wireshark.org/) and [Charles Proxy](https://www.charlesproxy.com/), to confirm the app is working
 
 ## Set up the Capacitor Project
 
 * Follow the CapacitorJS Getting Started guide to initialize a new project: [https://capacitorjs.com/docs/getting-started](https://capacitorjs.com/docs/getting-started)
 
    ```bash
-   npx cap init
+   npm init @capacitor/app # follow the instructions
+   cd <my-app-dir>
+   npm install
    ```
 
 * Add iOS and Android platforms to your project:
 
    ```bash
+   npm install @capacitor/android @capacitor/ios
    npx cap add android
    npx cap add ios
    ```
 
 ## Configure Capacitor to Load Your Website
 
-* **Delete the `www` folder.**  Capacitor's default configuration assumes your web app is in this folder. We'll be loading your PWA directly from its URL.
+* **Delete the `src` folder.**  Capacitor's default configuration assumes your web app is in this folder. We'll be loading your PWA directly from its URL.
 * **Update `capacitor.config.json`:**
 
    ```json
@@ -46,13 +51,19 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
 
    ```json
    {
-     "ios": {
-       "limitsNavigationsToAppBoundDomains": true
-     }
+    "appId": "com.yourcompany.yourapp",
+    "appName": "YourAppName",
+    "bundledWebRuntime": false,
+    "server": {
+      "url": "https://www.your-pwa-url.com" 
+    },
+    "ios": {
+      "limitsNavigationsToAppBoundDomains": true
+    }
    }
    ```
 
-* In your iOS project's `Info.plist`, add your PWA's URL to the `WKAppBoundDomains` array:
+* In your iOS project's `ios/App/App/Info.plist`, add your PWA's URL to a `WKAppBoundDomains` array in the top level `<dict>`:
 
    ```xml
    <key>WKAppBoundDomains</key>
@@ -61,25 +72,52 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
    </array>
    ```
 
-## Test the Basic App
+  Be sure to add any URLs you navigate to within your PWA in this array as well!
 
-* Run your app on a device or emulator:
+## Test the Basic Apps
 
-   ```bash
-   npx cap run ios
-   npx cap run android
-   ```
+* Sync your changes, then run your app on a device or emulator:
+
+  > [!NOTE]
+  > Capacitor will silently fail to read your config if the JSON is invalid. Be sure to check `capacitor.config.json` for any hanging commas!
+
+  ```bash
+  npx cap run ios
+
+  mkdir android/app/src/main/assets # sync will fail without this folder
+  npx cap run android
+  ```
 
 * Ensure your PWA loads correctly within the Capacitor app.
 
-## Integrate the Mobileproxy Library
+## Integrate the Outline SDK Mobileproxy Library
 
 **Build the Mobileproxy library:**
-  * Follow the instructions in the Outline SDK repository: [https://github.com/Jigsaw-Code/outline-sdk/tree/main/x/mobileproxy#build-the-go-mobile-binaries-with-go-build](https://github.com/Jigsaw-Code/outline-sdk/tree/main/x/mobileproxy#build-the-go-mobile-binaries-with-go-build)
+  * [Follow the instructions in the Outline SDK repository](https://github.com/Jigsaw-Code/outline-sdk/tree/main/x/mobileproxy#build-the-go-mobile-binaries-with-go-build):
+
+  ```bash
+    git clone https://github.com/Jigsaw-Code/outline-sdk.git
+    cd outline-sdk/x
+    go build -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
+
+    PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -o "$(pwd)/out/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+    PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=android -androidapi=21 -o "$(pwd)/out/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+  ```
 
 ### iOS Integration
-  * Add the compiled `mobileproxy` static library to your Xcode project.
-  * Create a new file called `OutlineBridgeViewController.swift` that looks like the following:
+  * Open the XCode project with `npx cap open ios`.
+  * Add the compiled `mobileproxy.xcframework` static library to your Xcode project:
+    * Right click on the `Frameworks` folder.
+    * Select `Add Files to "App"...`
+    * Select the `mobileproxy.xcframework` folder.
+
+  * Create a new file called `OutlineBridgeViewController.swift`:
+    * Right click on the `App` folder.
+    * Select `New File...`
+    * Select the `Swift File` and click `Next`.
+    * Enter in the file name.
+
+  * Extend the base Capacitor Bridge View Controller:
   ```swift
   import UIKit
   import Capacitor
@@ -121,7 +159,19 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
     }
     ```
 
-  * Then, set up the dialer and start the proxy in `applicationDidBecomeActive`:
+  * Import the Mobileproxy framework at the head of the `AppDelegate.swift` file:
+
+  ```swift
+    import Mobileproxy
+  ```
+
+  * Create a `proxy` property on the `AppDelegate`:
+
+  ```swift
+    var proxy: MobileproxyProxy?
+  ```
+  
+  * Then set up the dialer and start the proxy in `applicationDidBecomeActive`:
 
     ```swift
     func applicationDidBecomeActive(_ application: UIApplication) {
