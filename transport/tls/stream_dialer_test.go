@@ -140,6 +140,14 @@ func TestWithALPN(t *testing.T) {
 	require.Equal(t, []string{"h2", "http/1.1"}, cfg.NextProtos)
 }
 
+func TestWithRootCAs(t *testing.T) {
+	var cfg ClientConfig
+	rootCAs := x509.NewCertPool()
+	rootCAs.AddCert(&x509.Certificate{})
+	WithRootCAs(rootCAs)("", &cfg)
+	require.True(t, rootCAs.Equal(cfg.RootCAs))
+}
+
 // Make sure there are no connection leakage in DialStream
 func TestDialStreamCloseInnerConnOnError(t *testing.T) {
 	inner := &connCounterDialer{base: &transport.TCPDialer{}}
