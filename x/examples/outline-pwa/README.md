@@ -296,7 +296,7 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
 
 ## Verify with Packet Tracing
 
-* **iOS:** Start the emulator with `npx cap run ios`. Use [Charles Proxy](https://www.charlesproxy.com/) to view network traffic coming from your iOS simulator and observe DoH traffic coming from `9.9.9.9`.
+* **iOS:** TBD
 * **Android:** Start the emulator with `npx cap run android`. Use Wireshark to capture network traffic. Filter by `ip.addr == 9.9.9.9` (your chosen DNS server). You should see TCP and TLS traffic, indicating that your app is using DNS over HTTPS (DoH).
 
 ## Building and Distributing your App
