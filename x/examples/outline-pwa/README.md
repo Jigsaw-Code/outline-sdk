@@ -5,18 +5,19 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
 **Prerequisites:**
 
 * An existing PWA
-* [Node.js](https://nodejs.org/en/)
-* [GoLang](https://go.dev/)
-* [Android Studio](https://developer.android.com/studio/)
-* [XCode](https://developer.apple.com/xcode/) and [cocoapods](https://cocoapods.org/)
-* [Wireshark](https://www.wireshark.org/) and [Charles Proxy](https://www.charlesproxy.com/), to confirm the app is working
+* Make sure your development environment is set up with the following. [You can also follow CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup)
+  * [Node.js](https://nodejs.org/en/)
+  * [GoLang](https://go.dev/)
+  * [Android Studio](https://developer.android.com/studio/)
+  * [XCode](https://developer.apple.com/xcode/) and [cocoapods](https://cocoapods.org/)
+  * [Wireshark](https://www.wireshark.org/) and [Charles Proxy](https://www.charlesproxy.com/), to confirm the app is working
 
 ## Set up the Capacitor Project
 
 * Follow the CapacitorJS Getting Started guide to initialize a new project: [https://capacitorjs.com/docs/getting-started](https://capacitorjs.com/docs/getting-started)
 
    ```bash
-   npm init @capacitor/app # follow the instructions
+   npm init @capacitor/app # follow the instructions - make sure to pick an app ID that's unique!
    cd <my-app-dir>
    npm install
    ```
@@ -204,8 +205,32 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
     ```
 
 ### Android Integration
-  * **Convert your Android project to Kotlin.** You can do this by following the instructions in the Android documentation: [https://developer.android.com/kotlin/add-kotlin](https://developer.android.com/kotlin/add-kotlin)
-  * In your `MainActivity.kt`, confirm proxy override is available in `onCreate`:
+  * **Convert your Android project to Kotlin.** Open the Android project with `npx cap open android`.
+    * Navigate to `java/<your app ID>/MainActivity`
+    * Right click on the file and select "Convert Java File to Kotlin File". Confirm the following dialogs.
+    * Once done, you will need to right click the `MainActivity` a second time and select "Convert Java File to Kotlin File"
+
+    [See the official instructions if you encounter any issues.](https://developer.android.com/kotlin/add-kotlin)
+
+  
+  * **Import dependencies:** 
+    * Right click on `app` and select "Open Module Settings"
+    * In the sidebar, navigate to "Dependencies"
+    * Click the `+` button and select a Library Dependency
+    * Search for `androidx.webkit` and select it.
+    * Next we need to import the `mobileproxy.aar`. Click the `+` button again and select `JAR/AAR Dependency`.
+    * Type in the path `../../outline-sdk/x/out/mobileproxy.aar`
+    * Click `Apply`.
+
+    * In the head of your new `MainActivity.kt`, import the following:
+
+    ```kotlin
+    import android.os.*
+    import mobileproxy.*
+    import androidx.webkit.*
+    ```
+ 
+  * Now, in your `MainActivity.kt`, confirm proxy override is available in `onCreate`:
 
     ```kotlin
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -217,7 +242,7 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
     }
     ```
 
-  * Initialize `mobileproxy` with a smart dialer in `onCreate`:
+  * Initialize `mobileproxy` with a smart dialer in `onCreate`. Don't forget to replace `www.your-pwa-url.com`!:
 
     ```kotlin
     private var proxy: Proxy? = null
@@ -271,8 +296,18 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
 
 ## Verify with Packet Tracing
 
-* **Android:** Use Wireshark to capture network traffic. Filter by `ip.addr == 9.9.9.9` (your chosen DNS server). You should see TCP and TLS traffic, indicating that your app is using DNS over HTTPS (DoH).
-* **iOS:** Use [Charles Proxy](https://www.charlesproxy.com/) to view network traffic coming from your iOS simulator and observe DoH traffic coming from `9.9.9.9`.
+* **iOS:** Start the emulator with `npx cap run ios`. Use [Charles Proxy](https://www.charlesproxy.com/) to view network traffic coming from your iOS simulator and observe DoH traffic coming from `9.9.9.9`.
+* **Android:** Start the emulator with `npx cap run android`. Use Wireshark to capture network traffic. Filter by `ip.addr == 9.9.9.9` (your chosen DNS server). You should see TCP and TLS traffic, indicating that your app is using DNS over HTTPS (DoH).
+
+## Building and Distributing your App
+
+### iOS
+
+TODO: you will probably need to create a provisioning profile for your new app - https://forum.ionicframework.com/t/ios-build-app-provisioning-errors/208170/2
+
+### Android
+
+TODO: you will need to create a keystore in android studio and configure the path in the capacitor.config.json https://forum.ionicframework.com/t/error-missing-options-keystore-path-keystore-password-keystore-key-alias-keystore-key-password/243217/3
 
 **Important Notes:**
 
