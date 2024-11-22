@@ -19,8 +19,9 @@ import (
 	"crypto/x509"
 	"testing"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/stretchr/testify/require"
+
+	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
 func TestDomain(t *testing.T) {
@@ -145,7 +146,7 @@ func TestWithRootCAs(t *testing.T) {
 	rootCAs := x509.NewCertPool()
 	rootCAs.AddCert(&x509.Certificate{})
 	WithRootCAs(rootCAs)("", &cfg)
-	require.True(t, rootCAs.Equal(cfg.RootCAs))
+	require.Equal(t, rootCAs, cfg.RootCAs)
 }
 
 // Make sure there are no connection leakage in DialStream
