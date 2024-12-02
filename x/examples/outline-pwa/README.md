@@ -212,6 +212,15 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
 
     [See the official instructions if you encounter any issues.](https://developer.android.com/kotlin/add-kotlin)
 
+  * **Update your Gradle files for Kotlin compatibility.**
+    * Inside: `/android/app/build.gradle`, add `apply plugin: 'kotlin-android'` on line 2, directly under `apply plugin: 'com.android.application'`.
+    * Inside: `/android/variables.gradle`, update the SDK variables to:
+
+    ```
+    minSdkVersion = 26
+    compileSdkVersion = 35
+    targetSdkVersion = 35
+    ```
   
   * **Import dependencies:** 
     * Right click on `app` and select "Open Module Settings"
@@ -221,6 +230,7 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
     * Next we need to import the `mobileproxy.aar`. Click the `+` button again and select `JAR/AAR Dependency`.
     * Type in the path `../../outline-sdk/x/out/mobileproxy.aar`
     * Click `Apply`.
+    * **Important:** The two added dependencies are initially placed in `/android/app/capacitor.build.gradle`, which is a generated file that gets reset frequently. To avoid losing these dependencies, manually move them to `/android/app/build.gradle`.
 
     * In the head of your new `MainActivity.kt`, import the following:
 
