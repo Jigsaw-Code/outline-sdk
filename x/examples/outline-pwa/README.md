@@ -10,7 +10,11 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
   * [GoLang](https://go.dev/)
   * [Android Studio](https://developer.android.com/studio/)
   * [XCode](https://developer.apple.com/xcode/) and [cocoapods](https://cocoapods.org/)
-  * [Wireshark](https://www.wireshark.org/) and [Charles Proxy](https://www.charlesproxy.com/), to confirm the app is working
+  * [Wireshark](https://www.wireshark.org/), to confirm the app is working
+
+> [!TIP]
+> Kotlin Multiplatform [provides a tool called `kdoctor`](https://github.com/Kotlin/kdoctor) you can use to verify that your system is set up for cross-platform mobile development. You can ensure that
+> your system has the required dependencies by [installing it](https://github.com/Kotlin/kdoctor?tab=readme-ov-file#installation) and running `kdoctor`.
 
 ## Set up the Capacitor Project
 
@@ -317,7 +321,11 @@ TODO: you will probably need to create a provisioning profile for your new app -
 
 ### Android
 
-TODO: you will need to create a keystore in android studio and configure the path in the capacitor.config.json https://forum.ionicframework.com/t/error-missing-options-keystore-path-keystore-password-keystore-key-alias-keystore-key-password/243217/3
+First, generate a Key Store and use it to sign your app with Android Studio - follow these instructions: https://developer.android.com/studio/publish/app-signing#generate-key
+
+Note that you can choose to release your app as either an android app bundle (`.aab`) or an APK (`.apk`).
+1. You need an android app bundle (`.aab`) to release your app in the Google Play Store. For this you will have to have a [Google Play Developer Account](https://play.google.com/console/u/0/developers) and at least twenty trusted testers to unlock production access.
+2. APKs (`.apk`) can be freely sideloaded onto your user's devices. For an APK, you will have to take care of distribution yourself.
 
 **Important Notes:**
 
