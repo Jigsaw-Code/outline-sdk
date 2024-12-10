@@ -310,14 +310,18 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
 
 ## Verify with Packet Tracing
 
-* **iOS:** TBD
+* **iOS:** Load XCode and connect your iOS device. Make sure that your device allows your developer certificate (Check `Settings > General > VPN & Device Management` on your iOS device). Go to `Product > Profile` in XCode and select the "Network" option from the list of presets. Pressing the record button on the window that pops up should launch your app and record its traffic. Once done, set the view on the packet trace data to `History` and among the results you should see the DNS address `dn9.quad9.net`. 
 * **Android:** Start the emulator with `npx cap run android`. Use Wireshark to capture network traffic. Filter by `ip.addr == 9.9.9.9` (your chosen DNS server). You should see TCP and TLS traffic, indicating that your app is using DNS over HTTPS (DoH).
 
 ## Building and Distributing your App
 
 ### iOS
 
-TODO: you will probably need to create a provisioning profile for your new app - https://forum.ionicframework.com/t/ios-build-app-provisioning-errors/208170/2
+1. Create a developer account and add it to XCode Settings (`XCode > Settings... > Accounts`)
+2. Select your App in the file explorer and pick your Account's Team in `Signing & Capabilities`
+3. Connect your iOS device and select it as your build target in the top bar. XCode should automatically create a provisioning profile for the device and app combination.
+4. Build a production archive with `Product > Archive`
+5. On success, a window should pop up with your app listed in it. Select `Distribute App` and follow the instructions.
 
 ### Android
 
