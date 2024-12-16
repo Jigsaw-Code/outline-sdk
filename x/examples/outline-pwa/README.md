@@ -1,6 +1,6 @@
 # Building a Censorship-Resistant Android/iOS App with CapacitorJS and the Outline SDK Mobileproxy
 
-This code lab guides you through creating a censorship-resistant Android/iOS app that wraps your Progressive Web App (PWA) using CapacitorJS and the Outline SDK Mobileproxy. This setup routes your site's traffic through the Outline proxy, bypassing network restrictions. Note that the source in this folder is representative of what your end product should look like once the code lab is completed.
+This code lab guides you through creating a censorship-resistant Android/iOS app from scratch that wraps your Progressive Web App (PWA) using CapacitorJS and the Outline SDK Mobileproxy. This setup routes your site's traffic through the Outline proxy, bypassing network restrictions. Note that the source in this folder is representative of what your end product should look like once the code lab is completed.
 
 **Prerequisites:**
 
@@ -8,9 +8,9 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
 * Make sure your development environment is set up with the following. [You can also follow CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup)
   * [Node.js](https://nodejs.org/en/)
   * [GoLang](https://go.dev/)
-  * [Android Studio](https://developer.android.com/studio/)
+  * [OpenJDK 17](https://stackoverflow.com/a/70649641) and [Android Studio](https://developer.android.com/studio/)
   * [XCode](https://developer.apple.com/xcode/) and [cocoapods](https://cocoapods.org/)
-  * [Wireshark](https://www.wireshark.org/), to confirm the app is working
+* [Wireshark](https://www.wireshark.org/), to confirm the app is working
 
 > [!TIP]
 > Kotlin Multiplatform [provides a tool called `kdoctor`](https://github.com/Kotlin/kdoctor) you can use to verify that your system is set up for cross-platform mobile development. You can ensure that
@@ -20,6 +20,9 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
 
 * Follow the CapacitorJS Getting Started guide to initialize a new project: [https://capacitorjs.com/docs/getting-started](https://capacitorjs.com/docs/getting-started)
 
+> [!NOTE]
+> This will create a new directory containing your project. Make sure you run these commands relative to where you want your project to live.
+
    ```bash
    npm init @capacitor/app # follow the instructions - make sure to pick an app ID that's unique!
    cd <my-app-dir>
@@ -28,34 +31,53 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
 
 * Add iOS and Android platforms to your project:
 
-   ```bash
-   npm install @capacitor/android @capacitor/ios
-   npx cap add android
-   npx cap add ios
-   ```
+  ```bash
+  npm install @capacitor/android @capacitor/ios
+  npx cap add android
+  npx cap add ios
 
-## Configure Capacitor to Load Your Website
+  mkdir android/app/src/main/assets # sync will fail without this folder
+  npx cap sync
+  ```
 
-* **Delete the `src` folder.**  Capacitor's default configuration assumes your web app is in this folder. We'll be loading your PWA directly from its URL.
+## Confirm that the default apps are able to run
+
+### iOS
+
+* Open the iOS project in XCode with `npx cap open ios`.
+* Make sure the correct emulator or device is selected and press the ▶️ button.
+
+### Android
+
+* Open the Android project in Android Studio with `npx cap open android`.
+* Ensure you have an emulator with Android API 35 or later (check `Tools > Device Manager`), then press the ▶️ button.
+
+---
+
+## Configure Capacitor to Load Your PWA
+
 * **Update `capacitor.config.json`:**
 
-   ```json
-   {
-     "appId": "com.yourcompany.yourapp",
-     "appName": "YourAppName",
-     "bundledWebRuntime": false,
-     "server": {
-       "url": "https://www.your-pwa-url.com" 
-     }
-   }
-   ```
+  ```json
+  {
+    "appId": "com.yourcompany.yourapp",
+    "appName": "YourAppName",
+    "bundledWebRuntime": false,
+    "server": {
+      "url": "https://www.your-pwa-url.com" 
+    }
+  }
+  ```
+
+  > [!NOTE]
+  > Capacitor will silently fail to read your config if the JSON is invalid. Be sure to check `capacitor.config.json` for any hanging commas!
 
 ## Add Support for Service Workers on iOS
 
 * In `capacitor.config.json`, enable `limitsNavigationsToAppBoundDomains`:
 
-   ```json
-   {
+  ```json
+  {
     "appId": "com.yourcompany.yourapp",
     "appName": "YourAppName",
     "bundledWebRuntime": false,
@@ -65,35 +87,19 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
     "ios": {
       "limitsNavigationsToAppBoundDomains": true
     }
-   }
-   ```
+  }
+  ```
 
 * In your iOS project's `ios/App/App/Info.plist`, add your PWA's URL to a `WKAppBoundDomains` array in the top level `<dict>`:
 
-   ```xml
-   <key>WKAppBoundDomains</key>
-   <array>
-     <string>www.your-pwa-url.com</string>
-   </array>
-   ```
-
-  Be sure to add any URLs you navigate to within your PWA in this array as well!
-
-## Test the Basic Apps
-
-* Sync your changes, then run your app on a device or emulator:
-
-  > [!NOTE]
-  > Capacitor will silently fail to read your config if the JSON is invalid. Be sure to check `capacitor.config.json` for any hanging commas!
-
-  ```bash
-  npx cap run ios
-
-  mkdir android/app/src/main/assets # sync will fail without this folder
-  npx cap run android
+  ```xml
+  <key>WKAppBoundDomains</key>
+  <array>
+    <string>www.your-pwa-url.com</string>
+  </array>
   ```
 
-* Ensure your PWA loads correctly within the Capacitor app.
+  Be sure to add any URLs you navigate to within your PWA in this array as well!
 
 ## Integrate the Outline SDK Mobileproxy Library
 
