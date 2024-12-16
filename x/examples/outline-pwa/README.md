@@ -8,8 +8,8 @@ This code lab guides you through creating a censorship-resistant Android/iOS app
 * Make sure your development environment is set up with the following. [You can also follow CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup)
   * [Node.js](https://nodejs.org/en/)
   * [GoLang](https://go.dev/)
-  * [OpenJDK 17](https://stackoverflow.com/a/70649641) and [Android Studio](https://developer.android.com/studio/)
-  * [XCode](https://developer.apple.com/xcode/) and [cocoapods](https://cocoapods.org/)
+  * For Android, [OpenJDK 17](https://stackoverflow.com/a/70649641) and [Android Studio](https://developer.android.com/studio/)
+  * For iOS, [XCode](https://developer.apple.com/xcode/) and [cocoapods](https://cocoapods.org/)
 * [Wireshark](https://www.wireshark.org/), to confirm the app is working
 
 > [!TIP]
