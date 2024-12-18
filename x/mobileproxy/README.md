@@ -470,7 +470,7 @@ public final class StringList implements Seq.Proxy {
 
 ## Add the library to your mobile project
 
-To add the library to your mobile project, see Go Mobile's [Building and deploying to iOS](https://go.dev/wiki/Mobile#building-and-deploying-to-ios-1) and [Building and deploying to Android](https://github.com/golang/go/wiki/Mobile#building-and-deploying-to-android-1).
+To add the library to your mobile project, see Go Mobile's [Building and deploying to iOS](https://go.dev/wiki/Mobile#building-and-deploying-to-ios-1) and [Building and deploying to Android](https://go.dev/wiki/Mobile#building-and-deploying-to-android-1).
 
 ## Using the basic local proxy forwarder
 
