@@ -19,7 +19,6 @@ import (
 	"errors"
 	"flag"
 	"io"
-	"log"
 	"log/slog"
 	"net"
 	"net/http"
@@ -193,18 +192,18 @@ func main() {
 					msgType, buf, err := clientConn.Read(r.Context())
 					if err != nil {
 						if !errors.Is(err, io.EOF) {
-							log.Printf("Failed to read from client: %v\n", err)
+							slog.Info("Failed to read from client", "error", err)
 							clientConn.Close(websocket.StatusInternalError, "failed to read message from client")
 						}
 						break
 					}
 					if msgType != websocket.MessageBinary {
-						log.Printf("Bad message type: %v\n", msgType)
+						slog.Info("Bad message type", "type", msgType)
 						clientConn.Close(websocket.StatusUnsupportedData, "client message is not binary type")
 						break
 					}
 					if _, err := targetConn.Write(buf); err != nil {
-						log.Printf("Failed to write to target: %v\n", err)
+						slog.Info("Failed to write to target", "error", err)
 						continue
 						// clientConn.Close(websocket.StatusInternalError, "failed to write message to target")
 						// break
@@ -217,14 +216,14 @@ func main() {
 				n, err := targetConn.Read(buf)
 				if err != nil {
 					if !errors.Is(err, io.EOF) {
-						log.Printf("Failed to read from target: %v\n", err)
+						slog.Info("Failed to read from target", "error", err)
 						clientConn.Close(websocket.StatusInternalError, "failed to read message from target")
 					}
 					break
 				}
 				msg := buf[:n]
 				if err := clientConn.Write(r.Context(), websocket.MessageBinary, msg); err != nil {
-					log.Printf("Failed to write to client: %v\n", err)
+					slog.Info("Failed to write to client", "error", err)
 					clientConn.Close(websocket.StatusInternalError, "failed to write message to client")
 					break
 				}
