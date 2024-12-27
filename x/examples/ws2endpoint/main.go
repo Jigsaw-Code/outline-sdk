@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -49,6 +50,7 @@ func main() {
 	backendFlag := flag.String("backend", "", "Address of the endpoint to forward traffic to")
 	tcpPathFlag := flag.String("tcp_path", "/tcp", "Path where to run the WebSocket TCP forwarder")
 	udpPathFlag := flag.String("udp_path", "/udp", "Path where to run the WebSocket UDP forwarder")
+	ifaceFlag := flag.String("interface", "", "Interface to bind external connections to")
 	flag.Parse()
 
 	if *backendFlag == "" {
@@ -65,6 +67,26 @@ func main() {
 	slog.Info("Proxy listening ", "address", listener.Addr().String())
 
 	providers := configurl.NewDefaultProviders()
+
+	if *ifaceFlag != "" {
+		iface, err := net.InterfaceByName(*ifaceFlag) // Replace with your device name
+		if err != nil {
+			slog.Error("Failed to get interface", "error", err)
+			os.Exit(1)
+		}
+		slog.Info("Will bind target connections", "interface", iface.Name, "index", iface.Index)
+		boundDialer := net.Dialer{
+			Control: func(network, address string, c syscall.RawConn) error {
+				var err error
+				c.Control(func(fd uintptr) {
+					err = syscall.SetsockoptInt(int(fd), syscall.IPPROTO_IP, syscall.IP_BOUND_IF, iface.Index)
+				})
+				return err
+			},
+		}
+		providers.StreamDialers.BaseInstance = &transport.TCPDialer{Dialer: boundDialer}
+		providers.PacketDialers.BaseInstance = &transport.UDPDialer{Dialer: boundDialer}
+	}
 	mux := http.NewServeMux()
 	if *tcpPathFlag != "" {
 		dialer, err := providers.NewStreamDialer(context.Background(), *transportFlag)
@@ -97,8 +119,8 @@ func main() {
 				for {
 					msgType, buf, err := clientConn.Read(r.Context())
 					if err != nil {
-						slog.Info("Read failed", "error", err)
 						if !errors.Is(err, io.EOF) {
+							slog.Info("Failed to read from client", "error", err)
 							clientConn.Close(websocket.StatusInternalError, "failed to read message from client")
 						}
 						break
@@ -120,8 +142,8 @@ func main() {
 			for {
 				n, err := targetConn.Read(buf)
 				if err != nil {
-					slog.Info("Failed to read from target", "error", err)
 					if !errors.Is(err, io.EOF) {
+						slog.Info("Failed to read from target", "error", err)
 						clientConn.Close(websocket.StatusInternalError, "failed to read message from target")
 					}
 					break
