@@ -16,9 +16,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"io"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -27,7 +29,7 @@ import (
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
-	"golang.org/x/net/websocket"
+	"github.com/coder/websocket"
 )
 
 type natConn struct {
@@ -50,78 +52,170 @@ func main() {
 	flag.Parse()
 
 	if *backendFlag == "" {
-		log.Fatal("Must specify flag -backend")
+		slog.Error("Must specify flag -backend")
+		os.Exit(1)
 	}
 
 	listener, err := net.Listen("tcp", *listenFlag)
 	if err != nil {
-		log.Fatalf("Could not listen on address %v: %v", *listenFlag, err)
+		slog.Error("Could not listen", "address", *listenFlag, "error", err)
+		os.Exit(1)
 	}
 	defer listener.Close()
-	log.Printf("Proxy listening on %v\n", listener.Addr().String())
+	slog.Info("Proxy listening ", "address", listener.Addr().String())
 
 	providers := configurl.NewDefaultProviders()
 	mux := http.NewServeMux()
 	if *tcpPathFlag != "" {
 		dialer, err := providers.NewStreamDialer(context.Background(), *transportFlag)
 		if err != nil {
-			log.Fatalf("Could not create stream dialer: %v", err)
+			slog.Error("Could not create stream dialer", "error", err)
+			os.Exit(1)
 		}
 		endpoint := transport.StreamDialerEndpoint{Dialer: dialer, Address: *backendFlag}
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("Got stream request: %v\n", r)
-			handler := func(wsConn *websocket.Conn) {
-				targetConn, err := endpoint.ConnectStream(r.Context())
-				if err != nil {
-					log.Printf("Failed to upgrade: %v\n", err)
-					w.WriteHeader(http.StatusBadGateway)
-					return
-				}
-				defer targetConn.Close()
-				go func() {
-					io.Copy(targetConn, wsConn)
-					targetConn.CloseWrite()
-				}()
-				io.Copy(wsConn, targetConn)
-				wsConn.Close()
+			slog.Debug("Got stream request", "request", r)
+			defer slog.Debug("Request done")
+			clientConn, err := websocket.Accept(w, r, nil)
+			if err != nil {
+				slog.Info("Failed to accept Websocket connection", "error", err)
+				w.WriteHeader(http.StatusBadGateway)
+				return
 			}
-			websocket.Server{Handler: handler}.ServeHTTP(w, r)
+			defer clientConn.CloseNow()
+
+			targetConn, err := endpoint.ConnectStream(r.Context())
+			if err != nil {
+				slog.Info("Failed connect to target endpoint", "error", err)
+				clientConn.Close(websocket.StatusBadGateway, "")
+				return
+			}
+			defer targetConn.Close()
+
+			go func() {
+				defer targetConn.CloseWrite()
+				for {
+					msgType, buf, err := clientConn.Read(r.Context())
+					if err != nil {
+						slog.Info("Read failed", "error", err)
+						if !errors.Is(err, io.EOF) {
+							clientConn.Close(websocket.StatusInternalError, "failed to read message from client")
+						}
+						break
+					}
+					if msgType != websocket.MessageBinary {
+						slog.Info("Bad message type", "type", msgType)
+						clientConn.Close(websocket.StatusUnsupportedData, "client message is not binary type")
+						break
+					}
+					if _, err := targetConn.Write(buf); err != nil {
+						slog.Info("Failed to write to target", "error", err)
+						clientConn.Close(websocket.StatusInternalError, "failed to write message to target")
+						break
+					}
+				}
+			}()
+			// About 2 MTUs
+			buf := make([]byte, 3000)
+			for {
+				n, err := targetConn.Read(buf)
+				if err != nil {
+					slog.Info("Failed to read from target", "error", err)
+					if !errors.Is(err, io.EOF) {
+						clientConn.Close(websocket.StatusInternalError, "failed to read message from target")
+					}
+					break
+				}
+				msg := buf[:n]
+				if err := clientConn.Write(r.Context(), websocket.MessageBinary, msg); err != nil {
+					slog.Info("Failed to write to client", "error", err)
+					clientConn.Close(websocket.StatusInternalError, "failed to write message to client")
+					break
+				}
+			}
+			clientConn.Close(websocket.StatusNormalClosure, "")
 		})
 		mux.Handle(*tcpPathFlag, http.StripPrefix(*tcpPathFlag, handler))
 	}
 	if *udpPathFlag != "" {
 		dialer, err := providers.NewPacketDialer(context.Background(), *transportFlag)
 		if err != nil {
-			log.Fatalf("Could not create stream dialer: %v", err)
+			slog.Error("Could not create packet dialer", "error", err)
+			os.Exit(1)
 		}
 		endpoint := transport.PacketDialerEndpoint{Dialer: dialer, Address: *backendFlag}
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("Got packet request: %v\n", r)
-			handler := func(wsConn *websocket.Conn) {
-				targetConn, err := endpoint.ConnectPacket(r.Context())
-				if err != nil {
-					log.Printf("Failed to upgrade: %v\n", err)
-					w.WriteHeader(http.StatusBadGateway)
-					return
-				}
-				// Expire connetion after 5 minutes of idle time, as per
-				// https://datatracker.ietf.org/doc/html/rfc4787#section-4.3
-				targetConn = &natConn{targetConn, 5 * time.Minute}
-				go func() {
-					io.Copy(targetConn, wsConn)
-					targetConn.Close()
-				}()
-				io.Copy(wsConn, targetConn)
-				wsConn.Close()
+			// log.Printf("Got packet request: %v\n", r)
+			clientConn, err := websocket.Accept(w, r, nil)
+			if err != nil {
+				slog.Info("Failed to accept Websocket connection", "error", err)
+				w.WriteHeader(http.StatusBadGateway)
+				return
 			}
-			websocket.Server{Handler: handler}.ServeHTTP(w, r)
+			defer clientConn.CloseNow()
+
+			targetConn, err := endpoint.ConnectPacket(r.Context())
+			if err != nil {
+				slog.Info("Failed connect to Endpoint", "error", err)
+				clientConn.Close(websocket.StatusBadGateway, "")
+				return
+			}
+			// Expire connetion after 5 minutes of idle time, as per
+			// https://datatracker.ietf.org/doc/html/rfc4787#section-4.3
+			targetConn = &natConn{targetConn, 5 * time.Minute}
+			defer targetConn.Close()
+
+			go func() {
+				defer targetConn.Close()
+				for {
+					msgType, buf, err := clientConn.Read(r.Context())
+					if err != nil {
+						if !errors.Is(err, io.EOF) {
+							log.Printf("Failed to read from client: %v\n", err)
+							clientConn.Close(websocket.StatusInternalError, "failed to read message from client")
+						}
+						break
+					}
+					if msgType != websocket.MessageBinary {
+						log.Printf("Bad message type: %v\n", msgType)
+						clientConn.Close(websocket.StatusUnsupportedData, "client message is not binary type")
+						break
+					}
+					if _, err := targetConn.Write(buf); err != nil {
+						log.Printf("Failed to write to target: %v\n", err)
+						continue
+						// clientConn.Close(websocket.StatusInternalError, "failed to write message to target")
+						// break
+					}
+				}
+			}()
+			// About 2 MTUs
+			buf := make([]byte, 3000)
+			for {
+				n, err := targetConn.Read(buf)
+				if err != nil {
+					if !errors.Is(err, io.EOF) {
+						log.Printf("Failed to read from target: %v\n", err)
+						clientConn.Close(websocket.StatusInternalError, "failed to read message from target")
+					}
+					break
+				}
+				msg := buf[:n]
+				if err := clientConn.Write(r.Context(), websocket.MessageBinary, msg); err != nil {
+					log.Printf("Failed to write to client: %v\n", err)
+					clientConn.Close(websocket.StatusInternalError, "failed to write message to client")
+					break
+				}
+			}
+			clientConn.Close(websocket.StatusNormalClosure, "")
 		})
 		mux.Handle(*udpPathFlag, http.StripPrefix(*udpPathFlag, handler))
 	}
 	server := http.Server{Handler: mux}
 	go func() {
 		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Error running web server: %v", err)
+			slog.Error("Error running web server", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -129,11 +223,12 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 	<-sig
-	log.Println("Shutting down")
+	slog.Info("Shutting down")
 	// Gracefully shut down the server, with a 5s timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Failed to shutdown gracefully: %v", err)
+		slog.Error("Failed to shutdown gracefully: %v", err)
+		os.Exit(1)
 	}
 }
