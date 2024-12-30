@@ -112,48 +112,65 @@ func main() {
 			}
 			defer targetConn.Close()
 
+			// Handle client -> target.
 			go func() {
 				defer targetConn.CloseWrite()
+				defer clientConn.CloseRead(r.Context())
+				msgType, clientReader, err := clientConn.Reader(r.Context())
+				if err != nil {
+					clientConn.Close(websocket.StatusInternalError, "failed to get client reader")
+					return
+				}
+				if msgType != websocket.MessageBinary {
+					clientConn.Close(websocket.StatusInternalError, "client message is not binary")
+					return
+				}
+				buf := make([]byte, 3000)
 				for {
-					msgType, buf, err := clientConn.Read(r.Context())
+					n, err := clientReader.Read(buf)
 					if err != nil {
 						if !errors.Is(err, io.EOF) {
 							slog.Info("Failed to read from client", "error", err)
-							clientConn.Close(websocket.StatusInternalError, "failed to read message from client")
+							clientConn.Close(websocket.StatusInternalError, "failed to read from client")
 						}
 						break
 					}
-					if msgType != websocket.MessageBinary {
-						slog.Info("Bad message type", "type", msgType)
-						clientConn.Close(websocket.StatusUnsupportedData, "client message is not binary type")
-						break
-					}
-					if _, err := targetConn.Write(buf); err != nil {
+					read := buf[:n]
+					if _, err := targetConn.Write(read); err != nil {
 						slog.Info("Failed to write to target", "error", err)
 						clientConn.Close(websocket.StatusInternalError, "failed to write message to target")
 						break
 					}
 				}
 			}()
-			// About 2 MTUs
-			buf := make([]byte, 3000)
-			for {
-				n, err := targetConn.Read(buf)
+			// Handle target -> client
+			func() {
+				defer targetConn.CloseRead()
+				clientWriter, err := clientConn.Writer(r.Context(), websocket.MessageBinary)
 				if err != nil {
-					if !errors.Is(err, io.EOF) {
-						slog.Info("Failed to read from target", "error", err)
-						clientConn.Close(websocket.StatusInternalError, "failed to read message from target")
+					clientConn.Close(websocket.StatusInternalError, "failed to get client writer")
+					return
+				}
+				defer clientWriter.Close()
+				// About 2 MTUs
+				buf := make([]byte, 3000)
+				for {
+					n, err := targetConn.Read(buf)
+					if err != nil {
+						if !errors.Is(err, io.EOF) {
+							slog.Info("Failed to read from target", "error", err)
+							clientConn.Close(websocket.StatusInternalError, "failed to read message from target")
+						}
+						break
 					}
-					break
+					read := buf[:n]
+					if _, err := clientWriter.Write(read); err != nil {
+						slog.Info("Failed to write to client", "error", err)
+						clientConn.Close(websocket.StatusInternalError, "failed to write message to client")
+						break
+					}
 				}
-				msg := buf[:n]
-				if err := clientConn.Write(r.Context(), websocket.MessageBinary, msg); err != nil {
-					slog.Info("Failed to write to client", "error", err)
-					clientConn.Close(websocket.StatusInternalError, "failed to write message to client")
-					break
-				}
-			}
-			clientConn.Close(websocket.StatusNormalClosure, "")
+			}()
 		})
 		mux.Handle(*tcpPathFlag, http.StripPrefix(*tcpPathFlag, handler))
 	}
