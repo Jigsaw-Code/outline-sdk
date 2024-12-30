@@ -1,0 +1,22 @@
+{
+  "name": "outline-pwa-demo",
+  "version": "1.0.0",
+  "description": "An Amazing Capacitor App",
+  "main": "index.js",
+  "keywords": [
+    "capacitor",
+    "mobile"
+  ],
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/camera": "latest",
+    "@capacitor/core": "latest",
+    "@capacitor/ios": "^6.1.2",
+    "@capacitor/splash-screen": "latest"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "latest"
+  },
+  "author": "",
+  "license": "ISC"
+}
