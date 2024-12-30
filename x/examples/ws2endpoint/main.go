@@ -113,7 +113,9 @@ func main() {
 			defer targetConn.Close()
 
 			// Handle client -> target.
+			readClientDone := make(chan struct{})
 			go func() {
+				defer func() { readClientDone <- struct{}{} }()
 				defer targetConn.CloseWrite()
 				defer clientConn.CloseRead(r.Context())
 				msgType, clientReader, err := clientConn.Reader(r.Context())
@@ -171,6 +173,7 @@ func main() {
 					}
 				}
 			}()
+			<-readClientDone
 		})
 		mux.Handle(*tcpPathFlag, http.StripPrefix(*tcpPathFlag, handler))
 	}
