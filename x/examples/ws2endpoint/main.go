@@ -99,7 +99,7 @@ func main() {
 			clientConn, err := websocket.Accept(w, r, nil)
 			if err != nil {
 				slog.Info("Failed to accept Websocket connection", "error", err)
-				w.WriteHeader(http.StatusBadGateway)
+				http.Error(w, "Failed to accept Websocket connection", http.StatusBadGateway)
 				return
 			}
 			defer clientConn.CloseNow()
@@ -115,7 +115,7 @@ func main() {
 			// Handle client -> target.
 			readClientDone := make(chan struct{})
 			go func() {
-				defer func() { readClientDone <- struct{}{} }()
+				defer close(readClientDone)
 				defer targetConn.CloseWrite()
 				defer clientConn.CloseRead(r.Context())
 				msgType, clientReader, err := clientConn.Reader(r.Context())
