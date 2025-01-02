@@ -73,7 +73,6 @@ func parseWSConfig(configURL url.URL) (*wsConfig, error) {
 // }
 
 func registerWebsocketStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
-	var httpClient http.Client
 	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		_, err := newSD(ctx, config.BaseConfig)
 		if err != nil {
@@ -87,9 +86,9 @@ func registerWebsocketStreamDialer(r TypeRegistry[transport.StreamDialer], typeI
 			return nil, errors.New("must specify tcp_path")
 		}
 		return transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
-			wsURL := url.URL{Scheme: "http", Host: addr, Path: wsConfig.tcpPath}
+			wsURL := url.URL{Scheme: "wss", Host: addr, Path: wsConfig.tcpPath}
 			// origin := url.URL{Scheme: "http", Host: addr}
-			connect, err := websocket.NewCoderRWStreamEndpoint(wsURL.String(), &httpClient)
+			connect, err := websocket.NewGorillatreamEndpoint(wsURL.String(), nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create websocket stream endpoint: %w", err)
 			}
