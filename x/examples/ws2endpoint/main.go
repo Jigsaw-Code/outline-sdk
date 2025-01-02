@@ -103,6 +103,8 @@ func main() {
 				return
 			}
 			defer clientConn.CloseNow()
+			// Allow unbounded message, since we use a single message for the entire stream.
+			clientConn.SetReadLimit(-1)
 
 			targetConn, err := endpoint.ConnectStream(r.Context())
 			if err != nil {
