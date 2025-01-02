@@ -19,11 +19,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"golang.org/x/net/websocket"
+	"github.com/Jigsaw-Code/outline-sdk/x/websocket"
 )
 
 type wsConfig struct {
@@ -57,23 +58,24 @@ func parseWSConfig(configURL url.URL) (*wsConfig, error) {
 	return &cfg, nil
 }
 
-// wsToStreamConn converts a [websocket.Conn] to a [transport.StreamConn].
-type wsToStreamConn struct {
-	*websocket.Conn
-}
+// // wsToStreamConn converts a [websocket.Conn] to a [transport.StreamConn].
+// type wsToStreamConn struct {
+// 	*websocket.Conn
+// }
 
-func (c *wsToStreamConn) CloseRead() error {
-	// Nothing to do.
-	return nil
-}
+// func (c *wsToStreamConn) CloseRead() error {
+// 	// Nothing to do.
+// 	return nil
+// }
 
-func (c *wsToStreamConn) CloseWrite() error {
-	return c.Close()
-}
+// func (c *wsToStreamConn) CloseWrite() error {
+// 	return c.Close()
+// }
 
 func registerWebsocketStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
+	var httpClient http.Client
 	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		sd, err := newSD(ctx, config.BaseConfig)
+		_, err := newSD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -85,29 +87,21 @@ func registerWebsocketStreamDialer(r TypeRegistry[transport.StreamDialer], typeI
 			return nil, errors.New("must specify tcp_path")
 		}
 		return transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
-			wsURL := url.URL{Scheme: "ws", Host: addr, Path: wsConfig.tcpPath}
-			origin := url.URL{Scheme: "http", Host: addr}
-			wsCfg, err := websocket.NewConfig(wsURL.String(), origin.String())
+			wsURL := url.URL{Scheme: "http", Host: addr, Path: wsConfig.tcpPath}
+			// origin := url.URL{Scheme: "http", Host: addr}
+			connect, err := websocket.NewCoderRWStreamEndpoint(wsURL.String(), &httpClient)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create websocket config: %w", err)
+				return nil, fmt.Errorf("failed to create websocket stream endpoint: %w", err)
 			}
-			baseConn, err := sd.DialStream(ctx, addr)
-			if err != nil {
-				return nil, fmt.Errorf("failed to connect to websocket endpoint: %w", err)
-			}
-			wsConn, err := websocket.NewClient(wsCfg, baseConn)
-			if err != nil {
-				baseConn.Close()
-				return nil, fmt.Errorf("failed to create websocket client: %w", err)
-			}
-			return &wsToStreamConn{wsConn}, nil
+			return connect(ctx)
 		}), nil
 	})
 }
 
 func registerWebsocketPacketDialer(r TypeRegistry[transport.PacketDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
+	var httpClient http.Client
 	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
-		sd, err := newSD(ctx, config.BaseConfig)
+		_, err := newSD(ctx, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -119,22 +113,13 @@ func registerWebsocketPacketDialer(r TypeRegistry[transport.PacketDialer], typeI
 			return nil, errors.New("must specify udp_path")
 		}
 		return transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-			wsURL := url.URL{Scheme: "ws", Host: addr, Path: wsConfig.udpPath}
-			origin := url.URL{Scheme: "http", Host: addr}
-			wsCfg, err := websocket.NewConfig(wsURL.String(), origin.String())
+			wsURL := url.URL{Scheme: "http", Host: addr, Path: wsConfig.udpPath}
+			// origin := url.URL{Scheme: "http", Host: addr}
+			connect, err := websocket.NewCoderNetConnPacketEndpoint(wsURL.String(), &httpClient)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create websocket config: %w", err)
+				return nil, fmt.Errorf("failed to create websocket stream endpoint: %w", err)
 			}
-			baseConn, err := sd.DialStream(ctx, addr)
-			if err != nil {
-				return nil, fmt.Errorf("failed to connect to websocket endpoint: %w", err)
-			}
-			wsConn, err := websocket.NewClient(wsCfg, baseConn)
-			if err != nil {
-				baseConn.Close()
-				return nil, fmt.Errorf("failed to create websocket client: %w", err)
-			}
-			return wsConn, nil
+			return connect(ctx)
 		}), nil
 	})
 }
