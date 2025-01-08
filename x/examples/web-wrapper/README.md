@@ -62,7 +62,26 @@ Update `capacitor.config.json`:
 > [!NOTE]
 > Capacitor will silently fail to read your config if the JSON is invalid. Be sure to check `capacitor.config.json` for any hanging commas!
 
-**4. Integrate the Outline SDK Mobileproxy Library**
+**4. Update your Icon assets and Splash Screen**
+
+First, install the capacitor assets plugin:
+
+```bash
+npm install @capacitor/assets --save-dev
+```
+You'll need to create an `assets` folder in your project root with the following assets:
+
+- A 1024x1024 png titled `icon.png` containing your app icon.
+- A 2732x2732 png titled `splash.png` containing your splash screen.
+- Another 2732x2732 png titled `splash-dark.png` containing your splash screen in dark mode.
+
+Finally, run the following command to generate and place the assets in the appropriate places in your iOS project:
+
+```bash
+npx capacitor-assets generate --ios
+```
+
+**5. Integrate the Outline SDK Mobileproxy Library**
 
  Build the Mobileproxy library:
 
@@ -175,11 +194,11 @@ func applicationWillResignActive(_ application: UIApplication) {
 }
 ```
 
-**5. Verify with Packet Tracing**
+**6. Verify with Packet Tracing**
 
 Load XCode and connect your iOS device. Make sure that your device allows your developer certificate (Check `Settings > General > VPN & Device Management` on your iOS device). Go to `Product > Profile` in XCode and select the "Network" option from the list of presets. Pressing the record button on the window that pops up should launch your app and record its traffic. Once done, set the view on the packet trace data to `History` and among the results you should see the DNS address `dn9.quad9.net`.
 
-**6. Building and Distributing your App**
+**7. Building and Distributing your App**
 
 * Create a developer account and add it to XCode Settings (`XCode > Settings... > Accounts`)
 * Select your App in the file explorer and pick your Account's Team in `Signing & Capabilities`
@@ -187,7 +206,7 @@ Load XCode and connect your iOS device. Make sure that your device allows your d
 * Build a production archive with `Product > Archive`
 * On success, a window should pop up with your app listed in it. Select `Distribute App` and follow the instructions.
 
-**7. Advanced: Add Support for Service Workers on iOS**
+**8. Advanced: Add Support for Service Workers on iOS**
 
 By default, Service workers aren't supported in iOS webviews. To activate them, you need to do the following:
 
@@ -290,7 +309,26 @@ Update `capacitor.config.json`:
 > [!NOTE]
 > Capacitor will silently fail to read your config if the JSON is invalid. Be sure to check `capacitor.config.json` for any hanging commas!
 
-**4. Integrate the Outline SDK Mobileproxy Library**
+**4. Update your Icon assets and Splash Screen**
+
+First, install the capacitor assets plugin:
+
+```bash
+npm install @capacitor/assets --save-dev
+```
+You'll need to create an `assets` folder in your project root with the following assets:
+
+- A 1024x1024 png titled `icon.png` containing your app icon.
+- A 2732x2732 png titled `splash.png` containing your splash screen.
+- Another 2732x2732 png titled `splash-dark.png` containing your splash screen in dark mode.
+
+Finally, run the following command to generate and place the assets in the appropriate places in your Android project:
+
+```bash
+npx capacitor-assets generate --android
+```
+
+**5. Integrate the Outline SDK Mobileproxy Library**
 
 **Build the Mobileproxy library:**
 [Follow the instructions in the Outline SDK repository](https://github.com/Jigsaw-Code/outline-sdk/tree/main/x/mobileproxy#build-the-go-mobile-binaries-with-go-build):
