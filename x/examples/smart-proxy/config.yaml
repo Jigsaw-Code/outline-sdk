@@ -1,0 +1,66 @@
+# DNS strategies
+dns:
+  # Use the system resolver by default
+  - system: {}
+
+  # DNS-over-HTTPS
+
+  # Quad9
+  - https: { name: 2620:fe::fe }
+  - https: { name: 9.9.9.9 }
+  # Google
+  - https: { name: 2001:4860:4860::8888 }
+  - https: { name: 8.8.8.8 }
+  # Cloudflare
+  - https: { name: 2606:4700:4700::1111 }
+  - https: { name: 1.1.1.1 }
+  # Wikimedia DNS
+  - https: { name: 2001:67c:930::1 }
+  - https: { name: 185.71.138.138 }
+
+  # DNS-over-TLS
+
+  # Quad9
+  - tls: { name: 2620:fe::fe }
+  - tls: { name: 9.9.9.9 }
+  # Google
+  - tls: { name: 2001:4860:4860::8888 }
+  - tls: { name: 8.8.8.8 }
+  # Cloudflare
+  - tls: { name: 2606:4700:4700::1111 }
+  - tls: { name: 1.1.1.1 }
+  # Wikimedia DNS
+  - tls: { name: 2001:67c:930::1 }
+  - tls: { name: 185.71.138.138 }
+
+  # DNS-over-TCP
+
+  # Quad9
+  - tcp: { address: 2620:fe::fe }
+  - tcp: { address: 9.9.9.9 }
+  # Google
+  - tcp: { address: 2001:4860:4860::8888 }
+  - tcp: { address: 8.8.8.8 }
+  # Cloudflare
+  - tcp: { address: 2606:4700:4700::1111 }
+  - tcp: { address: 1.1.1.1 }
+
+  # DNS-over-UDP
+
+  # Quad9
+  - udp: { address: 2620:fe::fe }
+  - udp: { address: 9.9.9.9 }
+  # Google
+  - udp: { address: 2001:4860:4860::8888 }
+  - udp: { address: 8.8.8.8 }
+  # Cloudflare
+  - udp: { address: 2606:4700:4700::1111 }
+  - udp: { address: 1.1.1.1 }
+
+# TLS strategies
+tls:
+  - "" # Direct dialer
+  - split:1 # TCP stream split at position 1
+  - split:2,20*5 # TCP stream split at position 2, followed by 20 blocks of length 5.
+  - split:200|disorder:1 # TCP stream split at position 1, and send the second packet (packet #1) with zero TTL at first.
+  - tlsfrag:1 # TLS Record Fragmentation at position 1

@@ -111,7 +111,7 @@ FOUNDATION_EXPORT MobileproxyStringList* _Nullable MobileproxyNewListFromLines(N
 that will use the selected strategy.
 It uses testDomains to find a strategy that works when accessing those domains.
 The strategies to search are given in the searchConfig. An example can be found in
-https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.json
+https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.yaml
  */
 FOUNDATION_EXPORT MobileproxyStreamDialer* _Nullable MobileproxyNewSmartStreamDialer(MobileproxyStringList* _Nullable testDomains, NSString* _Nullable searchConfig, id<MobileproxyLogWriter> _Nullable logWriter, NSError* _Nullable* _Nullable error);
 

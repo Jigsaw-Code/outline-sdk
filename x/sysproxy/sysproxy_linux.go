@@ -18,6 +18,7 @@ package sysproxy
 
 import (
 	"errors"
+	"fmt"
 	"os/exec"
 	"strings"
 )
@@ -95,7 +96,11 @@ func setProxySettings(p ProxyType, host string, port string) error {
 }
 
 func gnomeSettingsSetString(settings, key, value string) error {
-	return exec.Command("gsettings", "set", settings, key, value).Run()
+	err := exec.Command("gsettings", "set", settings, key, value).Run()
+	if err != nil {
+		return fmt.Errorf("gsettings command failed: %w", err)
+	}
+	return nil
 }
 
 func getWebProxy() (host string, port string, enabled bool, err error) {
