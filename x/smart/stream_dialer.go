@@ -17,7 +17,6 @@ package smart
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -29,6 +28,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
+	"gopkg.in/yaml.v3"
 )
 
 // To test one strategy:
@@ -62,46 +62,46 @@ func (f *StrategyFinder) logCtx(ctx context.Context, format string, a ...any) {
 	f.log(format, a...)
 }
 
-type httpsEntryJSON struct {
+type httpsEntryConfig struct {
 	// Domain name of the host.
-	Name string `json:"name,omitempty"`
+	Name string `yaml:"name,omitempty"`
 	// Host:port. Defaults to Name:443.
-	Address string `json:"address,omitempty"`
+	Address string `yaml:"address,omitempty"`
 }
 
-type tlsEntryJSON struct {
+type tlsEntryConfig struct {
 	// Domain name of the host.
-	Name string `json:"name,omitempty"`
+	Name string `yaml:"name,omitempty"`
 	// Host:port. Defaults to Name:853.
-	Address string `json:"address,omitempty"`
+	Address string `yaml:"address,omitempty"`
 }
 
-type udpEntryJSON struct {
+type udpEntryConfig struct {
 	// Host:port.
-	Address string `json:"address,omitempty"`
+	Address string `yaml:"address,omitempty"`
 }
 
-type tcpEntryJSON struct {
+type tcpEntryConfig struct {
 	// Host:port.
-	Address string `json:"address,omitempty"`
+	Address string `yaml:"address,omitempty"`
 }
 
-type dnsEntryJSON struct {
-	System *struct{}       `json:"system,omitempty"`
-	HTTPS  *httpsEntryJSON `json:"https,omitempty"`
-	TLS    *tlsEntryJSON   `json:"tls,omitempty"`
-	UDP    *udpEntryJSON   `json:"udp,omitempty"`
-	TCP    *tcpEntryJSON   `json:"tcp,omitempty"`
+type dnsEntryConfig struct {
+	System *struct{}         `yaml:"system,omitempty"`
+	HTTPS  *httpsEntryConfig `yaml:"https,omitempty"`
+	TLS    *tlsEntryConfig   `yaml:"tls,omitempty"`
+	UDP    *udpEntryConfig   `yaml:"udp,omitempty"`
+	TCP    *tcpEntryConfig   `yaml:"tcp,omitempty"`
 }
 
-type configJSON struct {
-	DNS []dnsEntryJSON `json:"dns,omitempty"`
-	TLS []string       `json:"tls,omitempty"`
+type configConfig struct {
+	DNS []dnsEntryConfig `yaml:"dns,omitempty"`
+	TLS []string         `yaml:"tls,omitempty"`
 }
 
 // newDNSResolverFromEntry creates a [dns.Resolver] based on the config, returning the resolver and
 // a boolean indicating whether the resolver is secure (TLS, HTTPS) and a possible error.
-func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryJSON) (dns.Resolver, bool, error) {
+func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryConfig) (dns.Resolver, bool, error) {
 	if entry.System != nil {
 		return nil, false, nil
 	} else if cfg := entry.HTTPS; cfg != nil {
@@ -165,13 +165,13 @@ type smartResolver struct {
 	Secure bool
 }
 
-func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryJSON) ([]*smartResolver, error) {
+func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryConfig) ([]*smartResolver, error) {
 	if len(dnsConfig) == 0 {
 		return nil, errors.New("no DNS config entry")
 	}
 	rts := make([]*smartResolver, 0, len(dnsConfig))
 	for ei, entry := range dnsConfig {
-		idBytes, err := json.Marshal(entry)
+		idBytes, err := yaml.Marshal(entry)
 		if err != nil {
 			return nil, fmt.Errorf("cannot serialize entry %v: %w", ei, err)
 		}
@@ -185,7 +185,7 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryJSON) ([]*smart
 	return rts, nil
 }
 
-func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsConfig []dnsEntryJSON) (dns.Resolver, error) {
+func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsConfig []dnsEntryConfig) (dns.Resolver, error) {
 	resolvers, err := f.dnsConfigToResolver(dnsConfig)
 	if err != nil {
 		return nil, err
@@ -296,8 +296,8 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 // It returns an error if no strategy was found that unblocks the testDomains.
 // The testDomains must be domains with a TLS service running on port 443.
 func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, configBytes []byte) (transport.StreamDialer, error) {
-	var parsedConfig configJSON
-	err := json.Unmarshal(configBytes, &parsedConfig)
+	var parsedConfig configConfig
+	err := yaml.Unmarshal(configBytes, &parsedConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config: %v", err)
 	}

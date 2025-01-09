@@ -63,7 +63,7 @@ func supportsHappyEyeballs(dialer transport.StreamDialer) bool {
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
 	addrFlag := flag.String("localAddr", "localhost:1080", "Local proxy address")
-	configFlag := flag.String("config", "config.json", "Address of the config file")
+	configFlag := flag.String("config", "config.yaml", "Address of the config file")
 	transportFlag := flag.String("transport", "", "The base transport for the connections")
 	var domainsFlag stringArrayFlagValue
 	flag.Var(&domainsFlag, "domain", "The test domains to find strategies.")
