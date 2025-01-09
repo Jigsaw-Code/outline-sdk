@@ -97,11 +97,10 @@ func setProxySettings(p ProxyType, host string, port string) error {
 
 func gnomeSettingsSetString(settings, key, value string) error {
 	err := exec.Command("gsettings", "set", settings, key, value).Run()
-	exitErr := &exec.ExitError{}
-	if errors.As(err, &exitErr) {
-		return fmt.Errorf("%w, stderr: %v", err, string(exitErr.Stderr))
+	if err != nil {
+		return fmt.Errorf("gsettings command failed: %w", err)
 	}
-	return err
+	return nil
 }
 
 func getWebProxy() (host string, port string, enabled bool, err error) {
