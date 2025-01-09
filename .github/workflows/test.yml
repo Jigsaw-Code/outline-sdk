@@ -2,18 +2,18 @@ name: Build and Test
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
-permissions:  # added using https://github.com/step-security/secure-workflows
+permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
 
 jobs:
   test:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-22.04, macos-latest, windows-latest]
 
     runs-on: ${{ matrix.os }}
     env:
@@ -26,14 +26,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version-file: '${{ github.workspace }}/x/go.mod'
+          go-version-file: "${{ github.workspace }}/x/go.mod"
 
       - name: Build SDK
         run: go build -v ./...
 
       - name: Build X
         run: go build -C x -tags psiphon -o "${{ env.OUTPUT_DIR }}/" -v ./...
-      
+
       - name: Build Go Mobile
         if: matrix.os == 'macos-latest' || matrix.os == 'ubuntu-latest'
         run: go build -C x -o "${{ env.OUTPUT_DIR }}/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
@@ -53,7 +53,7 @@ jobs:
         run: go run github.com/google/go-licenses check --ignore=golang.org/x --allowed_licenses=Apache-2.0,Apache-3,BSD-3-Clause,BSD-4-Clause,CC0-1.0,MIT ./...
 
       - name: Check x licenses
-        env: {GO_FLAGS: -C x}
+        env: { GO_FLAGS: -C x }
         run: go run github.com/google/go-licenses check --ignore=golang.org/x --allowed_licenses=Apache-2.0,Apache-3,BSD-3-Clause,BSD-4-Clause,CC0-1.0,MIT ./...
 
       - name: Test SDK
