@@ -1,5 +1,8 @@
 # DNS strategies
 dns:
+  # Use the system resolver by default
+  - system: {}
+
   # DNS-over-HTTPS
 
   # Quad9
