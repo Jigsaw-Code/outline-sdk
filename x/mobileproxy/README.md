@@ -23,8 +23,7 @@ To integrate the MobileProxy into a Flutter app, follow this excellent tutorial 
 
 If you are looking into converting a web site or web app into a censorship-resistant mobile app, look at the [Web App Wrapper](https://github.com/Jigsaw-Code/outline-sdk/tree/main/x/examples/web-wrapper) that we are working on. 
 
-## General Integration Instructions
-
+## Add the MobileProxy dependency
 ### Build the MobileProxy libraries for Android and iOS
 
 First, Build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
@@ -487,6 +486,8 @@ To add the library to your mobile project, see Go Mobile's [Building and deployi
 
 
 ## Configure and run the local proxy forwarder
+
+You have the option to use a static configuration (which you may fetch dynamically from a remote resource), or use the Smart Proxy, which picks a DNS and TLS strategy for you automatically and doesn't need to tunnel traffic.
 
 ### Using static transport configuration
 
