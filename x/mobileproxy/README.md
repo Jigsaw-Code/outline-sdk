@@ -17,7 +17,7 @@ The integration typically consists of the following steps:
 
 ### Flutter Apps
 
-To integrate the Mobile Proxy into a Flutter app, follow this excellent tutorial by Anash Nouri: [Flutter Embedded VPN](https://blog.stackademic.com/flutter-embedded-vpn-c47144798995). Of note: the Mobile Proxy doesn't actually use VPN apis, and may not even need to use a proxy.
+To integrate the MobileProxy into a Flutter app, follow this excellent tutorial by Anash Nouri: [Flutter Embedded VPN](https://blog.stackademic.com/flutter-embedded-vpn-c47144798995). Of note: MobileProxy doesn't actually use VPN apis, and may not even need to use a proxy.
 
 ### Web Apps (Experimental)
 
@@ -25,7 +25,7 @@ If you are looking into converting a web site or web app into a censorship-resis
 
 ## General Integration Instructions
 
-### Build the Mobile Proxy libraries for Android and iOS
+### Build the MobileProxy libraries for Android and iOS
 
 First, Build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
 
@@ -528,7 +528,7 @@ proxy.stop()
 You need to configure your networking library to use the local proxy. How you do it depends on the networking library you are using.
 
 
-### Dart/Flutter HTTP client
+### Dart/Flutter HttpClient
 
 Set the proxy with the [`HttpClient.findProxy`]([url](https://api.flutter.dev/flutter/dart-io/HttpClient/findProxy.html)) function.
 
