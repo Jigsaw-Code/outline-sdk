@@ -14,7 +14,20 @@ The integration typically consists of the following steps:
 1. Configure and run MobileProxy within your app.
 1. Update your networking code to proxy traffic through the local MobileProxy.
 
-## Build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
+
+### Flutter Apps
+
+To integrate the Mobile Proxy into a Flutter app, follow this excellent tutorial by Anash Nouri: [Flutter Embedded VPN](https://blog.stackademic.com/flutter-embedded-vpn-c47144798995). Of note: the Mobile Proxy doesn't actually use VPN apis, and may not even need to use a proxy.
+
+### Web Apps (Experimental)
+
+If you are looking into converting a web site or web app into a censorship-resistant mobile app, look at the [Web App Wrapper](https://github.com/Jigsaw-Code/outline-sdk/tree/main/x/examples/web-wrapper) that we are working on. 
+
+## General Integration Instructions
+
+### Build the Mobile Proxy libraries for Android and iOS
+
+First, Build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
 
 From the `x/` directory:
 
@@ -22,7 +35,7 @@ From the `x/` directory:
 go build -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
 ```
 
-## Build the iOS and Android libraries with [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile#hdr-Build_a_library_for_Android_and_iOS)
+Then build the iOS and Android libraries with [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile#hdr-Build_a_library_for_Android_and_iOS)
 
 ```bash
 PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -o "$(pwd)/out/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
@@ -468,11 +481,14 @@ public final class StringList implements Seq.Proxy {
 
 </details>
 
-## Add the library to your mobile project
+### Add the library to your mobile project
 
 To add the library to your mobile project, see Go Mobile's [Building and deploying to iOS](https://go.dev/wiki/Mobile#building-and-deploying-to-ios-1) and [Building and deploying to Android](https://go.dev/wiki/Mobile#building-and-deploying-to-android-1).
 
-## Using the basic local proxy forwarder
+
+## Configure and run the local proxy forwarder
+
+### Using static transport configuration
 
 You need to call the `RunProxy` function passing the local address to use, and the transport configuration.
 
@@ -488,16 +504,16 @@ val proxy = Mobileproxy.runProxy("localhost:0", dialer)
 proxy.stop()
 ```
 
-## Using the smart local proxy forwarder ("Smart Proxy")
+### Using the Smart Proxy
 
 The Smart Proxy can automatically try multiple strategies to unblock access to the test domains you specify.
-You need to specify a strategy config in JSON format ([example](../examples/smart-proxy/config.json)). 
+You need to specify a strategy config in YAML format ([example](../examples/smart-proxy/config.yaml)). 
 
 On Android, the Kotlin code would look like this:
 ```kotlin
 // Use port zero to let the system pick an open port for you.
 val testDomains = Mobileproxy.newListFromLines("www.youtube.com\ni.ytimg.com")
-val strategiesConfig = "..."  // Config JSON.
+val strategiesConfig = "..."  // Config YAML.
 val dialer = Mobileproxy.newSmartStreamDialer(testDomains, strategiesConfig, Mobileproxy.newStderrLogWriter())
 
 val proxy = Mobileproxy.runProxy("localhost:0", dialer)
@@ -512,7 +528,7 @@ proxy.stop()
 You need to configure your networking library to use the local proxy. How you do it depends on the networking library you are using.
 
 
-### Dart/Flutter HttpClient
+### Dart/Flutter HTTP client
 
 Set the proxy with the [`HttpClient.findProxy`]([url](https://api.flutter.dev/flutter/dart-io/HttpClient/findProxy.html)) function.
 
