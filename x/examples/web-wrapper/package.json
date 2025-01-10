@@ -15,6 +15,7 @@
     "@capacitor/splash-screen": "latest"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "latest"
   },
   "author": "",
