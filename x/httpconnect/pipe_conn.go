@@ -15,14 +15,15 @@
 package httpconnect
 
 import (
+	"errors"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"io"
 )
 
-// PipeConn is a [transport.StreamConn] that overrides [Read] and [Write] functions with the given [reader] and [writer]
+// PipeConn is a [transport.StreamConn] that overrides [Read], [Write] (and corresponding [Close]) functions with the given [reader] and [writer]
 type PipeConn struct {
-	reader io.Reader
-	writer io.Writer
+	reader io.ReadCloser
+	writer io.WriteCloser
 	transport.StreamConn
 }
 
@@ -32,4 +33,16 @@ func (p *PipeConn) Read(b []byte) (n int, err error) {
 
 func (p *PipeConn) Write(b []byte) (n int, err error) {
 	return p.writer.Write(b)
+}
+
+func (p *PipeConn) CloseRead() error {
+	return errors.Join(p.reader.Close(), p.StreamConn.CloseRead())
+}
+
+func (p *PipeConn) CloseWrite() error {
+	return errors.Join(p.writer.Close(), p.StreamConn.CloseWrite())
+}
+
+func (p *PipeConn) Close() error {
+	return errors.Join(p.reader.Close(), p.writer.Close(), p.StreamConn.Close())
 }

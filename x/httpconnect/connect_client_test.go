@@ -99,3 +99,35 @@ func TestConnectClientOk(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 }
+
+func TestConnectClientFail(t *testing.T) {
+	t.Parallel()
+
+	targetURL := "somehost:1234"
+
+	proxySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodConnect, r.Method, "Method")
+		require.Equal(t, targetURL, r.Host, "Host")
+
+		w.WriteHeader(http.StatusBadRequest)
+		_, err := w.Write([]byte("HTTP/1.1 400 Bad request\r\n\r\n"))
+		require.NoError(t, err, "Write")
+	}))
+	defer proxySrv.Close()
+
+	proxyURL, err := url.Parse(proxySrv.URL)
+	require.NoError(t, err, "Parse")
+
+	dialer := &transport.TCPDialer{
+		Dialer: net.Dialer{},
+	}
+
+	connClient, err := NewConnectClient(
+		dialer,
+		proxyURL.Host,
+	)
+	require.NoError(t, err, "NewConnectClient")
+
+	_, err = connClient.DialStream(context.Background(), targetURL)
+	require.Error(t, err, "unexpected status code: 400")
+}
