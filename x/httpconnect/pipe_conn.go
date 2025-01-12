@@ -1,4 +1,4 @@
-// Copyright 2023 The Outline Authors
+// Copyright 2025 The Outline Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,29 +20,31 @@ import (
 	"io"
 )
 
-// PipeConn is a [transport.StreamConn] that overrides [Read], [Write] (and corresponding [Close]) functions with the given [reader] and [writer]
-type PipeConn struct {
+var _ transport.StreamConn = (*pipeConn)(nil)
+
+// pipeConn is a [transport.StreamConn] that overrides [Read], [Write] (and corresponding [Close]) functions with the given [reader] and [writer]
+type pipeConn struct {
 	reader io.ReadCloser
 	writer io.WriteCloser
 	transport.StreamConn
 }
 
-func (p *PipeConn) Read(b []byte) (n int, err error) {
+func (p *pipeConn) Read(b []byte) (n int, err error) {
 	return p.reader.Read(b)
 }
 
-func (p *PipeConn) Write(b []byte) (n int, err error) {
+func (p *pipeConn) Write(b []byte) (n int, err error) {
 	return p.writer.Write(b)
 }
 
-func (p *PipeConn) CloseRead() error {
+func (p *pipeConn) CloseRead() error {
 	return errors.Join(p.reader.Close(), p.StreamConn.CloseRead())
 }
 
-func (p *PipeConn) CloseWrite() error {
+func (p *pipeConn) CloseWrite() error {
 	return errors.Join(p.writer.Close(), p.StreamConn.CloseWrite())
 }
 
-func (p *PipeConn) Close() error {
+func (p *pipeConn) Close() error {
 	return errors.Join(p.reader.Close(), p.writer.Close(), p.StreamConn.Close())
 }

@@ -1,4 +1,4 @@
-// Copyright 2023 The Outline Authors
+// Copyright 2025 The Outline Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,9 +35,9 @@ type connectClient struct {
 
 var _ transport.StreamDialer = (*connectClient)(nil)
 
-type ConnectClientOption func(c *connectClient)
+type ClientOption func(c *connectClient)
 
-func NewConnectClient(dialer transport.StreamDialer, proxyAddr string, opts ...ConnectClientOption) (transport.StreamDialer, error) {
+func NewConnectClient(dialer transport.StreamDialer, proxyAddr string, opts ...ClientOption) (transport.StreamDialer, error) {
 	if dialer == nil {
 		return nil, errors.New("dialer must not be nil")
 	}
@@ -60,9 +60,9 @@ func NewConnectClient(dialer transport.StreamDialer, proxyAddr string, opts ...C
 }
 
 // WithHeaders appends the given [headers] to the CONNECT request
-func WithHeaders(headers http.Header) ConnectClientOption {
+func WithHeaders(headers http.Header) ClientOption {
 	return func(c *connectClient) {
-		c.headers = headers
+		c.headers = headers.Clone()
 	}
 }
 
@@ -90,7 +90,7 @@ func (cc *connectClient) doConnect(ctx context.Context, remoteAddr string, conn 
 
 	pr, pw := io.Pipe()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodConnect, "http://"+remoteAddr, pr)
+	req, err := http.NewRequestWithContext(ctx, http.MethodConnect, "http://"+remoteAddr, pr) // TODO: HTTPS support
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -113,10 +113,11 @@ func (cc *connectClient) doConnect(ctx context.Context, remoteAddr string, conn 
 		return nil, fmt.Errorf("do: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	return &PipeConn{
+	return &pipeConn{
 		reader:     resp.Body,
 		writer:     pw,
 		StreamConn: conn,

@@ -1,4 +1,4 @@
-// Copyright 2023 The Outline Authors
+// Copyright 2025 The Outline Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ import (
 	"context"
 	"encoding/base64"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
 	"github.com/stretchr/testify/require"
-	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -44,41 +44,19 @@ func TestConnectClientOk(t *testing.T) {
 	targetURL, err := url.Parse(targetSrv.URL)
 	require.NoError(t, err)
 
-	proxySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodConnect, r.Method, "Method")
-		require.Equal(t, targetURL.Host, r.Host, "Host")
-		require.Equal(t, []string{"Basic " + creds}, r.Header["Proxy-Authorization"], "Proxy-Authorization")
-
-		conn, err := net.Dial("tcp", targetURL.Host)
-		require.NoError(t, err, "Dial")
-
-		w.WriteHeader(http.StatusOK)
-		_, err = w.Write([]byte("HTTP/1.1 200 Connection established\r\n\r\n"))
-		require.NoError(t, err, "Write")
-
-		rc := http.NewResponseController(w)
-		err = rc.Flush()
-		require.NoError(t, err, "Flush")
-
-		clientConn, _, err := rc.Hijack()
-		require.NoError(t, err, "Hijack")
-
-		go func() {
-			_, _ = io.Copy(conn, clientConn)
-		}()
-		_, _ = io.Copy(clientConn, conn)
+	tcpDialer := &transport.TCPDialer{Dialer: net.Dialer{}}
+	connectHandler := httpproxy.NewConnectHandler(tcpDialer)
+	proxySrv := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		require.Equal(t, "Basic "+creds, request.Header.Get("Proxy-Authorization"))
+		connectHandler.ServeHTTP(writer, request)
 	}))
 	defer proxySrv.Close()
 
 	proxyURL, err := url.Parse(proxySrv.URL)
 	require.NoError(t, err, "Parse")
 
-	dialer := &transport.TCPDialer{
-		Dialer: net.Dialer{},
-	}
-
 	connClient, err := NewConnectClient(
-		dialer,
+		tcpDialer,
 		proxyURL.Host,
 		WithHeaders(http.Header{"Proxy-Authorization": []string{"Basic " + creds}}),
 	)
@@ -118,12 +96,10 @@ func TestConnectClientFail(t *testing.T) {
 	proxyURL, err := url.Parse(proxySrv.URL)
 	require.NoError(t, err, "Parse")
 
-	dialer := &transport.TCPDialer{
-		Dialer: net.Dialer{},
-	}
-
 	connClient, err := NewConnectClient(
-		dialer,
+		&transport.TCPDialer{
+			Dialer: net.Dialer{},
+		},
 		proxyURL.Host,
 	)
 	require.NoError(t, err, "NewConnectClient")
