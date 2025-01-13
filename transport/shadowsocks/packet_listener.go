@@ -54,8 +54,7 @@ func (c *packetListener) ListenPacket(ctx context.Context) (net.PacketConn, erro
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to endpoint: %w", err)
 	}
-	conn := packetConn{Conn: proxyConn, key: c.key}
-	return &conn, nil
+	return NewPacketConn(proxyConn, c.key), nil
 }
 
 type packetConn struct {
@@ -64,6 +63,15 @@ type packetConn struct {
 }
 
 var _ net.PacketConn = (*packetConn)(nil)
+
+// NewPacketConn wraps a [net.Conn] and returns a [net.PacketConn] that encrypts/decrypts
+// packets before writing/reading them to/from the underlying connection using the provided
+// encryption key.
+//
+// Closing the returned [net.PacketConn] will also close the underlying [net.Conn].
+func NewPacketConn(conn net.Conn, key *EncryptionKey) net.PacketConn {
+	return &packetConn{Conn: conn, key: key}
+}
 
 // WriteTo encrypts `b` and writes to `addr` through the proxy.
 func (c *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {

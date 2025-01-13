@@ -1,0 +1,17 @@
+output
+
+# vscode
+.vscode
+
+# node 
+node_modules
+
+# yarn
+.yarn/cache
+.yarn/sdks
+.yarn/unplugged
+.yarn/install-state.gz
+.pnp.*
+
+# apple
+.DS_Store

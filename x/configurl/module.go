@@ -42,6 +42,7 @@ func NewProviderContainer() *ProviderContainer {
 // RegisterDefaultProviders registers a set of default providers with the providers in [ProviderContainer].
 func RegisterDefaultProviders(c *ProviderContainer) *ProviderContainer {
 	// Please keep the list in alphabetical order.
+	registerDisorderDialer(&c.StreamDialers, "disorder", c.StreamDialers.NewInstance)
 	registerDO53StreamDialer(&c.StreamDialers, "do53", c.StreamDialers.NewInstance, c.PacketDialers.NewInstance)
 	registerDOHStreamDialer(&c.StreamDialers, "doh", c.StreamDialers.NewInstance)
 

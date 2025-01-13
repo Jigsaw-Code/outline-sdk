@@ -1,0 +1,92 @@
+/* 
+ Copyright 2023 The Outline Authors
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+     https://www.apache.org/licenses/LICENSE-2.0
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+*/
+
+@font-face {
+  font-family: "Jigsaw Sans";
+  src: url("./assets/fonts/jigsaw_sans/regular.woff2") format("woff2");
+  font-weight: normal;
+}
+
+@font-face {
+  font-family: "Jigsaw Sans";
+  src: url("./assets/fonts/jigsaw_sans/bold.woff2") format("woff2");
+  font-weight: bold;
+}
+
+:root {
+  font-size: clamp(16px, 1.5vw, 21px);
+
+  --font-sans-serif: "Jigsaw Sans", "Helvetica Neue", Helvetica, Arial,
+    sans-serif;
+  --font-monospace: "Menlo", Courier, monospace;
+
+  --size-border: 0.5px;
+  --size-border-switch: 2px;
+  --size-corner-radius: 0.2rem;
+  --size-gap-inner: 0.25rem;
+  --size-gap-narrow: 0.5rem;
+  --size-gap: 1rem;
+  --size-font-small: 0.75rem;
+  --size-font: 1rem;
+  --size-font-large: 1.85rem;
+  --size-switch: 1.5rem;
+  --size-app-width-min: 560px;
+  --size-app-width-max: 560px;
+
+  --timing-snappy: 140ms;
+
+  --jigsaw-black: hsl(300, 3%, 7%);
+  --jigsaw-white: white;
+  --jigsaw-green: hsl(153, 39%, 15%);
+  --jigsaw-green-medium: hsl(156, 33%, 31%);
+  --jigsaw-green-light: hsl(159, 13%, 74%);
+  --jigsaw-gray: hsl(0, 0%, 73%);
+  --jigsaw-gray-medium: hsl(0, 0%, 90%);
+  --jigsaw-gray-light: hsl(0, 0%, 98%);
+
+  --color-text: var(--jigsaw-black);
+  --color-text-brand: var(--jigsaw-white);
+  --color-text-highlight: var(--jigsaw-white);
+  --color-text-muted: var(--jigsaw-gray);
+  --color-background: var(--jigsaw-white);
+  --color-background-brand: var(--jigsaw-green);
+  --color-background-highlight: hsl(156, 33%, 55%);
+  --color-background-muted: var(--jigsaw-gray-medium);
+  --color-success-text: var(--jigsaw-green-medium);
+  --color-success-background: var(--jigsaw-green-light);
+  --color-error-text: hsl(0, 33%, 31%);
+  --color-error-background: hsl(0, 13%, 74%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :host {
+    --color-text: var(--jigsaw-gray-medium);
+    --color-text-brand: var(--jigsaw-white);
+    --color-text-highlight: var(--jigsaw-white);
+    --color-text-muted: hsl(0, 0%, 31%);
+    --color-background: var(--jigsaw-black);
+    --color-background-brand: var(--jigsaw-green);
+    --color-background-highlight: var(--jigsaw-green-medium);
+    --color-background-muted: hsl(0, 0%, 15%);
+    --color-success-text: var(--jigsaw-white);
+    --color-success-background: hsl(156, 50%, 31%);
+    --color-error-text: var(--jigsaw-white);
+    --color-error-background: hsl(0, 50%, 45%);
+  }
+}
+
+html,
+body,
+body * {
+  all: initial;
+}

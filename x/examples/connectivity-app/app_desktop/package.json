@@ -1,0 +1,27 @@
+{
+  "dependencies": {
+    "lit": "^2.7.6",
+    "shared_backend": "workspace:^",
+    "shared_frontend": "workspace:^"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "typescript": "^4.6.4",
+    "vite": "^3.0.7"
+  },
+  "name": "app_desktop",
+  "scripts": {
+    "setup": "yarn build:frontend",
+    "build": "concurrently -n linux,macos,windows 'yarn build:linux' 'yarn build:macos' 'yarn build:windows'",
+    "build:linux": "yarn setup && wails build -platform linux",
+    "build:macos": "yarn setup && wails build -platform darwin",
+    "build:frontend": "vite build",
+    "build:windows": "yarn setup && wails build -platform windows",
+    "clean": "rm -rf output node_modules",
+    "go": "go",
+    "watch": "wails dev",
+    "watch:frontend": "vite"
+  },
+  "type": "module",
+  "version": "0.0.0"
+}

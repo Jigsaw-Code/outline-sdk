@@ -1,0 +1,8 @@
+framework module "Mobileproxy" {
+	header "ref.h"
+    header "Mobileproxy.objc.h"
+    header "Universe.objc.h"
+    header "Mobileproxy.h"
+
+    export *
+}

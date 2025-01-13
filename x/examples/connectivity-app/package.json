@@ -1,0 +1,39 @@
+{
+  "author": "Daniel LaCosse",
+  "dependencies": {
+    "lit": "^2.7.6"
+  },
+  "description": "A cross-platform connectivity test app using the Outline SDK",
+  "devDependencies": {
+    "@yarnpkg/sdks": "^3.0.0-rc.48",
+    "concurrently": "^8.2.2",
+    "typescript": "^5.1.6"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "name": "outline_sdk_connectivity_test",
+  "packageManager": "yarn@4.0.1",
+  "private": true,
+  "scripts": {
+    "app_desktop": "yarn workspace app_desktop",
+    "app_mobile": "yarn workspace app_mobile",
+    "build": "yarn workspaces foreach -ptivW run build",
+    "clean": "yarn workspaces foreach -pivW run clean && rm -rf node_modules .yarn/cache .yarn/sdks .yarn/unplugged .yarn/install-state.",
+    "reset": "yarn clean && yarn && yarn sdks vscode",
+    "setup": "yarn && yarn workspaces foreach -pivW run setup",
+    "setup:vscode": "yarn sdks vscode",
+    "shared_backend": "yarn workspace shared_backend",
+    "shared_frontend": "yarn workspace shared_frontend",
+    "watch": "yarn workspaces foreach -pivW run watch",
+    "watch:android": "concurrently -n frontend,android 'yarn app_mobile watch:frontend' 'yarn workspaces foreach -pivW run watch:android'",
+    "watch:ios": "concurrently -n frontend,ios 'yarn app_mobile watch:frontend' 'yarn workspaces foreach -pivW run watch:ios'"
+  },
+  "version": "0.0.0",
+  "workspaces": [
+    "shared_backend",
+    "shared_frontend",
+    "app_desktop",
+    "app_mobile"
+  ]
+}

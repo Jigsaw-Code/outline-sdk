@@ -1,0 +1,19 @@
+{
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "nodemon": "^3.0.1"
+  },
+  "module": "index.ts",
+  "name": "shared_backend",
+  "scripts": {
+    "build": "concurrently 'yarn:build:*'",
+    "build:android": "mkdir -p output; gomobile bind -target android -androidapi 21 -o output/SharedBackend.aar github.com/Jigsaw-Code/outline-sdk/x/examples/outline-connectivity-app/shared_backend",
+    "build:ios": "mkdir -p output; gomobile bind -target ios,iossimulator -o output/SharedBackend.xcframework github.com/Jigsaw-Code/outline-sdk/x/examples/outline-connectivity-app/shared_backend",
+    "clean": "rm -rf output",
+    "go": "go",
+    "setup": "yarn build",
+    "watch": "nodemon --exec 'yarn build' --ext go",
+    "watch:android": "nodemon --exec 'yarn build:android' --ext go",
+    "watch:ios": "nodemon --exec 'yarn build:ios' --ext go"
+  }
+}

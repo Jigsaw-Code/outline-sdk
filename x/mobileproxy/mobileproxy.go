@@ -206,7 +206,7 @@ func toWriter(logWriter LogWriter) io.Writer {
 // that will use the selected strategy.
 // It uses testDomains to find a strategy that works when accessing those domains.
 // The strategies to search are given in the searchConfig. An example can be found in
-// https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.json
+// https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.yaml
 func NewSmartStreamDialer(testDomains *StringList, searchConfig string, logWriter LogWriter) (*StreamDialer, error) {
 	logBytesWriter := toWriter(logWriter)
 	// TODO: inject the base dialer for tests.

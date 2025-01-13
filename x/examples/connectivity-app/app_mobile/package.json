@@ -1,0 +1,33 @@
+{
+  "author": "Daniel LaCosse",
+  "dependencies": {
+    "@capacitor/android": "^5.3.0",
+    "@capacitor/core": "latest",
+    "@capacitor/ios": "^5.2.2",
+    "lit": "^2.7.6",
+    "shared_backend": "workspace:^",
+    "shared_frontend": "workspace:^"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "latest",
+    "concurrently": "^8.2.0",
+    "typescript": "^5.1.6",
+    "vite": "^2.9.13"
+  },
+  "name": "app_mobile",
+  "scripts": {
+    "build": "concurrently 'yarn:build:*'",
+    "build:android": "yarn setup:android && cap build android",
+    "build:frontend": "vite build",
+    "build:ios": "yarn setup:ios && cap build ios",
+    "clean": "rm -rf output node_modules ios/capacitor-cordova-ios-plugins ios/App/App.xcarchive ios/App/App.xcodeproj/xcuserdata ios/App/App.xcworkspace/xcuserdata ios/App/Pods ios/App/App/public ios/App/App/capacitor.config.json ios/App/App/config.xml",
+    "setup": "concurrently 'yarn:setup:*'",
+    "setup:android": "yarn build:frontend && CAPACITOR_PLATFORM=android cap sync android",
+    "setup:ios": "yarn build:frontend && CAPACITOR_PLATFORM=ios cap sync ios",
+    "watch": "concurrently 'yarn:watch:*'",
+    "watch:android": "yarn setup:android && cap open android",
+    "watch:frontend": "vite",
+    "watch:ios": "yarn setup:ios && cap open ios"
+  },
+  "version": "0.0.0"
+}

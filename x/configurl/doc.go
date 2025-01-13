@@ -103,11 +103,35 @@ For more details, refer to [github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag
 
 	tlsfrag:[LENGTH]
 
+Packet reordering (streams only, package [github.com/Jigsaw-Code/outline-sdk/x/disorder])
+
+The disorder strategy sends TCP packets out of order by manipulating the
+socket's Time To Live (TTL) or Hop Limit. It temporarily sets the TTL to a low
+value, causing specific packets to be dropped early in the network (like at the
+first router). These dropped packets are then re-transmitted later by the TCP
+stack, resulting in the receiver getting packets out of order. This can help
+bypass network filters that rely on inspecting the initial packets of a TCP
+connection.
+
+	disorder:[PACKET_NUMBER]
+
+PACKET_NUMBER: The number of writes before the disorder action occurs. The
+disorder action triggers when the number of writes equals PACKET_NUMBER. If set
+to 0 (default), the disorder happens on the first write. If set to 1, it happens
+on the second write, and so on.
+
 # Examples
 
 Packet splitting - To split outgoing streams on bytes 2 and 123, you can use:
 
 	split:2|split:123
+
+Disorder transport - Send some of the packets out of order:
+
+	disorder:0|split:123
+
+Split at position 123, then send packet 0 of 123 bytes (from splitting) out of order. The network filter will first receive packet 1, only then packet 0. This
+is done by setting the hop limit for the write to 1, and then restoring it. It will be sent with its original hop limit on retransmission.
 
 Evading DNS and SNI blocking - You can use Cloudflare's DNS-over-HTTPS to protect against DNS disruption.
 The DoH resolver cloudflare-dns.com is accessible from any cloudflare.net IP, so you can specify the address to avoid blocking
