@@ -17,10 +17,13 @@ package httpconnect
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
 	"github.com/stretchr/testify/require"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -28,16 +31,13 @@ import (
 	"testing"
 )
 
-func TestConnectClientOk(t *testing.T) {
+func Test_ConnectClient_HTTP_Ok(t *testing.T) {
 	t.Parallel()
 
 	creds := base64.StdEncoding.EncodeToString([]byte("username:password"))
 
 	targetSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method, "Method")
-		w.WriteHeader(http.StatusOK)
-		_, err := w.Write([]byte("HTTP/1.1 200 OK\r\n"))
-		require.NoError(t, err)
 	}))
 	defer targetSrv.Close()
 
@@ -78,7 +78,7 @@ func TestConnectClientOk(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
-func TestConnectClientFail(t *testing.T) {
+func Test_ConnectClient_HTTP_Fail(t *testing.T) {
 	t.Parallel()
 
 	targetURL := "somehost:1234"
@@ -106,4 +106,83 @@ func TestConnectClientFail(t *testing.T) {
 
 	_, err = connClient.DialStream(context.Background(), targetURL)
 	require.Error(t, err, "unexpected status code: 400")
+}
+
+func Test_ConnectClient_HTTP2_Ok(t *testing.T) {
+	t.Parallel()
+
+	targetSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method, "Method")
+		w.Header().Set("Content-Type", "text/plain")
+		_, err := w.Write([]byte("Hello, world!"))
+		require.NoError(t, err)
+	}))
+	defer targetSrv.Close()
+
+	targetURL, err := url.Parse(targetSrv.URL)
+	require.NoError(t, err)
+
+	tcpDialer := &transport.TCPDialer{Dialer: net.Dialer{}}
+	proxySrv := httptest.NewUnstartedServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		require.Equal(t, "HTTP/2.0", request.Proto, "Proto")
+		require.Equal(t, http.MethodConnect, request.Method, "Method")
+		require.Equal(t, targetURL.Host, request.URL.Host, "Host")
+
+		conn, err := tcpDialer.DialStream(request.Context(), request.URL.Host)
+		require.NoError(t, err, "DialStream")
+
+		writer.WriteHeader(http.StatusOK)
+		writer.(http.Flusher).Flush()
+
+		go func() {
+			_, _ = io.Copy(conn, request.Body)
+			require.NoError(t, err, "io.Copy")
+		}()
+
+		_, _ = io.Copy(writer, conn)
+		require.NoError(t, err, "io.Copy")
+	}))
+	proxySrv.EnableHTTP2 = true
+	proxySrv.StartTLS()
+	defer proxySrv.Close()
+
+	proxyURL, err := url.Parse(proxySrv.URL)
+	require.NoError(t, err, "Parse")
+
+	certs := x509.NewCertPool()
+	for _, c := range proxySrv.TLS.Certificates {
+		roots, err := x509.ParseCertificates(c.Certificate[len(c.Certificate)-1])
+		require.NoError(t, err, "x509.ParseCertificates")
+		for _, root := range roots {
+			certs.AddCert(root)
+		}
+	}
+
+	connClient, err := NewConnectClient(
+		tcpDialer,
+		proxyURL.Host,
+		WithHTTPS(&tls.Config{RootCAs: certs}),
+	)
+	require.NoError(t, err, "NewConnectClient")
+
+	streamConn, err := connClient.DialStream(context.Background(), targetURL.Host)
+	require.NoError(t, err, "DialStream")
+	require.NotNil(t, streamConn, "StreamConn")
+
+	req, err := http.NewRequest(http.MethodGet, targetSrv.URL, nil)
+	require.NoError(t, err, "NewRequest")
+	req.Header.Add("Connection", "close")
+
+	err = req.Write(streamConn)
+	require.NoError(t, err, "Write")
+
+	rd := bufio.NewReader(streamConn)
+	resp, err := http.ReadResponse(rd, req)
+	require.NoError(t, err, "ReadResponse")
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err, "ReadAll")
+	require.Equal(t, "Hello, world!", string(body))
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 }

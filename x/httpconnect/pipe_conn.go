@@ -22,7 +22,8 @@ import (
 
 var _ transport.StreamConn = (*pipeConn)(nil)
 
-// pipeConn is a [transport.StreamConn] that overrides [Read], [Write] (and corresponding [Close]) functions with the given [reader] and [writer]
+// pipeConn is a [transport.StreamConn] that overrides the Read and Write functions with the provided [io.ReadCloser] and [io.WriteCloser], respectively.
+// The CloseRead, CloseWrite, and Close functions first close the [io.ReadCloser] and [io.WriteCloser], and then call the corresponding functions on the connection.
 type pipeConn struct {
 	reader io.ReadCloser
 	writer io.WriteCloser
