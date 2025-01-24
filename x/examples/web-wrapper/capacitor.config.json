@@ -8,7 +8,7 @@
     }
   },
   "server": {
-    "url": "https://www.radiozamaneh.com/"
+    "url": "https://localhost:3000/puppeteer.html"
   },
   "ios": {
     "limitsNavigationsToAppBoundDomains": true
