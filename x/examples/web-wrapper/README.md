@@ -9,27 +9,43 @@ This example demonstrates how to use the Outline SDK to create a censorship-resi
 
 ## Running the example on MacOS & iOS
 
+### Install dependencies
+
 ```sh
-# install dependencies and setup project
 npm ci
-npx cap sync
 
-# the demo site requires SSL for the app to load properly
+# the demo website requires SSL for the app to load properly
 brew install mkcert
+```
 
+### Generate and apply the local SSL certificate authority
+
+```sh
 # make sure your JAVA_HOME is setup before generating the SSL certificate
 mkcert -install
 mkdir dist
-mkcert -key-file dist/localhost-key.pem -cert-file dist/localhost.pem localhost
-
-# run the demo site
-npx serve --ssl-cert dist/localhost.pem --ssl-key dist/localhost-key.pem www
+mkcert -key-file dist/localhost-key.pem -cert-file dist/localhost.pem localhost 10.0.2.2
 
 # open the iOS project
+npx cap sync
 npx cap open ios
 
 # open the finder window containing the root CA
 open "$(mkcert -CAROOT)"
 ```
 
-Start the app and drag the root CA that mkcert generated into the simulator...  (INSTRUCTIONS IN PROGRESS)
+Start the app and drag the root CA that mkcert generated into the simulator, then stop the app.
+
+### Run the project
+
+```sh
+# run the demo site
+npx serve --ssl-cert dist/localhost.pem --ssl-key dist/localhost-key.pem www
+
+# in a separate terminal, run the ios application
+npx cap run ios
+```
+
+## Running the example on MacOS & Android
+
+TODO

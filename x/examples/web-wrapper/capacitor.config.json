@@ -8,7 +8,7 @@
     }
   },
   "server": {
-    "url": "https://localhost:3000/puppeteer.html"
+    "url": "https://localhost:3000"
   },
   "ios": {
     "limitsNavigationsToAppBoundDomains": true

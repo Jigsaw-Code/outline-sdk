@@ -47,7 +47,7 @@
 	<true/>
 	<key>WKAppBoundDomains</key>
 	<array>
-		<string>www.radiozamaneh.com</string>
+		<string>localhost:3000</string>
 	</array>
 </dict>
 </plist>

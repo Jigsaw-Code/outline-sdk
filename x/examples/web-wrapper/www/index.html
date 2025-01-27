@@ -1,13 +1,84 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
   <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>My News Site</title>
+    <style>
+      body {
+        all: initial;
+      }
+
+      iframe {
+        width: 100vw;
+        height: 100svh;
+        height: 100vh;
+        border: none;
+      }
+
+      nav {
+        background: whitesmoke;
+        bottom: 0;
+        box-sizing: border-box;
+        left: 0;
+        padding: 1rem;
+        position: fixed;
+        transform: translateY(0);
+        transition: transform ease 240ms;
+        /* this delay on showing/hiding the controls softens the experience
+           and makes it feel less 'broken' */
+        transition-delay: 240ms;
+        width: 100vw;
+        will-change: transform;
+      }
+
+      nav.hidden {
+        transform: translateY(100%);
+      }
+
+      button {
+        all: initial;
+        cursor: pointer;
+      }
+    </style>
   </head>
   <body>
-    <h1>My News Site</h1>
-    <ol>
-      <li><a href="articles/article1.html">Article #1</a></li>
-      <li><a href="articles/article2.html">Article #2</a></li>
-    </ol>
+    <!-- 'onload' fires every time the puppet iframe navigates -->
+    <iframe
+      id="puppet"
+      src="fake-site.html"
+      onload="toggleControlVisibilityOnScroll()"
+    ></iframe>
+
+    <nav id="puppeteer-controls">
+      <button onclick="puppet.contentWindow.history.back();">←</button>
+    </nav>
+
+    <script>
+      const puppet = document.querySelector('#puppet');
+      const puppeteerControls = document.querySelector('#puppeteer-controls');
+
+      function toggleControlVisibilityOnScroll() {
+        let previousScrollDepth;
+        puppet.contentDocument.onscroll = (event) => {
+          const currentScrollDepth = puppet.contentWindow.pageYOffset;
+
+          if (!previousScrollDepth) {
+            previousScrollDepth = currentScrollDepth;
+          }
+
+          // When the user scrolls down, hide the controls.
+          if (currentScrollDepth > previousScrollDepth) {
+            puppeteerControls.classList.add('hidden');
+          
+          // When the user scroll up, show them.
+          } else {
+            puppeteerControls.classList.remove('hidden');
+          }
+
+          previousScrollDepth = currentScrollDepth;
+        };
+      }
+    </script>
   </body>
 </html>
