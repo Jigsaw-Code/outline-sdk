@@ -19,6 +19,6 @@
     "@capacitor/cli": "latest",
     "serve": "^14.2.4"
   },
-  "author": "",
+  "author": "Daniel LaCosse <daniellacosse@google.com>",
   "license": "ISC"
 }
