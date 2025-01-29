@@ -79,25 +79,6 @@ func newEndpoint[ConnType net.Conn](urlStr string, sd transport.StreamDialer, tl
 	}, nil
 }
 
-type endpoint[ConnType net.Conn] struct {
-	tlsConfig *tls.Config
-	headers   http.Header
-}
-
-func (e *endpoint[ConnType]) Connect(ctx context.Context) (ConnType, error) {
-	var zero ConnType
-	wsConn, _, err := wsDialer.DialContext(ctx, urlStr, e.headers)
-	if err != nil {
-		return zero, err
-	}
-	gConn := &gorillaConn{wsConn: wsConn}
-	wsConn.SetCloseHandler(func(code int, text string) error {
-		gConn.readErr = io.EOF
-		return nil
-	})
-	return wsToConn(gConn), nil
-}
-
 type gorillaConn struct {
 	wsConn        *websocket.Conn
 	writeErr      error
