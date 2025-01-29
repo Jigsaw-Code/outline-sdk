@@ -31,18 +31,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func newGorillaDialer(sd transport.StreamDialer, tlsConfig *tls.Config) *websocket.Dialer {
-	return &websocket.Dialer{
-		TLSClientConfig: tlsConfig,
-		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			if !strings.HasPrefix(network, "tcp") {
-				return nil, fmt.Errorf("websocket dialer does not support network type %v", network)
-			}
-			return sd.DialStream(ctx, addr)
-		},
-	}
-}
-
 func userAgentString() string {
 	return fmt.Sprintf("Outline (%s; %s; %s)", runtime.GOOS, runtime.GOARCH, runtime.Version())
 }
@@ -52,48 +40,62 @@ func userAgentString() string {
 // CloseRead will not close the Websocket connection, while CloseWrite sends a Websocket
 // close but continues reading until a close is received from the server.
 func NewStreamEndpoint(urlStr string, sd transport.StreamDialer, tlsConfig *tls.Config) (func(context.Context) (transport.StreamConn, error), error) {
-	_, err := url.Parse(urlStr)
-	if err != nil {
-		return nil, fmt.Errorf("url is invalid: %w", err)
-	}
-
-	wsDialer := newGorillaDialer(sd, tlsConfig)
-	headers := http.Header(map[string][]string{"User-Agent": {userAgentString()}})
-	return func(ctx context.Context) (transport.StreamConn, error) {
-		wsConn, _, err := wsDialer.DialContext(ctx, urlStr, headers)
-		if err != nil {
-			return nil, err
-		}
-		gConn := &gorillaConn{wsConn: wsConn}
-		wsConn.SetCloseHandler(func(code int, text string) error {
-			gConn.readErr = io.EOF
-			return nil
-		})
-		return gConn, nil
-	}, nil
+	return newEndpoint(urlStr, sd, tlsConfig, func(gc *gorillaConn) transport.StreamConn { return gc })
 }
 
 // NewPacketEndpoint creates a new Websocket Packet Endpoint. Each packet is exchanged as a Websocket message.
 func NewPacketEndpoint(urlStr string, sd transport.StreamDialer, tlsConfig *tls.Config) (func(context.Context) (net.Conn, error), error) {
+	return newEndpoint(urlStr, sd, tlsConfig, func(gc *gorillaConn) net.Conn { return gc })
+}
+
+func newEndpoint[ConnType net.Conn](urlStr string, sd transport.StreamDialer, tlsConfig *tls.Config, wsToConn func(*gorillaConn) ConnType) (func(context.Context) (ConnType, error), error) {
 	_, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, fmt.Errorf("url is invalid: %w", err)
 	}
 
-	wsDialer := newGorillaDialer(sd, tlsConfig)
+	wsDialer := &websocket.Dialer{
+		TLSClientConfig: tlsConfig,
+		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			if !strings.HasPrefix(network, "tcp") {
+				return nil, fmt.Errorf("websocket dialer does not support network type %v", network)
+			}
+			return sd.DialStream(ctx, addr)
+		},
+	}
 	headers := http.Header(map[string][]string{"User-Agent": {userAgentString()}})
-	return func(ctx context.Context) (net.Conn, error) {
+	return func(ctx context.Context) (ConnType, error) {
+		var zero ConnType
 		wsConn, _, err := wsDialer.DialContext(ctx, urlStr, headers)
 		if err != nil {
-			return nil, err
+			return zero, err
 		}
 		gConn := &gorillaConn{wsConn: wsConn}
 		wsConn.SetCloseHandler(func(code int, text string) error {
 			gConn.readErr = io.EOF
 			return nil
 		})
-		return gConn, nil
+		return wsToConn(gConn), nil
 	}, nil
+}
+
+type endpoint[ConnType net.Conn] struct {
+	tlsConfig *tls.Config
+	headers   http.Header
+}
+
+func (e *endpoint[ConnType]) Connect(ctx context.Context) (ConnType, error) {
+	var zero ConnType
+	wsConn, _, err := wsDialer.DialContext(ctx, urlStr, e.headers)
+	if err != nil {
+		return zero, err
+	}
+	gConn := &gorillaConn{wsConn: wsConn}
+	wsConn.SetCloseHandler(func(code int, text string) error {
+		gConn.readErr = io.EOF
+		return nil
+	})
+	return wsToConn(gConn), nil
 }
 
 type gorillaConn struct {
