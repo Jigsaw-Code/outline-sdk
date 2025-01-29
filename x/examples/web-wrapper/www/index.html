@@ -3,6 +3,11 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.esm.js"></script>
+    <script nomodule src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@ionic/core/css/ionic.bundle.css" rel="stylesheet">
+
     <title>My News Site</title>
     <style>
       body {
@@ -43,42 +48,24 @@
     </style>
   </head>
   <body>
-    <!-- 'onload' fires every time the puppet iframe navigates -->
-    <iframe
-      id="puppet"
-      src="fake-site.html"
-      onload="toggleControlVisibilityOnScroll()"
-    ></iframe>
+    <ion-app>
+      <ion-toolbar>
+        <ion-buttons slot="start">
+          <button onclick="mySite.contentWindow.history.back()">
 
-    <nav id="puppeteer-controls">
-      <button onclick="puppet.contentWindow.history.back();">←</button>
-    </nav>
-
+            <!-- ion-button doesn't properly expose click events? -->
+            <ion-button>
+              <ion-icon name="arrow-back-outline"></ion-icon>
+            </ion-button>
+          </button>
+        </ion-buttons>
+        <ion-title>Back Button</ion-title>
+      </ion-toolbar>
+  
+      <iframe id="my-site" src="my-site.html"></iframe>
+    </ion-app>
     <script>
-      const puppet = document.querySelector('#puppet');
-      const puppeteerControls = document.querySelector('#puppeteer-controls');
-
-      function toggleControlVisibilityOnScroll() {
-        let previousScrollDepth;
-        puppet.contentDocument.onscroll = (event) => {
-          const currentScrollDepth = puppet.contentWindow.pageYOffset;
-
-          if (!previousScrollDepth) {
-            previousScrollDepth = currentScrollDepth;
-          }
-
-          // When the user scrolls down, hide the controls.
-          if (currentScrollDepth > previousScrollDepth) {
-            puppeteerControls.classList.add('hidden');
-          
-          // When the user scroll up, show them.
-          } else {
-            puppeteerControls.classList.remove('hidden');
-          }
-
-          previousScrollDepth = currentScrollDepth;
-        };
-      }
+      const mySite = document.getElementById('my-site');
     </script>
   </body>
 </html>
