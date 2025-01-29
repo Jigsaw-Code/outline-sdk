@@ -43,6 +43,52 @@ func (c *natConn) Write(b []byte) (int, error) {
 	return c.Conn.Write(b)
 }
 
+func websocketToConn(ctx context.Context, targetConn io.Writer, clientConn *websocket.Conn) {
+	defer clientConn.CloseRead(ctx)
+	for {
+		msgType, msg, err := clientConn.Read(ctx)
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				slog.Warn("Failed to read from client", "error", err)
+				clientConn.Close(websocket.StatusInternalError, "failed to read from client")
+			}
+			break
+		}
+		if msgType != websocket.MessageBinary {
+			slog.Warn("received message is not binary", "type", msgType)
+			clientConn.Close(websocket.StatusInternalError, "received message is not binary")
+		}
+		if _, err := targetConn.Write(msg); err != nil {
+			slog.Warn("Failed to write to target", "error", err)
+			clientConn.Close(websocket.StatusInternalError, "failed to write message to target")
+			break
+		}
+	}
+}
+
+func connToWebsocket(ctx context.Context, clientConn *websocket.Conn, targetConn io.Reader) {
+	// About 2 MTUs
+	// TODO: use a buffer pool
+	buf := make([]byte, 3000)
+	// Read from target and relay to client.
+	for {
+		n, err := targetConn.Read(buf)
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				slog.Warn("failed to read from target", "error", err)
+				clientConn.Close(websocket.StatusInternalError, "failed to read message from target")
+			}
+			break
+		}
+		read := buf[:n]
+		if err := clientConn.Write(ctx, websocket.MessageBinary, read); err != nil {
+			slog.Warn("Failed to write to client", "error", err)
+			clientConn.Close(websocket.StatusInternalError, "failed to write message to client")
+			break
+		}
+	}
+}
+
 func main() {
 	listenFlag := flag.String("listen", "localhost:8080", "Local proxy address to listen on")
 	transportFlag := flag.String("transport", "", "Transport config")
@@ -89,48 +135,12 @@ func main() {
 			}
 			defer targetConn.Close()
 
+			// Relay traffic.
 			go func() {
-				defer clientConn.CloseRead(r.Context())
-				for {
-					msgType, msg, err := clientConn.Read(r.Context())
-					if err != nil {
-						if !errors.Is(err, io.EOF) {
-							slog.Warn("Failed to read from client", "error", err)
-							clientConn.Close(websocket.StatusInternalError, "failed to read from client")
-						}
-						break
-					}
-					if msgType != websocket.MessageBinary {
-						slog.Warn("received message is not binary", "type", msgType)
-						clientConn.Close(websocket.StatusInternalError, "received message is not binary")
-					}
-					if _, err := targetConn.Write(msg); err != nil {
-						slog.Warn("Failed to write to target", "error", err)
-						clientConn.Close(websocket.StatusInternalError, "failed to write message to target")
-						break
-					}
-				}
+				websocketToConn(r.Context(), targetConn, clientConn)
+				targetConn.CloseWrite()
 			}()
-
-			// About 2 MTUs
-			// TODO: use a buffer pool
-			buf := make([]byte, 3000)
-			for {
-				n, err := targetConn.Read(buf)
-				if err != nil {
-					if !errors.Is(err, io.EOF) {
-						slog.Warn("failed to read from target", "error", err)
-						clientConn.Close(websocket.StatusInternalError, "failed to read message from target")
-					}
-					break
-				}
-				read := buf[:n]
-				if err := clientConn.Write(r.Context(), websocket.MessageBinary, read); err != nil {
-					slog.Warn("Failed to write to client", "error", err)
-					clientConn.Close(websocket.StatusInternalError, "failed to write message to client")
-					break
-				}
-			}
+			connToWebsocket(r.Context(), clientConn, targetConn)
 		})
 		mux.Handle(*tcpPathFlag, http.StripPrefix(*tcpPathFlag, handler))
 	}
@@ -162,48 +172,9 @@ func main() {
 			targetConn = &natConn{targetConn, 5 * time.Minute}
 			defer targetConn.Close()
 
-			go func() {
-				defer clientConn.CloseRead(r.Context())
-				for {
-					msgType, msg, err := clientConn.Read(r.Context())
-					if err != nil {
-						if !errors.Is(err, io.EOF) {
-							slog.Warn("Failed to read from client", "error", err)
-							clientConn.Close(websocket.StatusInternalError, "failed to read from client")
-						}
-						break
-					}
-					if msgType != websocket.MessageBinary {
-						slog.Warn("received message is not binary", "type", msgType)
-						clientConn.Close(websocket.StatusInternalError, "received message is not binary")
-					}
-					if _, err := targetConn.Write(msg); err != nil {
-						slog.Warn("Failed to write to target", "error", err)
-						clientConn.Close(websocket.StatusInternalError, "failed to write message to target")
-						break
-					}
-				}
-			}()
-
-			// About 2 MTUs
-			// TODO: use a buffer pool
-			buf := make([]byte, 3000)
-			for {
-				n, err := targetConn.Read(buf)
-				if err != nil {
-					if !errors.Is(err, io.EOF) {
-						slog.Warn("failed to read from target", "error", err)
-						clientConn.Close(websocket.StatusInternalError, "failed to read message from target")
-					}
-					break
-				}
-				read := buf[:n]
-				if err := clientConn.Write(r.Context(), websocket.MessageBinary, read); err != nil {
-					slog.Warn("Failed to write to client", "error", err)
-					clientConn.Close(websocket.StatusInternalError, "failed to write message to client")
-					break
-				}
-			}
+			// Relay traffic
+			go websocketToConn(r.Context(), targetConn, clientConn)
+			connToWebsocket(r.Context(), clientConn, targetConn)
 		})
 		mux.Handle(*udpPathFlag, http.StripPrefix(*udpPathFlag, handler))
 	}
