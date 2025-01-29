@@ -16,9 +16,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"io"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -27,7 +29,7 @@ import (
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
-	"golang.org/x/net/websocket"
+	"github.com/coder/websocket"
 )
 
 type natConn struct {
@@ -58,7 +60,7 @@ func main() {
 		log.Fatalf("Could not listen on address %v: %v", *listenFlag, err)
 	}
 	defer listener.Close()
-	log.Printf("Proxy listening on %v\n", listener.Addr().String())
+	slog.Info("Proxy listening", "address", listener.Addr().String())
 
 	providers := configurl.NewDefaultProviders()
 	mux := http.NewServeMux()
@@ -69,23 +71,66 @@ func main() {
 		}
 		endpoint := transport.StreamDialerEndpoint{Dialer: dialer, Address: *backendFlag}
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("Got stream request: %v\n", r)
-			handler := func(wsConn *websocket.Conn) {
-				targetConn, err := endpoint.ConnectStream(r.Context())
-				if err != nil {
-					log.Printf("Failed to upgrade: %v\n", err)
-					w.WriteHeader(http.StatusBadGateway)
-					return
-				}
-				defer targetConn.Close()
-				go func() {
-					io.Copy(targetConn, wsConn)
-					targetConn.CloseWrite()
-				}()
-				io.Copy(wsConn, targetConn)
-				wsConn.Close()
+			slog.Info("Got stream request", "request", r)
+			clientConn, err := websocket.Accept(w, r, nil)
+			if err != nil {
+				slog.Warn("Failed to accept Websocket connection", "error", err)
+				http.Error(w, "Failed to accept Websocket connection", http.StatusBadGateway)
+				return
 			}
-			websocket.Server{Handler: handler}.ServeHTTP(w, r)
+			clientConn.SetReadLimit(-1)
+			defer clientConn.CloseNow()
+
+			targetConn, err := endpoint.ConnectStream(r.Context())
+			if err != nil {
+				slog.Warn("Failed to upgrade", "error", err)
+				w.WriteHeader(http.StatusBadGateway)
+				return
+			}
+			defer targetConn.Close()
+
+			go func() {
+				defer clientConn.CloseRead(r.Context())
+				for {
+					msgType, msg, err := clientConn.Read(r.Context())
+					if err != nil {
+						if !errors.Is(err, io.EOF) {
+							slog.Warn("Failed to read from client", "error", err)
+							clientConn.Close(websocket.StatusInternalError, "failed to read from client")
+						}
+						break
+					}
+					if msgType != websocket.MessageBinary {
+						slog.Warn("received message is not binary", "type", msgType)
+						clientConn.Close(websocket.StatusInternalError, "received message is not binary")
+					}
+					if _, err := targetConn.Write(msg); err != nil {
+						slog.Warn("Failed to write to target", "error", err)
+						clientConn.Close(websocket.StatusInternalError, "failed to write message to target")
+						break
+					}
+				}
+			}()
+
+			// About 2 MTUs
+			// TODO: use a buffer pool
+			buf := make([]byte, 3000)
+			for {
+				n, err := targetConn.Read(buf)
+				if err != nil {
+					if !errors.Is(err, io.EOF) {
+						slog.Warn("failed to read from target", "error", err)
+						clientConn.Close(websocket.StatusInternalError, "failed to read message from target")
+					}
+					break
+				}
+				read := buf[:n]
+				if err := clientConn.Write(r.Context(), websocket.MessageBinary, read); err != nil {
+					slog.Warn("Failed to write to client", "error", err)
+					clientConn.Close(websocket.StatusInternalError, "failed to write message to client")
+					break
+				}
+			}
 		})
 		mux.Handle(*tcpPathFlag, http.StripPrefix(*tcpPathFlag, handler))
 	}
@@ -96,25 +141,69 @@ func main() {
 		}
 		endpoint := transport.PacketDialerEndpoint{Dialer: dialer, Address: *backendFlag}
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("Got packet request: %v\n", r)
-			handler := func(wsConn *websocket.Conn) {
-				targetConn, err := endpoint.ConnectPacket(r.Context())
-				if err != nil {
-					log.Printf("Failed to upgrade: %v\n", err)
-					w.WriteHeader(http.StatusBadGateway)
-					return
-				}
-				// Expire connetion after 5 minutes of idle time, as per
-				// https://datatracker.ietf.org/doc/html/rfc4787#section-4.3
-				targetConn = &natConn{targetConn, 5 * time.Minute}
-				go func() {
-					io.Copy(targetConn, wsConn)
-					targetConn.Close()
-				}()
-				io.Copy(wsConn, targetConn)
-				wsConn.Close()
+			slog.Info("Got packet request", "request", r)
+			clientConn, err := websocket.Accept(w, r, nil)
+			if err != nil {
+				slog.Warn("Failed to accept Websocket connection", "error", err)
+				http.Error(w, "Failed to accept Websocket connection", http.StatusBadGateway)
+				return
 			}
-			websocket.Server{Handler: handler}.ServeHTTP(w, r)
+			clientConn.SetReadLimit(-1)
+			defer clientConn.CloseNow()
+
+			targetConn, err := endpoint.ConnectPacket(r.Context())
+			if err != nil {
+				slog.Warn("Failed to upgrade", "error", err)
+				w.WriteHeader(http.StatusBadGateway)
+				return
+			}
+			// Expire connetion after 5 minutes of idle time, as per
+			// https://datatracker.ietf.org/doc/html/rfc4787#section-4.3
+			targetConn = &natConn{targetConn, 5 * time.Minute}
+			defer targetConn.Close()
+
+			go func() {
+				defer clientConn.CloseRead(r.Context())
+				for {
+					msgType, msg, err := clientConn.Read(r.Context())
+					if err != nil {
+						if !errors.Is(err, io.EOF) {
+							slog.Warn("Failed to read from client", "error", err)
+							clientConn.Close(websocket.StatusInternalError, "failed to read from client")
+						}
+						break
+					}
+					if msgType != websocket.MessageBinary {
+						slog.Warn("received message is not binary", "type", msgType)
+						clientConn.Close(websocket.StatusInternalError, "received message is not binary")
+					}
+					if _, err := targetConn.Write(msg); err != nil {
+						slog.Warn("Failed to write to target", "error", err)
+						clientConn.Close(websocket.StatusInternalError, "failed to write message to target")
+						break
+					}
+				}
+			}()
+
+			// About 2 MTUs
+			// TODO: use a buffer pool
+			buf := make([]byte, 3000)
+			for {
+				n, err := targetConn.Read(buf)
+				if err != nil {
+					if !errors.Is(err, io.EOF) {
+						slog.Warn("failed to read from target", "error", err)
+						clientConn.Close(websocket.StatusInternalError, "failed to read message from target")
+					}
+					break
+				}
+				read := buf[:n]
+				if err := clientConn.Write(r.Context(), websocket.MessageBinary, read); err != nil {
+					slog.Warn("Failed to write to client", "error", err)
+					clientConn.Close(websocket.StatusInternalError, "failed to write message to client")
+					break
+				}
+			}
 		})
 		mux.Handle(*udpPathFlag, http.StripPrefix(*udpPathFlag, handler))
 	}
