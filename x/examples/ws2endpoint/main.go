@@ -150,9 +150,7 @@ func main() {
 				targetConn = &natConn{targetConn, 5 * time.Minute}
 				defer targetConn.Close()
 				// Relay from client to target.
-				go func() {
-					websocketToConn(targetConn, wsConn)
-				}()
+				go websocketToConn(targetConn, wsConn)
 				connToWebsocket(wsConn, targetConn)
 			}
 			websocket.Server{Handler: handler}.ServeHTTP(w, r)
