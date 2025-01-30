@@ -194,3 +194,16 @@ func (c *gorillaConn) CloseWrite() error {
 func (c *gorillaConn) Close() error {
 	return c.wsConn.Close()
 }
+
+// Upgrade upgrades an HTTP connection to a WebSocket connection. It returns a
+// [transport.StreamConn] representing the WebSocket connection, or an error if
+// the upgrade fails.
+func Upgrade(w http.ResponseWriter, r *http.Request, responseHeader http.Header) (transport.StreamConn, error) {
+	upgrader := websocket.Upgrader{}
+	wsConn, err := upgrader.Upgrade(w, r, responseHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	return &gorillaConn{wsConn: wsConn}, nil
+}
