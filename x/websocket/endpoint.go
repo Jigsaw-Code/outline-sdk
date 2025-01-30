@@ -106,12 +106,6 @@ func newEndpoint[ConnType net.Conn](urlStr string, sd transport.StreamDialer, ws
 	}, nil
 }
 
-// WrapConn wraps a [websocket.Conn] from the Gorilla library into a
-// [transport.StreamConn].
-func WrapConn(wsConn *websocket.Conn) transport.StreamConn {
-	return &gorillaConn{wsConn: wsConn}
-}
-
 type gorillaConn struct {
 	wsConn        *websocket.Conn
 	writeErr      error
