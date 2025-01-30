@@ -32,6 +32,10 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// defaultUpgrader is a pre-configured instance which provides reasonable default
+// values for various WebSocket upgrade parameters.
+var defaultUpgrader = websocket.Upgrader{}
+
 // NewStreamEndpoint creates a new Websocket Stream Endpoint. Streams are sent over
 // Websockets, with each Write becoming a separate message. Half-close is supported:
 // CloseRead will not close the Websocket connection, while CloseWrite sends a Websocket
@@ -193,4 +197,16 @@ func (c *gorillaConn) CloseWrite() error {
 
 func (c *gorillaConn) Close() error {
 	return c.wsConn.Close()
+}
+
+// Upgrade upgrades an HTTP connection to a WebSocket connection. It returns a
+// [transport.StreamConn] representing the WebSocket connection, or an error if
+// the upgrade fails.
+func Upgrade(w http.ResponseWriter, r *http.Request, responseHeader http.Header) (transport.StreamConn, error) {
+	wsConn, err := defaultUpgrader.Upgrade(w, r, responseHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	return &gorillaConn{wsConn: wsConn}, nil
 }
