@@ -97,13 +97,17 @@ func newEndpoint[ConnType net.Conn](urlStr string, sd transport.StreamDialer, ws
 		if err != nil {
 			return zero, err
 		}
-		gConn := &gorillaConn{wsConn: wsConn}
-		wsConn.SetCloseHandler(func(code int, text string) error {
-			gConn.readErr = io.EOF
-			return nil
-		})
-		return wsToConn(gConn), nil
+		return wsToConn(newGorillaConn(wsConn)), nil
 	}, nil
+}
+
+func newGorillaConn(wsConn *websocket.Conn) *gorillaConn {
+	gConn := &gorillaConn{wsConn: wsConn}
+	wsConn.SetCloseHandler(func(code int, text string) error {
+		gConn.readErr = io.EOF
+		return nil
+	})
+	return gConn
 }
 
 type gorillaConn struct {
@@ -196,6 +200,8 @@ func (c *gorillaConn) CloseWrite() error {
 }
 
 func (c *gorillaConn) Close() error {
+	c.CloseRead()
+	c.CloseWrite()
 	return c.wsConn.Close()
 }
 
@@ -208,6 +214,5 @@ func Upgrade(w http.ResponseWriter, r *http.Request, responseHeader http.Header)
 	if err != nil {
 		return nil, err
 	}
-
-	return &gorillaConn{wsConn: wsConn}, nil
+	return newGorillaConn(wsConn), nil
 }

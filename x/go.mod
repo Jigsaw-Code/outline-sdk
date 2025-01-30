@@ -7,7 +7,6 @@ require (
 	// Use github.com/Psiphon-Labs/psiphon-tunnel-core@staging-client as per
 	// https://github.com/Psiphon-Labs/psiphon-tunnel-core/?tab=readme-ov-file#using-psiphon-with-go-modules
 	github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20240619172145-03cade11f647
-	github.com/coder/websocket v1.8.12
 	github.com/gorilla/websocket v1.5.3
 	github.com/lmittmann/tint v1.0.5
 	github.com/quic-go/quic-go v0.48.1
