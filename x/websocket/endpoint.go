@@ -161,6 +161,9 @@ func (c *gorillaConn) Read(buf []byte) (int, error) {
 		return 0, c.readErr
 	}
 	if err != nil {
+		if _, ok := err.(*websocket.CloseError); ok {
+			return 0, io.EOF
+		}
 		return 0, err
 	}
 	if msgType != websocket.BinaryMessage {
