@@ -23,8 +23,6 @@ import (
 	"testing"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	// TODO(fortuna): Implement the test with gorilla instead.
-	"github.com/coder/websocket"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,61 +34,28 @@ func Test_NewStreamEndpoint(t *testing.T) {
 		// TODO(fortuna): support h2 and h3 on the server.
 		require.Equal(t, "", r.TLS.NegotiatedProtocol)
 		require.Equal(t, "HTTP/1.1", r.Proto)
-
 		t.Log("Got stream request", "request", r)
 		defer t.Log("Request done")
-		clientConn, err := websocket.Accept(w, r, nil)
+
+		clientConn, err := Upgrade(w, r, http.Header{})
 		if err != nil {
 			t.Log("Failed to accept Websocket connection", "error", err)
 			http.Error(w, "Failed to accept Websocket connection", http.StatusBadGateway)
 			return
 		}
-		clientConn.SetReadLimit(-1)
-		defer clientConn.CloseNow()
+		defer clientConn.Close()
 
 		// Handle client -> target.
 		readClientDone := make(chan struct{})
 		go func() {
 			defer close(readClientDone)
-			defer clientConn.CloseRead(r.Context())
-			for {
-				msgType, msg, err := clientConn.Read(r.Context())
-				if err != nil {
-					if !errors.Is(err, io.EOF) {
-						t.Log("Failed to read from client", "error", err)
-						clientConn.Close(websocket.StatusInternalError, "failed to read from client")
-					}
-					break
-				}
-				require.Equal(t, websocket.MessageBinary, msgType)
-				if _, err := toTargetWriter.Write(msg); err != nil {
-					t.Log("Failed to write to target", "error", err)
-					clientConn.Close(websocket.StatusInternalError, "failed to write message to target")
-					break
-				}
-			}
+			defer toTargetWriter.Close()
+			_, err := io.Copy(toTargetWriter, clientConn)
+			require.NoError(t, err)
 		}()
 		// Handle target -> client
-		func() {
-			// About 2 MTUs
-			buf := make([]byte, 3000)
-			for {
-				n, err := fromTargetReader.Read(buf)
-				if err != nil {
-					if !errors.Is(err, io.EOF) {
-						t.Log("Failed to read from target", "error", err)
-						clientConn.Close(websocket.StatusInternalError, "failed to read message from target")
-					}
-					break
-				}
-				read := buf[:n]
-				if err := clientConn.Write(r.Context(), websocket.MessageBinary, read); err != nil {
-					t.Log("Failed to write to client", "error", err)
-					clientConn.Close(websocket.StatusInternalError, "failed to write message to client")
-					break
-				}
-			}
-		}()
+		_, err = io.Copy(clientConn, fromTargetReader)
+		require.NoError(t, err)
 		<-readClientDone
 	})
 	mux.Handle("/tcp", http.StripPrefix("/tcp", handler))
@@ -157,19 +122,18 @@ func Test_NewPacketEndpoint(t *testing.T) {
 		// TODO(fortuna): support h2 and h3 on the server.
 		require.Equal(t, "", r.TLS.NegotiatedProtocol)
 		require.Equal(t, "HTTP/1.1", r.Proto)
-		clientConn, err := websocket.Accept(w, r, nil)
+		clientConn, err := Upgrade(w, r, http.Header{})
 		require.NoError(t, err)
-		defer clientConn.CloseNow()
+		defer clientConn.Close()
 
-		msgType, msg, err := clientConn.Read(r.Context())
+		buf := make([]byte, 8)
+		n, err := clientConn.Read(buf)
 		require.NoError(t, err)
-		require.Equal(t, websocket.MessageBinary, msgType)
-		require.Equal(t, []byte("Request"), msg)
+		require.Equal(t, []byte("Request"), buf[:n])
 
-		err = clientConn.Write(r.Context(), websocket.MessageBinary, []byte("Response"))
+		n, err = clientConn.Write([]byte("Response"))
 		require.NoError(t, err)
-
-		clientConn.Close(websocket.StatusNormalClosure, "")
+		require.Equal(t, 8, n)
 	})
 	mux.Handle("/udp", http.StripPrefix("/udp", handler))
 	ts := httptest.NewUnstartedServer(mux)
@@ -190,7 +154,8 @@ func Test_NewPacketEndpoint(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 7, n)
 
-	resp, err := io.ReadAll(conn)
+	buf := make([]byte, 9)
+	n, err = conn.Read(buf)
 	require.NoError(t, err)
-	require.Equal(t, []byte("Response"), resp)
+	require.Equal(t, []byte("Response"), buf[:n])
 }
