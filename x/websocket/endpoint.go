@@ -36,13 +36,13 @@ import (
 // Websockets, with each Write becoming a separate message. Half-close is supported:
 // CloseRead will not close the Websocket connection, while CloseWrite sends a Websocket
 // close but continues reading until a close is received from the server.
-func NewStreamEndpoint(urlStr string, sd transport.StreamDialer, opts ...Option) (func(context.Context) (transport.StreamConn, error), error) {
-	return newEndpoint(urlStr, sd, func(gc *gorillaConn) transport.StreamConn { return gc }, opts...)
+func NewStreamEndpoint(urlStr string, se transport.StreamEndpoint, opts ...Option) (func(context.Context) (transport.StreamConn, error), error) {
+	return newEndpoint(urlStr, se, func(gc *gorillaConn) transport.StreamConn { return gc }, opts...)
 }
 
 // NewPacketEndpoint creates a new Websocket Packet Endpoint. Each packet is exchanged as a Websocket message.
-func NewPacketEndpoint(urlStr string, sd transport.StreamDialer, opts ...Option) (func(context.Context) (net.Conn, error), error) {
-	return newEndpoint(urlStr, sd, func(gc *gorillaConn) net.Conn { return gc }, opts...)
+func NewPacketEndpoint(urlStr string, se transport.StreamEndpoint, opts ...Option) (func(context.Context) (net.Conn, error), error) {
+	return newEndpoint(urlStr, se, func(gc *gorillaConn) net.Conn { return gc }, opts...)
 }
 
 type options struct {
@@ -68,7 +68,7 @@ func WithHTTPHeaders(headers http.Header) Option {
 	}
 }
 
-func newEndpoint[ConnType net.Conn](urlStr string, sd transport.StreamDialer, wsToConn func(*gorillaConn) ConnType, opts ...Option) (func(context.Context) (ConnType, error), error) {
+func newEndpoint[ConnType net.Conn](urlStr string, se transport.StreamEndpoint, wsToConn func(*gorillaConn) ConnType, opts ...Option) (func(context.Context) (ConnType, error), error) {
 	_, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, fmt.Errorf("url is invalid: %w", err)
@@ -84,11 +84,11 @@ func newEndpoint[ConnType net.Conn](urlStr string, sd transport.StreamDialer, ws
 
 	wsDialer := &websocket.Dialer{
 		TLSClientConfig: resolvedOpts.tlsConfig,
-		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+		NetDialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
 			if !strings.HasPrefix(network, "tcp") {
 				return nil, fmt.Errorf("websocket dialer does not support network type %v", network)
 			}
-			return sd.DialStream(ctx, addr)
+			return se.ConnectStream(ctx)
 		},
 	}
 	return func(ctx context.Context) (ConnType, error) {

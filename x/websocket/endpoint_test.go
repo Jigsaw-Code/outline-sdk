@@ -91,7 +91,8 @@ func Test_NewStreamEndpoint(t *testing.T) {
 	// 	},
 	// }
 	client := ts.Client()
-	connect, err := NewStreamEndpoint("wss"+ts.URL[5:]+"/tcp", &transport.TCPDialer{}, WithTLSConfig(client.Transport.(*http.Transport).TLSClientConfig))
+	endpoint := &transport.TCPEndpoint{Address: ts.Listener.Addr().String()}
+	connect, err := NewStreamEndpoint("wss"+ts.URL[5:]+"/tcp", endpoint, WithTLSConfig(client.Transport.(*http.Transport).TLSClientConfig))
 	require.NoError(t, err)
 	require.NotNil(t, connect)
 
@@ -142,7 +143,8 @@ func Test_NewPacketEndpoint(t *testing.T) {
 	defer ts.Close()
 
 	client := ts.Client()
-	connect, err := NewPacketEndpoint("wss"+ts.URL[5:]+"/udp", &transport.TCPDialer{}, WithTLSConfig(client.Transport.(*http.Transport).TLSClientConfig))
+	endpoint := &transport.TCPEndpoint{Address: ts.Listener.Addr().String()}
+	connect, err := NewPacketEndpoint("wss"+ts.URL[5:]+"/udp", endpoint, WithTLSConfig(client.Transport.(*http.Transport).TLSClientConfig))
 	require.NoError(t, err)
 	require.NotNil(t, connect)
 
