@@ -72,7 +72,7 @@ func registerWebsocketStreamDialer(r TypeRegistry[transport.StreamDialer], typeI
 		}
 		return transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
 			wsURL := url.URL{Scheme: "ws", Host: addr, Path: wsConfig.tcpPath}
-			connect, err := websocket.NewStreamEndpoint(wsURL.String(), sd)
+			connect, err := websocket.NewStreamEndpoint(wsURL.String(), &transport.StreamDialerEndpoint{Address: addr, Dialer: sd})
 			if err != nil {
 				return nil, fmt.Errorf("failed to create websocket stream endpoint: %w", err)
 			}
@@ -96,7 +96,7 @@ func registerWebsocketPacketDialer(r TypeRegistry[transport.PacketDialer], typeI
 		}
 		return transport.FuncPacketDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 			wsURL := url.URL{Scheme: "ws", Host: addr, Path: wsConfig.udpPath}
-			connect, err := websocket.NewPacketEndpoint(wsURL.String(), sd)
+			connect, err := websocket.NewPacketEndpoint(wsURL.String(), &transport.StreamDialerEndpoint{Address: addr, Dialer: sd})
 			if err != nil {
 				return nil, fmt.Errorf("failed to create websocket stream endpoint: %w", err)
 			}
