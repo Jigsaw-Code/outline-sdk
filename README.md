@@ -46,7 +46,7 @@ The Outline SDK offers two types of strategies for evading DNS-based blocking: r
 - The [dns](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/dns) package can replace the resolution based on the system resolver with more resillient options:
   - Encrypted DNS over HTTPS (DoH) or TLS (DoT)
   - Alternative hosts and ports for UDP and TCP resolvers, making it possible to use resolvers that are not blocked.
-- The `override` config from [x/config](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config) with a `host` option can be used to force a specific address,
+- The `override` config from [x/configurl](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl) with a `host` option can be used to force a specific address,
   or you can implement your own Dialer that can map addresses.
 
 ### Bypass SNI-based Blocking
@@ -144,7 +144,7 @@ You can find detailed steps at the tutorial [Go for beginners: Getting started](
 The Outline SDK has several command-line utilities that illustrate the usage of the SDK, but are also valuable for debugging and trying the different strategies without having to build an app.
 
 They all take a `-transport` flag with a config that specifies what transport should be used to establish connections.
-The config format can be found in [x/config](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config).
+The config format can be found in [x/configurl](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl).
 
 
 ### Resolve a Domain Name

@@ -191,7 +191,7 @@ func main() {
 			container.NewVBox(
 				widget.NewLabelWithStyle("Local address", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 				addressEntry,
-				widget.NewRichTextFromMarkdown("**Transport config** ([format](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config#hdr-Config_Format))"),
+				widget.NewRichTextFromMarkdown("**Transport config** ([format](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format))"),
 				configEntry,
 				container.NewHBox(layout.NewSpacer(), startStopButton),
 				widget.NewLabelWithStyle("Status", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
