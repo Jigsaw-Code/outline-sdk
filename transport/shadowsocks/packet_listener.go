@@ -33,33 +33,45 @@ const clientUDPBufferSize = 16 * 1024
 var udpPool = slicepool.MakePool(clientUDPBufferSize)
 
 type packetListener struct {
-	endpoint transport.PacketEndpoint
-	key      *EncryptionKey
+	endpoint      transport.PacketEndpoint
+	key           *EncryptionKey
+	saltGenerator SaltGenerator
 }
 
 var _ transport.PacketListener = (*packetListener)(nil)
 
-func NewPacketListener(endpoint transport.PacketEndpoint, key *EncryptionKey) (transport.PacketListener, error) {
+type PacketListener = *packetListener
+
+// NewPacketListener creates a new Shadowsocks PacketListener that connects to the proxy on the given endpoint
+// and uses the given key for encryption.
+func NewPacketListener(endpoint transport.PacketEndpoint, key *EncryptionKey) (PacketListener, error) {
 	if endpoint == nil {
 		return nil, errors.New("argument endpoint must not be nil")
 	}
 	if key == nil {
 		return nil, errors.New("argument key must not be nil")
 	}
-	return &packetListener{endpoint: endpoint, key: key}, nil
+	return &packetListener{endpoint: endpoint, key: key, saltGenerator: RandomSaltGenerator}, nil
 }
 
-func (c *packetListener) ListenPacket(ctx context.Context) (net.PacketConn, error) {
-	proxyConn, err := c.endpoint.ConnectPacket(ctx)
+// SetSaltGenerator sets the SaltGenerator to use for encryption. If not set, it used the [RandomSaltGenerator] by default.
+func (pl *packetListener) SetSaltGenerator(sg SaltGenerator) {
+	pl.saltGenerator = sg
+}
+
+// ListenPacket creates a net.PackeConn to send packets from the remote endpoint.
+func (pl *packetListener) ListenPacket(ctx context.Context) (net.PacketConn, error) {
+	proxyConn, err := pl.endpoint.ConnectPacket(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to endpoint: %w", err)
 	}
-	return NewPacketConn(proxyConn, c.key), nil
+	return &packetConn{Conn: proxyConn, key: pl.key, saltGenerator: pl.saltGenerator}, nil
 }
 
 type packetConn struct {
 	net.Conn
-	key *EncryptionKey
+	key           *EncryptionKey
+	saltGenerator SaltGenerator
 }
 
 var _ net.PacketConn = (*packetConn)(nil)
@@ -70,7 +82,7 @@ var _ net.PacketConn = (*packetConn)(nil)
 //
 // Closing the returned [net.PacketConn] will also close the underlying [net.Conn].
 func NewPacketConn(conn net.Conn, key *EncryptionKey) net.PacketConn {
-	return &packetConn{Conn: conn, key: key}
+	return &packetConn{Conn: conn, key: key, saltGenerator: RandomSaltGenerator}
 }
 
 // WriteTo encrypts `b` and writes to `addr` through the proxy.
@@ -87,7 +99,7 @@ func (c *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
 	// partially overlapping the plaintext and cipher slices since `Pack` skips the salt when calling
 	// `AEAD.Seal` (see https://golang.org/pkg/crypto/cipher/#AEAD).
 	plaintextBuf := append(append(cipherBuf[saltSize:saltSize], socksTargetAddr...), b...)
-	buf, err := Pack(cipherBuf, plaintextBuf, c.key)
+	buf, err := PackSalt(cipherBuf, plaintextBuf, c.key, c.saltGenerator)
 	if err != nil {
 		return 0, err
 	}
