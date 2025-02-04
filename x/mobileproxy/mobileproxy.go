@@ -155,7 +155,7 @@ type StreamDialer struct {
 var configModule = configurl.NewDefaultProviders()
 
 // NewStreamDialerFromConfig creates a [StreamDialer] based on the given config.
-// The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config#hdr-Config_Format.
+// The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format.
 func NewStreamDialerFromConfig(transportConfig string) (*StreamDialer, error) {
 	dialer, err := configModule.NewStreamDialer(context.Background(), transportConfig)
 	if err != nil {

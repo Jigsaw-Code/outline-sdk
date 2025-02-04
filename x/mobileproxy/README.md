@@ -118,7 +118,7 @@ The function takes a timeoutSeconds number instead of a [time.Duration] so it's 
 - (nonnull instancetype)initWithRef:(_Nonnull id)ref;
 /**
  * NewStreamDialerFromConfig creates a [StreamDialer] based on the given config.
-The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config#hdr-Config_Format.
+The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format.
  */
 - (nullable instancetype)initFromConfig:(NSString* _Nullable)transportConfig;
 // skipped field StreamDialer.StreamDialer with unsupported type: github.com/Jigsaw-Code/outline-sdk/transport.StreamDialer
@@ -164,7 +164,7 @@ FOUNDATION_EXPORT id<MobileproxyLogWriter> _Nullable MobileproxyNewStderrLogWrit
 
 /**
  * NewStreamDialerFromConfig creates a [StreamDialer] based on the given config.
-The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config#hdr-Config_Format.
+The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format.
  */
 FOUNDATION_EXPORT MobileproxyStreamDialer* _Nullable MobileproxyNewStreamDialerFromConfig(NSString* _Nullable transportConfig, NSError* _Nullable* _Nullable error);
 
@@ -246,7 +246,7 @@ public final class StreamDialer implements Seq.Proxy {
 	
 	/**
 	 * NewStreamDialerFromConfig creates a [StreamDialer] based on the given config.
-	The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config#hdr-Config_Format.
+	The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format.
 	 */
 	public StreamDialer(String transportConfig) {
 		this.refnum = __NewStreamDialerFromConfig(transportConfig);
@@ -341,7 +341,7 @@ public abstract class Mobileproxy {
 	public static native LogWriter newStderrLogWriter();
 	/**
 	 * NewStreamDialerFromConfig creates a [StreamDialer] based on the given config.
-	The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config#hdr-Config_Format.
+	The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format.
 	 */
 	public static native StreamDialer newStreamDialerFromConfig(String transportConfig) throws Exception;
 	/**
