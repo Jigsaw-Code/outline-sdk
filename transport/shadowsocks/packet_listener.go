@@ -99,7 +99,7 @@ func (c *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
 	// partially overlapping the plaintext and cipher slices since `Pack` skips the salt when calling
 	// `AEAD.Seal` (see https://golang.org/pkg/crypto/cipher/#AEAD).
 	plaintextBuf := append(append(cipherBuf[saltSize:saltSize], socksTargetAddr...), b...)
-	buf, err := Pack(cipherBuf, plaintextBuf, c.key)
+	buf, err := PackSalt(cipherBuf, plaintextBuf, c.key, c.saltGenerator)
 	if err != nil {
 		return 0, err
 	}
