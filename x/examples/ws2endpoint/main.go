@@ -19,6 +19,7 @@ import (
 	"flag"
 	"io"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -27,7 +28,9 @@ import (
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
-	"golang.org/x/net/websocket"
+	"github.com/Jigsaw-Code/outline-sdk/x/websocket"
+	"github.com/lmittmann/tint"
+	"golang.org/x/term"
 )
 
 type natConn struct {
@@ -42,6 +45,10 @@ func (c *natConn) Write(b []byte) (int, error) {
 }
 
 func main() {
+	var logLevel slog.LevelVar
+	slog.SetDefault(slog.New(tint.NewHandler(
+		os.Stderr,
+		&tint.Options{NoColor: !term.IsTerminal(int(os.Stderr.Fd())), Level: &logLevel})))
 	listenFlag := flag.String("listen", "localhost:8080", "Local proxy address to listen on")
 	transportFlag := flag.String("transport", "", "Transport config")
 	backendFlag := flag.String("backend", "", "Address of the endpoint to forward traffic to")
@@ -58,7 +65,7 @@ func main() {
 		log.Fatalf("Could not listen on address %v: %v", *listenFlag, err)
 	}
 	defer listener.Close()
-	log.Printf("Proxy listening on %v\n", listener.Addr().String())
+	slog.Info("Proxy listening", "address", listener.Addr().String())
 
 	providers := configurl.NewDefaultProviders()
 	mux := http.NewServeMux()
@@ -69,23 +76,35 @@ func main() {
 		}
 		endpoint := transport.StreamDialerEndpoint{Dialer: dialer, Address: *backendFlag}
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("Got stream request: %v\n", r)
-			handler := func(wsConn *websocket.Conn) {
-				targetConn, err := endpoint.ConnectStream(r.Context())
-				if err != nil {
-					log.Printf("Failed to upgrade: %v\n", err)
-					w.WriteHeader(http.StatusBadGateway)
-					return
-				}
-				defer targetConn.Close()
-				go func() {
-					io.Copy(targetConn, wsConn)
-					targetConn.CloseWrite()
-				}()
-				io.Copy(wsConn, targetConn)
-				wsConn.Close()
+			slog.Info("Got stream request", "request", r)
+			clientConn, err := websocket.Upgrade(w, r, http.Header{})
+			if err != nil {
+				slog.Error("failed to accept Websocket connection", "error", err)
+				http.Error(w, "Failed to accept Websocket connection", http.StatusBadGateway)
+				return
 			}
-			websocket.Server{Handler: handler}.ServeHTTP(w, r)
+			defer clientConn.Close()
+
+			targetConn, err := endpoint.ConnectStream(r.Context())
+			if err != nil {
+				slog.Error("Failed to connect to the origin", "error", err)
+				w.WriteHeader(http.StatusBadGateway)
+				return
+			}
+			defer targetConn.Close()
+
+			go func() {
+				defer targetConn.CloseWrite()
+				_, err := io.Copy(targetConn, clientConn)
+				if err != nil {
+					slog.Error("Failed to relay client traffic to target", "error", err)
+				}
+			}()
+			_, err = io.Copy(clientConn, targetConn)
+			if err != nil {
+				slog.Error("Failed to relay target traffic to client", "error", err)
+			}
+			clientConn.CloseWrite()
 		})
 		mux.Handle(*tcpPathFlag, http.StripPrefix(*tcpPathFlag, handler))
 	}
@@ -96,25 +115,41 @@ func main() {
 		}
 		endpoint := transport.PacketDialerEndpoint{Dialer: dialer, Address: *backendFlag}
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("Got packet request: %v\n", r)
-			handler := func(wsConn *websocket.Conn) {
-				targetConn, err := endpoint.ConnectPacket(r.Context())
-				if err != nil {
-					log.Printf("Failed to upgrade: %v\n", err)
-					w.WriteHeader(http.StatusBadGateway)
-					return
-				}
-				// Expire connetion after 5 minutes of idle time, as per
-				// https://datatracker.ietf.org/doc/html/rfc4787#section-4.3
-				targetConn = &natConn{targetConn, 5 * time.Minute}
-				go func() {
-					io.Copy(targetConn, wsConn)
-					targetConn.Close()
-				}()
-				io.Copy(wsConn, targetConn)
-				wsConn.Close()
+			slog.Info("Got packet request", "request", r)
+			clientConn, err := websocket.Upgrade(w, r, http.Header{})
+			if err != nil {
+				slog.Error("failed to accept Websocket connection", "error", err)
+				http.Error(w, "Failed to accept Websocket connection", http.StatusBadGateway)
+				return
 			}
-			websocket.Server{Handler: handler}.ServeHTTP(w, r)
+			defer clientConn.Close()
+
+			targetConn, err := endpoint.ConnectPacket(r.Context())
+			if err != nil {
+				slog.Error("Failed to connect to the origin", "error", err)
+				w.WriteHeader(http.StatusBadGateway)
+				return
+			}
+			// Expire connection after 5 minutes of idle time, as per
+			// https://datatracker.ietf.org/doc/html/rfc4787#section-4.3
+			targetConn = &natConn{targetConn, 5 * time.Minute}
+			defer targetConn.Close()
+
+			done := false
+			go func() {
+				defer targetConn.Close()
+				_, err := io.Copy(targetConn, clientConn)
+				if err != nil && !done {
+					slog.Error("Failed to relay client traffic to target", "error", err)
+				}
+				done = true
+			}()
+			_, err = io.Copy(clientConn, targetConn)
+			if err != nil && !done {
+				slog.Error("Failed to relay target traffic to client", "error", err)
+			}
+			done = true
+			clientConn.Close()
 		})
 		mux.Handle(*udpPathFlag, http.StripPrefix(*udpPathFlag, handler))
 	}

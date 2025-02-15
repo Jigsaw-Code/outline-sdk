@@ -15,6 +15,7 @@
 package shadowsocks
 
 import (
+	"io"
 	"testing"
 	"time"
 
@@ -42,4 +43,33 @@ func BenchmarkPack(b *testing.B) {
 
 	megabits := float64(8*len(plaintextBuf)*b.N) * 1e-6
 	b.ReportMetric(megabits/(elapsed.Seconds()), "mbps")
+}
+
+type fixedSaltGenerator struct {
+	Salt []byte
+}
+
+func (sg *fixedSaltGenerator) GetSalt(salt []byte) error {
+	n := copy(salt, sg.Salt)
+	if n < len(salt) {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+
+func TestPack(t *testing.T) {
+	key := makeTestKey(t)
+	payload := makeTestPayload(100)
+	encrypted := make([]byte, len(payload)+key.SaltSize()+key.cipher.tagSize)
+	salt := makeTestPayload(key.SaltSize())
+	sg := &fixedSaltGenerator{salt}
+	encrypted, err := PackSalt(encrypted, payload, key, sg)
+	require.NoError(t, err)
+	// Ensure the selected salt is used.
+	require.Equal(t, salt, encrypted[:len(salt)])
+
+	// Ensure it decrypts correctly.
+	decrypted, err := Unpack(nil, encrypted, key)
+	require.NoError(t, err)
+	require.Equal(t, payload, decrypted)
 }

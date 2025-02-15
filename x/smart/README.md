@@ -88,7 +88,7 @@ The config that the Smart Dialer takes is in a JSON format. Here is an example:
 
 *   The `tls` field specifies a list of TLS transports to test.
 *   Each TLS transport is a string that specifies the transport to use.
-*   For example, `override:host=cloudflare.net|tlsfrag:1` specifies a transport that uses domain fronting with Cloudflare and TLS fragmentation. See the [config documentation](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/config#hdr-Config_Format) for details.
+*   For example, `override:host=cloudflare.net|tlsfrag:1` specifies a transport that uses domain fronting with Cloudflare and TLS fragmentation. See the [config documentation](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format) for details.
 
 ### Using the Smart Dialer
 

@@ -25,17 +25,18 @@ var ErrShortPacket = errors.New("short packet")
 // Assumes all ciphers have NonceSize() <= 12.
 var zeroNonce [12]byte
 
-// Pack encrypts a Shadowsocks-UDP packet and returns a slice containing the encrypted packet.
+// PackSalt encrypts a Shadowsocks-UDP packet and returns a slice containing the encrypted packet.
 // dst must be big enough to hold the encrypted packet.
 // If plaintext and dst overlap but are not aligned for in-place encryption, this
 // function will panic.
-func Pack(dst, plaintext []byte, key *EncryptionKey) ([]byte, error) {
+// It uses the given [SaltGenerator] to generate the salt.
+func PackSalt(dst, plaintext []byte, key *EncryptionKey, sg SaltGenerator) ([]byte, error) {
 	saltSize := key.SaltSize()
 	if len(dst) < saltSize {
 		return nil, io.ErrShortBuffer
 	}
 	salt := dst[:saltSize]
-	if err := RandomSaltGenerator.GetSalt(salt); err != nil {
+	if err := sg.GetSalt(salt); err != nil {
 		return nil, err
 	}
 
@@ -48,6 +49,11 @@ func Pack(dst, plaintext []byte, key *EncryptionKey) ([]byte, error) {
 		return nil, io.ErrShortBuffer
 	}
 	return aead.Seal(salt, zeroNonce[:aead.NonceSize()], plaintext, nil), nil
+}
+
+// Pack calls PackSalt with the [RandomSaltGenerator].
+func Pack(dst, plaintext []byte, key *EncryptionKey) ([]byte, error) {
+	return PackSalt(dst, plaintext, key, RandomSaltGenerator)
 }
 
 // Unpack decrypts a Shadowsocks-UDP packet in the format [salt][cipherText][AEAD tag] and returns a slice containing
