@@ -55,13 +55,15 @@ func (h *udpHandler) ReceiveTo(tunConn lwip.UDPConn, data []byte, destAddr *net.
 
 	h.mu.Lock()
 	reqSender, ok := h.senders[laddr]
+	h.mu.Unlock()
 	if !ok {
 		if reqSender, err = h.newSession(tunConn); err != nil {
 			return
 		}
+		h.mu.Lock()
 		h.senders[laddr] = reqSender
+		h.mu.Unlock()
 	}
-	h.mu.Unlock()
 
 	_, err = reqSender.WriteTo(data, destAddr.AddrPort())
 	return
