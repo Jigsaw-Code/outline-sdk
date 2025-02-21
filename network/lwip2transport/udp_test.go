@@ -18,13 +18,14 @@ import (
 	"errors"
 	"net"
 	"net/netip"
+	"sync"
 	"testing"
 
 	"github.com/Jigsaw-Code/outline-sdk/network"
 	"github.com/stretchr/testify/require"
 )
 
-// Make sure we can successfully Close the request sender and response receiver wihout deadlock
+// Make sure PacketResponseReceiver Closes the corresponding PacketRequestSender.
 func TestUDPResponseWriterCloseNoDeadlock(t *testing.T) {
 	proxy := &noopSingleSessionPacketProxy{}
 	h := newUDPHandler(proxy)
@@ -35,15 +36,43 @@ func TestUDPResponseWriterCloseNoDeadlock(t *testing.T) {
 	err := h.ReceiveTo(&noopLwIPUDPConn{localAddr}, []byte{}, destAddr)
 	require.NoError(t, err)
 
-	// Close this single session (i.e. the request sender), it will close proxy.respWriter
-	// udpHandler must make sure only one `Close()` is called, and there should be no deadlocks
-	err = proxy.respWriter.Close()
-	require.NoError(t, err)
-	require.Exactly(t, 1, proxy.closeCnt)
+	// Close proxy.respWriter, it should indirectly Close the proxy only once.
+	const ConcurrentCloseCount = 50
+	errs := make([]error, ConcurrentCloseCount)
+	wg := sync.WaitGroup{}
+	wg.Add(ConcurrentCloseCount)
+	for i := 0; i < ConcurrentCloseCount; i++ {
+		go func(k int) {
+			defer wg.Done()
+			errs[k] = proxy.respWriter.Close()
+		}(i)
+	}
+	wg.Wait()
+
+	nNilErr := 0
+	for _, e := range errs {
+		if e == nil {
+			nNilErr++
+		} else {
+			require.ErrorIs(t, e, network.ErrClosed)
+		}
+	}
+	require.Equal(t, nNilErr, 1)
+	require.Equal(t, 1, proxy.closeCnt)
+}
+
+// Make sure ReceiveTo can handle errors without deadlock.
+func TestReceiveToNoDeadlockWhenError(t *testing.T) {
+	h := newUDPHandler(errPacketProxy{})
+	localAddr := net.UDPAddrFromAddrPort(netip.MustParseAddrPort("127.0.0.1:60127"))
+	destAddr := net.UDPAddrFromAddrPort(netip.MustParseAddrPort("1.2.3.4:4321"))
+	err := h.ReceiveTo(&noopLwIPUDPConn{localAddr}, []byte{}, destAddr)
+	require.ErrorIs(t, err, errNewSession)
 }
 
 /********** Test Utilities **********/
 
+// noopSingleSessionPacketProxy returns a single PacketRequestSender that does nothing.
 type noopSingleSessionPacketProxy struct {
 	closeCnt   int
 	respWriter network.PacketResponseReceiver
@@ -66,6 +95,7 @@ func (p *noopSingleSessionPacketProxy) WriteTo([]byte, netip.AddrPort) (int, err
 	return 0, nil
 }
 
+// noopLwIPUDPConn is a UDPConn that does nothing.
 type noopLwIPUDPConn struct {
 	localAddr *net.UDPAddr
 }
@@ -84,4 +114,14 @@ func (*noopLwIPUDPConn) ReceiveTo(data []byte, addr *net.UDPAddr) error {
 
 func (*noopLwIPUDPConn) WriteFrom(data []byte, addr *net.UDPAddr) (int, error) {
 	return 0, nil
+}
+
+// noopSingleSessionPacketProxy always returns an error in NewSession.
+type errPacketProxy struct {
+}
+
+var errNewSession = errors.New("error in NewSession")
+
+func (errPacketProxy) NewSession(network.PacketResponseReceiver) (network.PacketRequestSender, error) {
+	return nil, errNewSession
 }
