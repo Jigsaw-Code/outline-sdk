@@ -94,6 +94,8 @@ type ClientConfig struct {
 	NextProtos []string
 	// The cache for sessin resumption.
 	SessionCache tls.ClientSessionCache
+	// The root certificate authorities for client to use for certificate verification.
+	RootCAs *x509.CertPool
 }
 
 // toStdConfig creates a [tls.Config] based on the configured parameters.
@@ -102,6 +104,7 @@ func (cfg *ClientConfig) toStdConfig() *tls.Config {
 		ServerName:         cfg.ServerName,
 		NextProtos:         cfg.NextProtos,
 		ClientSessionCache: cfg.SessionCache,
+		RootCAs:            cfg.RootCAs,
 		// Set InsecureSkipVerify to skip the default validation we are
 		// replacing. This will not disable VerifyConnection.
 		InsecureSkipVerify: true,
@@ -186,5 +189,12 @@ func WithSessionCache(sessionCache tls.ClientSessionCache) ClientOption {
 func WithCertificateName(hostname string) ClientOption {
 	return func(_ string, config *ClientConfig) {
 		config.CertificateName = hostname
+	}
+}
+
+// WithRootCAs sets the root certificate authorities for the client to use for certificate verification.
+func WithRootCAs(rootCAs *x509.CertPool) ClientOption {
+	return func(_ string, config *ClientConfig) {
+		config.RootCAs = rootCAs
 	}
 }
