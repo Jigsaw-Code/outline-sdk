@@ -159,11 +159,12 @@ func (c *gorillaConn) Read(buf []byte) (int, error) {
 		return 0, c.readErr
 	}
 	if err != nil {
-		if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-			return 0, io.EOF
-		}
-		if websocket.IsUnexpectedCloseError(err) {
-			return 0, net.ErrClosed
+		var closeError *websocket.CloseError
+		if errors.As(err, &closeError) {
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+				return 0, io.EOF
+			}
+			return 0, fmt.Errorf("%w %w", net.ErrClosed, closeError)
 		}
 		return 0, err
 	}
