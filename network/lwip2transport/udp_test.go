@@ -18,7 +18,6 @@ import (
 	"errors"
 	"net"
 	"net/netip"
-	"sync"
 	"testing"
 
 	"github.com/Jigsaw-Code/outline-sdk/network"
@@ -38,26 +37,22 @@ func TestUDPResponseWriterCloseNoDeadlock(t *testing.T) {
 
 	// Close proxy.respWriter, it should indirectly Close the proxy only once.
 	const ConcurrentCloseCount = 50
-	errs := make([]error, ConcurrentCloseCount)
-	wg := sync.WaitGroup{}
-	wg.Add(ConcurrentCloseCount)
+	errChan := make(chan error, ConcurrentCloseCount)
 	for i := 0; i < ConcurrentCloseCount; i++ {
 		go func(k int) {
-			defer wg.Done()
-			errs[k] = proxy.respWriter.Close()
+			errChan <- proxy.respWriter.Close()
 		}(i)
 	}
-	wg.Wait()
 
 	nNilErr := 0
-	for _, e := range errs {
-		if e == nil {
+	for i := 0; i < ConcurrentCloseCount; i++ {
+		if e := <-errChan; e == nil {
 			nNilErr++
 		} else {
 			require.ErrorIs(t, e, network.ErrClosed)
 		}
 	}
-	require.Equal(t, nNilErr, 1)
+	require.Equal(t, 1, nNilErr)
 	require.Equal(t, 1, proxy.closeCnt)
 }
 
