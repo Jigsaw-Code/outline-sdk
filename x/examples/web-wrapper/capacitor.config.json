@@ -8,7 +8,7 @@
     }
   },
   "server": {
-    "url": "https://www.radiozamaneh.com/"
+    "url": "https://local.dev:3000"
   },
   "ios": {
     "limitsNavigationsToAppBoundDomains": true
