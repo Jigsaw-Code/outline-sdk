@@ -7,85 +7,66 @@ This example demonstrates how to use the Outline SDK to create a censorship-resi
 > - [iOS](docs/ios.md)
 > - [Android](docs/android.md)
 
-## Running the example on the **iOS Simulator** via MacOS
 
-### Install dependencies
+## Starting the Web Wrapper demo site.
 
-* [Node.js](https://nodejs.org/en/), for the Capacitor build system.
-* [XCode](https://developer.apple.com/xcode/) and [cocoapods](https://cocoapods.org/). [Please follow CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#ios-requirements)
-
-```sh
-# the demo website requires SSL for the app to load properly
-brew install mkcert
-
-npm run reset
-```
-
-### Start the demo site
+* You will need [Node.js](https://nodejs.org/en/) for the web server.
+* You will need [mkcert](https://github.com/FiloSottile/mkcert), which can be installed via `brew install mkcert`. The wrapper will not load the site without TLS.
 
 ```sh
-# this creates the local certificate
+# Install the mkcert root CA:
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$(mkcert -CAROOT)/rootCA.pem"
+
+# Add local.dev to the MacOS hosts file:
+sudo -- sh -c 'echo "127.0.0.1 local.dev" >> /etc/hosts'
+
+# Start the web server. This also creates the local certificate via `npm run cert:create`.
+npm ci
 npm run start:www
 ```
 
-### Apply the local SSL certificate authority to the simulator and start the app
+Open `https://local.dev:3000` in your browser to make sure it's working. You should not see any errors.
+
+
+## Running the example on the **iOS Simulator** via MacOS
+
+* Make sure the demo site is successfully running at `https://local.dev:3000` ([See above](#starting-the-web-wrapper-demo-site)).
+* You will need [XCode](https://developer.apple.com/xcode/) and [cocoapods](https://cocoapods.org/). [Please follow CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#ios-requirements)
 
 ```sh
-# add local.dev to the MacOS hosts file
-echo "127.0.0.1 local.dev" >> /etc/hosts
-
-# open the iOS project
+# In a new terminal, open the iOS project:
 npm run open:ios
 
-# open the finder window containing the root CA
+# Open the finder window containing the root CA:
 open "$(mkcert -CAROOT)"
 ```
 
-Start the app, drag the root CA that mkcert generated into the simulator, then restart the app.
-
+Start the app in XCode, drag the root CA that mkcert generated into the simulator, the n restart the app.
 
 ## Running the example on the **Android emulator** via MacOS
 
-### Install dependencies
-
-* [Node.js](https://nodejs.org/en/), for the Capacitor build system.
-* [OpenJDK 17](https://stackoverflow.com/a/70649641) and [Android Studio](https://developer.android.com/studio/) [Please follow CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#android-requirements)
+* Make sure the demo site is successfully running at `https://local.dev:3000` ([See above](#starting-the-web-wrapper-demo-site)).
+* You will need [OpenJDK 17](https://stackoverflow.com/a/70649641) and [Android Studio](https://developer.android.com/studio/) [Please follow CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#android-requirements)
 
 ```sh
-# the demo website requires SSL for the app to load properly
-brew install mkcert
-
-npm run reset
-```
-
-### Start the demo site
-
-```sh
-# this creates the local certificate
-npm run start:www
-```
-
-### Apply the local SSL certificate authority to the emulator and start the app
-
-```sh
-# get list of avd ids and pick one
+# Get the list of android virtual device (AVD) IDs and pick one:
 avdmanager list
 
-# once your chosen emulator is running
+# Start your chosen emulator:
 emulator -avd '<emulator id>' -writable-system
 
-# root and mount the emulator
+# Re-mount the emulator in a readable/writable state:
 adb root
 adb disable-verify
 adb reboot
 adb root
 adb remount
 
-# you should see 'remounted /** as RW'
-# now you can modify the emulator hosts file
+# You should see 'remounted /** as RW'.
+# Now you can modify the emulator hosts file:
 adb shell "echo '10.0.2.2 local.dev' >> /etc/hosts"
 
-# open the finder window containing the root CA
+# Open the finder window containing the root CA:
 open "$(mkcert -CAROOT)"
 ```
 

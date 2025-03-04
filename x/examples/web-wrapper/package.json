@@ -25,7 +25,7 @@
   "scripts": {
     "clean": "npx rimraf node_modules/ output/ ios/capacitor-cordova-ios-plugins/ ios/DerivedData/ android/.gradle/ android/.idea/ android/capacitor-cordova-android-plugins/ android/local.properties android/app/build/",
     "reset": "npm run clean && npm ci && npx cap sync",
-    "cert:create": "mkdir -p output/cert && JAVA_HOME=$(/usr/libexec/java_home) mkcert -install && JAVA_HOME=$(/usr/libexec/java_home) mkcert -key-file output/cert/dev-key.pem -cert-file output/cert/dev.pem *.dev",
+    "cert:create": "mkdir -p output/cert && JAVA_HOME=$(/usr/libexec/java_home) mkcert -install && JAVA_HOME=$(/usr/libexec/java_home) mkcert -key-file output/cert/dev-key.pem -cert-file output/cert/dev.pem local.dev",
     "start:www": "npm run cert:create && npx serve --ssl-cert output/cert/dev.pem --ssl-key output/cert/dev-key.pem www",
     "open:ios": "npx cap open ios",
     "start:android": "npx cap run android"
