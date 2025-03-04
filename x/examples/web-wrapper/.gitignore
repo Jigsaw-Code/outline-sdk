@@ -1,7 +1,7 @@
+.DS_Store
 .idea/
-node_modules/
+.sourcemaps
 .vscode/
 *.map
-.DS_Store
-.sourcemaps
-dist/
+node_modules/
+output/

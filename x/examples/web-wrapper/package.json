@@ -17,8 +17,17 @@
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "latest",
+    "rimraf": "^6.0.1",
     "serve": "^14.2.4"
   },
   "author": "Daniel LaCosse <daniellacosse@google.com>",
-  "license": "ISC"
+  "license": "MIT",
+  "scripts": {
+    "clean": "npx rimraf node_modules/ output/ ios/capacitor-cordova-ios-plugins/ ios/DerivedData/ android/.gradle/ android/.idea/ android/capacitor-cordova-android-plugins/ android/local.properties android/app/build/",
+    "reset": "npm run clean && npm ci && npx cap sync",
+    "cert:create": "mkdir -p output/cert && JAVA_HOME=$(/usr/libexec/java_home) mkcert -install && JAVA_HOME=$(/usr/libexec/java_home) mkcert -key-file output/cert/dev-key.pem -cert-file output/cert/dev.pem *.dev",
+    "start:www": "npm run cert:create && npx serve --ssl-cert output/cert/dev.pem --ssl-key output/cert/dev-key.pem www",
+    "open:ios": "npx cap open ios",
+    "start:android": "npx cap run android"
+  }
 }

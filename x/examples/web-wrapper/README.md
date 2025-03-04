@@ -7,55 +7,72 @@ This example demonstrates how to use the Outline SDK to create a censorship-resi
 > - [iOS](docs/ios.md)
 > - [Android](docs/android.md)
 
-## Running the example on MacOS & iOS
+## Running the example on the **iOS Simulator** via MacOS
 
 ### Install dependencies
 
-```sh
-npm ci
+* [Node.js](https://nodejs.org/en/), for the Capacitor build system.
+* [XCode](https://developer.apple.com/xcode/) and [cocoapods](https://cocoapods.org/). [Please follow CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#ios-requirements)
 
+```sh
 # the demo website requires SSL for the app to load properly
 brew install mkcert
+
+npm run reset
 ```
 
-### Generate and apply the local SSL certificate authority
+### Start the demo site
 
 ```sh
-# make sure your JAVA_HOME is setup before generating the SSL certificate
-mkcert -install
-mkdir dist
-JAVA_HOME=$(/usr/libexec/java_home) mkcert -key-file dist/dev-key.pem -cert-file dist/dev.pem *.dev
+# this creates the local certificate
+npm run start:www
+```
 
-# add local.dev to the hosts file
+### Apply the local SSL certificate authority to the simulator and start the app
+
+```sh
+# add local.dev to the MacOS hosts file
 echo "127.0.0.1 local.dev" >> /etc/hosts
 
 # open the iOS project
-npx cap sync
-npx cap open ios
+npm run open:ios
 
 # open the finder window containing the root CA
 open "$(mkcert -CAROOT)"
 ```
 
-Start the app and drag the root CA that mkcert generated into the simulator, then stop the app.
+Start the app, drag the root CA that mkcert generated into the simulator, then restart the app.
 
-### Run the project
+
+## Running the example on the **Android emulator** via MacOS
+
+### Install dependencies
+
+* [Node.js](https://nodejs.org/en/), for the Capacitor build system.
+* [OpenJDK 17](https://stackoverflow.com/a/70649641) and [Android Studio](https://developer.android.com/studio/) [Please follow CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#android-requirements)
 
 ```sh
-# run the demo site
-npx serve --ssl-cert dist/dev.pem --ssl-key dist/dev-key.pem www
+# the demo website requires SSL for the app to load properly
+brew install mkcert
 
-# in a separate terminal, run the ios application
-npx cap run ios
+npm run reset
 ```
 
-## Running the example on MacOS & Android
-
-TODO
+### Start the demo site
 
 ```sh
+# this creates the local certificate
+npm run start:www
+```
+
+### Apply the local SSL certificate authority to the emulator and start the app
+
+```sh
+# get list of avd ids and pick one
+avdmanager list
+
 # once your chosen emulator is running
-emulator -avd <emulator id> -writable-system
+emulator -avd '<emulator id>' -writable-system
 
 # root and mount the emulator
 adb root
@@ -65,8 +82,21 @@ adb root
 adb remount
 
 # you should see 'remounted /** as RW'
-# now you can modify the hosts file
+# now you can modify the emulator hosts file
 adb shell "echo '10.0.2.2 local.dev' >> /etc/hosts"
 
-# TODO: generate and install the root CA on your android device
+# open the finder window containing the root CA
+open "$(mkcert -CAROOT)"
+```
+
+Drag the root CA that mkcert generated into the simulator, then:
+
+- Open the 'Settings' app.
+- Go to `Security >> Ecryption & Credentials >> Install from storage`
+- Select 'CA Certificate' from the list of options and accept the warning.
+- Navigate to the root CA on the device and open it.
+- Confirm the installation.
+
+```sh
+npm run start:android # (?)
 ```
