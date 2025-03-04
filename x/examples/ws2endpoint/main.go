@@ -88,7 +88,6 @@ func main() {
 			targetConn, err := endpoint.ConnectStream(r.Context())
 			if err != nil {
 				slog.Error("Failed to connect to the origin", "error", err)
-				w.WriteHeader(http.StatusBadGateway)
 				return
 			}
 			defer targetConn.Close()
@@ -127,7 +126,6 @@ func main() {
 			targetConn, err := endpoint.ConnectPacket(r.Context())
 			if err != nil {
 				slog.Error("Failed to connect to the origin", "error", err)
-				w.WriteHeader(http.StatusBadGateway)
 				return
 			}
 			// Expire connection after 5 minutes of idle time, as per
