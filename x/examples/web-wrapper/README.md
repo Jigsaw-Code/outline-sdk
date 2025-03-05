@@ -41,7 +41,7 @@ npm run open:ios
 open "$(mkcert -CAROOT)"
 ```
 
-Start the app in XCode, drag the root CA that mkcert generated into the simulator, the n restart the app.
+Start the app in XCode, drag the `rootCA.pem` that mkcert generated into the simulator, then restart the app.
 
 ## Running the example on the **Android emulator** via MacOS
 
