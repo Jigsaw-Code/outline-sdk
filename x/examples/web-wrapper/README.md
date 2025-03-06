@@ -40,7 +40,7 @@ open "$(mkcert -CAROOT)"
 
 Start the app in XCode, drag the `rootCA.pem` that mkcert generated into the simulator, then restart the app.
 
-## Running the example on the **Android emulator** via MacOS
+## Running the example on the **Android emulator** via MacOS (WIP)
 
 * Make sure the demo site is successfully running at `https://local.dev:3000` ([See above](#starting-the-web-wrapper-demo-site)).
 * You will need [OpenJDK 17](https://stackoverflow.com/a/70649641) and [Android Studio](https://developer.android.com/studio/) [Please follow CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#android-requirements)
