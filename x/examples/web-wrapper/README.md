@@ -8,7 +8,7 @@ This example demonstrates how to use the Outline SDK to create a censorship-resi
 > - [Android](docs/android.md)
 
 
-## Starting the Web Wrapper demo site.
+## Starting the Web Wrapper demo site (with same-origin navigation iframe)
 
 * You will need [Node.js](https://nodejs.org/en/) for the web server.
 * You will need [mkcert](https://github.com/FiloSottile/mkcert), which can be installed via `brew install mkcert`. The wrapper will not load the site without TLS.
@@ -22,7 +22,7 @@ npm ci
 npm run start:www
 ```
 
-Open `https://local.dev:3000` in your browser to make sure it's working. You should not see any errors.
+Open `https://localhost:3000` in your browser to make sure it's working. You should not see any errors.
 
 
 ## Running the example on the **iOS Simulator** via MacOS
