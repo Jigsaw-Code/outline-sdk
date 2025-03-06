@@ -22,7 +22,7 @@ npm ci
 npm run start:www
 ```
 
-Open `https://localhost:3000` in your browser to make sure it's working. You should not see any errors.
+Open [`https://localhost:3000/`](https://localhost:3000/) in your browser to make sure it's working. You should not see any errors.
 
 
 ## Running the example on the **iOS Simulator** via MacOS
