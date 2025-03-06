@@ -47,7 +47,7 @@
 	<true/>
 	<key>WKAppBoundDomains</key>
 	<array>
-		<string>local.dev</string>
+		<string>localhost</string>
 	</array>
 </dict>
 </plist>

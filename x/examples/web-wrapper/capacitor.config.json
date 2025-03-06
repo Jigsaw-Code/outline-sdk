@@ -8,9 +8,9 @@
     }
   },
   "server": {
-    "url": "local.dev:3000"
+    "url": "https://localhost:3000/"
   },
   "ios": {
-    "limitsNavigationsToAppBoundDomains": false
+    "limitsNavigationsToAppBoundDomains": true
   }
 }

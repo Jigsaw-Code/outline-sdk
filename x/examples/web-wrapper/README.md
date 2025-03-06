@@ -17,9 +17,6 @@ This example demonstrates how to use the Outline SDK to create a censorship-resi
 # Install the mkcert root CA:
 sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$(mkcert -CAROOT)/rootCA.pem"
 
-# Add local.dev to the MacOS hosts file:
-sudo -- sh -c 'echo "127.0.0.1 local.dev" >> /etc/hosts'
-
 # Start the web server. This also creates the local certificate via `npm run cert:create`.
 npm ci
 npm run start:www
@@ -64,7 +61,7 @@ adb remount
 
 # You should see 'remounted /** as RW'.
 # Now you can modify the emulator hosts file:
-adb shell "echo '10.0.2.2 local.dev' >> /etc/hosts"
+adb shell "echo '10.0.2.2 localhost' >> /etc/hosts"
 
 # Open the finder window containing the root CA:
 open "$(mkcert -CAROOT)"
