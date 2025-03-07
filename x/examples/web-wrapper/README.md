@@ -32,14 +32,14 @@ npx cap open ios
 
 Click the "play" button to start your iOS app!
 
-## Running the example on the **Android emulator** via MacOS (WIP)
+## Running the example on the **Android emulator** via MacOS (WIP - currently crashing)
 
 * Make sure the demo site is successfully running at your `NGROK_DOMAIN` ([See above](#starting-the-web-wrapper-demo-site)).
 * You will need [OpenJDK 17](https://stackoverflow.com/a/70649641) and [Android Studio](https://developer.android.com/studio/) [Please follow CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#android-requirements)
 
 ```sh
 # In a new terminal, open the android project:
-npm run open android
+npx cap open android
 ```
 
 Click the "play" button to start your Android app!
