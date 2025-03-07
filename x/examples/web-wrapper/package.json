@@ -12,12 +12,23 @@
     "@capacitor/camera": "latest",
     "@capacitor/core": "latest",
     "@capacitor/ios": "^6.1.2",
-    "@capacitor/splash-screen": "latest"
+    "@capacitor/splash-screen": "latest",
+    "@ngrok/ngrok": "^1.4.1",
+    "serve-handler": "^6.1.6"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
-    "@capacitor/cli": "latest"
+    "@capacitor/cli": "latest",
+    "handlebars": "^4.7.8",
+    "rimraf": "^6.0.1"
   },
-  "author": "",
-  "license": "ISC"
+  "author": "Daniel LaCosse <daniellacosse@google.com>",
+  "license": "Apache-2.0",
+  "scripts": {
+    "build:templates": "node .scripts/build_templates.mjs",
+    "clean": "bash .scripts/clean.sh",
+    "reset": "npm run clean && npm run setup",
+    "setup": "npm ci && npm run build:templates && npx cap sync",
+    "start": "npm run setup && node .scripts/start.mjs"
+  }
 }

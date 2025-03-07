@@ -19,7 +19,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func applicationDidBecomeActive(_ application: UIApplication) {
         var dialerError: NSError?
         if let dialer = MobileproxyNewSmartStreamDialer(
-            MobileproxyNewListFromLines("www.radiozamaneh.com"),
+            MobileproxyNewListFromLines(Config.domain),
             "{\"dns\":[{\"https\":{\"name\":\"9.9.9.9\"}}],\"tls\":[\"\",\"split:1\",\"split:2\",\"tlsfrag:1\"]}",
             MobileproxyNewStderrLogWriter(),
             &dialerError
