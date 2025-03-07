@@ -16,4 +16,7 @@ npx rimraf \
   android/capacitor-cordova-android-plugins/ \
   android/local.properties \
   android/app/build/ \
+  android/app/src/main/assets/public \
+  android/app/src/main/assets/capacitor.config.json \
+  android/app/src/main/assets/capacitor.plugins.json \
   android/app/src/main/java/org/getoutline/pwa/Config.kt
