@@ -20,7 +20,7 @@ NGROK_TOKEN="YOUR_NGROK_AUTH_TOKEN" NGROK_DOMAIN="YOUR_NGROK_DOMAIN" npm run sta
 Open your `NGROK_DOMAIN` in your browser to make sure it's working. You should not see any errors.
 
 
-## Running the example on the **iOS Simulator** via MacOS
+## Running the example on the **iOS Simulator**
 
 * Make sure the demo site is successfully running at your `NGROK_DOMAIN` ([See above](#starting-the-web-wrapper-demo-site)).
 * You will need [XCode](https://developer.apple.com/xcode/) and [cocoapods](https://cocoapods.org/). [Please follow CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#ios-requirements)
@@ -30,9 +30,9 @@ Open your `NGROK_DOMAIN` in your browser to make sure it's working. You should n
 npx cap open ios
 ```
 
-Click the "play" button to start your iOS app!
+Click the "play" button in XCode to start your iOS app!
 
-## Running the example on the **Android emulator** via MacOS (WIP - currently crashing)
+## Running the example on the **Android emulator**
 
 * Make sure the demo site is successfully running at your `NGROK_DOMAIN` ([See above](#starting-the-web-wrapper-demo-site)).
 * You will need [OpenJDK 17](https://stackoverflow.com/a/70649641) and [Android Studio](https://developer.android.com/studio/) [Please follow CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#android-requirements)
@@ -42,4 +42,4 @@ Click the "play" button to start your iOS app!
 npx cap open android
 ```
 
-Click the "play" button to start your Android app!
+Click the "play" button in Android Studio to start your Android app!
