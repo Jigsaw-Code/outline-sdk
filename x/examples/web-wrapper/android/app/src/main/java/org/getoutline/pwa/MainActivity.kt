@@ -20,7 +20,7 @@ class MainActivity : BridgeActivity() {
             this.proxy = Mobileproxy.runProxy(
                 "127.0.0.1:0",
                 Mobileproxy.newSmartStreamDialer(
-                    Mobileproxy.newListFromLines(Config.ngrokDomain),
+                    Mobileproxy.newListFromLines(Config.domain),
                     "{\"dns\":[{\"https\":{\"name\":\"9.9.9.9\"}}],\"tls\":[\"\",\"split:1\",\"split:2\",\"tlsfrag:1\"]}",
                     Mobileproxy.newStderrLogWriter()
                 )

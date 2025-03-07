@@ -25,7 +25,7 @@ if (!process.env.NGROK_DOMAIN) {
 
       fs.writeFileSync(
         templatePath.replace(".handlebars", ""),
-        template({ NGROK_DOMAIN: process.env.NGROK_DOMAIN }),
+        template({ domain: process.env.NGROK_DOMAIN }),
         "utf-8",
       );
 

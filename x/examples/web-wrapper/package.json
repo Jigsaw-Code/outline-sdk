@@ -23,7 +23,7 @@
     "rimraf": "^6.0.1"
   },
   "author": "Daniel LaCosse <daniellacosse@google.com>",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "scripts": {
     "build:templates": "node .scripts/build_templates.mjs",
     "clean": "bash .scripts/clean.sh",
