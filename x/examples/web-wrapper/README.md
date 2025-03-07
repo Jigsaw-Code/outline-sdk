@@ -11,7 +11,7 @@ This example demonstrates how to use the Outline SDK to create a censorship-resi
 ## Starting the Web Wrapper demo site (with same-origin navigation iframe)
 
 * You will need [Node.js](https://nodejs.org/en/) for the web server.
-* You will need an [ngrok account](https://ngrok.com/), from which you can get your [`NGROK_TOKEN`]() and [`NGROK_DOMAIN`]()
+* You will need an [ngrok account](https://ngrok.com/), from which you can get your [`NGROK_TOKEN`](https://dashboard.ngrok.com/get-started/your-authtoken) and [`NGROK_DOMAIN`](https://dashboard.ngrok.com/domains)
 
 ```sh
 NGROK_TOKEN="YOUR_NGROK_AUTH_TOKEN" NGROK_DOMAIN="YOUR_NGROK_DOMAIN" npm run start
