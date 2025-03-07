@@ -13,26 +13,37 @@
 // limitations under the License.
 
 /*
-Package configurl provides convenience functions to create network objects based on a text config.
-This is experimental and mostly for illustrative purposes at this point.
+Package configurl provides a flexible and extensible framework for creating network objects based on textual configurations.
+This enables dynamic, composable, and easily shared transport configurations, making it ideal for complex networking scenarios.
 
-Configurable strategies simplifies the way you create and manage strategies.
-With the configurl package, you can use [ProviderContainer.NewPacketDialer], [ProviderContainer.NewStreamDialer] and [ProviderContainer.NewPacketListener] to create objects using a simple text string.
+This package is currently experimental and primarily serves as a demonstration of its capabilities and potential use cases.
 
-Key Benefits:
+Key Features:
 
-  - Ease of Use: Create transports effortlessly by providing a textual configuration, reducing boilerplate code.
-  - Serialization: Easily share configurations with users or between different parts of your application, including your Go backend.
-  - Dynamic Configuration: Set your app's transport settings at runtime.
-  - DPI Evasion: Advanced nesting and configuration options help you evade Deep Packet Inspection (DPI).
+  - Ease of Use: Define and create complex transport stacks using simple, human-readable text strings.
+  - Serialization: Easily share and persist configurations between different components or users.
+  - Dynamic Configuration: Modify an application's transport behavior at runtime.
+  - Composability: Nest and combine various transport strategies to create sophisticated configurations.
+  - DPI Evasion: Implement advanced strategies like packet splitting and TLS fragmentation to evade Deep Packet Inspection (DPI).
+  - Extensibility: Define custom transport strategies and integrate them seamlessly.
 
-# Config Format
+# Configuration Format
 
-The configuration string is composed of parts separated by the `|` symbol, which define nested dialers.
-For example, `A|B` means dialer `B` takes dialer `A` as its input.
-An empty string represents the direct TCP/UDP dialer, and is used as the input to the first cofigured dialer.
+The configuration string is a pipe-separated (|) sequence of transport definitions. The order of transports indicates nesting, where the output of the first transport is used as the input to the next.
 
-Each dialer configuration follows a URL format, where the scheme defines the type of Dialer. Supported formats are described below.
+Example: A|B|C
+
+In this example:
+
+ 1. Transport A is the base transport.
+ 2. Transport B wraps transport A.
+ 3. Transport C wraps transport B.
+
+An empty string ("") represents the default TCP/UDP dialer.
+
+Each transport definition follows a URL-like format, where the scheme identifies the transport type, and the opaque part (after the scheme) contains options specific to the transport.
+
+The following sections list transport types are currently supported, along with their configuration options.
 
 # Proxy Protocols
 
@@ -153,7 +164,17 @@ DPI Evasion - To add packet splitting to a Shadowsocks server for enhanced DPI e
 
 	split:2|ss://[USERINFO]@[HOST]:[PORT]
 
-Defining custom strategies - You can define your custom strategy by implementing and registering [BuildFunc[ObjectType]] functions:
+# Defining custom strategies
+
+Core Concepts:
+
+  - [ProviderContainer]: A central registry for managing different types of network object builders (StreamDialers, PacketDialers, PacketListeners).
+  - [ExtensibleProvider]: A type that provides a mechanism to register and retrieve builders for specific subtypes of network objects.
+  - [BuildFunc]: A function that creates an instance of a network object from a parsed configuration.
+  - [Config]: A parsed representation of the configuration string.
+  - [TypeRegistry]: An interface for registering new transport types.
+
+You can define your custom strategy by implementing and registering [BuildFunc[ObjectType]] functions:
 
 	// Create new config parser.
 	// p := configurl.NewProviderContainer()
