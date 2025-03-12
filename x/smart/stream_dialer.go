@@ -335,6 +335,38 @@ func (f *StrategyFinder) NewProxylessDialer(ctx context.Context, testDomains []s
 	return f.findTLS(ctx, testDomains, dnsDialer, config.TLS)
 }
 
+// Create a new proxy dialer and test it with the testDomains
+func (f *StrategyFinder) NewProxyDialer(ctx context.Context, testDomains []string, proxyConfig []string) (transport.StreamDialer, error) {
+	for _, ssURL := range proxyConfig {
+		// TODO test each server with the given url
+		dialer, err := getShadowsocksStreamDialer(ctx, ssURL)
+		if err != nil {
+			return nil, fmt.Errorf("getShadowsocksStreamDialer failed: %w", err)
+		}
+
+		for _, testDomain := range testDomains {
+			startTime := time.Now()
+
+			testAddr := net.JoinHostPort(testDomain, "443")
+
+			f.logCtx(ctx, "🏃 run Shadowsocks: '%v' (domain: %v)\n", ssURL, testDomain)
+
+			ctx, cancel := context.WithTimeout(ctx, f.TestTimeout)
+			defer cancel()
+			conn, err := dialer.DialStream(ctx, testAddr)
+			if err != nil {
+				f.logCtx(ctx, "🏁 got Shadowsocks: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", ssURL, testDomain, time.Since(startTime), err)
+			} else {
+				defer conn.Close()
+				f.logCtx(ctx, "🏁 got Shadowsocks: '%v' (domain: %v), duration=%v, status=ok ✅\n", ssURL, testDomain, time.Since(startTime))
+				return dialer, err
+			}
+		}
+		return nil, fmt.Errorf("could not find a working proxy: %w", err)
+	}
+	return nil, errors.New("no proxy config provided")
+}
+
 // NewDialer uses the config in configBytes to search for a strategy that unblocks DNS and TLS for all of the testDomains, returning a dialer with the found strategy.
 // It returns an error if no strategy was found that unblocks the testDomains.
 // The testDomains must be domains with a TLS service running on port 443.
@@ -353,9 +385,12 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 
 	dialer, err := f.NewProxylessDialer(ctx, testDomains, parsedConfig)
 	if err == nil {
+		// Prefer a proxyless strategy when it works
 		return dialer, err
+	} else if len(parsedConfig.PROXY) > 0 {
+		// But fall back to a proxy when one is available
+		return f.NewProxyDialer(ctx, testDomains, parsedConfig.PROXY)
 	} else {
-		ssURL := parsedConfig.PROXY[0]
-		return getShadowsocksStreamDialer(ctx, ssURL)
+		return nil, err
 	}
 }
