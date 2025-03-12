@@ -293,6 +293,25 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 	}), nil
 }
 
+// getShadowsocksStreamDialer creates a StreamDialer from an ss://... URL.
+func getShadowsocksStreamDialer(ctx context.Context, ssURL string) (transport.StreamDialer, error) {
+	// 1. Parse the config string.
+	config, err := configurl.ParseConfig(ssURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	// 2. Create an ExtensibleProvider with registered Shadowsocks support.
+	providers := configurl.NewDefaultProviders()
+	// 3. Create the StreamDialer.
+	streamDialer, err := providers.NewStreamDialer(ctx, config.URL.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Shadowsocks stream dialer: %w", err)
+	}
+
+	return streamDialer, nil
+}
+
 // NewDialer uses the config in configBytes to search for a strategy that unblocks DNS and TLS for all of the testDomains, returning a dialer with the found strategy.
 // It returns an error if no strategy was found that unblocks the testDomains.
 // The testDomains must be domains with a TLS service running on port 443.
