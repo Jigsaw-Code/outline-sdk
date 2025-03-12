@@ -295,21 +295,44 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 
 // getShadowsocksStreamDialer creates a StreamDialer from an ss://... URL.
 func getShadowsocksStreamDialer(ctx context.Context, ssURL string) (transport.StreamDialer, error) {
-	// 1. Parse the config string.
 	config, err := configurl.ParseConfig(ssURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	// 2. Create an ExtensibleProvider with registered Shadowsocks support.
 	providers := configurl.NewDefaultProviders()
-	// 3. Create the StreamDialer.
 	streamDialer, err := providers.NewStreamDialer(ctx, config.URL.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Shadowsocks stream dialer: %w", err)
 	}
 
 	return streamDialer, nil
+}
+
+// Attempts to create a new Dialer using only proxyless (DNS and TLS strategies)
+func (f *StrategyFinder) NewProxylessDialer(ctx context.Context, testDomains []string, config configConfig) (transport.StreamDialer, error) {
+	resolver, err := f.findDNS(ctx, testDomains, config.DNS)
+	if err != nil {
+		return nil, err
+	}
+	var dnsDialer transport.StreamDialer
+	if resolver == nil {
+		if _, ok := f.StreamDialer.(*transport.TCPDialer); !ok {
+			return nil, fmt.Errorf("cannot use system resolver with base dialer of type %T", f.StreamDialer)
+		}
+		dnsDialer = f.StreamDialer
+	} else {
+		resolver = newSimpleLRUCacheResolver(resolver, 100)
+		dnsDialer, err = dns.NewStreamDialer(resolver, f.StreamDialer)
+		if err != nil {
+			return nil, fmt.Errorf("dns.NewStreamDialer failed: %w", err)
+		}
+	}
+
+	if len(config.TLS) == 0 {
+		return dnsDialer, nil
+	}
+	return f.findTLS(ctx, testDomains, dnsDialer, config.TLS)
 }
 
 // NewDialer uses the config in configBytes to search for a strategy that unblocks DNS and TLS for all of the testDomains, returning a dialer with the found strategy.
@@ -328,26 +351,11 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 		testDomains[di] = makeFullyQualified(domain)
 	}
 
-	resolver, err := f.findDNS(ctx, testDomains, parsedConfig.DNS)
-	if err != nil {
-		return nil, err
-	}
-	var dnsDialer transport.StreamDialer
-	if resolver == nil {
-		if _, ok := f.StreamDialer.(*transport.TCPDialer); !ok {
-			return nil, fmt.Errorf("cannot use system resolver with base dialer of type %T", f.StreamDialer)
-		}
-		dnsDialer = f.StreamDialer
+	dialer, err := f.NewProxylessDialer(ctx, testDomains, parsedConfig)
+	if err == nil {
+		return dialer, err
 	} else {
-		resolver = newSimpleLRUCacheResolver(resolver, 100)
-		dnsDialer, err = dns.NewStreamDialer(resolver, f.StreamDialer)
-		if err != nil {
-			return nil, fmt.Errorf("dns.NewStreamDialer failed: %w", err)
-		}
+		ssURL := parsedConfig.PROXY[0]
+		return getShadowsocksStreamDialer(ctx, ssURL)
 	}
-
-	if len(parsedConfig.TLS) == 0 {
-		return dnsDialer, nil
-	}
-	return f.findTLS(ctx, testDomains, dnsDialer, parsedConfig.TLS)
 }
