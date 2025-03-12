@@ -16,4 +16,7 @@ dns:
   - https: { name: mitm-software.badssl.com }
 
 proxy:
+  # Revoked key
+  - ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@159.203.76.146:9953/?outline=1
+  # Good key
   - ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpxYXJNZEJ0VkYyamhaMnFFWGRtNWFY@159.203.76.146:9953/?outline=1
