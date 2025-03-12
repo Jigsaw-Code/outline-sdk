@@ -95,8 +95,9 @@ type dnsEntryConfig struct {
 }
 
 type configConfig struct {
-	DNS []dnsEntryConfig `yaml:"dns,omitempty"`
-	TLS []string         `yaml:"tls,omitempty"`
+	DNS   []dnsEntryConfig `yaml:"dns,omitempty"`
+	TLS   []string         `yaml:"tls,omitempty"`
+	PROXY []string         `yaml:"proxy,omitempty"`
 }
 
 // newDNSResolverFromEntry creates a [dns.Resolver] based on the config, returning the resolver and
