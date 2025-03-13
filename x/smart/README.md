@@ -2,23 +2,21 @@
 
 The **Smart Dialer** searches for a strategy that unblocks DNS and TLS for a given list of test domains. It takes a config describing multiple strategies to pick from.
 
-## JSON config for the Smart Dialer
+## YAML config for the Smart Dialer
 
-The config that the Smart Dialer takes is in a JSON format. Here is an example:
+The config that the Smart Dialer takes is in a YAML format. Here is an example:
 
-```json
-{
-  "dns": [
-      {"system": {}},
-      {"https": {"name": "8.8.8.8"}},
-      {"https": {"name": "9.9.9.9"}}
-  ],
-  "tls": [
-      "",
-      "split:2",
-      "tlsfrag:1"
-  ]
-}
+```yaml
+dns:
+  - system: {}
+  - https:
+      name: 8.8.8.8
+  - https:
+      name: 9.9.9.9
+tls:
+  - ""
+  - split:2
+  - tlsfrag:1
 ```
 
 ### DNS Configuration
@@ -33,14 +31,10 @@ The config that the Smart Dialer takes is in a JSON format. Here is an example:
 
 #### DNS-over-HTTPS Resolver (DoH)
 
-```json
-{
-  "https": {
-    "name": "dns.google",
-    "address": "8.8.8.8"
-  }
-}
-
+```yaml
+https:
+  name: dns.google
+  address: 8.8.8.8
 ```
 
 *   `name`: The domain name of the DoH server.
@@ -48,13 +42,10 @@ The config that the Smart Dialer takes is in a JSON format. Here is an example:
 
 #### DNS-over-TLS Resolver (DoT)
 
-```json
-{
-  "tls": {
-    "name": "dns.google",
-    "address": "8.8.8.8"
-  }
-}
+```yaml
+tls:
+  name: dns.google
+  address: 8.8.8.8
 ```
 
 *   `name`: The domain name of the DoT server.
@@ -62,24 +53,18 @@ The config that the Smart Dialer takes is in a JSON format. Here is an example:
 
 #### UDP Resolver
 
-```json
-{
-  "udp": {
-    "address": "8.8.8.8"
-  }
-}
+```yaml
+udp:
+  address: 8.8.8.8
 ```
 
 *   `address`: The host:port of the UDP resolver.
 
 #### TCP Resolver
 
-```json
-{
-  "tcp": {
-    "address": "8.8.8.8"
-  }
-}
+```yaml
+tcp:
+  address: 8.8.8.8
 ```
 
 *   `address`: The host:port of the TCP resolver.
@@ -103,18 +88,16 @@ finder := &smart.StrategyFinder{
 }
 
 configBytes := []byte(`
-{
-  "dns": [
-      {"system": {}},
-      {"https": {"name": "8.8.8.8"}},
-      {"https": {"name": "9.9.9.9"}}
-  ],
-  "tls": [
-      "",
-      "split:2",
-      "tlsfrag:1"
-  ]
-}
+dns:
+  - system: {}
+  - https:
+      name: 8.8.8.8
+  - https:
+      name: 9.9.9.9
+tls:
+  - ""
+  - split:2
+  - tlsfrag:1
 `)
 
 dialer, err := finder.NewDialer(context.Background(), []string{"www.google.com"}, configBytes)
