@@ -344,9 +344,9 @@ func (f *StrategyFinder) NewProxyDialer(ctx context.Context, testDomains []strin
 			return nil, fmt.Errorf("getShadowsocksStreamDialer failed: %w", err)
 		}
 
+		successfulTests := 0
 		for _, testDomain := range testDomains {
 			startTime := time.Now()
-
 			testAddr := net.JoinHostPort(testDomain, "443")
 
 			f.logCtx(ctx, "🏃 run Shadowsocks: '%v' (domain: %v)\n", ssURL, testDomain)
@@ -359,12 +359,15 @@ func (f *StrategyFinder) NewProxyDialer(ctx context.Context, testDomains []strin
 			} else {
 				defer conn.Close()
 				f.logCtx(ctx, "🏁 got Shadowsocks: '%v' (domain: %v), duration=%v, status=ok ✅\n", ssURL, testDomain, time.Since(startTime))
-				return dialer, err
+				successfulTests += 1
 			}
 		}
-		return nil, fmt.Errorf("could not find a working proxy: %w", err)
+		// all domains succeeded
+		if successfulTests == len(testDomains)-1 {
+			return dialer, err
+		}
 	}
-	return nil, errors.New("no proxy config provided")
+	return nil, fmt.Errorf("could not find a working proxy")
 }
 
 // NewDialer uses the config in configBytes to search for a strategy that unblocks DNS and TLS for all of the testDomains, returning a dialer with the found strategy.
