@@ -95,8 +95,9 @@ type dnsEntryConfig struct {
 }
 
 type configConfig struct {
-	DNS []dnsEntryConfig `yaml:"dns,omitempty"`
-	TLS []string         `yaml:"tls,omitempty"`
+	DNS   []dnsEntryConfig `yaml:"dns,omitempty"`
+	TLS   []string         `yaml:"tls,omitempty"`
+	PROXY []string         `yaml:"proxy,omitempty"`
 }
 
 // newDNSResolverFromEntry creates a [dns.Resolver] based on the config, returning the resolver and
@@ -292,23 +293,25 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 	}), nil
 }
 
-// NewDialer uses the config in configBytes to search for a strategy that unblocks DNS and TLS for all of the testDomains, returning a dialer with the found strategy.
-// It returns an error if no strategy was found that unblocks the testDomains.
-// The testDomains must be domains with a TLS service running on port 443.
-func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, configBytes []byte) (transport.StreamDialer, error) {
-	var parsedConfig configConfig
-	err := yaml.Unmarshal(configBytes, &parsedConfig)
+// getStreamDialer creates a StreamDialer from an ss://... URL.
+func getStreamDialer(ctx context.Context, ssURL string) (transport.StreamDialer, error) {
+	config, err := configurl.ParseConfig(ssURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse config: %v", err)
+		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	// Make domain fully-qualified to prevent confusing domain search.
-	testDomains = append(make([]string, 0, len(testDomains)), testDomains...)
-	for di, domain := range testDomains {
-		testDomains[di] = makeFullyQualified(domain)
+	providers := configurl.NewDefaultProviders()
+	streamDialer, err := providers.NewStreamDialer(ctx, config.URL.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Shadowsocks stream dialer: %w", err)
 	}
 
-	resolver, err := f.findDNS(ctx, testDomains, parsedConfig.DNS)
+	return streamDialer, nil
+}
+
+// Attempts to create a new Dialer using only proxyless (DNS and TLS strategies)
+func (f *StrategyFinder) NewProxylessDialer(ctx context.Context, testDomains []string, config configConfig) (transport.StreamDialer, error) {
+	resolver, err := f.findDNS(ctx, testDomains, config.DNS)
 	if err != nil {
 		return nil, err
 	}
@@ -326,8 +329,79 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 		}
 	}
 
-	if len(parsedConfig.TLS) == 0 {
+	if len(config.TLS) == 0 {
 		return dnsDialer, nil
 	}
-	return f.findTLS(ctx, testDomains, dnsDialer, parsedConfig.TLS)
+	return f.findTLS(ctx, testDomains, dnsDialer, config.TLS)
+}
+
+// Create a new proxy dialer and test it with the testDomains
+func (f *StrategyFinder) NewProxyDialer(ctx context.Context, testDomains []string, proxyConfig []string) (transport.StreamDialer, error) {
+	for _, ssURL := range proxyConfig {
+		// TODO test each server with the given url
+		dialer, err := getStreamDialer(ctx, ssURL)
+		if err != nil {
+			return nil, fmt.Errorf("getStreamDialer failed: %w", err)
+		}
+
+		successfulTests := 0
+
+		for _, testDomain := range testDomains {
+			startTime := time.Now()
+			testAddr := net.JoinHostPort(testDomain, "443")
+
+			f.logCtx(ctx, "🏃 run Shadowsocks: '%v' (domain: %v)\n", ssURL, testDomain)
+
+			ctx, cancel := context.WithTimeout(ctx, f.TestTimeout)
+			defer cancel()
+			testConn, err := dialer.DialStream(ctx, testAddr)
+			if err != nil {
+				f.logCtx(ctx, "🏁 got Shadowsocks: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", ssURL, testDomain, time.Since(startTime), err)
+			}
+			tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
+			err = tlsConn.HandshakeContext(ctx)
+			tlsConn.Close()
+			if err != nil {
+				f.logCtx(ctx, "🏁 got Shadowsocks: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", ssURL, testDomain, time.Since(startTime), err)
+			} else {
+				f.logCtx(ctx, "🏁 got Shadowsocks: '%v' (domain: %v), duration=%v, status=ok ✅\n", ssURL, testDomain, time.Since(startTime))
+				successfulTests += 1
+			}
+		}
+		fmt.Printf("Successful tests %v \n", successfulTests)
+
+		// all domains succeeded
+		if successfulTests == len(testDomains) {
+			return dialer, err
+		}
+	}
+	return nil, fmt.Errorf("could not find a working proxy")
+}
+
+// NewDialer uses the config in configBytes to search for a strategy that unblocks DNS and TLS for all of the testDomains, returning a dialer with the found strategy.
+// It returns an error if no strategy was found that unblocks the testDomains.
+// The testDomains must be domains with a TLS service running on port 443.
+func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, configBytes []byte) (transport.StreamDialer, error) {
+	var parsedConfig configConfig
+	err := yaml.Unmarshal(configBytes, &parsedConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse config: %v", err)
+	}
+
+	// Make domain fully-qualified to prevent confusing domain search.
+	testDomains = append(make([]string, 0, len(testDomains)), testDomains...)
+	for di, domain := range testDomains {
+		testDomains[di] = makeFullyQualified(domain)
+	}
+
+	dialer, err := f.NewProxylessDialer(ctx, testDomains, parsedConfig)
+	if err == nil {
+		// Prefer a proxyless strategy when it works
+		return dialer, err
+	} else if len(parsedConfig.PROXY) > 0 {
+		// But fall back to a proxy when one is available
+		return f.NewProxyDialer(ctx, testDomains, parsedConfig.PROXY)
+	} else {
+		return nil, err
+	}
 }
