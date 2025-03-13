@@ -293,8 +293,8 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 	}), nil
 }
 
-// getShadowsocksStreamDialer creates a StreamDialer from an ss://... URL.
-func getShadowsocksStreamDialer(ctx context.Context, ssURL string) (transport.StreamDialer, error) {
+// getStreamDialer creates a StreamDialer from an ss://... URL.
+func getStreamDialer(ctx context.Context, ssURL string) (transport.StreamDialer, error) {
 	config, err := configurl.ParseConfig(ssURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
@@ -339,12 +339,13 @@ func (f *StrategyFinder) NewProxylessDialer(ctx context.Context, testDomains []s
 func (f *StrategyFinder) NewProxyDialer(ctx context.Context, testDomains []string, proxyConfig []string) (transport.StreamDialer, error) {
 	for _, ssURL := range proxyConfig {
 		// TODO test each server with the given url
-		dialer, err := getShadowsocksStreamDialer(ctx, ssURL)
+		dialer, err := getStreamDialer(ctx, ssURL)
 		if err != nil {
-			return nil, fmt.Errorf("getShadowsocksStreamDialer failed: %w", err)
+			return nil, fmt.Errorf("getStreamDialer failed: %w", err)
 		}
 
 		successfulTests := 0
+
 		for _, testDomain := range testDomains {
 			startTime := time.Now()
 			testAddr := net.JoinHostPort(testDomain, "443")
@@ -353,17 +354,24 @@ func (f *StrategyFinder) NewProxyDialer(ctx context.Context, testDomains []strin
 
 			ctx, cancel := context.WithTimeout(ctx, f.TestTimeout)
 			defer cancel()
-			conn, err := dialer.DialStream(ctx, testAddr)
+			testConn, err := dialer.DialStream(ctx, testAddr)
 			if err != nil {
 				f.logCtx(ctx, "🏁 got Shadowsocks: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", ssURL, testDomain, time.Since(startTime), err)
+			}
+			tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
+			err = tlsConn.HandshakeContext(ctx)
+			tlsConn.Close()
+			if err != nil {
+				f.logCtx(ctx, "🏁 got Shadowsocks: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", ssURL, testDomain, time.Since(startTime), err)
 			} else {
-				defer conn.Close()
 				f.logCtx(ctx, "🏁 got Shadowsocks: '%v' (domain: %v), duration=%v, status=ok ✅\n", ssURL, testDomain, time.Since(startTime))
 				successfulTests += 1
 			}
 		}
+		fmt.Printf("Successful tests %v \n", successfulTests)
+
 		// all domains succeeded
-		if successfulTests == len(testDomains)-1 {
+		if successfulTests == len(testDomains) {
 			return dialer, err
 		}
 	}
