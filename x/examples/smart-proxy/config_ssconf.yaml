@@ -7,6 +7,7 @@ proxy:
   - ssconf://docs.google.com/spreadsheets/d/e/2PACX-1vTj4Vz55haX0bn6CcDoMKNHbHxk__UarhkNS62BLQ_lgwhbwEvxlQ-f3kttXe93AFKsBrqST42Prvmb/pub?output=csv
   # hostname
   # error: could not find a working proxy
+  # works in outline client, so possibly an issue with configurl
   - ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpxc0dnbjVnR0VtS2g@147-182-248-224.nip.io:20478/?outline=1#QA%20Hostname
 
 
