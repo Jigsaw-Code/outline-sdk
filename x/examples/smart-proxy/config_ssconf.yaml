@@ -1,0 +1,13 @@
+proxy:
+  # websockets
+  # Failed to find dialer: getShadowsocksStreamDialer failed: failed to create Shadowsocks stream dialer: config type 'ssconf' is not registered
+  - ssconf://pad.riseup.net/p/r.b54860e295394290609512e977900ad1/export/txt#Advanced%20Config
+  # online config
+  # Failed to find dialer: getShadowsocksStreamDialer failed: failed to create Shadowsocks stream dialer: config type 'ssconf' is not registered
+  - ssconf://docs.google.com/spreadsheets/d/e/2PACX-1vTj4Vz55haX0bn6CcDoMKNHbHxk__UarhkNS62BLQ_lgwhbwEvxlQ-f3kttXe93AFKsBrqST42Prvmb/pub?output=csv
+  # hostname
+  # error: could not find a working proxy
+  - ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpxc0dnbjVnR0VtS2g@147-182-248-224.nip.io:20478/?outline=1#QA%20Hostname
+
+
+
