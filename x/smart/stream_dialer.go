@@ -186,7 +186,7 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryConfig) ([]*sma
 	return rts, nil
 }
 
-// getStreamDialer creates a StreamDialer from a configURL, for example "ss://..."
+// create a StreamDialer from a configURL, for example "ss://..."
 func getStreamDialer(ctx context.Context, configURL string) (transport.StreamDialer, error) {
 	config, err := configurl.ParseConfig(configURL)
 	if err != nil {
@@ -309,7 +309,7 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 	}), nil
 }
 
-// Find the fastest fallback dialer and test it with the testDomains
+// Return the fastest fallback dialer that is able to access all the testDomans
 func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string, fallbackConfig []string) (transport.StreamDialer, error) {
 	if len(fallbackConfig) == 0 {
 		return nil, errors.New("no fallback was specified")
