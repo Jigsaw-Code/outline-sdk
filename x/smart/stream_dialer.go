@@ -315,6 +315,8 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 		return nil, errors.New("no fallback was specified")
 	}
 
+	ctx, searchDone := context.WithCancel(ctx)
+	defer searchDone()
 	raceStart := time.Now()
 	type SearchResult struct {
 		Dialer transport.StreamDialer
