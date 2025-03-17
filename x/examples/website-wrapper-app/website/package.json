@@ -1,0 +1,16 @@
+{
+  "name": "@website-wrapper-app/website",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@ngrok/ngrok": "1.4.1",
+    "http-proxy": "^1.18.1",
+    "serve-handler": "6.1.6"
+  },
+  "devDependencies": {
+    "vite": "^6.2.0"
+  },
+  "scripts": {
+    "start": "node ./start.script.mjs"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@website-wrapper-app/wrapper-app",
+  "version": "1.0.0",
+  "keywords": [
+    "capacitor",
+    "mobile"
+  ],
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/camera": "latest",
+    "@capacitor/core": "latest",
+    "@capacitor/ios": "^6.1.2",
+    "@capacitor/splash-screen": "latest"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "latest"
+  },
+  "author": "Daniel LaCosse <daniellacosse@google.com>",
+  "license": "Apache-2.0"
+}

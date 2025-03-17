@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.esm.js"></script>
+    <script nomodule src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@ionic/core/css/ionic.bundle.css" rel="stylesheet">
+
+    <title>My News Site</title>
+    <style>
+      body {
+        all: initial;
+      }
+
+      iframe {
+        width: 100vw;
+        height: 100svh;
+        height: 100vh;
+        border: none;
+      }
+
+      button {
+        all: initial;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <ion-app>
+      <ion-toolbar>
+        <ion-buttons slot="start">
+          <button onclick="mySite.contentWindow.history.back()">
+
+            <!-- ion-button doesn't properly expose click events? -->
+            <ion-button>
+              <ion-icon name="arrow-back-outline"></ion-icon>
+            </ion-button>
+          </button>
+        </ion-buttons>
+        <ion-title>My Site Navigation</ion-title>
+      </ion-toolbar>
+  
+      <iframe id="my-site"></iframe>
+    </ion-app>
+    <script>
+      const mySite = document.getElementById('my-site');
+    </script>
+  </body>
+</html>
