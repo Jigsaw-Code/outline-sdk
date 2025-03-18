@@ -3,13 +3,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { glob } from "glob";
 
-import startWebsite from "./navigation_proxy/start.script.mjs";
+import startNavigationProxy from "./start_proxy.mjs";
 
 const INPUT_DIR = "wrapper_template";
 const OUTPUT_DIR = "output/wrapper_app";
 
 (async function () {
-  const { mainDomain, navigationUrl } = await startWebsite();
+  const { mainDomain, navigationUrl } = await startNavigationProxy();
 
   const sourceFilepaths = await glob(path.join(process.cwd(), INPUT_DIR, "**", "*"), {
     nodir: true,

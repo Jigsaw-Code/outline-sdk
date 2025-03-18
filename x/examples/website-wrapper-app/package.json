@@ -3,17 +3,25 @@
     "capacitor",
     "mobile"
   ],
+  "dependencies": {
+    "@ngrok/ngrok": "1.4.1",
+    "http-proxy": "^1.18.1",
+    "serve-handler": "6.1.6"
+  },
   "devDependencies": {
     "glob": "^11.0.1",
     "handlebars": "^4.7.8",
-    "rimraf": "^6.0.1"
+    "rimraf": "^6.0.1",
+    "vite": "^6.2.0"
   },
   "author": "Daniel LaCosse <daniellacosse@google.com>",
   "license": "Apache-2.0",
   "scripts": {
+    "build:mobileproxy": "bash ./.scripts/build_mobileproxy.sh",
+    "build:template": "node ./.scripts/build_template.mjs",
     "clean": "rimraf node_modules/ output/",
     "reset": "npm run clean && npm ci",
-    "build": "node ./build.script.mjs"
+    "start:proxy": "node ./.scripts/start_proxy.mjs"
   },
   "private": true,
   "workspaces": [

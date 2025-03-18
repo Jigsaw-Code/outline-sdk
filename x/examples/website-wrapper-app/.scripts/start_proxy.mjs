@@ -1,13 +1,12 @@
 import ngrok from "@ngrok/ngrok";
 import httpProxy from "http-proxy";
 import http from "node:http";
-import { fileURLToPath } from "node:url";
+import path from "node:path";
 import { createServer } from "vite";
 import { randomUUID } from "node:crypto";
 
 const NAVIGATION_PATH = `/${randomUUID()}`;
 const TARGET_DOMAIN = process.env.TARGET_DOMAIN || "www.example.com";
-const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 if (!process.env.NGROK_TOKEN) {
   throw new Error("NGROK_TOKEN must be set!");
@@ -18,10 +17,10 @@ const getLocalServerUrl = (server) => {
   return typeof addressResult === "string" ? addressResult : `http://[${addressResult.address}]:${addressResult.port}`;
 };
 
-export default function() {
-  return new Promise(async (resolve, reject) => {
+export default function main() {
+  return new Promise(async (resolve) => {
     const navigationServer = await createServer({
-      root: __dirname,
+      root: path.join(process.cwd(), "navigation_proxy"),
       server: {
         allowedHosts: true
       }
@@ -65,6 +64,6 @@ export default function() {
   });
 }
 
-if (import.meta.url === process.argv[1]) {
+if (import.meta.url.endsWith(process.argv[1])) {
   main().catch(console.error);
 }
