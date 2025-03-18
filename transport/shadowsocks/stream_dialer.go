@@ -17,6 +17,7 @@ package shadowsocks
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -97,6 +98,7 @@ func (c *StreamDialer) DialStream(ctx context.Context, remoteAddr string) (trans
 		return nil, errors.New("failed to write target address")
 	}
 	time.AfterFunc(c.ClientDataWait, func() {
+		fmt.Printf("calling flush, check for segfault if conn already closed\n")
 		ssw.Flush()
 	})
 	ssr := NewReader(proxyConn, c.key)
