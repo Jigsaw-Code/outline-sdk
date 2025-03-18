@@ -1,5 +1,5 @@
 {
-  "name": "@website-wrapper-app/website",
+  "name": "@website-wrapper-app/navigation",
   "version": "1.0.0",
   "type": "module",
   "dependencies": {

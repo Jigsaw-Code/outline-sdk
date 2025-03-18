@@ -47,7 +47,10 @@
 	<true/>
 	<key>WKAppBoundDomains</key>
 	<array>
-		<string>{{domain}}</string>
+		<string>{{mainDomain}}</string>
+		{{#each whitelistedDomains}}
+		<string>{{this}}</string>
+		{{/each}}
 	</array>
 </dict>
 </plist>

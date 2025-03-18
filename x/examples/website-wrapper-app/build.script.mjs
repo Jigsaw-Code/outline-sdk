@@ -1,19 +1,19 @@
 import handlebars from "handlebars";
-import fs from "fs";
-import path from "path";
+import fs from "node:fs";
+import path from "node:path";
 import { glob } from "glob";
 
-// TODO: Replace with SED
+import startWebsite from "./navigation_proxy/start.script.mjs";
+
 const INPUT_DIR = "wrapper_template";
 const OUTPUT_DIR = "output/wrapper_app";
 
-if (!process.env.NGROK_DOMAIN) {
-  throw new Error("NGROK_DOMAIN must be set!");
-}
-
 (async function () {
+  const { mainDomain, navigationUrl } = await startWebsite();
+
   const sourceFilepaths = await glob(path.join(process.cwd(), INPUT_DIR, "**", "*"), {
-    nodir: true
+    nodir: true,
+    dot: true
   });
 
   for (const sourceFilepath of sourceFilepaths) {
@@ -39,9 +39,13 @@ if (!process.env.NGROK_DOMAIN) {
     fs.writeFileSync(
       destinationFilepath.replace(/\.handlebars$/, ""),
       template({
-        domain: process.env.NGROK_DOMAIN
+        mainDomain,
+        navigationUrl,
+        whitelistedDomains: process.env.WHITELISTED_DOMAINS?.split(/,\s*/) ?? []
       }),
       "utf8"
     );
+
+    console.log(`Generated ${destinationFilepath}`);
   }
 })();

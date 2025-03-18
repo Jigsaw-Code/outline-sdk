@@ -4,6 +4,7 @@
     "mobile"
   ],
   "devDependencies": {
+    "glob": "^11.0.1",
     "handlebars": "^4.7.8",
     "rimraf": "^6.0.1"
   },
@@ -16,7 +17,7 @@
   },
   "private": true,
   "workspaces": [
-    "website",
+    "navigation_proxy",
     "output/wrapper_app"
   ]
 }

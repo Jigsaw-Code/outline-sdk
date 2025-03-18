@@ -32,7 +32,7 @@
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		6586F0B22D7B90DB00C351BD /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		65E7FC362CB71E37004207E3 /* OutlineBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineBridgeViewController.swift; sourceTree = "<group>"; };
-		65E7FC3A2CB86B11004207E3 /* mobileproxy.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = mobileproxy.xcframework; path = ../../generated/mobileproxy.xcframework; sourceTree = "<group>"; };
+		65E7FC3A2CB86B11004207E3 /* mobileproxy.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = mobileproxy.xcframework; path = ../../../mobileproxy/mobileproxy.xcframework; sourceTree = "<group>"; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
