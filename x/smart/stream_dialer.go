@@ -186,22 +186,6 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryConfig) ([]*sma
 	return rts, nil
 }
 
-// create a StreamDialer from a configURL, for example "ss://..."
-func getStreamDialer(ctx context.Context, configURL string) (transport.StreamDialer, error) {
-	config, err := configurl.ParseConfig(configURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse config: %w", err)
-	}
-
-	providers := configurl.NewDefaultProviders()
-	streamDialer, err := providers.NewStreamDialer(ctx, config.URL.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stream dialer: %w", err)
-	}
-
-	return streamDialer, nil
-}
-
 func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsConfig []dnsEntryConfig) (dns.Resolver, error) {
 	resolvers, err := f.dnsConfigToResolver(dnsConfig)
 	if err != nil {
@@ -322,9 +306,10 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 		Dialer transport.StreamDialer
 		Config string
 	}
+	var configModule = configurl.NewDefaultProviders()
 
 	fallback, err := raceTests(ctx, 250*time.Millisecond, fallbackConfig, func(fallbackUrl string) (*SearchResult, error) {
-		dialer, err := getStreamDialer(ctx, fallbackUrl)
+		dialer, err := configModule.NewStreamDialer(ctx, fallbackUrl)
 		if err != nil {
 			return nil, fmt.Errorf("getStreamDialer failed: %w", err)
 		}
@@ -361,7 +346,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 }
 
 // Attempts to create a new Dialer using only proxyless (DNS and TLS) strategies
-func (f *StrategyFinder) NewProxylessDialer(ctx context.Context, testDomains []string, config configConfig) (transport.StreamDialer, error) {
+func (f *StrategyFinder) newProxylessDialer(ctx context.Context, testDomains []string, config configConfig) (transport.StreamDialer, error) {
 	resolver, err := f.findDNS(ctx, testDomains, config.DNS)
 	if err != nil {
 		return nil, err
@@ -402,7 +387,7 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 		testDomains[di] = makeFullyQualified(domain)
 	}
 
-	dialer, err := f.NewProxylessDialer(ctx, testDomains, parsedConfig)
+	dialer, err := f.newProxylessDialer(ctx, testDomains, parsedConfig)
 	if err != nil {
 		return f.findFallback(ctx, testDomains, parsedConfig.FALLBACK)
 	}

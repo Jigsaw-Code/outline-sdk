@@ -82,16 +82,16 @@ tcp:
 
 A fallback configuration is used if none of the proxyless strategies are able to connect. For example it can specify a backup proxy server to attempt the user's connection. Using a fallback will be slower to start, since first the other DNS/TLS strategies must fail/timeout.
 
-The fallback strings should be configURL config strings as defined in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Proxy_Protocols
+The fallback strings should be a valid StreamDialer configs as defined in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Proxy_Protocols
 
-#### An Outline SS server
+#### Shadowsocks server example
 
 ```yaml
 fallback:
   - ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1
 ```
 
-#### A socks5 server
+#### SOCKS5 server example
 
 ```yaml
 fallback:
