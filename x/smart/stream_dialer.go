@@ -186,6 +186,33 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryConfig) ([]*sma
 	return rts, nil
 }
 
+// Test that a dialer is able to access all the given test domains. Returns nil if all tests succeed
+func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.StreamDialer, testDomains []string, transportCfg string) error {
+	for _, testDomain := range testDomains {
+		startTime := time.Now()
+
+		testAddr := net.JoinHostPort(testDomain, "443")
+		f.logCtx(ctx, "🏃 running test: '%v' (domain: %v)\n", transportCfg, testDomain)
+
+		ctx, cancel := context.WithTimeout(ctx, f.TestTimeout)
+		defer cancel()
+		testConn, err := dialer.DialStream(ctx, testAddr)
+		if err != nil {
+			f.logCtx(ctx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+			return err
+		}
+		tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
+		err = tlsConn.HandshakeContext(ctx)
+		tlsConn.Close()
+		if err != nil {
+			f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+			return err
+		}
+		f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
+	}
+	return nil
+}
+
 func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsConfig []dnsEntryConfig) (dns.Resolver, error) {
 	resolvers, err := f.dnsConfigToResolver(dnsConfig)
 	if err != nil {
@@ -247,28 +274,12 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 		if err != nil {
 			return nil, fmt.Errorf("WrapStreamDialer failed: %w", err)
 		}
-		for _, testDomain := range testDomains {
-			startTime := time.Now()
 
-			testAddr := net.JoinHostPort(testDomain, "443")
-			f.logCtx(ctx, "🏃 run TLS: '%v' (domain: %v)\n", transportCfg, testDomain)
-
-			ctx, cancel := context.WithTimeout(ctx, f.TestTimeout)
-			defer cancel()
-			testConn, err := tlsDialer.DialStream(ctx, testAddr)
-			if err != nil {
-				f.logCtx(ctx, "🏁 got TLS: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-				return nil, err
-			}
-			tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
-			err = tlsConn.HandshakeContext(ctx)
-			tlsConn.Close()
-			if err != nil {
-				f.logCtx(ctx, "🏁 got TLS: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-				return nil, err
-			}
-			f.logCtx(ctx, "🏁 got TLS: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
+		err = f.testDialer(ctx, tlsDialer, testDomains, transportCfg)
+		if err != nil {
+			return nil, err
 		}
+
 		return &SearchResult{tlsDialer, transportCfg}, nil
 	})
 	if err != nil {
@@ -314,28 +325,11 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 			return nil, fmt.Errorf("getStreamDialer failed: %w", err)
 		}
 
-		for _, testDomain := range testDomains {
-			startTime := time.Now()
-			testAddr := net.JoinHostPort(testDomain, "443")
-
-			f.logCtx(ctx, "🏃 run Fallback: '%v' (domain: %v)\n", fallbackUrl, testDomain)
-
-			ctx, cancel := context.WithTimeout(ctx, f.TestTimeout)
-			defer cancel()
-			testConn, err := dialer.DialStream(ctx, testAddr)
-			if err != nil {
-				f.logCtx(ctx, "🏁 got Fallback: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", fallbackUrl, testDomain, time.Since(startTime), err)
-			}
-			tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
-			err = tlsConn.HandshakeContext(ctx)
-			tlsConn.Close()
-			if err != nil {
-				f.logCtx(ctx, "🏁 got Fallback: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", fallbackUrl, testDomain, time.Since(startTime), err)
-				return nil, err
-			} else {
-				f.logCtx(ctx, "🏁 got Fallback: '%v' (domain: %v), duration=%v, status=ok ✅\n", fallbackUrl, testDomain, time.Since(startTime))
-			}
+		err = f.testDialer(ctx, dialer, testDomains, fallbackUrl)
+		if err != nil {
+			return nil, err
 		}
+
 		return &SearchResult{dialer, fallbackUrl}, nil
 	})
 	if err != nil {
