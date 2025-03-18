@@ -95,8 +95,9 @@ type dnsEntryConfig struct {
 }
 
 type configConfig struct {
-	DNS []dnsEntryConfig `yaml:"dns,omitempty"`
-	TLS []string         `yaml:"tls,omitempty"`
+	DNS      []dnsEntryConfig `yaml:"dns,omitempty"`
+	TLS      []string         `yaml:"tls,omitempty"`
+	FALLBACK []string         `yaml:"fallback,omitempty"`
 }
 
 // newDNSResolverFromEntry creates a [dns.Resolver] based on the config, returning the resolver and
@@ -185,6 +186,33 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryConfig) ([]*sma
 	return rts, nil
 }
 
+// Test that a dialer is able to access all the given test domains. Returns nil if all tests succeed
+func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.StreamDialer, testDomains []string, transportCfg string) error {
+	for _, testDomain := range testDomains {
+		startTime := time.Now()
+
+		testAddr := net.JoinHostPort(testDomain, "443")
+		f.logCtx(ctx, "🏃 running test: '%v' (domain: %v)\n", transportCfg, testDomain)
+
+		ctx, cancel := context.WithTimeout(ctx, f.TestTimeout)
+		defer cancel()
+		testConn, err := dialer.DialStream(ctx, testAddr)
+		if err != nil {
+			f.logCtx(ctx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+			return err
+		}
+		tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
+		err = tlsConn.HandshakeContext(ctx)
+		tlsConn.Close()
+		if err != nil {
+			f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+			return err
+		}
+		f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
+	}
+	return nil
+}
+
 func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsConfig []dnsEntryConfig) (dns.Resolver, error) {
 	resolvers, err := f.dnsConfigToResolver(dnsConfig)
 	if err != nil {
@@ -246,28 +274,12 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 		if err != nil {
 			return nil, fmt.Errorf("WrapStreamDialer failed: %w", err)
 		}
-		for _, testDomain := range testDomains {
-			startTime := time.Now()
 
-			testAddr := net.JoinHostPort(testDomain, "443")
-			f.logCtx(ctx, "🏃 run TLS: '%v' (domain: %v)\n", transportCfg, testDomain)
-
-			ctx, cancel := context.WithTimeout(ctx, f.TestTimeout)
-			defer cancel()
-			testConn, err := tlsDialer.DialStream(ctx, testAddr)
-			if err != nil {
-				f.logCtx(ctx, "🏁 got TLS: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-				return nil, err
-			}
-			tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
-			err = tlsConn.HandshakeContext(ctx)
-			tlsConn.Close()
-			if err != nil {
-				f.logCtx(ctx, "🏁 got TLS: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-				return nil, err
-			}
-			f.logCtx(ctx, "🏁 got TLS: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
+		err = f.testDialer(ctx, tlsDialer, testDomains, transportCfg)
+		if err != nil {
+			return nil, err
 		}
+
 		return &SearchResult{tlsDialer, transportCfg}, nil
 	})
 	if err != nil {
@@ -292,23 +304,44 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 	}), nil
 }
 
-// NewDialer uses the config in configBytes to search for a strategy that unblocks DNS and TLS for all of the testDomains, returning a dialer with the found strategy.
-// It returns an error if no strategy was found that unblocks the testDomains.
-// The testDomains must be domains with a TLS service running on port 443.
-func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, configBytes []byte) (transport.StreamDialer, error) {
-	var parsedConfig configConfig
-	err := yaml.Unmarshal(configBytes, &parsedConfig)
+// Return the fastest fallback dialer that is able to access all the testDomans
+func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string, fallbackConfig []string) (transport.StreamDialer, error) {
+	if len(fallbackConfig) == 0 {
+		return nil, errors.New("no fallback was specified")
+	}
+
+	ctx, searchDone := context.WithCancel(ctx)
+	defer searchDone()
+	raceStart := time.Now()
+	type SearchResult struct {
+		Dialer transport.StreamDialer
+		Config string
+	}
+	var configModule = configurl.NewDefaultProviders()
+
+	fallback, err := raceTests(ctx, 250*time.Millisecond, fallbackConfig, func(fallbackUrl string) (*SearchResult, error) {
+		dialer, err := configModule.NewStreamDialer(ctx, fallbackUrl)
+		if err != nil {
+			return nil, fmt.Errorf("getStreamDialer failed: %w", err)
+		}
+
+		err = f.testDialer(ctx, dialer, testDomains, fallbackUrl)
+		if err != nil {
+			return nil, err
+		}
+
+		return &SearchResult{dialer, fallbackUrl}, nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse config: %v", err)
+		return nil, fmt.Errorf("could not find a working fallback: %w", err)
 	}
+	f.log("🏆 selected fallback '%v' in %0.2fs\n\n", fallback.Config, time.Since(raceStart).Seconds())
+	return fallback.Dialer, nil
+}
 
-	// Make domain fully-qualified to prevent confusing domain search.
-	testDomains = append(make([]string, 0, len(testDomains)), testDomains...)
-	for di, domain := range testDomains {
-		testDomains[di] = makeFullyQualified(domain)
-	}
-
-	resolver, err := f.findDNS(ctx, testDomains, parsedConfig.DNS)
+// Attempts to create a new Dialer using only proxyless (DNS and TLS) strategies
+func (f *StrategyFinder) newProxylessDialer(ctx context.Context, testDomains []string, config configConfig) (transport.StreamDialer, error) {
+	resolver, err := f.findDNS(ctx, testDomains, config.DNS)
 	if err != nil {
 		return nil, err
 	}
@@ -326,8 +359,31 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 		}
 	}
 
-	if len(parsedConfig.TLS) == 0 {
+	if len(config.TLS) == 0 {
 		return dnsDialer, nil
 	}
-	return f.findTLS(ctx, testDomains, dnsDialer, parsedConfig.TLS)
+	return f.findTLS(ctx, testDomains, dnsDialer, config.TLS)
+}
+
+// NewDialer uses the config in configBytes to search for a strategy that unblocks DNS and TLS for all of the testDomains, returning a dialer with the found strategy.
+// It returns an error if no strategy was found that unblocks the testDomains.
+// The testDomains must be domains with a TLS service running on port 443.
+func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, configBytes []byte) (transport.StreamDialer, error) {
+	var parsedConfig configConfig
+	err := yaml.Unmarshal(configBytes, &parsedConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse config: %v", err)
+	}
+
+	// Make domain fully-qualified to prevent confusing domain search.
+	testDomains = append(make([]string, 0, len(testDomains)), testDomains...)
+	for di, domain := range testDomains {
+		testDomains[di] = makeFullyQualified(domain)
+	}
+
+	dialer, err := f.newProxylessDialer(ctx, testDomains, parsedConfig)
+	if err != nil {
+		return f.findFallback(ctx, testDomains, parsedConfig.FALLBACK)
+	}
+	return dialer, err
 }

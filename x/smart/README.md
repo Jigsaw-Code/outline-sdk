@@ -17,6 +17,9 @@ tls:
   - ""
   - split:2
   - tlsfrag:1
+
+fallback:
+  - ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1
 ```
 
 ### DNS Configuration
@@ -75,6 +78,26 @@ tcp:
 *   Each TLS transport is a string that specifies the transport to use.
 *   For example, `override:host=cloudflare.net|tlsfrag:1` specifies a transport that uses domain fronting with Cloudflare and TLS fragmentation. See the [config documentation](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format) for details.
 
+### Fallback Configuration
+
+A fallback configuration is used if none of the proxyless strategies are able to connect. For example it can specify a backup proxy server to attempt the user's connection. Using a fallback will be slower to start, since first the other DNS/TLS strategies must fail/timeout.
+
+The fallback strings should be a valid StreamDialer configs as defined in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Proxy_Protocols
+
+#### Shadowsocks server example
+
+```yaml
+fallback:
+  - ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1
+```
+
+#### SOCKS5 server example
+
+```yaml
+fallback:
+  - socks5://[USERINFO]@[HOST]:[PORT]
+```
+
 ### Using the Smart Dialer
 
 To use the Smart Dialer, create a `StrategyFinder` object and call the `NewDialer` method, passing in the list of test domains and the JSON config. The `NewDialer` method will return a `transport.StreamDialer` that can be used to create connections using the found strategy. For example:
@@ -98,6 +121,8 @@ tls:
   - ""
   - split:2
   - tlsfrag:1
+fallback:
+  - ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1
 `)
 
 dialer, err := finder.NewDialer(context.Background(), []string{"www.google.com"}, configBytes)
