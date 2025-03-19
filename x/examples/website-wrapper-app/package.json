@@ -1,8 +1,4 @@
 {
-  "keywords": [
-    "capacitor",
-    "mobile"
-  ],
   "dependencies": {
     "@ngrok/ngrok": "1.4.1",
     "http-proxy": "^1.18.1",
@@ -11,21 +7,19 @@
   "devDependencies": {
     "glob": "^11.0.1",
     "handlebars": "^4.7.8",
-    "rimraf": "^6.0.1",
     "vite": "^6.2.0"
   },
   "author": "Daniel LaCosse <daniellacosse@google.com>",
   "license": "Apache-2.0",
   "scripts": {
+    "build:app": "node ./.scripts/build_app.mjs",
     "build:mobileproxy": "bash ./.scripts/build_mobileproxy.sh",
-    "build:template": "node ./.scripts/build_template.mjs",
-    "clean": "rimraf node_modules/ output/",
+    "clean": "npx rimraf node_modules/ output/",
+    "open:android": "cd output/wrapper_app && npm install && npx cap sync android && npx cap open android",
+    "open:ios": "cd output/wrapper_app && npm install && npx cap sync ios && npx cap open ios",
     "reset": "npm run clean && npm ci",
+    "start:app": "node ./.scripts/start_app.mjs",
     "start:proxy": "node ./.scripts/start_proxy.mjs"
   },
-  "private": true,
-  "workspaces": [
-    "navigation_proxy",
-    "output/wrapper_app"
-  ]
+  "private": true
 }

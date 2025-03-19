@@ -5,19 +5,16 @@ import path from "node:path";
 import { createServer } from "vite";
 import { randomUUID } from "node:crypto";
 
-const NAVIGATION_PATH = `/${randomUUID()}`;
-const TARGET_DOMAIN = process.env.TARGET_DOMAIN || "www.example.com";
-
-if (!process.env.NGROK_TOKEN) {
-  throw new Error("NGROK_TOKEN must be set!");
-}
-
 const getLocalServerUrl = (server) => {
   const addressResult = server.address();
   return typeof addressResult === "string" ? addressResult : `http://[${addressResult.address}]:${addressResult.port}`;
 };
 
-export default function main() {
+export default function main({ 
+  mainDomain = process.env.TARGET_DOMAIN || "www.example.com",
+  authtoken = process.env.NGROK_TOKEN,
+  navigationPath = `/${randomUUID()}`
+}) {
   return new Promise(async (resolve) => {
     const navigationServer = await createServer({
       root: path.join(process.cwd(), "navigation_proxy"),
@@ -30,14 +27,14 @@ export default function main() {
   
     const proxyMiddleware = httpProxy.createProxyServer({});
     const proxyServer = http.createServer((request, response) => {
-      if (request.url.startsWith(NAVIGATION_PATH)) {
+      if (request.url.startsWith(navigationPath)) {
         return proxyMiddleware.web(request, response, {
           target: getLocalServerUrl(navigationServer.httpServer),
         });
       }
   
       return proxyMiddleware.web(request, response, {
-        target: `https://${TARGET_DOMAIN}`,
+        target: `https://${mainDomain}`,
         changeOrigin: true
       });
     });
@@ -46,24 +43,30 @@ export default function main() {
       const listener = await ngrok.forward({
         addr: getLocalServerUrl(proxyServer),
         authtoken_from_env: false,
-        authtoken: process.env.NGROK_TOKEN,
+        authtoken,
         verify_upstream_tls: false,
         response_header_add: [
           "Allow-Access-Control-Origin: *",
           "Access-Control-Allow-Headers: *",
         ],
       });
+
+      const navigationUrl = listener.url() + navigationPath;
   
-      console.log("Externally accessible navigation URL:", listener.url() + NAVIGATION_PATH);
+      console.log("Externally accessible navigation URL:", navigationUrl);
 
       resolve({
-        mainDomain: listener.url().replace('https://', '').replace('http://', ''),
-        navigationUrl: listener.url() + NAVIGATION_PATH
+        mainDomain: listener.url().replace(/$https?\:\/\//, ''),
+        navigationUrl
       })
     });  
   });
 }
 
 if (import.meta.url.endsWith(process.argv[1])) {
+  if (!process.env.NGROK_TOKEN) {
+    throw new Error("NGROK_TOKEN must be set!");
+  }
+  
   main().catch(console.error);
 }
