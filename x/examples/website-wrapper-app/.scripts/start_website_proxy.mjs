@@ -51,7 +51,7 @@ export default function main({
       console.log("Externally accessible URL:", navigationUrl);
 
       resolve({
-        mainDomain: listener.url().replace(/$https?\:\/\//, ''),
+        entryDomain: listener.url().replace("https://", ''),
         navigationUrl
       })
     });  
