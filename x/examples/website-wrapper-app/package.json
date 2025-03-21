@@ -18,8 +18,8 @@
     "build:wrapper_app_template": "node ./.scripts/build_wrapper_app_template.mjs",
     "build": "bash ./.scripts/build.mjs",
     "clean": "npx rimraf node_modules/ output/",
-    "open:android": "cd output/wrapper_app && npx cap open android",
-    "open:ios": "cd output/wrapper_app && npx cap open ios",
+    "open:android": "cd output/wrapper_app && npx run open:android",
+    "open:ios": "cd output/wrapper_app && npx run open:ios",
     "reset": "npm run clean && npm ci",
     "start:website_proxy": "node ./.scripts/start_website_proxy.mjs",
     "start": "node ./.scripts/start.mjs"
