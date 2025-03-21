@@ -1,7 +1,9 @@
 {
   "dependencies": {
     "@ngrok/ngrok": "1.4.1",
+    "archiver": "^7.0.1",
     "http-proxy": "^1.18.1",
+    "minimist": "^1.2.8",
     "serve-handler": "6.1.6"
   },
   "devDependencies": {
@@ -12,14 +14,14 @@
   "author": "Daniel LaCosse <daniellacosse@google.com>",
   "license": "Apache-2.0",
   "scripts": {
-    "build:app": "node ./.scripts/build_app.mjs",
-    "build:mobileproxy": "bash ./.scripts/build_mobileproxy.sh",
+    "build:wrapper_app_template": "node ./.scripts/build_wrapper_app_template.mjs",
+    "build:sdk_mobileproxy": "bash ./.scripts/build_sdk_mobileproxy.sh",
     "clean": "npx rimraf node_modules/ output/",
-    "open:android": "cd output/wrapper_app && npm install && npx cap sync android && npx cap open android",
-    "open:ios": "cd output/wrapper_app && npm install && npx cap sync ios && npx cap open ios",
     "reset": "npm run clean && npm ci",
-    "start:app": "node ./.scripts/start_app.mjs",
-    "start:proxy": "node ./.scripts/start_proxy.mjs"
+    "start:website_proxy": "node ./.scripts/start_website_proxy.mjs",
+    "start": "node ./.scripts/start.mjs",
+    "open:ios": "cd output/wrapper_app && npx cap open ios",
+    "open:android": "cd output/wrapper_app && npx cap open android"
   },
   "private": true
 }
