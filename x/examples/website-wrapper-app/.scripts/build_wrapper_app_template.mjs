@@ -8,6 +8,7 @@ import path from "node:path";
 import minimist from "minimist";
 
 import {
+  DEFAULT_SMART_DIALER_CONFIG,
   OUTPUT_DIR,
   SDK_MOBILEPROXY_OUTPUT_DIR,
   WRAPPER_APP_OUTPUT_DIR,
@@ -21,6 +22,7 @@ export default async function main(
     platform,
     entryDomain = "www.example.com",
     navigationUrl,
+    smartDialerConfig = DEFAULT_SMART_DIALER_CONFIG,
     additionalDomains = [],
   },
 ) {
@@ -57,7 +59,11 @@ export default async function main(
       destinationFilepath.replace(/\.handlebars$/, ""),
       template({
         entryDomain,
-        navigationUrl: navigationUrl ? navigationUrl : `https://${entryDomain}/`,
+        navigationUrl: navigationUrl
+          ? navigationUrl
+          : `https://${entryDomain}/`,
+        domainList: [entryDomain, ...additionalDomains].join(","),
+        smartDialerConfig: JSON.stringify(smartDialerConfig),
         additionalDomains,
       }),
       "utf8",
@@ -65,7 +71,7 @@ export default async function main(
   }
 
   if (!fs.existsSync(SDK_MOBILEPROXY_OUTPUT_DIR)) {
-    await promisify(exec)(`npm run build:sdk_mobileproxy ${platform}`)
+    await promisify(exec)(`npm run build:sdk_mobileproxy ${platform}`);
   }
 
   fs.mvSync(
@@ -106,5 +112,10 @@ if (import.meta.url.endsWith(process.argv[1])) {
     throw new Error("`--platform` must be set!");
   }
 
-  main(args).catch(console.error);
+  main({
+    ...args,
+    additionalDomains: args.additionalDomains.split(/,\s*/) ?? [],
+    smartDialerConfig: JSON.parse(args.smartDialerConfig),
+  })
+    .catch(console.error);
 }

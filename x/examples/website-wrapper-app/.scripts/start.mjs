@@ -7,20 +7,16 @@ import startWebsiteProxy from "./start_website_proxy.mjs";
 import buildWrapperAppTemplate from "./build_wrapper_app_template.mjs";
 import minimist from "minimist";
 
-(async function(){
+(async function () {
   const args = minimist(process.argv.slice(2));
 
   await npmRun(`build:sdk_mobileproxy ${args.platform}`);
 
-  if (args.proxyToken) {
-    const proxyLocations = await startWebsiteProxy(args);
-    
-    await buildWrapperAppTemplate({...args, ...proxyLocations});  
-  } else {
-    await buildWrapperAppTemplate(args);
-  }
+  const proxyLocations = await startWebsiteProxy(args);
+
+  await buildWrapperAppTemplate({ ...args, ...proxyLocations });
 
   await npmRun(`open:${args.platform}`);
 })();
 
-const npmRun = script => promisify(exec)(`npm run ${script}`);
+const npmRun = (script) => promisify(exec)(`npm run ${script}`);

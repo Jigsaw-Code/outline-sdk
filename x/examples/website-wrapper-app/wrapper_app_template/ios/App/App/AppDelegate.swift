@@ -19,8 +19,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func applicationDidBecomeActive(_ application: UIApplication) {
         var dialerError: NSError?
         if let dialer = MobileproxyNewSmartStreamDialer(
-            MobileproxyNewListFromLines(Config.domain),
-            "{\"dns\":[{\"https\":{\"name\":\"9.9.9.9\"}}],\"tls\":[\"\",\"split:1\",\"split:2\",\"tlsfrag:1\"]}",
+            MobileproxyNewListFromLines(Config.domainList),
+            Config.smartDialer,
             MobileproxyNewStderrLogWriter(),
             &dialerError
         ) {

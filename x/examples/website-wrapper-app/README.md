@@ -8,7 +8,7 @@
 
 ```sh
 npm run clean # no need to do this on a fresh install
-npm run build -- --platform=ios --entryDomain="www.mysite.com" --additionalDomains="cdn.mysite.com,auth.mysite.com"
+npm run build -- --platform=ios --entryDomain="www.mysite.com" --additionalDomains="cdn.mysite.com,auth.mysite.com" --smartDialerConfig="<MY_SMART_DIALER_CONFIG_TEXT>"
 ```
 
 XCode will automatically open the compiled project. Click the "play" button in XCode to start your iOS app! You can also 
@@ -33,7 +33,7 @@ npm run start -- --platform=ios \
 
 ```sh
 npm run clean # no need to do this on a fresh install
-npm run build -- --platform=android --entryDomain="www.mysite.com" --additionalDomains="cdn.mysite.com,auth.mysite.com"
+npm run build -- --platform=android --entryDomain="www.mysite.com" --additionalDomains="cdn.mysite.com,auth.mysite.com" --smartDialerConfig="<MY_SMART_DIALER_CONFIG_TEXT>"
 ```
 
 Click the "play" button in Android Studio to start your Android app!
