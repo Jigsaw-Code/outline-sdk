@@ -14,7 +14,7 @@ import {
   WRAPPER_APP_OUTPUT_SDK_MOBILEPROXY_DIR,
   WRAPPER_APP_OUTPUT_ZIP,
   WRAPPER_APP_TEMPLATE_DIR,
-} from "./_constants.mjs";
+} from "./lib/constants.mjs";
 
 export default async function main(
   {
@@ -101,6 +101,10 @@ function zip(root, destination) {
 
 if (import.meta.url.endsWith(process.argv[1])) {
   const args = minimist(process.argv.slice(2));
+
+  if (args.platform === undefined) {
+    throw new Error("`--platform` must be set!");
+  }
 
   main(args).catch(console.error);
 }
