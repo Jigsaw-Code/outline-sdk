@@ -11,7 +11,7 @@ export const WRAPPER_APP_OUTPUT_ZIP = path.join(OUTPUT_DIR, "wrapper_app.zip");
 
 export const SDK_MOBILEPROXY_OUTPUT_DIR = path.join(OUTPUT_DIR, "mobileproxy");
 export const WRAPPER_APP_OUTPUT_SDK_MOBILEPROXY_DIR = path.join(
-  WRAPPER_APP_DIR,
+  WRAPPER_APP_OUTPUT_DIR,
   "mobileproxy",
 );
 

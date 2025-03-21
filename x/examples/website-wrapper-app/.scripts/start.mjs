@@ -10,13 +10,9 @@ import minimist from "minimist";
 (async function () {
   const args = minimist(process.argv.slice(2));
 
-  await npmRun(`build:sdk_mobileproxy ${args.platform}`);
-
   const proxyLocations = await startWebsiteProxy(args);
 
   await buildWrapperAppTemplate({ ...args, ...proxyLocations });
 
-  await npmRun(`open:${args.platform}`);
+  await promisify(exec)(`npm run open:${args.platform}`);
 })();
-
-const npmRun = (script) => promisify(exec)(`npm run ${script}`);

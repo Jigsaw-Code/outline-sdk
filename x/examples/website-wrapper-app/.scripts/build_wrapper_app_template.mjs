@@ -34,11 +34,13 @@ export default async function main(
     },
   );
 
+  console.log("Building project from template...");
+
   for (const sourceFilepath of sourceFilepaths) {
     const destinationFilepath = path.join(
-      OUTPUT_DIR,
+      WRAPPER_APP_OUTPUT_DIR,
       path.relative(
-        WRAPPER_APP_OUTPUT_DIR,
+        WRAPPER_APP_TEMPLATE_DIR,
         sourceFilepath,
       ),
     );
@@ -71,20 +73,27 @@ export default async function main(
   }
 
   if (!fs.existsSync(SDK_MOBILEPROXY_OUTPUT_DIR)) {
+    console.log(`Building mobileproxy for ${platform}...`);
+
     await promisify(exec)(`npm run build:sdk_mobileproxy ${platform}`);
   }
 
-  fs.mvSync(
+  console.log("Copying mobileproxy files into the project...");
+
+  fs.cpSync(
     SDK_MOBILEPROXY_OUTPUT_DIR,
     WRAPPER_APP_OUTPUT_SDK_MOBILEPROXY_DIR,
+    { recursive: true },
   );
 
+  console.log("Installing external dependencies for the project...");
   await promisify(exec)(`
     cd ${WRAPPER_APP_OUTPUT_DIR}
-    npm ci
+    npm install
     npx cap sync ${platform}
   `);
 
+  console.log("Zipping project...");
   await zip(WRAPPER_APP_OUTPUT_DIR, WRAPPER_APP_OUTPUT_ZIP);
 }
 

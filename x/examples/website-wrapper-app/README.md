@@ -7,7 +7,7 @@
 * You will need [XCode](https://developer.apple.com/xcode/) and [cocoapods](https://cocoapods.org/). [Please follow CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#ios-requirements)
 
 ```sh
-npm run clean # no need to do this on a fresh install
+npm run reset
 npm run build -- --platform=ios --entryDomain="www.mysite.com" --additionalDomains="cdn.mysite.com,auth.mysite.com" --smartDialerConfig="<MY_SMART_DIALER_CONFIG_TEXT>"
 ```
 

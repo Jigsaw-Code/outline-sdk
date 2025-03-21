@@ -16,7 +16,7 @@
   "scripts": {
     "build:sdk_mobileproxy": "bash ./.scripts/build_sdk_mobileproxy.sh",
     "build:wrapper_app_template": "node ./.scripts/build_wrapper_app_template.mjs",
-    "build": "bash ./.scripts/build.mjs",
+    "build": "node ./.scripts/build.mjs",
     "clean": "npx rimraf node_modules/ output/",
     "open:android": "cd output/wrapper_app && npx run open:android",
     "open:ios": "cd output/wrapper_app && npx run open:ios",
