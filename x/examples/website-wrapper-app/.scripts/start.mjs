@@ -14,5 +14,6 @@ import minimist from "minimist";
 
   await buildWrapperAppTemplate({ ...args, ...proxyLocations });
 
+  // TODO: not working
   await promisify(exec)(`npm run open:${args.platform}`);
 })();

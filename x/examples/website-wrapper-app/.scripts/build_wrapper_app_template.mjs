@@ -95,6 +95,8 @@ export default async function main(
 
   console.log("Zipping project...");
   await zip(WRAPPER_APP_OUTPUT_DIR, WRAPPER_APP_OUTPUT_ZIP);
+
+  console.log("Project ready!");
 }
 
 function zip(root, destination) {
