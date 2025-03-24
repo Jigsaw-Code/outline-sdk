@@ -2,8 +2,6 @@ module github.com/Jigsaw-Code/outline-sdk/x
 
 go 1.23.0
 
-toolchain go1.24.1
-
 require (
 	github.com/Jigsaw-Code/outline-sdk v0.0.19
 	// Use github.com/Psiphon-Labs/psiphon-tunnel-core@staging-client as per
