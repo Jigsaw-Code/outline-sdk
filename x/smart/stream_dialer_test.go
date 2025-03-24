@@ -1,27 +1,14 @@
 package smart
 
 import (
-	//"bytes"
 	"context"
-	//"crypto/tls"
-	//"errors"
-	//"fmt"
 	"io"
 	"net"
-
-	//"net/http"
-	//"net/http/httptest"
-	//"strings"
-	//"sync"
 	"testing"
 	"time"
 
-	//"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	//"github.com/Jigsaw-Code/outline-sdk/transport/shadowsocks"
-	//"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 	"github.com/stretchr/testify/require"
-	//"gopkg.in/yaml.v3"
 )
 
 // Test helpers
@@ -37,10 +24,10 @@ func (m *mockStreamDialer) DialStream(ctx context.Context, addr string) (transpo
 
 // mockPacketDialer is a mock implementation of transport.PacketDialer for testing.
 type mockPacketDialer struct {
-	dialFunc func(ctx context.Context, addr string) (transport.PacketConn, error)
+	dialFunc func(ctx context.Context, addr string) (net.PacketConn, error)
 }
 
-func (m *mockPacketDialer) DialPacket(ctx context.Context, addr string) (transport.PacketConn, error) {
+func (m *mockPacketDialer) DialPacket(ctx context.Context, addr string) (net.PacketConn, error) {
 	return m.dialFunc(ctx, addr)
 }
 
