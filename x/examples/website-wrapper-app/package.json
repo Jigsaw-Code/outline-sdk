@@ -2,6 +2,7 @@
   "dependencies": {
     "@ngrok/ngrok": "1.4.1",
     "archiver": "^7.0.1",
+    "chalk": "^5.4.1",
     "http-proxy": "^1.18.1",
     "minimist": "^1.2.8",
     "serve-handler": "6.1.6"
@@ -21,7 +22,7 @@
     "open:android": "cd output/wrapper_app && npm run open:android",
     "open:ios": "cd output/wrapper_app && npm run open:ios",
     "reset": "npm run clean && npm ci",
-    "start:website_proxy": "node ./.scripts/start_website_proxy.mjs",
+    "start:navigation_proxy": "node ./.scripts/start_navigation_proxy.mjs",
     "start": "node ./.scripts/start.mjs"
   },
   "private": true

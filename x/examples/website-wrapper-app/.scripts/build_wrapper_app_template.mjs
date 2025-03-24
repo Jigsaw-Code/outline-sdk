@@ -1,6 +1,7 @@
 import { exec } from "node:child_process";
 import { glob } from "glob";
 import { promisify } from "node:util";
+import chalk from "chalk";
 import archiver from "archiver";
 import fs from "node:fs";
 import handlebars from "handlebars";
@@ -25,6 +26,12 @@ export default async function main(
     additionalDomains = [],
   },
 ) {
+  if (!fs.existsSync(SDK_MOBILEPROXY_OUTPUT_DIR)) {
+    console.log(`Building the Outline SDK mobileproxy library for ${platform}...`);
+
+    await promisify(exec)(`npm run build:sdk_mobileproxy ${platform}`);
+  }
+
   const sourceFilepaths = await glob(
     path.join(WRAPPER_APP_TEMPLATE_DIR, "**", "*"),
     {
@@ -56,6 +63,10 @@ export default async function main(
       fs.readFileSync(sourceFilepath, "utf8"),
     );
 
+    if (typeof additionalDomains === "string") {
+      additionalDomains = [additionalDomains];
+    }
+
     fs.writeFileSync(
       destinationFilepath.replace(/\.handlebars$/, ""),
       template({
@@ -63,18 +74,12 @@ export default async function main(
         navigationUrl: navigationUrl
           ? navigationUrl
           : `https://${entryDomain}/`,
-        domainList: [entryDomain, ...additionalDomains].join("\n"),
-        smartDialerConfig: JSON.stringify(smartDialerConfig).replaceAll('"', "'"),
+        domainList: [entryDomain, ...additionalDomains].join("\\n"),
+        smartDialerConfig: typeof smartDialerConfig === "object" ? JSON.stringify(smartDialerConfig).replaceAll('"',  '\\"') : smartDialerConfig,
         additionalDomains,
       }),
       "utf8",
     );
-  }
-
-  if (!fs.existsSync(SDK_MOBILEPROXY_OUTPUT_DIR)) {
-    console.log(`Building mobileproxy for ${platform}...`);
-
-    await promisify(exec)(`npm run build:sdk_mobileproxy ${platform}`);
   }
 
   console.log("Copying mobileproxy files into the project...");
@@ -92,7 +97,7 @@ export default async function main(
     npx cap sync ${platform}
   `);
 
-  console.log("Zipping project...");
+  console.log(`Zipping project to ${chalk.blue(WRAPPER_APP_OUTPUT_ZIP)}...`);
   await zip(WRAPPER_APP_OUTPUT_DIR, WRAPPER_APP_OUTPUT_ZIP);
 
   console.log("Project ready!");

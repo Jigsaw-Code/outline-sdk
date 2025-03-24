@@ -18,4 +18,5 @@ else
 fi
 
 cd ../..
+rm -rf "$(pwd)/mobileproxy"
 mv "$(pwd)/outline-sdk/x/out" "$(pwd)/mobileproxy"

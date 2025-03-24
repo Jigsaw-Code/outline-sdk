@@ -2,6 +2,8 @@ import path from "node:path";
 
 export const OUTPUT_DIR = path.join(process.cwd(), "output");
 
+export const NAVIGATION_PROXY_DIR = path.join(process.cwd(), "navigation_proxy");
+
 export const WRAPPER_APP_TEMPLATE_DIR = path.join(
   process.cwd(),
   "wrapper_app_template",
