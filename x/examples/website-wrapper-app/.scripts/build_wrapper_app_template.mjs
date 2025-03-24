@@ -9,7 +9,6 @@ import minimist from "minimist";
 
 import {
   DEFAULT_SMART_DIALER_CONFIG,
-  OUTPUT_DIR,
   SDK_MOBILEPROXY_OUTPUT_DIR,
   WRAPPER_APP_OUTPUT_DIR,
   WRAPPER_APP_OUTPUT_SDK_MOBILEPROXY_DIR,
@@ -64,8 +63,8 @@ export default async function main(
         navigationUrl: navigationUrl
           ? navigationUrl
           : `https://${entryDomain}/`,
-        domainList: [entryDomain, ...additionalDomains].join(","),
-        smartDialerConfig: JSON.stringify(smartDialerConfig),
+        domainList: [entryDomain, ...additionalDomains].join("\n"),
+        smartDialerConfig: JSON.stringify(smartDialerConfig).replaceAll('"', "'"),
         additionalDomains,
       }),
       "utf8",
