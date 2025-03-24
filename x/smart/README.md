@@ -2,23 +2,24 @@
 
 The **Smart Dialer** searches for a strategy that unblocks DNS and TLS for a given list of test domains. It takes a config describing multiple strategies to pick from.
 
-## JSON config for the Smart Dialer
+## YAML config for the Smart Dialer
 
-The config that the Smart Dialer takes is in a JSON format. Here is an example:
+The config that the Smart Dialer takes is in a YAML format. Here is an example:
 
-```json
-{
-  "dns": [
-      {"system": {}},
-      {"https": {"name": "8.8.8.8"}},
-      {"https": {"name": "9.9.9.9"}}
-  ],
-  "tls": [
-      "",
-      "split:2",
-      "tlsfrag:1"
-  ]
-}
+```yaml
+dns:
+  - system: {}
+  - https:
+      name: 8.8.8.8
+  - https:
+      name: 9.9.9.9
+tls:
+  - ""
+  - split:2
+  - tlsfrag:1
+
+fallback:
+  - ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1
 ```
 
 ### DNS Configuration
@@ -33,14 +34,10 @@ The config that the Smart Dialer takes is in a JSON format. Here is an example:
 
 #### DNS-over-HTTPS Resolver (DoH)
 
-```json
-{
-  "https": {
-    "name": "dns.google",
-    "address": "8.8.8.8"
-  }
-}
-
+```yaml
+https:
+  name: dns.google
+  address: 8.8.8.8
 ```
 
 *   `name`: The domain name of the DoH server.
@@ -48,13 +45,10 @@ The config that the Smart Dialer takes is in a JSON format. Here is an example:
 
 #### DNS-over-TLS Resolver (DoT)
 
-```json
-{
-  "tls": {
-    "name": "dns.google",
-    "address": "8.8.8.8"
-  }
-}
+```yaml
+tls:
+  name: dns.google
+  address: 8.8.8.8
 ```
 
 *   `name`: The domain name of the DoT server.
@@ -62,24 +56,18 @@ The config that the Smart Dialer takes is in a JSON format. Here is an example:
 
 #### UDP Resolver
 
-```json
-{
-  "udp": {
-    "address": "8.8.8.8"
-  }
-}
+```yaml
+udp:
+  address: 8.8.8.8
 ```
 
 *   `address`: The host:port of the UDP resolver.
 
 #### TCP Resolver
 
-```json
-{
-  "tcp": {
-    "address": "8.8.8.8"
-  }
-}
+```yaml
+tcp:
+  address: 8.8.8.8
 ```
 
 *   `address`: The host:port of the TCP resolver.
@@ -89,6 +77,26 @@ The config that the Smart Dialer takes is in a JSON format. Here is an example:
 *   The `tls` field specifies a list of TLS transports to test.
 *   Each TLS transport is a string that specifies the transport to use.
 *   For example, `override:host=cloudflare.net|tlsfrag:1` specifies a transport that uses domain fronting with Cloudflare and TLS fragmentation. See the [config documentation](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format) for details.
+
+### Fallback Configuration
+
+A fallback configuration is used if none of the proxyless strategies are able to connect. For example it can specify a backup proxy server to attempt the user's connection. Using a fallback will be slower to start, since first the other DNS/TLS strategies must fail/timeout.
+
+The fallback strings should be a valid StreamDialer configs as defined in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Proxy_Protocols
+
+#### Shadowsocks server example
+
+```yaml
+fallback:
+  - ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1
+```
+
+#### SOCKS5 server example
+
+```yaml
+fallback:
+  - socks5://[USERINFO]@[HOST]:[PORT]
+```
 
 ### Using the Smart Dialer
 
@@ -103,18 +111,18 @@ finder := &smart.StrategyFinder{
 }
 
 configBytes := []byte(`
-{
-  "dns": [
-      {"system": {}},
-      {"https": {"name": "8.8.8.8"}},
-      {"https": {"name": "9.9.9.9"}}
-  ],
-  "tls": [
-      "",
-      "split:2",
-      "tlsfrag:1"
-  ]
-}
+dns:
+  - system: {}
+  - https:
+      name: 8.8.8.8
+  - https:
+      name: 9.9.9.9
+tls:
+  - ""
+  - split:2
+  - tlsfrag:1
+fallback:
+  - ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1
 `)
 
 dialer, err := finder.NewDialer(context.Background(), []string{"www.google.com"}, configBytes)
