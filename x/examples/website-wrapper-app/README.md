@@ -1,6 +1,6 @@
 # Outline SDK Web Wrapper
 
-## Building the app project template for **iOS**
+## Building the app project for **iOS**
 
 * You will need your site's domain and a list of domains that you would also like to load in your app.
 * You will need [go](https://golang.org/) to build the SDK library.
@@ -9,7 +9,7 @@
 
 ```sh
 npm run reset
-npm run build -- --platform=ios --entryDomain="www.mysite.com" --additionalDomains="cdn.mysite.com,auth.mysite.com" --smartDialerConfig="<MY_SMART_DIALER_CONFIG_TEXT>"
+npm run build:project -- --platform=ios --entryDomain="www.mysite.com" --additionalDomains="cdn.mysite.com,auth.mysite.com" --smartDialerConfig="<MY_SMART_DIALER_CONFIG_TEXT>"
 ```
 
 XCode will automatically open the compiled project. Click the "play" button in XCode to start your iOS app!
@@ -39,10 +39,10 @@ Many sites don't handle their own navigation - if this applies to you, you can r
 ```sh
 npm run start -- --platform=ios \
   --entryDomain="www.mysite.com" --additionalDomains="cdn.mysite.com,auth.mysite.com" \
-  --proxyToken="<YOUR_NGROK_AUTH_TOKEN>" --proxyNavigationPath="/nav"
+  --navigatorToken="<YOUR_NGROK_AUTH_TOKEN>" --navigatorPath="/nav"
 ```
 
-## Building the app project template for **Android**
+## Building the app project for **Android**
 
 * You will need your site's domain list of domains that you would also like to load in your app.
 * You will need [Node.js](https://nodejs.org/en/) for the web server.
@@ -51,7 +51,7 @@ npm run start -- --platform=ios \
 
 ```sh
 npm run clean # no need to do this on a fresh install
-npm run build -- --platform=android --entryDomain="www.mysite.com" --additionalDomains="cdn.mysite.com,auth.mysite.com" --smartDialerConfig="<MY_SMART_DIALER_CONFIG_TEXT>"
+npm run build:project -- --platform=android --entryDomain="www.mysite.com" --additionalDomains="cdn.mysite.com,auth.mysite.com" --smartDialerConfig="<MY_SMART_DIALER_CONFIG_TEXT>"
 ```
 
 Wait for Gradle to load your project. Click the "play" button in Android Studio to start your Android app!
@@ -72,7 +72,6 @@ Then, run the following command to generate and place the assets in the appropri
 npx capacitor-assets generate --android
 ```
 
-
 ### Viewing your site in the example navigation iframe
 
 Many sites don't handle their own navigation - if this applies to you, you can run a proxy to demonstrate what your site would look like in an example same-origin navigation iframe.
@@ -81,8 +80,8 @@ Many sites don't handle their own navigation - if this applies to you, you can r
 
 ```sh
 npm run start -- --platform=android \
-  --entryDomain="www.mysite.com" --additionalDomains="cdn.mysite.com,auth.mysite.com" \
-  --proxyToken="<YOUR_NGROK_AUTH_TOKEN>" --proxyNavigationPath="/nav"
+  --entryDomain="www.mysite.com" --additionalDomains="cdn.mysite.com, auth.mysite.com" \
+  --navigatorToken="<YOUR_NGROK_AUTH_TOKEN>" --navigatorPath="/nav"
 ```
 
 ## Troubleshooting

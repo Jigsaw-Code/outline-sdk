@@ -1,3 +1,17 @@
+// Copyright 2025 The Outline Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import { exec } from "node:child_process";
 import { glob } from "glob";
 import { promisify } from "node:util";
@@ -8,14 +22,29 @@ import handlebars from "handlebars";
 import path from "node:path";
 import minimist from "minimist";
 
-import {
-  DEFAULT_SMART_DIALER_CONFIG,
-  SDK_MOBILEPROXY_OUTPUT_DIR,
+import path from "node:path";
+
+const OUTPUT_DIR = path.join(process.cwd(), "output");
+
+const WRAPPER_APP_TEMPLATE_DIR = path.join(
+  process.cwd(),
+  "wrapper_app_project/template",
+);
+const WRAPPER_APP_OUTPUT_DIR = path.join(OUTPUT_DIR, "wrapper_app_project");
+const WRAPPER_APP_OUTPUT_ZIP = path.join(OUTPUT_DIR, "wrapper_app_project.zip");
+
+const SDK_MOBILEPROXY_OUTPUT_DIR = path.join(OUTPUT_DIR, "mobileproxy");
+const WRAPPER_APP_OUTPUT_SDK_MOBILEPROXY_DIR = path.join(
   WRAPPER_APP_OUTPUT_DIR,
-  WRAPPER_APP_OUTPUT_SDK_MOBILEPROXY_DIR,
-  WRAPPER_APP_OUTPUT_ZIP,
-  WRAPPER_APP_TEMPLATE_DIR,
-} from "./lib/constants.mjs";
+  "mobileproxy",
+);
+
+const DEFAULT_SMART_DIALER_CONFIG = {
+  dns: [{
+    https: { name: "9.9.9.9" },
+  }],
+  tls: ["", "split:1", "split:2", "tlsfrag:1"],
+};
 
 export default async function main(
   {
@@ -70,6 +99,7 @@ export default async function main(
     fs.writeFileSync(
       destinationFilepath.replace(/\.handlebars$/, ""),
       template({
+        platform,
         entryDomain,
         navigationUrl: navigationUrl
           ? navigationUrl
@@ -123,8 +153,12 @@ function zip(root, destination) {
 if (import.meta.url.endsWith(process.argv[1])) {
   const args = minimist(process.argv.slice(2));
 
-  if (args.platform === undefined) {
-    throw new Error("`--platform` must be set!");
+  if (!args.platform) {
+    throw new Error(`Parameter \`--platform\` not provided.`);
+  }
+
+  if (!args.entryDomain) {
+    throw new Error(`Parameter \`--entryDomain\` not provided.`);
   }
 
   main({

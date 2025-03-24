@@ -1,21 +1,32 @@
+// Copyright 2025 The Outline Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 import ngrok from "@ngrok/ngrok";
 import httpProxy from "http-proxy";
 import http from "node:http";
 import chalk from "chalk";
 import { createServer } from "vite";
 import minimist from "minimist";
-import { NAVIGATION_PROXY_DIR } from "./lib/constants.mjs";
 
 export default function main({
   entryDomain = "www.example.com",
-  proxyToken,
-  proxyNavigationPath = "/",
+  navigatorToken,
+  navigatorPath = "/",
 }) {
   return new Promise(async (resolve) => {
-    console.log(NAVIGATION_PROXY_DIR);
-
     const navigationServer = await createServer({
-      root: NAVIGATION_PROXY_DIR,
+      root: path.join(process.cwd(), "basic_navigator_example/src"),
       server: {
         allowedHosts: true,
       },
@@ -25,7 +36,7 @@ export default function main({
 
     const proxyMiddleware = httpProxy.createProxyServer({});
     const proxyServer = http.createServer((request, response) => {
-      if (request.url.startsWith(proxyNavigationPath)) {
+      if (request.url.startsWith(navigatorPath)) {
         return proxyMiddleware.web(request, response, {
           target: getLocalServerUrl(navigationServer.httpServer),
         });
@@ -41,7 +52,7 @@ export default function main({
       const listener = await ngrok.forward({
         addr: getLocalServerUrl(proxyServer),
         authtoken_from_env: false,
-        authtoken: proxyToken,
+        authtoken: navigatorToken,
         verify_upstream_tls: false,
         response_header_add: [
           "Allow-Access-Control-Origin: *",
@@ -49,7 +60,7 @@ export default function main({
         ],
       });
 
-      const navigationUrl = listener.url() + proxyNavigationPath;
+      const navigationUrl = listener.url() + navigatorPath;
 
       console.log("Navigation proxy running @", chalk.blue(navigationUrl));
 
@@ -71,12 +82,12 @@ const getLocalServerUrl = (server) => {
 if (import.meta.url.endsWith(process.argv[1])) {
   const args = minimist(process.argv.slice(2));
 
-  if (!args.proxyToken) {
-    throw new Error("`--proxyToken` must be set!");
+  if (!args.navigatorToken) {
+    throw new Error("`--navigatorToken` must be set!");
   }
 
-  if (!args.proxyNavigationPath) {
-    throw new Error("`--proxyNavigationPath` must be set!");
+  if (!args.navigatorPath) {
+    throw new Error("`--navigatorPath` must be set!");
   }
 
   main(args).catch(console.error);
