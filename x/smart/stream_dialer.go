@@ -95,11 +95,13 @@ type dnsEntryConfig struct {
 	TCP    *tcpEntryConfig   `yaml:"tcp,omitempty"`
 }
 
-type fallbackEntryConfig struct {
-	ConfigURL 	string 					`yaml:"configUrl,omitempty"`
+type psiphonEntryConfig struct {
 	// Don't verify the psiphon config format here, just pass it forward
 	Psiphon 	map[string]interface{} 	`yaml:"psiphon,omitempty"`
 }
+
+// can be either a configurl string or a psiphon config
+type fallbackEntryConfig any
 
 type configConfig struct {
 	DNS      []dnsEntryConfig 		`yaml:"dns,omitempty"`
@@ -327,20 +329,9 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 	var configModule = configurl.NewDefaultProviders()
 
 	fallback, err := raceTests(ctx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
-		if (fallbackConfig.Psiphon != nil) {
-			psiphonJSON, err := json.Marshal(fallbackConfig.Psiphon)
-			if err != nil {
-                f.logCtx(ctx, "Error marshaling to JSON: %v, %v", fallbackConfig.Psiphon, err)
-       		}
-
-			// TODO(laplante): pass this forward into psiphon.go, which takes raw json
-			f.logCtx(ctx, "❌ Psiphon is not yet supported, skipping: %v\n", string(psiphonJSON))
-			return nil, fmt.Errorf("psiphon is not yet supported: %v", string(psiphonJSON))
-		}
-
-		if (fallbackConfig.ConfigURL != "") {
-			fallbackUrl := fallbackConfig.ConfigURL
-			
+		switch v := fallbackConfig.(type) {
+		case string:
+			fallbackUrl := v
 			dialer, err := configModule.NewStreamDialer(ctx, fallbackUrl)
 			if err != nil {
 				return nil, fmt.Errorf("getStreamDialer failed: %w", err)
@@ -352,8 +343,20 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 			}
 
 			return &SearchResult{dialer, fallbackConfig}, nil
+		case map[string]interface{}:
+			psiphonJSON, err := json.Marshal(v)
+			if err != nil {
+				f.logCtx(ctx, "Error marshaling to JSON: %v, %v", v, err)
+			}
+
+			// TODO(laplante): pass this forward into psiphon.go, which takes raw json
+			f.logCtx(ctx, "❌ Psiphon is not yet supported, skipping: %v\n", string(psiphonJSON))
+			return nil, fmt.Errorf("psiphon is not yet supported: %v", string(psiphonJSON))
+		default:
+			return nil, fmt.Errorf("unknown fallback type: %v", v)
 		}
 
+		// If neither, it's an unknown type
 		return nil, fmt.Errorf("unknown fallback type: %v", fallbackConfig)
 	})
 	if err != nil {
