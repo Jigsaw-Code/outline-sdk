@@ -26,7 +26,7 @@ fallback:
   # Nonexistent Outline Server
   - ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1
   # Nonexistant Psiphon Config JSON. Not yet supported
-  - {
+  - psiphon: {
       "LocalHttpProxyPort":8081,
       "LocalSocksProxyPort":1081,
       "PropagationChannelId":"FFFFFFFFFFFFFFFF",

@@ -95,12 +95,7 @@ type dnsEntryConfig struct {
 	TCP    *tcpEntryConfig   `yaml:"tcp,omitempty"`
 }
 
-type psiphonEntryConfig struct {
-	// Don't verify the psiphon config format here, just pass it forward
-	Psiphon 	map[string]interface{} 	`yaml:"psiphon,omitempty"`
-}
-
-// can be either a configurl string or a psiphon config
+// can be either a configurl string or {psiphon: psiphonConfig}
 type fallbackEntryConfig any
 
 type configConfig struct {
