@@ -17,6 +17,7 @@ package smart
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -94,10 +95,16 @@ type dnsEntryConfig struct {
 	TCP    *tcpEntryConfig   `yaml:"tcp,omitempty"`
 }
 
+type fallbackEntryConfig struct {
+	ConfigURL 	string 					`yaml:"configUrl,omitempty"`
+	// Don't verify the psiphon config format here, just pass it forward
+	Psiphon 	map[string]interface{} 	`yaml:"psiphon,omitempty"`
+}
+
 type configConfig struct {
-	DNS      []dnsEntryConfig `yaml:"dns,omitempty"`
-	TLS      []string         `yaml:"tls,omitempty"`
-	FALLBACK []string         `yaml:"fallback,omitempty"`
+	DNS      []dnsEntryConfig 		`yaml:"dns,omitempty"`
+	TLS      []string         		`yaml:"tls,omitempty"`
+	Fallback []fallbackEntryConfig 	`yaml:"fallback,omitempty"`
 }
 
 // newDNSResolverFromEntry creates a [dns.Resolver] based on the config, returning the resolver and
@@ -305,8 +312,8 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 }
 
 // Return the fastest fallback dialer that is able to access all the testDomans
-func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string, fallbackConfig []string) (transport.StreamDialer, error) {
-	if len(fallbackConfig) == 0 {
+func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string, fallbackConfigs []fallbackEntryConfig) (transport.StreamDialer, error) {
+	if len(fallbackConfigs) == 0 {
 		return nil, errors.New("no fallback was specified")
 	}
 
@@ -315,22 +322,39 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 	raceStart := time.Now()
 	type SearchResult struct {
 		Dialer transport.StreamDialer
-		Config string
+		Config fallbackEntryConfig
 	}
 	var configModule = configurl.NewDefaultProviders()
 
-	fallback, err := raceTests(ctx, 250*time.Millisecond, fallbackConfig, func(fallbackUrl string) (*SearchResult, error) {
-		dialer, err := configModule.NewStreamDialer(ctx, fallbackUrl)
-		if err != nil {
-			return nil, fmt.Errorf("getStreamDialer failed: %w", err)
+	fallback, err := raceTests(ctx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
+		if (fallbackConfig.Psiphon != nil) {
+			psiphonJSON, err := json.Marshal(fallbackConfig.Psiphon)
+			if err != nil {
+                f.logCtx(ctx, "Error marshaling to JSON: %v, %v", fallbackConfig.Psiphon, err)
+       		}
+
+			// TODO(laplante): pass this forward into psiphon.go, which takes raw json
+			f.logCtx(ctx, "❌ Psiphon is not yet supported, skipping: %v\n", string(psiphonJSON))
+			return nil, fmt.Errorf("psiphon is not yet supported: %v", string(psiphonJSON))
 		}
 
-		err = f.testDialer(ctx, dialer, testDomains, fallbackUrl)
-		if err != nil {
-			return nil, err
+		if (fallbackConfig.ConfigURL != "") {
+			fallbackUrl := fallbackConfig.ConfigURL
+			
+			dialer, err := configModule.NewStreamDialer(ctx, fallbackUrl)
+			if err != nil {
+				return nil, fmt.Errorf("getStreamDialer failed: %w", err)
+			}
+
+			err = f.testDialer(ctx, dialer, testDomains, fallbackUrl)
+			if err != nil {
+				return nil, err
+			}
+
+			return &SearchResult{dialer, fallbackConfig}, nil
 		}
 
-		return &SearchResult{dialer, fallbackUrl}, nil
+		return nil, fmt.Errorf("unknown fallback type: %v", fallbackConfig)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not find a working fallback: %w", err)
@@ -383,7 +407,7 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 
 	dialer, err := f.newProxylessDialer(ctx, testDomains, parsedConfig)
 	if err != nil {
-		return f.findFallback(ctx, testDomains, parsedConfig.FALLBACK)
+		return f.findFallback(ctx, testDomains, parsedConfig.Fallback)
 	}
 	return dialer, err
 }
