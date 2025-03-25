@@ -16,10 +16,10 @@
   "license": "Apache-2.0",
   "scripts": {
     "build:sdk_mobileproxy": "bash ./.scripts/build_sdk_mobileproxy.sh",
-    "build:project": "node ./.scripts/wrapper_app_project/build.mjs",
+    "build:project": "node ./wrapper_app_project/.scripts/build.mjs",
     "clean": "npx rimraf node_modules/ output/",
-    "open:android": "cd output/wrapper_app && npm run open:android",
-    "open:ios": "cd output/wrapper_app && npm run open:ios",
+    "open:android": "cd output/wrapper_app_project && npm run open:android",
+    "open:ios": "cd output/wrapper_app_project && npm run open:ios",
     "reset": "npm run clean && npm ci",
     "start:navigator": "node ./basic_navigator_example/.scripts/start.mjs",
     "start": "node ./.scripts/start.mjs"

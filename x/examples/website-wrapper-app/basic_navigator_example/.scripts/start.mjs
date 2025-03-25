@@ -16,6 +16,7 @@ import ngrok from "@ngrok/ngrok";
 import httpProxy from "http-proxy";
 import http from "node:http";
 import chalk from "chalk";
+import path from "node:path";
 import { createServer } from "vite";
 import minimist from "minimist";
 

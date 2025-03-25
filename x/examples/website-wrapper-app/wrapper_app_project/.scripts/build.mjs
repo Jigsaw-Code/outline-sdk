@@ -22,8 +22,6 @@ import handlebars from "handlebars";
 import path from "node:path";
 import minimist from "minimist";
 
-import path from "node:path";
-
 const OUTPUT_DIR = path.join(process.cwd(), "output");
 
 const WRAPPER_APP_TEMPLATE_DIR = path.join(
@@ -163,8 +161,8 @@ if (import.meta.url.endsWith(process.argv[1])) {
 
   main({
     ...args,
-    additionalDomains: args.additionalDomains.split(/,\s*/) ?? [],
-    smartDialerConfig: JSON.parse(args.smartDialerConfig),
+    additionalDomains: args.additionalDomains?.split(/,\s*/) ?? [],
+    smartDialerConfig: args.smartDialerConfig ? JSON.parse(args.smartDialerConfig) : undefined,
   })
     .catch(console.error);
 }
