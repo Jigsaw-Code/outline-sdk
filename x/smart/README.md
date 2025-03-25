@@ -88,14 +88,14 @@ The fallback strings should be a valid StreamDialer configs as defined in https:
 
 ```yaml
 fallback:
-  - ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1
+  - configUrl: ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1
 ```
 
 #### SOCKS5 server example
 
 ```yaml
 fallback:
-  - socks5://[USERINFO]@[HOST]:[PORT]
+  - configUrl: socks5://[USERINFO]@[HOST]:[PORT]
 ```
 
 ### Using the Smart Dialer
