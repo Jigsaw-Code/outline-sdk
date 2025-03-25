@@ -193,6 +193,17 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryConfig) ([]*sma
 	return rts, nil
 }
 
+func (f *StrategyFinder) getPsiphonDialer(ctx context.Context, fallbackConfig fallbackEntryConfig) (transport.StreamDialer, error) {
+	psiphonJSON, err := json.Marshal(fallbackConfig.Psiphon)
+	if err != nil {
+		f.logCtx(ctx, "Error marshaling to JSON: %v, %v", fallbackConfig.Psiphon, err)
+	   }
+
+	// TODO(laplante): pass this forward into psiphon.go, which takes raw json
+	f.logCtx(ctx, "❌ Psiphon is not yet supported, skipping: %v\n", string(psiphonJSON))
+	return nil, fmt.Errorf("psiphon is not yet supported: %v", string(psiphonJSON))
+}
+
 // Test that a dialer is able to access all the given test domains. Returns nil if all tests succeed
 func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.StreamDialer, testDomains []string, transportCfg string) error {
 	for _, testDomain := range testDomains {
@@ -327,15 +338,20 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 	var configModule = configurl.NewDefaultProviders()
 
 	fallback, err := raceTests(ctx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
+		dialer := f.StreamDialer
+		
 		if (fallbackConfig.Psiphon != nil) {
-			psiphonJSON, err := json.Marshal(fallbackConfig.Psiphon)
+			dialer, err := f.getPsiphonDialer(ctx, fallbackConfig)
 			if err != nil {
-                f.logCtx(ctx, "Error marshaling to JSON: %v, %v", fallbackConfig.Psiphon, err)
-       		}
+				return nil, fmt.Errorf("getPsiphonDialer failed: %w", err)
+			}
 
-			// TODO(laplante): pass this forward into psiphon.go, which takes raw json
-			f.logCtx(ctx, "❌ Psiphon is not yet supported, skipping: %v\n", string(psiphonJSON))
-			return nil, fmt.Errorf("psiphon is not yet supported: %v", string(psiphonJSON))
+			err = f.testDialer(ctx, dialer, testDomains, fallbackConfig.Psiphon)
+			if err != nil {
+				return nil, err
+			}
+
+			return &SearchResult{dialer, fallbackConfig}, nil
 		}
 
 		if (fallbackConfig.ConfigURL != "") {
@@ -354,7 +370,9 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 			return &SearchResult{dialer, fallbackConfig}, nil
 		}
 
-		return nil, fmt.Errorf("unknown fallback type: %v", fallbackConfig)
+		if dialer == nil {
+			return nil, fmt.Errorf("unknown fallback type: %v", fallbackConfig)
+		}
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not find a working fallback: %w", err)
