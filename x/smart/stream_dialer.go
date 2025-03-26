@@ -98,8 +98,12 @@ type dnsEntryConfig struct {
 	TCP    *tcpEntryConfig   `yaml:"tcp,omitempty"`
 }
 
-// can be either a configurl string or {psiphon: psiphonConfig}
+// can be either a configurl string or psiphonEntryConfig
 type fallbackEntryConfig any
+
+type psiphonEntryConfig {
+	Psiphon any
+}
 
 type configConfig struct {
 	DNS      []dnsEntryConfig 		`yaml:"dns,omitempty"`
@@ -196,6 +200,8 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryConfig) ([]*sma
 func (f *StrategyFinder) getPsiphonDialer(ctx context.Context, psiphonJSON []byte) (transport.StreamDialer, error) {
 	config := &psiphon.DialerConfig{ProviderConfig: psiphonJSON}
 
+	f.logCtx(ctx, "psiphon config: %v\n", string(psiphonJSON))
+
 	cacheBaseDir, err := os.UserCacheDir()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get the user cache directory: %w", err)
@@ -209,6 +215,8 @@ func (f *StrategyFinder) getPsiphonDialer(ctx context.Context, psiphonJSON []byt
 
 	dialer := psiphon.GetSingletonDialer()
 	if err := dialer.Start(ctx, config); err != nil {
+		f.logCtx(ctx, "failed to start psiphon dialer: %w\n", err)
+
 		return nil, fmt.Errorf("failed to start psiphon dialer: %w", err)
 	}
 
@@ -232,9 +240,16 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 		}
 		tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
 		err = tlsConn.HandshakeContext(ctx)
+
+		state := tlsConn.ConnectionState()
+
+		f.logCtx(ctx, "----------------\n", )
+		f.logCtx(ctx, "tls handshake connection: %+v \n %+v\n", state, tlsConn)
+		f.logCtx(ctx, "----------------\n", )
+
 		tlsConn.Close()
-		if err != nil {
-			f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+		if (err != nil || !state.HandshakeComplete) {
+			f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, state=%v err=%v ❌\n", transportCfg, testDomain, time.Since(startTime), state, err)
 			return err
 		}
 		f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
