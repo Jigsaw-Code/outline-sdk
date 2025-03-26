@@ -23,12 +23,15 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"os"
+	"path"
 	"sync"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
+	"github.com/Jigsaw-Code/outline-sdk/x/psiphon"
 	"gopkg.in/yaml.v3"
 )
 
@@ -95,8 +98,12 @@ type dnsEntryConfig struct {
 	TCP    *tcpEntryConfig   `yaml:"tcp,omitempty"`
 }
 
-// can be either a configurl string or {psiphon: psiphonConfig}
+// can be either a configurl string or psiphonEntryConfig
 type fallbackEntryConfig any
+
+type psiphonEntryConfig {
+	Psiphon any
+}
 
 type configConfig struct {
 	DNS      []dnsEntryConfig 		`yaml:"dns,omitempty"`
@@ -190,6 +197,32 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryConfig) ([]*sma
 	return rts, nil
 }
 
+func (f *StrategyFinder) getPsiphonDialer(ctx context.Context, psiphonJSON []byte) (transport.StreamDialer, error) {
+	config := &psiphon.DialerConfig{ProviderConfig: psiphonJSON}
+
+	f.logCtx(ctx, "psiphon config: %v\n", string(psiphonJSON))
+
+	cacheBaseDir, err := os.UserCacheDir()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get the user cache directory: %w", err)
+	}
+
+	config.DataRootDirectory = path.Join(cacheBaseDir, "psiphon")
+	if err := os.MkdirAll(config.DataRootDirectory, 0700); err != nil {
+		return nil, fmt.Errorf("Failed to create storage directory: %w", err)
+	}
+	f.logCtx(ctx, "Using data store in %v\n", config.DataRootDirectory)
+
+	dialer := psiphon.GetSingletonDialer()
+	if err := dialer.Start(ctx, config); err != nil {
+		f.logCtx(ctx, "failed to start psiphon dialer: %w\n", err)
+
+		return nil, fmt.Errorf("failed to start psiphon dialer: %w", err)
+	}
+
+	return dialer, nil
+}
+
 // Test that a dialer is able to access all the given test domains. Returns nil if all tests succeed
 func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.StreamDialer, testDomains []string, transportCfg string) error {
 	for _, testDomain := range testDomains {
@@ -207,9 +240,16 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 		}
 		tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
 		err = tlsConn.HandshakeContext(ctx)
+
+		state := tlsConn.ConnectionState()
+
+		f.logCtx(ctx, "----------------\n", )
+		f.logCtx(ctx, "tls handshake connection: %+v \n %+v\n", state, tlsConn)
+		f.logCtx(ctx, "----------------\n", )
+
 		tlsConn.Close()
-		if err != nil {
-			f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+		if (err != nil || !state.HandshakeComplete) {
+			f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, state=%v err=%v ❌\n", transportCfg, testDomain, time.Since(startTime), state, err)
 			return err
 		}
 		f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
@@ -339,14 +379,28 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 
 			return &SearchResult{dialer, fallbackConfig}, nil
 		case map[string]interface{}:
-			psiphonJSON, err := json.Marshal(v)
+			psiphonConfig, ok := v["psiphon"]
+			if !ok {
+				return nil, fmt.Errorf("unknown fallback type: %v", v)
+			}
+			psiphonJSON, err := json.Marshal(psiphonConfig)
 			if err != nil {
-				f.logCtx(ctx, "Error marshaling to JSON: %v, %v", v, err)
+				f.logCtx(ctx, "Error marshaling to JSON: %v, %v", psiphonConfig, err)
 			}
 
-			// TODO(laplante): pass this forward into psiphon.go, which takes raw json
-			f.logCtx(ctx, "❌ Psiphon is not yet supported, skipping: %v\n", string(psiphonJSON))
-			return nil, fmt.Errorf("psiphon is not yet supported: %v", string(psiphonJSON))
+			dialer, err := f.getPsiphonDialer(ctx, psiphonJSON)
+			if err != nil {
+				return nil, fmt.Errorf("getPsiphonDialer failed: %w", err)
+			}
+
+			err = f.testDialer(ctx, dialer, testDomains, string(psiphonJSON))
+			if err != nil {
+				return nil, err
+			}
+
+			return &SearchResult{dialer, string(psiphonJSON)}, nil
+			
+			return nil, fmt.Errorf("unknown fallback type: %v", v)
 		default:
 			return nil, fmt.Errorf("unknown fallback type: %v", v)
 		}
