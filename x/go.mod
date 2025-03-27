@@ -7,6 +7,7 @@ require (
 	// Use github.com/Psiphon-Labs/psiphon-tunnel-core@staging-client as per
 	// https://github.com/Psiphon-Labs/psiphon-tunnel-core/?tab=readme-ov-file#using-psiphon-with-go-modules
 	github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20250319154633-ceb78316d06e
+	github.com/goccy/go-yaml v1.16.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/lmittmann/tint v1.0.5
 	github.com/quic-go/quic-go v0.48.1
@@ -17,7 +18,6 @@ require (
 	golang.org/x/net v0.36.0
 	golang.org/x/sys v0.30.0
 	golang.org/x/term v0.29.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -119,5 +119,6 @@ require (
 	golang.zx2c4.com/wireguard v0.0.0-20230325221338-052af4a8072b // indirect
 	golang.zx2c4.com/wireguard/windows v0.5.3 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	tailscale.com v1.58.2 // indirect
 )
