@@ -17,6 +17,7 @@ package smart
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -26,6 +27,8 @@ import (
 	"time"
 
 	"github.com/goccy/go-yaml"
+	"github.com/goccy/go-yaml/ast"
+	"github.com/goccy/go-yaml/parser"
 	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
@@ -94,10 +97,19 @@ type dnsEntryConfig struct {
 	TCP    *tcpEntryConfig   `yaml:"tcp,omitempty"`
 }
 
+type fallbackEntryStructConfig struct {
+	Psiphon any	`yaml:"psiphon,omitempty"`
+	// As we allow more fallback types beyond psiphon they will be added here
+}
+
+// This contains either a configURL string or a fallbackEntryStructConfig
+// It is parsed into the correct type later
+type fallbackEntryConfig any
+
 type configConfig struct {
-	DNS      []dnsEntryConfig `yaml:"dns,omitempty"`
-	TLS      []string         `yaml:"tls,omitempty"`
-	FALLBACK []string         `yaml:"fallback,omitempty"`
+	DNS      []dnsEntryConfig 		`yaml:"dns,omitempty"`
+	TLS      []string         		`yaml:"tls,omitempty"`
+	Fallback []fallbackEntryConfig 	`yaml:"fallback,omitempty"`
 }
 
 // newDNSResolverFromEntry creates a [dns.Resolver] based on the config, returning the resolver and
@@ -305,8 +317,8 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 }
 
 // Return the fastest fallback dialer that is able to access all the testDomans
-func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string, fallbackConfig []string) (transport.StreamDialer, error) {
-	if len(fallbackConfig) == 0 {
+func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string, fallbackConfigs []fallbackEntryConfig) (transport.StreamDialer, error) {
+	if len(fallbackConfigs) == 0 {
 		return nil, errors.New("no fallback was specified")
 	}
 
@@ -315,23 +327,40 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 	raceStart := time.Now()
 	type SearchResult struct {
 		Dialer transport.StreamDialer
-		Config string
+		Config fallbackEntryConfig
 	}
 	var configModule = configurl.NewDefaultProviders()
 
-	fallback, err := raceTests(ctx, 250*time.Millisecond, fallbackConfig, func(fallbackUrl string) (*SearchResult, error) {
-		dialer, err := configModule.NewStreamDialer(ctx, fallbackUrl)
-		if err != nil {
-			return nil, fmt.Errorf("getStreamDialer failed: %w", err)
-		}
+	fallback, err := raceTests(ctx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
+		switch v := fallbackConfig.(type) {
+		case string:
+			configUrl := v
+			dialer, err := configModule.NewStreamDialer(ctx, configUrl)
+			if err != nil {
+				return nil, fmt.Errorf("getStreamDialer failed: %w", err)
+			}
 
-		err = f.testDialer(ctx, dialer, testDomains, fallbackUrl)
-		if err != nil {
-			return nil, err
-		}
+			err = f.testDialer(ctx, dialer, testDomains, configUrl)
+			if err != nil {
+				return nil, err
+			}
 
-		return &SearchResult{dialer, fallbackUrl}, nil
+			return &SearchResult{dialer, fallbackConfig}, nil
+		case fallbackEntryStructConfig:
+			psiphonCfg := v.Psiphon
+			psiphonJSON, err := json.Marshal(psiphonCfg)
+			if err != nil {
+				f.logCtx(ctx, "Error marshaling to JSON: %v, %v", psiphonCfg, err)
+			}
+
+			// TODO(laplante): pass this forward into psiphon.go, which takes raw json
+			f.logCtx(ctx, "❌ Psiphon is not yet supported, skipping: %v\n", string(psiphonJSON))
+			return nil, fmt.Errorf("psiphon is not yet supported: %v", string(psiphonJSON))
+		default:
+			return nil, fmt.Errorf("unknown fallback type: %v", v)
+		}
 	})
+
 	if err != nil {
 		return nil, fmt.Errorf("could not find a working fallback: %w", err)
 	}
@@ -365,14 +394,58 @@ func (f *StrategyFinder) newProxylessDialer(ctx context.Context, testDomains []s
 	return f.findTLS(ctx, testDomains, dnsDialer, config.TLS)
 }
 
+func (f *StrategyFinder) parseConfig(configBytes []byte) (configConfig, error) {
+	parsedBytes, err := parser.ParseBytes(configBytes, 0)
+	if err != nil {
+		return configConfig{}, fmt.Errorf("failed to parse config: %v", err)
+	}
+
+	var parsedConfig configConfig
+	err = yaml.NodeToValue(parsedBytes.Docs[0].Body, &parsedConfig)
+	if err != nil {
+		return configConfig{}, fmt.Errorf("failed to parse config: %v", err)
+	}
+
+	// Parse fallback list
+	mapping, ok := parsedBytes.Docs[0].Body.(*ast.MappingNode)
+	if !ok {
+		return configConfig{}, fmt.Errorf("failed to parse config: root is not a mapping")
+	}
+	for _, value := range mapping.Values {
+		if key, ok := value.Key.(*ast.StringNode); ok && key.Value == "fallback" {
+			sequence, ok := value.Value.(*ast.SequenceNode)
+			if !ok {
+				return configConfig{}, fmt.Errorf("failed to parse config: fallback is not a sequence")
+			}
+			for i, fallback := range sequence.Values {
+				switch v := fallback.(type) {
+				case *ast.StringNode:
+					parsedConfig.Fallback[i] = v.Value
+				case *ast.MappingNode:
+					var fallbackEntry fallbackEntryStructConfig
+					err := yaml.NodeToValue(v, &fallbackEntry)
+					if err != nil {
+						return configConfig{}, fmt.Errorf("failed to parse config as fallbackEntryStructConfig: %v", err)
+					}
+					parsedConfig.Fallback[i] =  fallbackEntry
+				default:
+					return configConfig{}, fmt.Errorf("unknown fallback type: %v", v)
+				}
+			}
+		}
+	}
+
+	return parsedConfig, nil
+}
+
 // NewDialer uses the config in configBytes to search for a strategy that unblocks DNS and TLS for all of the testDomains, returning a dialer with the found strategy.
 // It returns an error if no strategy was found that unblocks the testDomains.
 // The testDomains must be domains with a TLS service running on port 443.
 func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, configBytes []byte) (transport.StreamDialer, error) {
 	var parsedConfig configConfig
-	err := yaml.Unmarshal(configBytes, &parsedConfig)
+	parsedConfig, err := f.parseConfig(configBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse config: %v", err)
+		return nil, err
 	}
 
 	// Make domain fully-qualified to prevent confusing domain search.
@@ -383,7 +456,7 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 
 	dialer, err := f.newProxylessDialer(ctx, testDomains, parsedConfig)
 	if err != nil {
-		return f.findFallback(ctx, testDomains, parsedConfig.FALLBACK)
+		return f.findFallback(ctx, testDomains, parsedConfig.Fallback)
 	}
 	return dialer, err
 }
