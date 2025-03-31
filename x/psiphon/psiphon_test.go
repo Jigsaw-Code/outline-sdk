@@ -136,6 +136,25 @@ func TestDialer_Start_Invalid_Field_Config(t *testing.T) {
 	require.Error(t, GetSingletonDialer().Start(context.Background(), cfg))
 }
 
+func TestDialer_Start_Invalid_Config(t *testing.T) {
+	invalidPsiphonConfig := `{
+		"PropagationChannelId":"AAAAAAAAAAAAAAAA",
+		"RemoteServerListDownloadFilename":"fake",
+		"RemoteServerListSignaturePublicKey":"not-a-public-key",
+		"RemoteServerListUrl":"https://not-a-psiphon-server-url.com",
+		"SponsorId":"AAAAAAAAAAAAAAAA",
+		"UseIndistinguishableTLS":true
+	}`
+	cfg, delete := newTestConfig(t, invalidPsiphonConfig)
+	defer delete()
+
+	GetSingletonDialer().Start(context.Background(), cfg)
+
+	require.Error(t, GetSingletonDialer().Start(context.Background(), cfg))
+
+	// TODO: hangs instead of erroring
+}
+
 func TestDialer_Start_Cancelled(t *testing.T) {
 	cfg, delete := newSampleTestConfig(t)
 	defer delete()
