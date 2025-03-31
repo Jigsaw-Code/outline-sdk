@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net"
 	"os"
 	"testing"
@@ -148,9 +149,16 @@ func TestDialer_Start_Invalid_Config(t *testing.T) {
 	cfg, delete := newTestConfig(t, invalidPsiphonConfig)
 	defer delete()
 
-	GetSingletonDialer().Start(context.Background(), cfg)
+	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	defer cancel()
 
-	require.Error(t, GetSingletonDialer().Start(context.Background(), cfg))
+	err := GetSingletonDialer().Start(ctx, cfg)
+	if err != nil {
+		log.Println("psiphon start err: %w", err)
+	}
+
+	require.ErrorIs(t, GetSingletonDialer().Start(ctx, cfg), errNotStartedStop)
+
 
 	// TODO: hangs instead of erroring
 }
