@@ -137,6 +137,36 @@ func TestDialer_Start_Invalid_Field_Config(t *testing.T) {
 	require.Error(t, GetSingletonDialer().Start(context.Background(), cfg))
 }
 
+func TestDialer_Start_Invalid_Propagation_ID_Timeout(t *testing.T) {
+	invalidPsiphonConfig := `{
+		"PropagationChannelId":"!@#$%^&*!@#$%^&*",
+		"SponsorId":"!@#$%^&*!@#$%^&*"
+	}`
+	cfg, delete := newTestConfig(t, invalidPsiphonConfig)
+	defer delete()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1 * time.Second)
+	defer cancel()
+
+	require.ErrorIs(t, GetSingletonDialer().Start(ctx, cfg), context.DeadlineExceeded)
+}
+
+func TestDialer_Start_Valid_Propagation_ID(t *testing.T) {
+	invalidPsiphonConfig := `{
+		"PropagationChannelId":"AAAAAAAAAAAAAAAA",
+		"SponsorId":"AAAAAAAAAAAAAAAA",
+		"RemoteServerListUrl":"https://s3.amazonaws.com//psiphon/web/mjr4-p23r-puwl/server_list_compressed_fake",
+		"RemoteServerListSignaturePublicKey":"not-a-key"
+	}`
+	cfg, delete := newTestConfig(t, invalidPsiphonConfig)
+	defer delete()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1 * time.Second)
+	defer cancel()
+
+	require.ErrorIs(t, GetSingletonDialer().Start(ctx, cfg), context.DeadlineExceeded)
+}
+
 func TestDialer_Start_Invalid_Config(t *testing.T) {
 	invalidPsiphonConfig := `{
 		"PropagationChannelId":"AAAAAAAAAAAAAAAA",
