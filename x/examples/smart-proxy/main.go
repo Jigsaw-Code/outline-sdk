@@ -127,7 +127,7 @@ func main() {
 	logDialer := transport.FuncStreamDialer(func(ctx context.Context, address string) (transport.StreamConn, error) {
 		conn, err := dialer.DialStream(ctx, address)
 		if err != nil {
-			debugLog.Printf("Failed to dial %v: %v\n", address, err)
+			debugLog.Printf("Failed to dial %v: %v, %w\n", address, dialer, err)
 		}
 		return conn, err
 	})

@@ -217,6 +217,10 @@ func (f *StrategyFinder) getPsiphonDialer(ctx context.Context, psiphonJSON []byt
 
 // Test that a dialer is able to access all the given test domains. Returns nil if all tests succeed
 func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.StreamDialer, testDomains []string, transportCfg string) error {
+	f.logCtx(ctx, "------------ \n")
+	f.logCtx(ctx, "logging dialer: %+v, %v", dialer, testDomains)
+	f.logCtx(ctx, "------------ \n")
+
 	for _, testDomain := range testDomains {
 		startTime := time.Now()
 
@@ -370,7 +374,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 			}
 			psiphonJSON, err := json.Marshal(psiphonConfig)
 			if err != nil {
-				f.logCtx(ctx, "Error marshaling to JSON: %v, %v", psiphonConfig, err)
+				return nil, fmt.Errorf("Error marshaling to JSON: %v, %v", psiphonConfig, err)
 			}
 
 			dialer, err := f.getPsiphonDialer(ctx, psiphonJSON)
@@ -380,9 +384,11 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 
 			err = f.testDialer(ctx, dialer, testDomains, string(psiphonJSON))
 			if err != nil {
+				f.logCtx(ctx, "error testing dialer: %v, %v", psiphonConfig, err)
 				return nil, err
 			}
 
+			f.logCtx(ctx, "returning valid dialer: %+v, %v \n", dialer, psiphonConfig)
 			return &SearchResult{dialer, string(psiphonJSON)}, nil
 			
 			return nil, fmt.Errorf("unknown fallback type: %v", v)
@@ -396,7 +402,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 	if err != nil {
 		return nil, fmt.Errorf("could not find a working fallback: %w", err)
 	}
-	f.log("🏆 selected fallback '%v' in %0.2fs\n\n", fallback.Config, time.Since(raceStart).Seconds())
+	f.log("🏆 selected fallback '%+v' '%v' in %0.2fs\n\n", fallback.Dialer, fallback.Config, time.Since(raceStart).Seconds())
 	return fallback.Dialer, nil
 }
 
