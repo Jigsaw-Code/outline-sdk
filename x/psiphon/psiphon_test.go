@@ -29,16 +29,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestConfig(tb testing.TB) (*DialerConfig, func()) {
+
+func newTestConfig(tb testing.TB, config string) (*DialerConfig, func()) {
 	tempDir, err := os.MkdirTemp("", "psiphon")
 	require.NoError(tb, err)
 	return &DialerConfig{
 		DataRootDirectory: tempDir,
-		ProviderConfig: json.RawMessage(`{
-			"PropagationChannelId": "ID1",
-			"SponsorId": "ID2"
-		}`),
+		ProviderConfig: json.RawMessage(config),
 	}, func() { os.RemoveAll(tempDir) }
+}
+
+func newSampleTestConfig(tb testing.TB) (*DialerConfig, func()) {
+	sampleConfig := `{
+			"PropagationChannelId": "ID1", 
+			"SponsorId": "ID2"
+		}`
+	return newTestConfig(tb, sampleConfig)
 }
 
 func TestDialer_Start_Successful(t *testing.T) {
@@ -116,8 +122,22 @@ func TestDialer_Start_NilConfig(t *testing.T) {
 	require.Error(t, GetSingletonDialer().Start(context.Background(), nil))
 }
 
+func TestDialer_Start_Invalid_Json_Config(t *testing.T) {
+	invalidPsiphonConfig := "invalid"
+	cfg, delete := newTestConfig(t, invalidPsiphonConfig)
+	defer delete()
+	require.Error(t, GetSingletonDialer().Start(context.Background(), cfg))
+}
+
+func TestDialer_Start_Invalid_Field_Config(t *testing.T) {
+	invalidPsiphonConfig := `{"not_a_field": 1}`
+	cfg, delete := newTestConfig(t, invalidPsiphonConfig)
+	defer delete()
+	require.Error(t, GetSingletonDialer().Start(context.Background(), cfg))
+}
+
 func TestDialer_Start_Cancelled(t *testing.T) {
-	cfg, delete := newTestConfig(t)
+	cfg, delete := newSampleTestConfig(t)
 	defer delete()
 	errCh := make(chan error)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -130,7 +150,7 @@ func TestDialer_Start_Cancelled(t *testing.T) {
 }
 
 func TestDialer_Start_Timeout(t *testing.T) {
-	cfg, delete := newTestConfig(t)
+	cfg, delete := newSampleTestConfig(t)
 	defer delete()
 	errCh := make(chan error)
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now())
