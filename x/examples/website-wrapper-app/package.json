@@ -12,7 +12,6 @@
     "handlebars": "^4.7.8",
     "vite": "^6.2.0"
   },
-  "author": "Daniel LaCosse <daniellacosse@google.com>",
   "license": "Apache-2.0",
   "scripts": {
     "build:sdk_mobileproxy": "bash ./.scripts/build_sdk_mobileproxy.sh",
