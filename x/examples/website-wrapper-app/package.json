@@ -1,0 +1,27 @@
+{
+  "dependencies": {
+    "@ngrok/ngrok": "1.4.1",
+    "archiver": "^7.0.1",
+    "chalk": "^5.4.1",
+    "http-proxy": "^1.18.1",
+    "minimist": "^1.2.8",
+    "serve-handler": "6.1.6"
+  },
+  "devDependencies": {
+    "glob": "^11.0.1",
+    "handlebars": "^4.7.8",
+    "vite": "^6.2.0"
+  },
+  "license": "Apache-2.0",
+  "scripts": {
+    "build:sdk_mobileproxy": "bash ./.scripts/build_sdk_mobileproxy.sh",
+    "build:project": "node ./wrapper_app_project/.scripts/build.mjs",
+    "clean": "npx rimraf node_modules/ output/",
+    "open:android": "cd output/wrapper_app_project && npm run open:android",
+    "open:ios": "cd output/wrapper_app_project && npm run open:ios",
+    "reset": "npm run clean && npm ci",
+    "start:navigator": "node ./basic_navigator_example/.scripts/start.mjs",
+    "start": "node ./.scripts/start.mjs"
+  },
+  "private": true
+}
