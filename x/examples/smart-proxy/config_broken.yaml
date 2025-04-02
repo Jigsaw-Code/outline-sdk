@@ -23,5 +23,13 @@ tls:
   - tlsfrag:1
 
 fallback:
-  # Nonexistent server
+  # Nonexistent Outline Server
   - ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1
+  # Nonexistant Psiphon Config JSON. Not yet supported
+  - psiphon: {
+      "PropagationChannelId":"FFFFFFFFFFFFFFFF",
+      "SponsorId":"FFFFFFFFFFFFFFFF",
+    }
+  # Nonexistant local socks5 proxy
+  - socks5://192.168.1.10:1080
+
