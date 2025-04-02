@@ -178,10 +178,12 @@ func TestDialer_DialStream(t *testing.T) {
 		// Dial after Start.
 		require.NoError(t, dialer.Start(ctx, nil))
 		require.False(t, tunnel.stopped)
-		conn, err := dialer.DialStream(ctx, "")
+		dialCtx, dialCancel := context.WithCancel(ctx)
+		conn, err := dialer.DialStream(dialCtx, "")
 		require.NoError(t, err)
 		require.NoError(t, conn.CloseRead())
 		require.NoError(t, conn.CloseWrite())
+		dialCancel()
 
 		// Dial after Stop.
 		require.NoError(t, dialer.Stop())
@@ -189,6 +191,38 @@ func TestDialer_DialStream(t *testing.T) {
 		_, err = dialer.DialStream(nil, "")
 		require.ErrorIs(t, err, errNotStartedDial)
 	}
+}
+
+func TestDialer_MultipleDialStream(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	dialer := GetSingletonDialer()
+
+	var tunnel errorTunnel
+	startTunnel = func(ctx context.Context, config *DialerConfig) (psiphonTunnel, error) {
+		tunnel.stopped = false
+		return &tunnel, nil
+	}
+	defer func() {
+		startTunnel = psiphonStartTunnel
+	}()
+
+	// Dial after Start.
+	require.NoError(t, dialer.Start(ctx, nil))
+
+	// Make sure multiple dials with cancels work
+	for i := 0; i < 2; i++ {
+		require.False(t, tunnel.stopped)
+		dialCtx, dialCancel := context.WithCancel(ctx)
+		conn, err := dialer.DialStream(dialCtx, "")
+		require.NoError(t, err)
+		require.NoError(t, conn.CloseRead())
+		require.NoError(t, conn.CloseWrite())
+		dialCancel()
+	}
+	require.NoError(t, dialer.Stop())
+	require.True(t, tunnel.stopped)
 }
 
 func TestDialer_DialStream_Error(t *testing.T) {
