@@ -11,6 +11,6 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
-func getPsiphonDialer(ctx context.Context, psiphonJSON []byte) (transport.StreamDialer, error) {
+func newPsiphonDialer(ctx context.Context, psiphonJSON []byte) (transport.StreamDialer, error) {
 	return nil, fmt.Errorf("To use psiphon configuration in x/smart the package must be built with the build tag `psiphon`: %w", errors.ErrUnsupported) 
 }

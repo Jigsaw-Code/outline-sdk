@@ -375,7 +375,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 					f.logCtx(ctx, "Error marshaling to JSON: %v, %v", psiphonCfg, err)
 				}
 
-				dialer, err := getPsiphonDialer(ctx, psiphonJSON)
+				dialer, err := newPsiphonDialer(ctx, psiphonJSON)
 				if err != nil {
 					return nil, fmt.Errorf("getPsiphonDialer failed: %w", err)
 				}
