@@ -62,7 +62,7 @@ export default async function main(
   if (!fs.existsSync(SDK_MOBILEPROXY_OUTPUT_DIR)) {
     console.log(`Building the Outline SDK mobileproxy library for ${platform}...`);
 
-    await promisify(exec)(`npm run build:mobileproxy ${platform} ${SDK_MOBILEPROXY_OUTPUT_DIR}`);
+    await promisify(exec)(`npm run build:mobileproxy ${platform} ${output}`);
   }
 
   const sourceFilepaths = await glob(
