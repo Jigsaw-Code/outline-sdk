@@ -9,7 +9,7 @@ git clone https://github.com/Jigsaw-Code/outline-sdk
 cd outline-sdk/x/examples/website-wrapper-app
 ```
 
-> [!WARN]
+> [!WARNING]
 > Both **iOS** and **Android** are currently confirmed to be working on MacOS. Use other platforms at your own risk.
 
 ## Building the app project for **iOS**
@@ -20,7 +20,7 @@ cd outline-sdk/x/examples/website-wrapper-app
 * You will need [XCode](https://developer.apple.com/xcode/). 
 * You will need [cocoapods](https://cocoapods.org/). 
 
-[Please refer to CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#ios-requirements)
+[Please refer to CapacitorJS's environment setup guide.](https://capacitorjs.com/docs/getting-started/environment-setup#ios-requirements)
 
 ```sh
 npm run reset
@@ -34,6 +34,7 @@ See below for the list of available configuration options.
 
 ### Adding icon and splash screen assets to your generated iOS project
 
+> [!NOTE]
 > TODO: automate this process
 
 You'll need to add the following images to the `assets` folder in your generated project:
@@ -61,7 +62,7 @@ npm run start -- --platform=ios --entryDomain="www.example.com" \
 
 ## Building the app project for **Android**
 
-* You will need your site's domain list of domains that you would also like to load in your app.
+* You will need your site's domain.
 * You will need [Node.js](https://nodejs.org/en/) for the project setup and web server.
 * You will need [go](https://golang.org/) to build the SDK library.
 * You will need [OpenJDK 17](https://stackoverflow.com/a/70649641) to build the app.
@@ -69,7 +70,7 @@ npm run start -- --platform=ios --entryDomain="www.example.com" \
   * Make sure to [install the NDK](https://developer.android.com/studio/projects/install-ndk#default-version).
   * Make sure to [set the correct JDK](https://stackoverflow.com/a/30631386).
 
-[Please refer to CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#android-requirements)
+[Please refer to CapacitorJS's environment setup guide.](https://capacitorjs.com/docs/getting-started/environment-setup#android-requirements)
 
 ```sh
 npm run reset
@@ -83,6 +84,7 @@ Wait for Gradle to load your project. Click the "play" button in Android Studio 
 
 ### Adding icon and splash screen assets to your generated Android project
 
+> [!NOTE]
 > TODO: automate this process
 
 You'll need to add the following images to the `assets` folder in your generated project:
@@ -115,10 +117,11 @@ npm run start -- --platform=android  --entryDomain="www.example.com" \
 | `--platform`        | Specifies the target platform for the build.                                    | `"ios"` or `"android"`   |
 | `--entryDomain`     | The primary domain of your website.                                             | Any valid domain name    |
 | `--additionalDomains` | A list of other domains that should be accessible within the app.               | Comma-separated domains |
-| `--smartDialerConfig` | A JSON string containing the configuration for the smart dialer feature.       | Valid JSON string       |
+| `--smartDialerConfig` | A JSON string containing the configuration for the [smart dialer feature](../../smart#yaml-config-for-the-smart-dialer).       | Valid JSON string       |
 | `--navigatorToken`  | Your ngrok authentication token for using the navigation proxy.                 | Your ngrok auth token    |
 | `--navigatorPath`   | The path to use for the navigation iframe when using the navigation proxy. | Any valid path           |
 
 ## Troubleshooting
 
-> TODO: troubleshooting script
+> [!NOTE]
+> TODO: automate this process
