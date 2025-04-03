@@ -23,18 +23,9 @@ import path from "node:path";
 import minimist from "minimist";
 
 const OUTPUT_DIR = path.join(process.cwd(), "output");
-
 const WRAPPER_APP_TEMPLATE_DIR = path.join(
   process.cwd(),
   "wrapper_app_project/template",
-);
-const WRAPPER_APP_OUTPUT_DIR = path.join(OUTPUT_DIR, "wrapper_app_project");
-const WRAPPER_APP_OUTPUT_ZIP = path.join(OUTPUT_DIR, "wrapper_app_project.zip");
-
-const SDK_MOBILEPROXY_OUTPUT_DIR = path.join(OUTPUT_DIR, "mobileproxy");
-const WRAPPER_APP_OUTPUT_SDK_MOBILEPROXY_DIR = path.join(
-  WRAPPER_APP_OUTPUT_DIR,
-  "mobileproxy",
 );
 
 const DEFAULT_SMART_DIALER_CONFIG = {
@@ -46,17 +37,32 @@ const DEFAULT_SMART_DIALER_CONFIG = {
 
 export default async function main(
   {
-    platform,
+    additionalDomains = [],
+    appId,
+    appName,
     entryDomain = "www.example.com",
     navigationUrl,
+    output = OUTPUT_DIR,
+    platform,
     smartDialerConfig = DEFAULT_SMART_DIALER_CONFIG,
-    additionalDomains = [],
   },
 ) {
+  // Manually expand the '~' character in the output path.
+  output = output.replace("~", process.env.HOME);
+
+  const WRAPPER_APP_OUTPUT_DIR = path.resolve(output, "wrapper_app_project");
+  const WRAPPER_APP_OUTPUT_ZIP = path.resolve(output, "wrapper_app_project.zip");
+  
+  const SDK_MOBILEPROXY_OUTPUT_DIR = path.resolve(output, "mobileproxy");
+  const WRAPPER_APP_OUTPUT_SDK_MOBILEPROXY_DIR = path.resolve(
+    WRAPPER_APP_OUTPUT_DIR,
+    "mobileproxy",
+  );
+
   if (!fs.existsSync(SDK_MOBILEPROXY_OUTPUT_DIR)) {
     console.log(`Building the Outline SDK mobileproxy library for ${platform}...`);
 
-    await promisify(exec)(`npm run build:sdk_mobileproxy ${platform}`);
+    await promisify(exec)(`npm run build:mobileproxy ${platform} ${SDK_MOBILEPROXY_OUTPUT_DIR}`);
   }
 
   const sourceFilepaths = await glob(
@@ -94,11 +100,28 @@ export default async function main(
       additionalDomains = [additionalDomains];
     }
 
+    const [entryTld, ...entryDomainParts] = entryDomain.split(".").reverse();
+
+    // Infer an app name from the base entry domain part 
+    const defaultAppName = entryDomainParts[0].toLocaleLowerCase().replaceAll(
+      /\w[a-z0-9]*[-_]*/g,
+      match => {
+        match = match.replace(/[-_]+/, " ");
+
+        return match.charAt(0).toUpperCase() + match.slice(1).toLowerCase();
+      }
+    )
+  
+    // Infer an app ID from the entry domain by reversing it (e.g. `www.example.com` becomes `com.example.www`)
+    const defaultAppId = entryTld + "." + entryDomainParts.join(".");
+
     fs.writeFileSync(
       destinationFilepath.replace(/\.handlebars$/, ""),
       template({
         platform,
         entryDomain,
+        appId: appId ?? defaultAppId,
+        appName: appName ?? defaultAppName,
         navigationUrl: navigationUrl
           ? navigationUrl
           : `https://${entryDomain}/`,

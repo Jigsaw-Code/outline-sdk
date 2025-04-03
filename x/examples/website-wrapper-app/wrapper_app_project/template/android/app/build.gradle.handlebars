@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "org.getoutline.pwa"
+    namespace "{{appId}}.android"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "org.getoutline.pwa"
+        applicationId "{{appId}}.android"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

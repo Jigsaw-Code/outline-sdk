@@ -31,6 +31,10 @@ import chalk from "chalk";
     throw new Error(`Parameter \`--entryDomain\` not provided.`);
   }
 
+  if (args.output) {
+    throw new Error(`Parameter \`output\` is not supported in the 'start' script`);
+  }
+
   let proxyLocations = {};
   if (args.navigatorToken && args.navigatorPath) {
     proxyLocations = await startNavigator(args);

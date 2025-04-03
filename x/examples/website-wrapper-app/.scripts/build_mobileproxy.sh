@@ -15,9 +15,15 @@
 # limitations under the License.
 
 PLATFORM="$1"
+OUTPUT="${2:-output}"
 
-git clone https://github.com/Jigsaw-Code/outline-sdk.git output/outline-sdk
-cd output/outline-sdk/x
+if [ "$OUTPUT" = "/" ] || [ "$OUTPUT" = "*" ]; then
+  echo "Error: OUTPUT cannot be '/' or '*'. These are dangerous values."
+  exit 1
+fi
+
+git clone https://github.com/Jigsaw-Code/outline-sdk.git $OUTPUT/outline-sdk
+cd $OUTPUT/outline-sdk/x
 go build -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
 
 if [ "$PLATFORM" = "ios" ]; then
@@ -32,5 +38,5 @@ else
 fi
 
 cd ../..
-rm -rf "$(pwd)/mobileproxy"
-mv "$(pwd)/outline-sdk/x/out" "$(pwd)/mobileproxy"
+rm -rf "$OUTPUT/mobileproxy"
+mv "$(pwd)/outline-sdk/x/out" "mobileproxy"
