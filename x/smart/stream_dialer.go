@@ -375,9 +375,14 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 					f.logCtx(ctx, "Error marshaling to JSON: %v, %v", psiphonCfg, err)
 				}
 
-				// TODO(laplante): pass this forward into psiphon.go, which takes raw json
-				f.logCtx(ctx, "❌ Psiphon is not yet supported, skipping: %v\n", string(psiphonJSON))
-				return nil, fmt.Errorf("psiphon is not yet supported: %v", string(psiphonJSON))
+				dialer, err := getPsiphonDialer(ctx, psiphonJSON)
+				if err != nil {
+					return nil, fmt.Errorf("getPsiphonDialer failed: %w", err)
+				}
+
+				// TODO(laplante): test the psiphon dialer
+
+				return &SearchResult{dialer, string(psiphonJSON)}, nil
 			} else {
 				return nil, fmt.Errorf("unknown fallback type: %v", v)
 			}
