@@ -120,11 +120,20 @@ func main() {
 	fmt.Println("Finding strategy")
 	startTime := time.Now()
 	dialer, err := finder.NewDialer(context.Background(), domainsFlag, finderConfig)
+
+	debugLog.Printf("------------ \n")
+	debugLog.Printf("logging dialer in smart-proxy main: %+v \n", dialer)
+	debugLog.Printf("------------ \n")
+
 	if err != nil {
 		log.Fatalf("Failed to find dialer: %v", err)
 	}
 	fmt.Printf("Found strategy in %0.2fs\n", time.Since(startTime).Seconds())
 	logDialer := transport.FuncStreamDialer(func(ctx context.Context, address string) (transport.StreamConn, error) {
+		debugLog.Printf("------------ \n")
+		debugLog.Printf("logging before reconnection attempt in smart-proxy main: %+v \n", dialer)
+		debugLog.Printf("------------ \n")
+
 		conn, err := dialer.DialStream(ctx, address)
 		if err != nil {
 			debugLog.Printf("Failed to dial %v: %v\n", address, err)
@@ -148,6 +157,10 @@ func main() {
 			log.Fatalf("Error running web server: %v", err)
 		}
 	}()
+
+	debugLog.Printf("------------ \n")
+	debugLog.Printf("logging dialer after proxy server started: %+v \n", dialer)
+	debugLog.Printf("------------ \n")
 
 	// Wait for interrupt signal to stop the proxy.
 	sig := make(chan os.Signal, 1)

@@ -24,6 +24,8 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"os"
+	"path"
 	"sync"
 	"time"
 
@@ -31,6 +33,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
+	"github.com/Jigsaw-Code/outline-sdk/x/psiphon"
 )
 
 // To test one strategy:
@@ -193,6 +196,56 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryConfig) (dns.Reso
 	}
 }
 
+func (f *StrategyFinder) getPsiphonDialer(ctx context.Context, psiphonJSON []byte) (transport.StreamDialer, error) {
+	config := &psiphon.DialerConfig{ProviderConfig: psiphonJSON}
+
+	cacheBaseDir, err := os.UserCacheDir()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get the user cache directory: %w", err)
+	}
+
+	config.DataRootDirectory = path.Join(cacheBaseDir, "psiphon")
+	if err := os.MkdirAll(config.DataRootDirectory, 0700); err != nil {
+		return nil, fmt.Errorf("Failed to create storage directory: %w", err)
+	}
+	f.logCtx(ctx, "Using data store in %v\n", config.DataRootDirectory)
+
+	dialer := psiphon.GetSingletonDialer()
+	// TODO: do we want to allow the max timeout here instead? (5m)
+	// and give examples of setting a shorter timeout via the config?
+	ctx, _ = context.WithTimeout(context.Background(), 5 * time.Second)
+	if err := dialer.Start(ctx, config); err != nil {
+		return nil, fmt.Errorf("failed to start psiphon dialer: %w", err)
+	}
+
+	f.logCtx(ctx, "------------ \n")
+	f.logCtx(ctx, "logging dialer after start: %+v \n", dialer)
+	f.logCtx(ctx, "------------ \n")
+
+	return dialer, nil
+}
+
+// Takes a (potentially very long) psiphon config and outputs
+// a short signature string for logging identification purposes
+// with only the PropagationChannelId and SponsorId (required fields)
+// ex: {PropagationChannelId: FFFFFFFFFFFFFFFF, SponsorId: FFFFFFFFFFFFFFFF}
+// If the config does not contains these fields
+// output the whole config as a string
+func (f *StrategyFinder) getPsiphonConfigSignature(psiphonJSON []byte) string {
+	var psiphonConfig map[string]any
+	if err := json.Unmarshal(psiphonJSON, &psiphonConfig); err != nil {
+		return string(psiphonJSON)
+	}
+
+	propagationChannelId, ok1 := psiphonConfig["PropagationChannelId"].(string)
+	sponsorId, ok2 := psiphonConfig["SponsorId"].(string)
+
+	if ok1 && ok2 {
+		return fmt.Sprintf("{PropagationChannelId: %v, SponsorId: %v}", propagationChannelId, sponsorId)
+	}
+	return string(psiphonJSON)
+}
+
 type smartResolver struct {
 	dns.Resolver
 	ID     string
@@ -343,7 +396,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 		return nil, errors.New("no fallback was specified")
 	}
 
-	ctx, searchDone := context.WithCancel(ctx)
+	raceCtx, searchDone := context.WithCancel(ctx)
 	defer searchDone()
 	raceStart := time.Now()
 	type SearchResult struct {
@@ -352,16 +405,16 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 	}
 	var configModule = configurl.NewDefaultProviders()
 
-	fallback, err := raceTests(ctx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
+	fallback, err := raceTests(raceCtx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
 		switch v := fallbackConfig.(type) {
 		case string:
 			configUrl := v
-			dialer, err := configModule.NewStreamDialer(ctx, configUrl)
+			dialer, err := configModule.NewStreamDialer(raceCtx, configUrl)
 			if err != nil {
 				return nil, fmt.Errorf("getStreamDialer failed: %w", err)
 			}
 
-			err = f.testDialer(ctx, dialer, testDomains, configUrl)
+			err = f.testDialer(raceCtx, dialer, testDomains, configUrl)
 			if err != nil {
 				return nil, err
 			}
@@ -375,14 +428,20 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 					f.logCtx(ctx, "Error marshaling to JSON: %v, %v", psiphonCfg, err)
 				}
 
-				dialer, err := newPsiphonDialer(ctx, psiphonJSON)
+				// psiphonDialar is started in the broader context, not the race, since it persists in the background
+				dialer, err := f.getPsiphonDialer(ctx, psiphonJSON)
 				if err != nil {
 					return nil, fmt.Errorf("getPsiphonDialer failed: %w", err)
 				}
 
-				// TODO(laplante): test the psiphon dialer
-
 				return &SearchResult{dialer, string(psiphonJSON)}, nil
+				err = f.testDialer(raceCtx, dialer, testDomains, f.getPsiphonConfigSignature(psiphonJSON))
+				if err != nil {
+					f.logCtx(ctx, "error testing dialer: %v, %v", f.getPsiphonConfigSignature(psiphonJSON), err)
+					return nil, err
+				}
+
+				return &SearchResult{dialer, f.getPsiphonConfigSignature(psiphonJSON)}, nil
 			} else {
 				return nil, fmt.Errorf("unknown fallback type: %v", v)
 			}
@@ -395,6 +454,11 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 		return nil, fmt.Errorf("could not find a working fallback: %w", err)
 	}
 	f.log("🏆 selected fallback '%v' in %0.2fs\n\n", fallback.Config, time.Since(raceStart).Seconds())
+
+	f.logCtx(ctx, "------------ \n")
+	f.logCtx(ctx, "logging dialer after handshake success: %+v \n", fallback.Dialer)
+	f.logCtx(ctx, "------------ \n")
+
 	return fallback.Dialer, nil
 }
 
@@ -474,7 +538,13 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 
 	dialer, err := f.newProxylessDialer(ctx, testDomains, parsedConfig)
 	if err != nil {
-		return f.findFallback(ctx, testDomains, parsedConfig.Fallback)
+		dialer, err = f.findFallback(ctx, testDomains, parsedConfig.Fallback)
+
+		f.logCtx(ctx, "------------ \n")
+		f.logCtx(ctx, "logging dialer just before return from newdialer: %+v \n", dialer)
+		f.logCtx(ctx, "------------ \n")
+
+		return dialer, err
 	}
 	return dialer, err
 }
