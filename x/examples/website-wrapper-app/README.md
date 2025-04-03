@@ -39,9 +39,9 @@ See below for the list of available configuration options.
 
 You'll need to add the following images to the `assets` folder in your generated project:
 
-A 1024x1024 png titled `icon.png` containing your app icon.
-A 2732x2732 png titled `splash.png` containing your splash screen.
-Another 2732x2732 png titled `splash-dark.png` containing your splash screen in dark mode.
+- A 1024x1024 png titled `icon.png` containing your app icon.
+- A 2732x2732 png titled `splash.png` containing your splash screen.
+- Another 2732x2732 png titled `splash-dark.png` containing your splash screen in dark mode.
 
 Then, run the following command to generate and place the assets in the appropriate places in your iOS project:
 
@@ -89,9 +89,9 @@ Wait for Gradle to load your project. Click the "play" button in Android Studio 
 
 You'll need to add the following images to the `assets` folder in your generated project:
 
-A 1024x1024 png titled `icon.png` containing your app icon.
-A 2732x2732 png titled `splash.png` containing your splash screen.
-Another 2732x2732 png titled `splash-dark.png` containing your splash screen in dark mode.
+- A 1024x1024 png titled `icon.png` containing your app icon.
+- A 2732x2732 png titled `splash.png` containing your splash screen.
+- Another 2732x2732 png titled `splash-dark.png` containing your splash screen in dark mode.
 
 Then, run the following command to generate and place the assets in the appropriate places in your Android project:
 
