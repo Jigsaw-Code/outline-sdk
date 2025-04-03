@@ -26,7 +26,7 @@ To verify that your system has the necessary dependencies to generate your web w
 * You will need [XCode](https://developer.apple.com/xcode/). 
 * You will need [cocoapods](https://cocoapods.org/). 
 
-[Please refer to CapacitorJS's environment setup guide.](https://capacitorjs.com/docs/getting-started/environment-setup#ios-requirements)
+[Please refer to CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#ios-requirements) and run `./doctor` to check to see if you have all the required dependencies.
 
 ```sh
 npm run reset
@@ -36,7 +36,7 @@ npm run open:ios
 
 Click the "play" button in XCode to start your iOS app!
 
-See below for the list of available configuration options.
+[See below for the list of available configuration options.](#available-configuration-options)
 
 ### Adding icon and splash screen assets to your generated iOS project
 
@@ -76,7 +76,7 @@ npm run start -- --platform=ios --entryDomain="www.example.com" \
   * Make sure to [install the NDK](https://developer.android.com/studio/projects/install-ndk#default-version).
   * Make sure to [set the correct JDK](https://stackoverflow.com/a/30631386).
 
-[Please refer to CapacitorJS's environment setup guide.](https://capacitorjs.com/docs/getting-started/environment-setup#android-requirements)
+[Please refer to CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#android-requirements) and run `./doctor` to check to see if you have all the required dependencies.
 
 ```sh
 npm run reset
@@ -129,7 +129,7 @@ npm run start -- --platform=android  --entryDomain="www.example.com" \
 
 ## Troubleshooting
 
-When encountering an issue, the first thing you'll want to do is try the doctor script to see if your system has all the required dependencies:
+When encountering an issue, the first thing you'll want to do is run the doctor script to see if your system has all the required dependencies:
 
 ```sh
 ./doctor
