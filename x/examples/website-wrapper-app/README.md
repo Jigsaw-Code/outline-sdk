@@ -14,7 +14,7 @@ cd outline-sdk/x/examples/website-wrapper-app
 
 ## Building the app project for **iOS**
 
-* You will need your site's domain and a list of domains that you would also like to load in your app.
+* You will need your site's domain.
 * You will need [go](https://golang.org/) to build the SDK library.
 * You will need [Node.js](https://nodejs.org/en/) for the project setup and web server.
 * You will need [XCode](https://developer.apple.com/xcode/). 
@@ -118,10 +118,10 @@ npm run start -- --platform=android  --entryDomain="www.example.com" \
 | `--entryDomain`     | The primary domain of your website.                                             | Any valid domain name    |
 | `--additionalDomains` | A list of other domains that should be accessible within the app.               | Comma-separated domains |
 | `--smartDialerConfig` | A JSON string containing the configuration for the [smart dialer feature](../../smart#yaml-config-for-the-smart-dialer).       | Valid JSON string       |
-| `--navigatorToken`  | Your ngrok authentication token for using the navigation proxy.                 | Your ngrok auth token    |
+| `--navigatorToken`  | Your ngrok authentication token for using the navigation proxy.                 | Your [ngrok auth token](https://dashboard.ngrok.com/get-started/your-authtoken)    |
 | `--navigatorPath`   | The path to use for the navigation iframe when using the navigation proxy. | Any valid path           |
 
 ## Troubleshooting
 
 > [!NOTE]
-> TODO: automate this process
+> TODO: doctor script
