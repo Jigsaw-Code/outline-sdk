@@ -9,8 +9,11 @@ git clone https://github.com/Jigsaw-Code/outline-sdk
 cd outline-sdk/x/examples/website-wrapper-app
 ```
 
-> [!WARNING]
-> Both **iOS** and **Android** are currently confirmed to be working on MacOS. Use other platforms at your own risk.
+To verify that your system has the necessary dependencies to generate your web wrapper project, run the web wrapper doctor:
+
+```sh
+./doctor
+```
 
 ## Building the app project for **iOS**
 
@@ -123,5 +126,13 @@ npm run start -- --platform=android  --entryDomain="www.example.com" \
 
 ## Troubleshooting
 
+When encountering an issue, the first thing you'll want to do is try the doctor script to see if your system has all the required dependencies:
+
+```sh
+./doctor
+```
+
+### Commonly occuring issues
+
 > [!NOTE]
-> TODO: doctor script
+> TODO: compile a list of commonly occuring issues.
