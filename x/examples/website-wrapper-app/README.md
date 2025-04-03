@@ -17,6 +17,9 @@ To verify that your system has the necessary dependencies to generate your web w
 
 ## Building the app project for **iOS**
 
+> [!WARNING]
+> You can only build iOS apps on MacOS.
+
 * You will need your site's domain.
 * You will need [go](https://golang.org/) to build the SDK library.
 * You will need [Node.js](https://nodejs.org/en/) for the project setup and web server.
