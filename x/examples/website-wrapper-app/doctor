@@ -23,6 +23,7 @@ NC='\033[0m'
 CHECK_MARK="✅"
 CROSS_MARK="❌"
 WARNING_MARK="⚠️"
+INFORMATION_MARK="ℹ️"
 
 URL_NODE="https://nodejs.org/en/download/"
 URL_GO="https://go.dev/doc/install"
@@ -31,7 +32,8 @@ URL_XCODE="https://developer.apple.com/xcode/"
 HINT_XCODE_CLI="Try running 'xcode-select --install' in your terminal, or install Xcode from the App Store."
 URL_COCOAPODS="https://cocoapods.org/"
 HINT_COCOAPODS="Try running 'sudo gem install cocoapods'"
-URL_JAVA_17="https://adoptium.net/temurin/releases/?version=17"
+URL_JAVA_17="https://formulae.brew.sh/formula/openjdk@17"
+HINT_JAVA_17="Make sure to add the JDK location to your \$JAVA_HOME environment variable: 'export JAVA_HOME=\$(brew --prefix openjdk@17)'"
 URL_ANDROID_STUDIO="https://developer.android.com/studio#downloads"
 URL_ANDROID_NDK="https://developer.android.com/studio/projects/install-ndk"
 
@@ -72,6 +74,9 @@ check_dependency() {
                   if [[ -n "$install_url" ]]; then
                      printf "  Installation guide: ${BLUE}%s${NC}\n" "$install_url"
                  fi
+                 if [[ -n "$install_hint" ]]; then
+                   printf "  ${BLUE}${INFORMATION_MARK} %s${NC}\n" "$install_hint"
+                 fi
                  all_ok=0
                  dependency_found=0
             else
@@ -90,7 +95,7 @@ check_dependency() {
              printf "  Installation guide: ${BLUE}%s${NC}\n" "$install_url"
         fi
         if [[ -n "$install_hint" ]]; then
-            printf "  Common command: ${YELLOW}%s${NC}\n" "$install_hint"
+            printf "  ${BLUE}${INFORMATION_MARK} %s${NC}\n" "$install_hint"
         fi
         all_ok=0
         dependency_found=0
@@ -152,8 +157,8 @@ fi
 echo ""
 echo "Checking Android specific dependencies..."
 # Java check - specifically looking for 17
-check_dependency "Java JDK" "java" "java -version" "version \"17." "Outline SDK requires OpenJDK 17." "$URL_JAVA_17" "" "stderr"
-check_dependency "Java Compiler" "javac" "javac -version" "javac 17." "Ensure JDK (not just JRE) is installed and in PATH." "$URL_JAVA_17"
+check_dependency "Java JDK" "java" "java -version" "version \"17." "Outline SDK requires OpenJDK 17." "$URL_JAVA_17" "$HINT_JAVA_17" "stderr"
+check_dependency "Java Compiler" "javac" "javac -version" "javac 17." "Ensure JDK (not just JRE) is installed and in PATH." "$URL_JAVA_17" "$HINT_JAVA_17"
 
 
 # Android SDK check
