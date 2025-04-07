@@ -68,6 +68,9 @@ npm run start -- --platform=ios --entryDomain="www.example.com" \
 
 ## Building the app project for **Android**
 
+> [!WARNING]
+> If you want to build Android on Windows, please use [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/install)
+
 * You will need your site's domain.
 * You will need [Node.js](https://nodejs.org/en/) for the project setup and web server.
 * You will need [go](https://golang.org/) to build the SDK library.
