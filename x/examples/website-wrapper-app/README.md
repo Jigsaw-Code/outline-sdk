@@ -120,8 +120,8 @@ npm run start -- --platform=android  --entryDomain="www.example.com" \
 
 | Option              | Description                                                                     | Possible Values          |
 | ------------------- | ------------------------------------------------------------------------------- | ------------------------ |
-| `--platform`        | Specifies the target platform for the build.                                    | `"ios"` or `"android"`   |
-| `--entryDomain`     | The primary domain of your website.                                             | Any valid domain name    |
+| `--platform`        | **(Required)** Specifies the target platform for the build.                                    | `"ios"` or `"android"`   |
+| `--entryDomain`     | **(Required)** The primary domain of your website.                                             | Any valid domain name    |
 | `--additionalDomains` | A list of other domains that should be accessible within the app.               | Comma-separated domains |
 | `--smartDialerConfig` | A JSON string containing the configuration for the [smart dialer feature](../../smart#yaml-config-for-the-smart-dialer).       | Valid JSON string       |
 | `--navigatorToken`  | Your ngrok authentication token for using the navigation proxy.                 | Your [ngrok auth token](https://dashboard.ngrok.com/get-started/your-authtoken)    |

@@ -18,7 +18,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m'
+CLEAR='\033[0m'
 
 CHECK_MARK="✅"
 CROSS_MARK="❌"
@@ -31,7 +31,7 @@ MIN_GO_VERSION="1.21"
 URL_XCODE="https://developer.apple.com/xcode/"
 HINT_XCODE_CLI="Try running 'xcode-select --install' in your terminal, or install Xcode from the App Store."
 URL_COCOAPODS="https://cocoapods.org/"
-HINT_COCOAPODS="Try running 'sudo gem install cocoapods'"
+HINT_COCOAPODS="Try running 'sudo gem install cocoapods' or 'brew install cocoapods' in your terminal."
 URL_JAVA_17="https://formulae.brew.sh/formula/openjdk@17"
 HINT_JAVA_17="Make sure to add the JDK location to your \$JAVA_HOME environment variable: 'export JAVA_HOME=\$(brew --prefix openjdk@17)'"
 URL_ANDROID_STUDIO="https://developer.android.com/studio#downloads"
@@ -62,40 +62,40 @@ check_dependency() {
             fi
 
             if [[ -n "$expected_detail" ]] && [[ "$detail_output" == *"$expected_detail"* ]]; then
-                printf "${GREEN}${CHECK_MARK} Found (%s)${NC}\n" "$(echo "$detail_output" | head -n 1)"
+                printf "${GREEN}${CHECK_MARK} Found (%s)${CLEAR}\n" "$(echo "$detail_output" | head -n 1)"
                 dependency_found=1
             elif [[ -n "$expected_detail" ]]; then
-                 printf "${RED}${CROSS_MARK} Found, but version mismatch or unexpected output.${NC}\n"
+                 printf "${RED}${CROSS_MARK} Found, but version mismatch or unexpected output.${CLEAR}\n"
                  printf "  Expected something containing: %s\n" "$expected_detail"
                  printf "  Got: %s\n" "$(echo "$detail_output" | head -n 1)"
                  if [[ -n "$detail_fail_warning" ]]; then
-                     printf "  ${YELLOW}${WARNING_MARK} %s${NC}\n" "$detail_fail_warning"
+                     printf "  ${YELLOW}${WARNING_MARK} %s${CLEAR}\n" "$detail_fail_warning"
                  fi
                   if [[ -n "$install_url" ]]; then
-                     printf "  Installation guide: ${BLUE}%s${NC}\n" "$install_url"
+                     printf "  Installation guide: ${BLUE}%s${CLEAR}\n" "$install_url"
                  fi
                  if [[ -n "$install_hint" ]]; then
-                   printf "  ${BLUE}${INFORMATION_MARK} %s${NC}\n" "$install_hint"
+                   printf "  ${BLUE}${INFORMATION_MARK} %s${CLEAR}\n" "$install_hint"
                  fi
                  all_ok=0
                  dependency_found=0
             else
                  # Detail command exists, but no specific string to check, just show output
-                 printf "${GREEN}${CHECK_MARK} Found (%s)${NC}\n" "$(echo "$detail_output" | head -n 1)"
+                 printf "${GREEN}${CHECK_MARK} Found (%s)${CLEAR}\n" "$(echo "$detail_output" | head -n 1)"
                  dependency_found=1
             fi
         else
              # No detail check needed, just existence
-             printf "${GREEN}${CHECK_MARK} Found${NC}\n"
+             printf "${GREEN}${CHECK_MARK} Found${CLEAR}\n"
              dependency_found=1
         fi
     else
-        printf "${RED}${CROSS_MARK} Not found.${NC}\n"
+        printf "${RED}${CROSS_MARK} Not found.${CLEAR}\n"
         if [[ -n "$install_url" ]]; then
-             printf "  Installation guide: ${BLUE}%s${NC}\n" "$install_url"
+             printf "  Installation guide: ${BLUE}%s${CLEAR}\n" "$install_url"
         fi
         if [[ -n "$install_hint" ]]; then
-            printf "  ${BLUE}${INFORMATION_MARK} %s${NC}\n" "$install_hint"
+            printf "  ${BLUE}${INFORMATION_MARK} %s${CLEAR}\n" "$install_hint"
         fi
         all_ok=0
         dependency_found=0
@@ -126,11 +126,11 @@ if check_dependency "Go" "go" "" "" "" "$URL_GO"; then
     go_version_num=$(echo "$go_version_full" | awk '{print $3}' | sed 's/^go//')
     printf "  Checking Go version (requires >= ${MIN_GO_VERSION})... "
     if check_version_ge "$go_version_num" "$MIN_GO_VERSION"; then
-        printf "${GREEN}${CHECK_MARK} Version ${go_version_num} is sufficient.${NC}\n"
+        printf "${GREEN}${CHECK_MARK} Version ${go_version_num} is sufficient.${CLEAR}\n"
     else
-        printf "${RED}${CROSS_MARK} Version ${go_version_num} is too low.${NC}\n"
+        printf "${RED}${CROSS_MARK} Version ${go_version_num} is too low.${CLEAR}\n"
         printf "  Please upgrade Go to version ${MIN_GO_VERSION} or higher.\n"
-        printf "  Installation guide: ${BLUE}%s${NC}\n" "$URL_GO"
+        printf "  Installation guide: ${BLUE}%s${CLEAR}\n" "$URL_GO"
         all_ok=0
     fi
 fi
@@ -139,10 +139,10 @@ echo ""
 echo "Checking OS..."
 printf "Checking for macOS (required for iOS builds)... "
 if [[ "$(uname)" == "Darwin" ]]; then
-    printf "${GREEN}${CHECK_MARK} Found (macOS)${NC}\n"
+    printf "${GREEN}${CHECK_MARK} Found (macOS)${CLEAR}\n"
     is_macos=1
 else
-    printf "${YELLOW}${WARNING_MARK} Not macOS ($(uname)). iOS builds require macOS.${NC}\n"
+    printf "${YELLOW}${WARNING_MARK} Not macOS ($(uname)). iOS builds require macOS.${CLEAR}\n"
 fi
 
 echo ""
@@ -151,7 +151,7 @@ if [[ $is_macos -eq 1 ]]; then
     check_dependency "Xcode Command Line Tools" "xcodebuild" "xcodebuild -version" "" "" "$URL_XCODE" "$HINT_XCODE_CLI"
     check_dependency "Cocoapods" "pod" "pod --version" "" "" "$URL_COCOAPODS" "$HINT_COCOAPODS"
 else
-    printf "${YELLOW}Skipping iOS checks (not on macOS)${NC}\n"
+    printf "${YELLOW}Skipping iOS checks (not on macOS)${CLEAR}\n"
 fi
 
 echo ""
@@ -162,19 +162,16 @@ check_dependency "JDK 17" "javac" "javac -version" "javac 17." "Ensure JDK (not 
 
 
 # Android SDK check
-printf "Checking for Android SDK (ANDROID_HOME or ANDROID_SDK_ROOT)... "
+printf "Checking for Android SDK (ANDROID_HOME)... "
 android_sdk_path=""
 if [[ -n "$ANDROID_HOME" ]] && [[ -d "$ANDROID_HOME" ]]; then
-    printf "${GREEN}${CHECK_MARK} Found (ANDROID_HOME=${ANDROID_HOME})${NC}\n"
+    printf "${GREEN}${CHECK_MARK} Found (ANDROID_HOME=${ANDROID_HOME})${CLEAR}\n"
     android_sdk_path="$ANDROID_HOME"
-elif [[ -n "$ANDROID_SDK_ROOT" ]] && [[ -d "$ANDROID_SDK_ROOT" ]]; then
-    printf "${GREEN}${CHECK_MARK} Found (ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT})${NC}\n"
-    android_sdk_path="$ANDROID_SDK_ROOT"
 else
-    printf "${RED}${CROSS_MARK} Not found.${NC}\n"
-    printf "  Please set either the ANDROID_HOME or ANDROID_SDK_ROOT environment variable\n"
+    printf "${RED}${CROSS_MARK} Not found.${CLEAR}\n"
+    printf "  Please set either the ANDROID_HOME environment variable\n"
     printf "  pointing to your Android SDK installation.\n"
-    printf "  Install Android Studio & SDK: ${BLUE}%s${NC}\n" "$URL_ANDROID_STUDIO"
+    printf "  Install Android Studio & SDK: ${BLUE}%s${CLEAR}\n" "$URL_ANDROID_STUDIO"
     all_ok=0
 fi
 
@@ -183,24 +180,24 @@ if [[ -n "$android_sdk_path" ]]; then
     printf "Checking for Android NDK within SDK ($android_sdk_path)... "
     # Look for common NDK directory names.
     if find "$android_sdk_path" -maxdepth 2 -type d \( -name "ndk" -o -name "ndk-bundle" \) -print -quit | grep -q .; then
-        printf "${GREEN}${CHECK_MARK} Found (NDK directory present)${NC}\n"
+        printf "${GREEN}${CHECK_MARK} Found (NDK directory present)${CLEAR}\n"
     else
-        printf "${RED}${CROSS_MARK} Not found.${NC}\n"
+        printf "${RED}${CROSS_MARK} Not found.${CLEAR}\n"
         printf "  Could not find a common NDK directory ('ndk' or 'ndk-bundle') within '$android_sdk_path'.\n"
-        printf "  Install NDK via Android Studio's SDK Manager: ${BLUE}%s${NC}\n" "$URL_ANDROID_NDK"
+        printf "  Install NDK via Android Studio's SDK Manager: ${BLUE}%s${CLEAR}\n" "$URL_ANDROID_NDK"
         all_ok=0
     fi
 else
-     printf "${YELLOW}Skipping NDK check (Android SDK path not found)${NC}\n"
+     printf "${YELLOW}Skipping NDK check (Android SDK path not found)${CLEAR}\n"
 fi
 
 
 # Final Result
 echo ""
 if [[ $all_ok -eq 1 ]]; then
-    printf "${GREEN}--- ${CHECK_MARK} All required dependencies seem to be installed! ---${NC}\n"
+    printf "${GREEN}--- ${CHECK_MARK} All required dependencies seem to be installed! ---${CLEAR}\n"
     exit 0
 else
-    printf "${RED}--- ${CROSS_MARK} Some dependencies are missing or incorrect. Please review the errors above and follow the links/hints provided. ---${NC}\n"
+    printf "${RED}--- ${CROSS_MARK} Some dependencies are missing or incorrect. Please review the errors above and follow the links/hints provided. ---${CLEAR}\n"
     exit 1
 fi
