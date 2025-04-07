@@ -393,7 +393,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 				psiphonCfg := v.Psiphon
 				psiphonJSON, err := json.Marshal(psiphonCfg)
 				if err != nil {
-					f.logCtx(ctx, "Error marshaling to JSON: %v, %v", psiphonCfg, err)
+					f.logCtx(ctx, "Error marshaling to JSON: %v, %v\n", psiphonCfg, err)
 				}
 				psiphonSignature := f.getPsiphonConfigSignature(psiphonJSON)
 
@@ -404,7 +404,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 
 				err = f.testDialer(raceCtx, dialer, testDomains, psiphonSignature)
 				if err != nil {
-					f.logCtx(ctx, "error testing dialer: %v, %v", psiphonSignature, err)
+					f.logCtx(ctx, "error testing dialer: %v, %v\n", psiphonSignature, err)
 					return nil, err
 				}
 
@@ -413,7 +413,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 				return nil, fmt.Errorf("unknown fallback type: %v", v)
 			}
 		default:
-			return nil, fmt.Errorf("unknown fallback type: %v", v)
+			return nil, fmt.Errorf("unknown fallback type: %v\n", v)
 		}
 	})
 
