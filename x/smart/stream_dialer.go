@@ -193,6 +193,27 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryConfig) (dns.Reso
 	}
 }
 
+// Takes a (potentially very long) psiphon config and outputs
+// a short signature string for logging identification purposes
+// with only the PropagationChannelId and SponsorId (required fields)
+// ex: {PropagationChannelId: FFFFFFFFFFFFFFFF, SponsorId: FFFFFFFFFFFFFFFF}
+// If the config does not contains these fields
+// output the whole config as a string
+func (f *StrategyFinder) getPsiphonConfigSignature(psiphonJSON []byte) string {
+	var psiphonConfig map[string]any
+	if err := json.Unmarshal(psiphonJSON, &psiphonConfig); err != nil {
+		return string(psiphonJSON)
+	}
+
+	propagationChannelId, ok1 := psiphonConfig["PropagationChannelId"].(string)
+	sponsorId, ok2 := psiphonConfig["SponsorId"].(string)
+
+	if ok1 && ok2 {
+		return fmt.Sprintf("{PropagationChannelId: %v, SponsorId: %v}", propagationChannelId, sponsorId)
+	}
+	return string(psiphonJSON)
+}
+
 type smartResolver struct {
 	dns.Resolver
 	ID     string
@@ -343,7 +364,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 		return nil, errors.New("no fallback was specified")
 	}
 
-	ctx, searchDone := context.WithCancel(ctx)
+	raceCtx, searchDone := context.WithCancel(ctx)
 	defer searchDone()
 	raceStart := time.Now()
 	type SearchResult struct {
@@ -352,16 +373,16 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 	}
 	var configModule = configurl.NewDefaultProviders()
 
-	fallback, err := raceTests(ctx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
+	fallback, err := raceTests(raceCtx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
 		switch v := fallbackConfig.(type) {
 		case string:
 			configUrl := v
-			dialer, err := configModule.NewStreamDialer(ctx, configUrl)
+			dialer, err := configModule.NewStreamDialer(raceCtx, configUrl)
 			if err != nil {
 				return nil, fmt.Errorf("getStreamDialer failed: %w", err)
 			}
 
-			err = f.testDialer(ctx, dialer, testDomains, configUrl)
+			err = f.testDialer(raceCtx, dialer, testDomains, configUrl)
 			if err != nil {
 				return nil, err
 			}
@@ -374,15 +395,20 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 				if err != nil {
 					f.logCtx(ctx, "Error marshaling to JSON: %v, %v", psiphonCfg, err)
 				}
+				psiphonSignature := f.getPsiphonConfigSignature(psiphonJSON)
 
-				dialer, err := newPsiphonDialer(ctx, psiphonJSON)
+				dialer, err := newPsiphonDialer(ctx, psiphonJSON, psiphonSignature)
 				if err != nil {
 					return nil, fmt.Errorf("getPsiphonDialer failed: %w", err)
 				}
 
-				// TODO(laplante): test the psiphon dialer
+				err = f.testDialer(raceCtx, dialer, testDomains, psiphonSignature)
+				if err != nil {
+					f.logCtx(ctx, "error testing dialer: %v, %v", psiphonSignature, err)
+					return nil, err
+				}
 
-				return &SearchResult{dialer, string(psiphonJSON)}, nil
+				return &SearchResult{dialer, psiphonSignature}, nil
 			} else {
 				return nil, fmt.Errorf("unknown fallback type: %v", v)
 			}
@@ -395,6 +421,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 		return nil, fmt.Errorf("could not find a working fallback: %w", err)
 	}
 	f.log("🏆 selected fallback '%v' in %0.2fs\n\n", fallback.Config, time.Since(raceStart).Seconds())
+
 	return fallback.Dialer, nil
 }
 
