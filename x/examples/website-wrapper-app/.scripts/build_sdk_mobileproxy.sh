@@ -15,8 +15,9 @@
 # limitations under the License.
 
 PLATFORM="$1"
+TAG="${2:-"x/v0.0.1"}"
 
-git clone https://github.com/Jigsaw-Code/outline-sdk.git output/outline-sdk
+git clone --depth 1 --branch "${TAG}" https://github.com/Jigsaw-Code/outline-sdk.git output/outline-sdk
 cd output/outline-sdk/x
 go build -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
 
