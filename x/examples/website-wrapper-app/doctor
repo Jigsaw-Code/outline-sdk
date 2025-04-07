@@ -157,7 +157,7 @@ fi
 echo ""
 echo "Checking Android specific dependencies..."
 # Java check - specifically looking for 17
-check_dependency "Java JDK" "java" "java -version" "version \"17." "Outline SDK requires OpenJDK 17." "$URL_JAVA_17" "$HINT_JAVA_17" "stderr"
+check_dependency "Java Runtime" "java" "java -version" "version \"17." "Outline SDK requires OpenJDK 17." "$URL_JAVA_17" "$HINT_JAVA_17" "stderr"
 check_dependency "Java Compiler" "javac" "javac -version" "javac 17." "Ensure JDK (not just JRE) is installed and in PATH." "$URL_JAVA_17" "$HINT_JAVA_17"
 
 
