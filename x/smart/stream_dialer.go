@@ -404,7 +404,6 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 
 				err = f.testDialer(raceCtx, dialer, testDomains, psiphonSignature)
 				if err != nil {
-					f.logCtx(ctx, "error testing dialer: %v, %v\n", psiphonSignature, err)
 					return nil, err
 				}
 
