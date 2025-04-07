@@ -82,8 +82,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         let dialog = UIAlertController(title: "Error", message: error.localizedDescription, preferredStyle: .alert)
 
-        dialog.addAction(UIAlertAction(title: "OK", style: .deault))
+        dialog.addAction(UIAlertAction(title: "OK", style: .default))
 
-        rootViewController.present(alert, animated: false)
+        rootViewController.present(dialog, animated: false)
     }
 }
