@@ -34,6 +34,13 @@ From the `x/` directory:
 go build -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
 ```
 
+> [!WARNING]
+> The psiphon library is not included in the build by default because the psiphon codebase uses GPL. To support psiphon configuration in smart-proxy please build using the `psiphon` build tag.
+
+```bash
+go build -tags psiphon -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
+```
+
 Then build the iOS and Android libraries with [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile#hdr-Build_a_library_for_Android_and_iOS)
 
 ```bash
