@@ -113,7 +113,7 @@ export default async function main(
     )
   
     // Infer an app ID from the entry domain by reversing it (e.g. `www.example.com` becomes `com.example.www`)
-    const defaultAppId = entryTld + "." + entryDomainParts.join(".");
+    const defaultAppId = entryTld + "." + entryDomainParts.join(".").replaceAll("-", "");
 
     fs.writeFileSync(
       destinationFilepath.replace(/\.handlebars$/, ""),
