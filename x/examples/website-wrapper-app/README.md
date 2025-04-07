@@ -71,7 +71,7 @@ npm run start -- --platform=ios --entryDomain="www.example.com" \
 * You will need your site's domain.
 * You will need [Node.js](https://nodejs.org/en/) for the project setup and web server.
 * You will need [go](https://golang.org/) to build the SDK library.
-* You will need [OpenJDK 17](https://stackoverflow.com/a/70649641) to build the app.
+* You will need [JDK 17](https://stackoverflow.com/a/70649641) to build the app.
 * You will need [Android Studio](https://developer.android.com/studio/).
   * Make sure to [install the NDK](https://developer.android.com/studio/projects/install-ndk#default-version).
   * Make sure to [set the correct JDK](https://stackoverflow.com/a/30631386).
