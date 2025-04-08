@@ -191,6 +191,14 @@ func (m *MockResolver) LookupIP(ctx context.Context, network, host string) ([]ne
 	return args.Get(0).([]net.IP), args.Error(1)
 }
 
+func (m *MockResolver) Query(ctx context.Context, name string, qtype uint16) (*dns.Msg, error) {
+	args := m.Called(ctx, name, qtype)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*dns.Msg), args.Error(1)
+}
+
 func TestCreateFallbackDialers_EmptyConfig(t *testing.T) {
 	finder := &StrategyFinder{}
 	_, err := finder.createFallbackDialers(context.Background(), []fallbackEntryConfig{})
