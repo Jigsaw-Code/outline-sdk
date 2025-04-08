@@ -42,6 +42,10 @@ npm run start -- --platform=ios \
   --navigatorToken="<YOUR_NGROK_AUTH_TOKEN>" --navigatorPath="/nav"
 ```
 
+### Publishing your app in the App Store
+
+[Follow these instructions on how to publish your app for beta testing and the App Store.](https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases)
+
 ## Building the app project for **Android**
 
 * You will need your site's domain list of domains that you would also like to load in your app.
@@ -83,6 +87,10 @@ npm run start -- --platform=android \
   --entryDomain="www.mysite.com" --additionalDomains="cdn.mysite.com, auth.mysite.com" \
   --navigatorToken="<YOUR_NGROK_AUTH_TOKEN>" --navigatorPath="/nav"
 ```
+
+### Publishing your app in the Google Play Store
+
+[Follow these instructions to learn how to publish your app to the Google Play Store](https://developer.android.com/studio/publish)
 
 ## Troubleshooting
 
