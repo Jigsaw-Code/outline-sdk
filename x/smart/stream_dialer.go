@@ -33,6 +33,31 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 )
 
+// ResolverFactory creates a dns.Resolver from a dnsEntryConfig.
+type ResolverFactory interface {
+	NewResolver(entry dnsEntryConfig) (dns.Resolver, bool, error)
+}
+
+// DialerFactory creates a transport.StreamDialer from a string config.
+type DialerFactory interface {
+	NewStreamDialer(ctx context.Context, config string) (transport.StreamDialer, error)
+}
+
+// PsiphonDialerFactory creates a transport.StreamDialer from a psiphon config.
+type PsiphonDialerFactory interface {
+	NewPsiphonDialer(ctx context.Context, psiphonJSON []byte, psiphonSignature string) (transport.StreamDialer, error)
+}
+
+// TestRunner runs tests against a dialer.
+type TestRunner interface {
+	TestDialer(ctx context.Context, dialer transport.StreamDialer, testDomains []string, transportCfg string) error
+}
+
+// ConfigParser parses the config.
+type ConfigParser interface {
+	ParseConfig(configBytes []byte) (configConfig, error)
+}
+
 // To test one strategy:
 // go run -C ./x/examples/smart-proxy/ . -v -localAddr=localhost:1080 --transport="" --domain www.rferl.org  --config=<(echo '{"dns": [{"https": {"name": "doh.sb"}}]}')
 
@@ -42,6 +67,25 @@ type StrategyFinder struct {
 	StreamDialer transport.StreamDialer
 	PacketDialer transport.PacketDialer
 	logMu        sync.Mutex
+	ResolverFactory ResolverFactory
+	DialerFactory DialerFactory
+	PsiphonDialerFactory PsiphonDialerFactory
+	TestRunner TestRunner
+	ConfigParser ConfigParser
+}
+
+func NewStrategyFinder(streamDialer transport.StreamDialer, packetDialer transport.PacketDialer, logWriter io.Writer) *StrategyFinder {
+	return &StrategyFinder{
+		TestTimeout:  5 * time.Second,
+		LogWriter:    logWriter,
+		StreamDialer: streamDialer,
+		PacketDialer: packetDialer,
+		ResolverFactory: &DefaultResolverFactory{streamDialer, packetDialer},
+		DialerFactory: &DefaultDialerFactory{},
+		PsiphonDialerFactory: &DefaultPsiphonDialerFactory{},
+		TestRunner: &DefaultTestRunner{},
+		ConfigParser: &DefaultConfigParser{},
+	}
 }
 
 func (f *StrategyFinder) log(format string, a ...any) {
@@ -133,9 +177,13 @@ func mapToAny(in map[string]any, out any) error {
 	return nil
 }
 
-// newDNSResolverFromEntry creates a [dns.Resolver] based on the config, returning the resolver and
-// a boolean indicating whether the resolver is secure (TLS, HTTPS) and a possible error.
-func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryConfig) (dns.Resolver, bool, error) {
+// DefaultResolverFactory is the default implementation of ResolverFactory.
+type DefaultResolverFactory struct {
+	StreamDialer transport.StreamDialer
+	PacketDialer transport.PacketDialer
+}
+
+func (f *DefaultResolverFactory) NewResolver(entry dnsEntryConfig) (dns.Resolver, bool, error) {
 	if entry.System != nil {
 		return nil, false, nil
 	} else if cfg := entry.HTTPS; cfg != nil {
@@ -193,6 +241,85 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryConfig) (dns.Reso
 	}
 }
 
+// DefaultDialerFactory is the default implementation of DialerFactory.
+type DefaultDialerFactory struct{}
+
+func (f *DefaultDialerFactory) NewStreamDialer(ctx context.Context, config string) (transport.StreamDialer, error) {
+	var configModule = configurl.NewDefaultProviders()
+	return configModule.NewStreamDialer(ctx, config)
+}
+
+// DefaultPsiphonDialerFactory is the default implementation of PsiphonDialerFactory.
+type DefaultPsiphonDialerFactory struct{}
+
+func (f *DefaultPsiphonDialerFactory) NewPsiphonDialer(ctx context.Context, psiphonJSON []byte, psiphonSignature string) (transport.StreamDialer, error) {
+	return newPsiphonDialer(ctx, psiphonJSON, psiphonSignature)
+}
+
+// DefaultTestRunner is the default implementation of TestRunner.
+type DefaultTestRunner struct{}
+
+func (f *DefaultTestRunner) TestDialer(ctx context.Context, dialer transport.StreamDialer, testDomains []string, transportCfg string) error {
+	for _, testDomain := range testDomains {
+		startTime := time.Now()
+
+		testAddr := net.JoinHostPort(testDomain, "443")
+		//f.logCtx(ctx, "🏃 running test: '%v' (domain: %v)\n", transportCfg, testDomain)
+
+		ctx, cancel := context.WithTimeout(ctx, 5 * time.Second)
+		defer cancel()
+		testConn, err := dialer.DialStream(ctx, testAddr)
+		if err != nil {
+			//f.logCtx(ctx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+			return err
+		}
+		tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
+		err = tlsConn.HandshakeContext(ctx)
+		tlsConn.Close()
+		if err != nil {
+			//f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+			return err
+		}
+		//f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
+	}
+	return nil
+}
+
+// DefaultConfigParser is the default implementation of ConfigParser.
+type DefaultConfigParser struct{}
+
+func (f *DefaultConfigParser) ParseConfig(configBytes []byte) (configConfig, error) {
+	var parsedConfig configConfig
+	var configMap map[string]any
+	err := yaml.Unmarshal(configBytes, &configMap)
+	if err != nil {
+		return configConfig{}, fmt.Errorf("failed to unmarshal config to map: %w", err)
+	}
+	err = mapToAny(configMap, &parsedConfig)
+	if err != nil {
+		return configConfig{}, fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	// Iterate through fallback field and convert individual elements to strings or fallbackEntryStructConfig
+	for i, fallbackElement := range parsedConfig.Fallback {
+		switch v := fallbackElement.(type) {
+		case string:
+			parsedConfig.Fallback[i] = v
+		case map[string]any:
+			var fallbackEntry fallbackEntryStructConfig
+			err := mapToAny(v, &fallbackEntry)
+			if err != nil {
+				return configConfig{}, fmt.Errorf("failed to parse fallback config: %w", err)
+			}
+			parsedConfig.Fallback[i] = fallbackEntry
+		default:
+			return configConfig{}, fmt.Errorf("unknown fallback type: %v", v)
+		}
+	}
+
+	return parsedConfig, nil
+}
+
 // Takes a (potentially very long) psiphon config and outputs
 // a short signature string for logging identification purposes
 // with only the PropagationChannelId and SponsorId (required fields)
@@ -231,7 +358,7 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryConfig) ([]*sma
 			return nil, fmt.Errorf("cannot serialize entry %v: %w", ei, err)
 		}
 		id := string(idBytes)
-		resolver, isSecure, err := f.newDNSResolverFromEntry(entry)
+		resolver, isSecure, err := f.ResolverFactory.NewResolver(entry)
 		if err != nil {
 			return nil, fmt.Errorf("failed to process entry %v: %w", ei, err)
 		}
@@ -240,31 +367,8 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryConfig) ([]*sma
 	return rts, nil
 }
 
-// Test that a dialer is able to access all the given test domains. Returns nil if all tests succeed
 func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.StreamDialer, testDomains []string, transportCfg string) error {
-	for _, testDomain := range testDomains {
-		startTime := time.Now()
-
-		testAddr := net.JoinHostPort(testDomain, "443")
-		f.logCtx(ctx, "🏃 running test: '%v' (domain: %v)\n", transportCfg, testDomain)
-
-		ctx, cancel := context.WithTimeout(ctx, f.TestTimeout)
-		defer cancel()
-		testConn, err := dialer.DialStream(ctx, testAddr)
-		if err != nil {
-			f.logCtx(ctx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-			return err
-		}
-		tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
-		err = tlsConn.HandshakeContext(ctx)
-		tlsConn.Close()
-		if err != nil {
-			f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-			return err
-		}
-		f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
-	}
-	return nil
+	return f.TestRunner.TestDialer(ctx, dialer, testDomains, transportCfg)
 }
 
 func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsConfig []dnsEntryConfig) (dns.Resolver, error) {
@@ -284,7 +388,7 @@ func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsC
 			default:
 			}
 
-			f.logCtx(ctx, "🏃 run DNS: %v (domain: %v)\n", resolver.ID, testDomain)
+			//f.logCtx(ctx, "🏃 run DNS: %v (domain: %v)\n", resolver.ID, testDomain)
 			startTime := time.Now()
 			ips, err := testDNSResolver(ctx, f.TestTimeout, resolver, testDomain)
 			duration := time.Since(startTime)
@@ -294,7 +398,7 @@ func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsC
 				status = fmt.Sprintf("%v ❌", err)
 			}
 			// Only output log if the search is not done yet.
-			f.logCtx(ctx, "🏁 got DNS: %v (domain: %v), duration=%v, ips=%v, status=%v\n", resolver.ID, testDomain, duration, ips, status)
+			//f.logCtx(ctx, "🏁 got DNS: %v (domain: %v), duration=%v, ips=%v, status=%v\n", resolver.ID, testDomain, duration, ips, status)
 
 			if err != nil {
 				return nil, err
@@ -313,8 +417,6 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 	if len(tlsConfig) == 0 {
 		return nil, errors.New("config for TLS is empty. Please specify at least one transport")
 	}
-	var configModule = configurl.NewDefaultProviders()
-	configModule.StreamDialers.BaseInstance = baseDialer
 
 	ctx, searchDone := context.WithCancel(ctx)
 	defer searchDone()
@@ -324,7 +426,7 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 		Config string
 	}
 	result, err := raceTests(ctx, 250*time.Millisecond, tlsConfig, func(transportCfg string) (*SearchResult, error) {
-		tlsDialer, err := configModule.NewStreamDialer(ctx, transportCfg)
+		tlsDialer, err := f.DialerFactory.NewStreamDialer(ctx, transportCfg)
 		if err != nil {
 			return nil, fmt.Errorf("WrapStreamDialer failed: %w", err)
 		}
@@ -371,13 +473,12 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 		Dialer transport.StreamDialer
 		Config fallbackEntryConfig
 	}
-	var configModule = configurl.NewDefaultProviders()
 
 	fallback, err := raceTests(raceCtx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
 		switch v := fallbackConfig.(type) {
 		case string:
 			configUrl := v
-			dialer, err := configModule.NewStreamDialer(raceCtx, configUrl)
+			dialer, err := f.DialerFactory.NewStreamDialer(raceCtx, configUrl)
 			if err != nil {
 				return nil, fmt.Errorf("getStreamDialer failed: %w", err)
 			}
@@ -397,7 +498,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 				}
 				psiphonSignature := f.getPsiphonConfigSignature(psiphonJSON)
 
-				dialer, err := newPsiphonDialer(ctx, psiphonJSON, psiphonSignature)
+				dialer, err := f.PsiphonDialerFactory.NewPsiphonDialer(ctx, psiphonJSON, psiphonSignature)
 				if err != nil {
 					return nil, fmt.Errorf("getPsiphonDialer failed: %w", err)
 				}
@@ -450,44 +551,11 @@ func (f *StrategyFinder) newProxylessDialer(ctx context.Context, testDomains []s
 	return f.findTLS(ctx, testDomains, dnsDialer, config.TLS)
 }
 
-func (f *StrategyFinder) parseConfig(configBytes []byte) (configConfig, error) {
-	var parsedConfig configConfig
-	var configMap map[string]any
-	err := yaml.Unmarshal(configBytes, &configMap)
-	if err != nil {
-		return configConfig{}, fmt.Errorf("failed to unmarshal config to map: %w", err)
-	}
-	err = mapToAny(configMap, &parsedConfig)
-	if err != nil {
-		return configConfig{}, fmt.Errorf("failed to parse config: %w", err)
-	}
-
-	// Iterate through fallback field and convert individual elements to strings or fallbackEntryStructConfig
-	for i, fallbackElement := range parsedConfig.Fallback {
-		switch v := fallbackElement.(type) {
-		case string:
-			parsedConfig.Fallback[i] = v
-		case map[string]any:
-			var fallbackEntry fallbackEntryStructConfig
-			err := mapToAny(v, &fallbackEntry)
-			if err != nil {
-				return configConfig{}, fmt.Errorf("failed to parse fallback config: %w", err)
-			}
-			parsedConfig.Fallback[i] = fallbackEntry
-		default:
-			return configConfig{}, fmt.Errorf("unknown fallback type: %v", v)
-		}
-	}
-
-	return parsedConfig, nil
-}
-
 // NewDialer uses the config in configBytes to search for a strategy that unblocks DNS and TLS for all of the testDomains, returning a dialer with the found strategy.
 // It returns an error if no strategy was found that unblocks the testDomains.
 // The testDomains must be domains with a TLS service running on port 443.
 func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, configBytes []byte) (transport.StreamDialer, error) {
-	var parsedConfig configConfig
-	parsedConfig, err := f.parseConfig(configBytes)
+	parsedConfig, err := f.ConfigParser.ParseConfig(configBytes)
 	if err != nil {
 		return nil, err
 	}
