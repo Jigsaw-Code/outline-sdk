@@ -20,31 +20,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        var dialerError: NSError?
-        if let dialer = MobileproxyNewSmartStreamDialer(
-            MobileproxyNewListFromLines(Config.domainList),
-            Config.smartDialer,
-            MobileproxyNewStderrLogWriter(),
-            &dialerError
-        ) {
-            if let error = dialerError {
-                self.showError(error)
-                return
-            }
-
-            var proxyError: NSError?
-            self.proxy = MobileproxyRunProxy(
-                "127.0.0.1:8080",
-                dialer,
-                &proxyError
-            )
-
-            if let error = proxyError {
-                self.showError(error)
-
-                self.proxy = nil
-                return
-            }
+        if !self.tryProxy() {
+            // try one more time
+            self.tryProxy()
         }
     }
 
@@ -74,16 +52,30 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
-    private func showError(error: NSError) {
-        guard let rootViewController = self.window?.rootViewController else {
-            print("Could not find root view controller to present error.")
-            return
+    private func tryProxy() -> Bool {
+        var dialerError: NSError?
+        if let dialer = MobileproxyNewSmartStreamDialer(
+            MobileproxyNewListFromLines(Config.domainList),
+            Config.smartDialer,
+            MobileproxyNewStderrLogWriter(),
+            &dialerError
+        ) {
+            if let error = dialerError {
+                return false
+            }
+
+            var proxyError: NSError?
+            self.proxy = MobileproxyRunProxy(
+                "127.0.0.1:8080",
+                dialer,
+                &proxyError
+            )
+
+            if let error = proxyError {
+                return false
+            }
         }
 
-        let dialog = UIAlertController(title: "Error", message: error.localizedDescription, preferredStyle: .alert)
-
-        dialog.addAction(UIAlertAction(title: "OK", style: .default))
-
-        rootViewController.present(dialog, animated: false)
+        return true
     }
 }

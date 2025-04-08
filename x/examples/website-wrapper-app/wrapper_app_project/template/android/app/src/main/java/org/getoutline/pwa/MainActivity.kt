@@ -1,7 +1,6 @@
 package org.getoutline.pwa
 
 import android.os.Bundle
-import android.widget.Toast
 import com.getcapacitor.BridgeActivity
 
 import mobileproxy.*
@@ -18,37 +17,9 @@ class MainActivity : BridgeActivity() {
         super.onCreate(savedInstanceState)
 
         if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
-            try {
-                this.proxy = Mobileproxy.runProxy(
-                    "127.0.0.1:0",
-                    Mobileproxy.newSmartStreamDialer(
-                        Mobileproxy.newListFromLines(Config.domainList),
-                        Config.smartDialer,
-                        Mobileproxy.newStderrLogWriter()
-                    )
-                )
-
-                // NOTE: this affects all requests in the application
-                ProxyController.getInstance()
-                    .setProxyOverride(
-                        ProxyConfig.Builder()
-                            .addProxyRule(this.proxy!!.address())
-                            .build(),
-                        {
-                            runOnUiThread {
-                                // Capacitor does not expose a way to defer the loading of the webview,
-                                // so we simply refresh the page
-                                this.bridge.webView.reload()
-                            }
-                        },
-                        {}
-                    )
-            } catch (e: Exception) {
-                this.proxy = null;
-
-                runOnUiThread {
-                    Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+            if (!this.tryProxy()) {
+                // try one more time
+                this.tryProxy()
             }
         }
     }
@@ -58,5 +29,38 @@ class MainActivity : BridgeActivity() {
         this.proxy = null
 
         super.onDestroy()
+    }
+
+    private fun tryProxy(): Boolean {
+        try {
+            this.proxy = Mobileproxy.runProxy(
+                "127.0.0.1:0",
+                Mobileproxy.newSmartStreamDialer(
+                    Mobileproxy.newListFromLines(Config.domainList),
+                    Config.smartDialer,
+                    Mobileproxy.newStderrLogWriter()
+                )
+            )
+
+            // NOTE: this affects all requests in the application
+            ProxyController.getInstance()
+                .setProxyOverride(
+                    ProxyConfig.Builder()
+                        .addProxyRule(this.proxy!!.address())
+                        .build(),
+                    {
+                        runOnUiThread {
+                            // Capacitor does not expose a way to defer the loading of the webview,
+                            // so we simply refresh the page
+                            this.bridge.webView.reload()
+                        }
+                    },
+                    {}
+                )
+        } catch (e: Exception) {
+            return false
+        }
+
+        return true
     }
 }
