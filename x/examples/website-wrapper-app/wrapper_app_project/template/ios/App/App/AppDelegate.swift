@@ -52,6 +52,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
+    @discardableResult
     private func tryProxy() -> Bool {
         var dialerError: NSError?
         if let dialer = MobileproxyNewSmartStreamDialer(
@@ -60,18 +61,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             MobileproxyNewStderrLogWriter(),
             &dialerError
         ) {
-            if let error = dialerError {
+            if let _ = dialerError {
                 return false
             }
 
             var proxyError: NSError?
             self.proxy = MobileproxyRunProxy(
-                "127.0.0.1:8080",
+                "127.0.0.1:0",
                 dialer,
                 &proxyError
             )
+            
+            Config.proxyPort = String(self.proxy?.port() ?? 0)
 
-            if let error = proxyError {
+            if let _ = proxyError {
                 return false
             }
         }
