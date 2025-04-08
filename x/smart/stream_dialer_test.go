@@ -854,3 +854,4 @@ func TestFindTLS_InvalidPort(t *testing.T) {
 	_, err = dialer.DialStream(context.Background(), "test.com:invalid")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "could not resolve port")
+}
