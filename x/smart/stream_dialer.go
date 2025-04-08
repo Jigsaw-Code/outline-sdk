@@ -97,7 +97,7 @@ type dnsEntryConfig struct {
 }
 
 type fallbackEntryStructConfig struct {
-	Psiphon any	`yaml:"psiphon,omitempty"`
+	Psiphon any `yaml:"psiphon,omitempty"`
 	// As we allow more fallback types beyond psiphon they will be added here
 }
 
@@ -106,9 +106,9 @@ type fallbackEntryStructConfig struct {
 type fallbackEntryConfig any
 
 type configConfig struct {
-	DNS      []dnsEntryConfig 		`yaml:"dns,omitempty"`
-	TLS      []string         		`yaml:"tls,omitempty"`
-	Fallback []fallbackEntryConfig 	`yaml:"fallback,omitempty"`
+	DNS      []dnsEntryConfig      `yaml:"dns,omitempty"`
+	TLS      []string              `yaml:"tls,omitempty"`
+	Fallback []fallbackEntryConfig `yaml:"fallback,omitempty"`
 }
 
 // mapToAny marshalls a map into a struct. It's a helper for parsers that want to
@@ -360,34 +360,31 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 
 // Return the fastest fallback dialer that is able to access all the testDomans
 func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string, fallbackConfigs []fallbackEntryConfig) (transport.StreamDialer, error) {
+	dialers, err := f.createFallbackDialers(ctx, fallbackConfigs)
+	if err != nil {
+		return nil, err
+	}
+	return f.testFallbackDialers(ctx, testDomains, dialers)
+}
+
+// createFallbackDialers creates a list of fallback dialers from the config.
+func (f *StrategyFinder) createFallbackDialers(ctx context.Context, fallbackConfigs []fallbackEntryConfig) ([]fallbackDialer, error) {
 	if len(fallbackConfigs) == 0 {
 		return nil, errors.New("no fallback was specified")
 	}
 
-	raceCtx, searchDone := context.WithCancel(ctx)
-	defer searchDone()
-	raceStart := time.Now()
-	type SearchResult struct {
-		Dialer transport.StreamDialer
-		Config fallbackEntryConfig
-	}
 	var configModule = configurl.NewDefaultProviders()
+	var dialers []fallbackDialer
 
-	fallback, err := raceTests(raceCtx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
+	for _, fallbackConfig := range fallbackConfigs {
 		switch v := fallbackConfig.(type) {
 		case string:
 			configUrl := v
-			dialer, err := configModule.NewStreamDialer(raceCtx, configUrl)
+			dialer, err := configModule.NewStreamDialer(ctx, configUrl)
 			if err != nil {
 				return nil, fmt.Errorf("getStreamDialer failed: %w", err)
 			}
-
-			err = f.testDialer(raceCtx, dialer, testDomains, configUrl)
-			if err != nil {
-				return nil, err
-			}
-
-			return &SearchResult{dialer, fallbackConfig}, nil
+			dialers = append(dialers, fallbackDialer{dialer, fallbackConfig})
 		case fallbackEntryStructConfig:
 			if v.Psiphon != nil {
 				psiphonCfg := v.Psiphon
@@ -401,32 +398,65 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 				if err != nil {
 					return nil, fmt.Errorf("getPsiphonDialer failed: %w", err)
 				}
-
-				err = f.testDialer(raceCtx, dialer, testDomains, psiphonSignature)
-				if err != nil {
-					return nil, err
-				}
-
-				return &SearchResult{dialer, psiphonSignature}, nil
+				dialers = append(dialers, fallbackDialer{dialer, psiphonSignature})
 			} else {
 				return nil, fmt.Errorf("unknown fallback type: %v", v)
 			}
 		default:
 			return nil, fmt.Errorf("unknown fallback type: %v\n", v)
 		}
+	}
+	return dialers, nil
+}
+
+type fallbackDialer struct {
+	Dialer transport.StreamDialer
+	Config any
+}
+
+// testFallbackDialers tests a list of fallback dialers and returns the first one that works.
+func (f *StrategyFinder) testFallbackDialers(ctx context.Context, testDomains []string, dialers []fallbackDialer) (transport.StreamDialer, error) {
+	raceCtx, searchDone := context.WithCancel(ctx)
+	defer searchDone()
+	raceStart := time.Now()
+
+	type SearchResult struct {
+		Dialer transport.StreamDialer
+		Config any
+	}
+
+	result, err := raceTests(raceCtx, 250*time.Millisecond, dialers, func(dialer fallbackDialer) (*SearchResult, error) {
+		err := f.testDialer(raceCtx, dialer.Dialer, testDomains, fmt.Sprintf("%v", dialer.Config))
+		if err != nil {
+			return nil, err
+		}
+		return &SearchResult{dialer.Dialer, dialer.Config}, nil
 	})
 
 	if err != nil {
 		return nil, fmt.Errorf("could not find a working fallback: %w", err)
 	}
-	f.log("🏆 selected fallback '%v' in %0.2fs\n\n", fallback.Config, time.Since(raceStart).Seconds())
+	f.log("🏆 selected fallback '%v' in %0.2fs\n\n", result.Config, time.Since(raceStart).Seconds())
 
-	return fallback.Dialer, nil
+	return result.Dialer, nil
 }
 
 // Attempts to create a new Dialer using only proxyless (DNS and TLS) strategies
 func (f *StrategyFinder) newProxylessDialer(ctx context.Context, testDomains []string, config configConfig) (transport.StreamDialer, error) {
-	resolver, err := f.findDNS(ctx, testDomains, config.DNS)
+	dnsDialer, err := f.createDNSDialer(ctx, config.DNS)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(config.TLS) == 0 {
+		return dnsDialer, nil
+	}
+	return f.findTLS(ctx, testDomains, dnsDialer, config.TLS)
+}
+
+// createDNSDialer creates a DNS dialer from the config.
+func (f *StrategyFinder) createDNSDialer(ctx context.Context, dnsConfig []dnsEntryConfig) (transport.StreamDialer, error) {
+	resolver, err := f.findDNS(ctx, []string{"www.google.com"}, dnsConfig) //TODO: remove hardcoded test domain
 	if err != nil {
 		return nil, err
 	}
@@ -443,11 +473,7 @@ func (f *StrategyFinder) newProxylessDialer(ctx context.Context, testDomains []s
 			return nil, fmt.Errorf("dns.NewStreamDialer failed: %w", err)
 		}
 	}
-
-	if len(config.TLS) == 0 {
-		return dnsDialer, nil
-	}
-	return f.findTLS(ctx, testDomains, dnsDialer, config.TLS)
+	return dnsDialer, nil
 }
 
 func (f *StrategyFinder) parseConfig(configBytes []byte) (configConfig, error) {
