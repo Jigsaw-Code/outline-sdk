@@ -64,7 +64,7 @@ dns:
   - randomkey: {}
 `
 	configBytes := []byte(config)
-	finder := NewStrategyFinder(context.Background(), &transport.TCPDialer{}, &transport.UDPDialer{}, nil)
+	finder := &StrategyFinder{}
 	_, err := finder.ConfigParser.ParseConfig(configBytes)
 	require.Error(t, err)
 }
@@ -78,8 +78,8 @@ dns:
   - udp: { address: tmcell.tm }
   - udp: { address: dns1.transtelecom.net. }
   - tls:
-	  name: captive-portal.badssl.com
-	  address: captive-portal.badssl.com:443
+      name: captive-portal.badssl.com
+      address: captive-portal.badssl.com:443
   - https: { name: mitm-software.badssl.com }
 
 tls:
@@ -92,13 +92,13 @@ tls:
 fallback:
   - ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1
   - psiphon: {
-	  "PropagationChannelId":"FFFFFFFFFFFFFFFF",
-	  "SponsorId":"FFFFFFFFFFFFFFFF",
-	}
+      "PropagationChannelId":"FFFFFFFFFFFFFFFF",
+      "SponsorId":"FFFFFFFFFFFFFFFF",
+    }
   - socks5://192.168.1.10:1080
 `
 	configBytes := []byte(config)
-	finder := NewStrategyFinder(context.Background(), &transport.TCPDialer{}, &transport.UDPDialer{}, nil)
+	finder := &StrategyFinder{}
 	parsedConfig, err := finder.ConfigParser.ParseConfig(configBytes)
 	require.NoError(t, err)
 
@@ -116,7 +116,7 @@ fallback:
 		Fallback: []fallbackEntryConfig{
 			"ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1",
 			fallbackEntryStructConfig{
-				Psiphon: map[string]any{
+				Psiphon: map[string]any {
 					"PropagationChannelId": "FFFFFFFFFFFFFFFF",
 					"SponsorId":            "FFFFFFFFFFFFFFFF",
 				},
