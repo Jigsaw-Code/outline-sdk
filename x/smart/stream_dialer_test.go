@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/stretchr/testify/require"
@@ -62,7 +64,7 @@ dns:
   - randomkey: {}
 `
 	configBytes := []byte(config)
-	finder := NewStrategyFinder(&transport.TCPDialer{}, &transport.UDPDialer{}, nil)
+	finder := NewStrategyFinder(context.Background(), &transport.TCPDialer{}, &transport.UDPDialer{}, nil)
 	_, err := finder.ConfigParser.ParseConfig(configBytes)
 	require.Error(t, err)
 }
@@ -96,7 +98,7 @@ fallback:
   - socks5://192.168.1.10:1080
 `
 	configBytes := []byte(config)
-	finder := NewStrategyFinder(&transport.TCPDialer{}, &transport.UDPDialer{}, nil)
+	finder := NewStrategyFinder(context.Background(), &transport.TCPDialer{}, &transport.UDPDialer{}, nil)
 	parsedConfig, err := finder.ConfigParser.ParseConfig(configBytes)
 	require.NoError(t, err)
 
@@ -114,7 +116,7 @@ fallback:
 		Fallback: []fallbackEntryConfig{
 			"ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1",
 			fallbackEntryStructConfig{
-				Psiphon: map[string]any {
+				Psiphon: map[string]any{
 					"PropagationChannelId": "FFFFFFFFFFFFFFFF",
 					"SponsorId":            "FFFFFFFFFFFFFFFF",
 				},
@@ -134,14 +136,14 @@ fallback:
 	  SponsorId: FFFFFFFFFFFFFFFF
 `
 	configBytes := []byte(config)
-	finder := NewStrategyFinder(&transport.TCPDialer{}, &transport.UDPDialer{}, nil)
+	finder := NewStrategyFinder(context.Background(), &transport.TCPDialer{}, &transport.UDPDialer{}, nil)
 	parsedConfig, err := finder.ConfigParser.ParseConfig(configBytes)
 	require.NoError(t, err)
 
 	expectedConfig := configConfig{
 		Fallback: []fallbackEntryConfig{
 			fallbackEntryStructConfig{
-				Psiphon: map[string]any {
+				Psiphon: map[string]any{
 					"PropagationChannelId": "FFFFFFFFFFFFFFFF",
 					"SponsorId":            "FFFFFFFFFFFFFFFF",
 				},
@@ -153,7 +155,7 @@ fallback:
 }
 
 func Test_getPsiphonConfigSignature_ValidFields(t *testing.T) {
-	finder := NewStrategyFinder(&transport.TCPDialer{}, &transport.UDPDialer{}, nil)
+	finder := NewStrategyFinder(context.Background(), &transport.TCPDialer{}, &transport.UDPDialer{}, nil)
 	config := []byte(`{
 		"PropagationChannelId": "FFFFFFFFFFFFFFFF",
 		"SponsorId": "FFFFFFFFFFFFFFFF",
@@ -169,7 +171,7 @@ func Test_getPsiphonConfigSignature_InvalidFields(t *testing.T) {
 	// If we don't understand the psiphon config we received for any reason
 	// then just output it as an opaque string
 
-	finder := NewStrategyFinder(&transport.TCPDialer{}, &transport.UDPDialer{}, nil)
+	finder := NewStrategyFinder(context.Background(), &transport.TCPDialer{}, &transport.UDPDialer{}, nil)
 	config := []byte(`{"ClientPlatform": "outline", "ClientVersion": "1"}`)
 	expected := `{"ClientPlatform": "outline", "ClientVersion": "1"}`
 	actual := finder.getPsiphonConfigSignature(config)
@@ -219,15 +221,15 @@ func TestNewDialer_BrokenConfig(t *testing.T) {
 	}
 
 	finder := &StrategyFinder{
-		TestTimeout:  5,
-		LogWriter:    nil,
-		StreamDialer: &transport.TCPDialer{},
-		PacketDialer: &transport.UDPDialer{},
-		ResolverFactory: mockResolverFactory,
-		DialerFactory: mockDialerFactory,
+		TestTimeout:            5,
+		LogWriter:            NewCancellableLogWriter(context.Background(), nil),
+		StreamDialer:         &transport.TCPDialer{},
+		PacketDialer:         &transport.UDPDialer{},
+		ResolverFactory:        mockResolverFactory,
+		DialerFactory:          mockDialerFactory,
 		PsiphonDialerFactory: mockPsiphonDialerFactory,
-		TestRunner: mockTestRunner,
-		ConfigParser: mockConfigParser,
+		TestRunner:             mockTestRunner,
+		ConfigParser:           mockConfigParser,
 	}
 
 	_, err = finder.NewDialer(context.Background(), testDomains, configBytes)

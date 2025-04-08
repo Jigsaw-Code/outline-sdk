@@ -33,6 +33,37 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 )
 
+// CancellableLogWriter is a log writer that can be cancelled.
+type CancellableLogWriter struct {
+	io.Writer
+	ctx context.Context
+	logMu        sync.Mutex
+}
+
+func NewCancellableLogWriter(ctx context.Context, writer io.Writer) *CancellableLogWriter {
+	return &CancellableLogWriter{Writer: writer, ctx: ctx}
+}
+
+// Only log if context is not done
+func (f *CancellableLogWriter) logCtx(ctx context.Context, format string, a ...any) {
+	if ctx != nil {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+	}
+	f.log(format, a...)
+}
+
+func (f *CancellableLogWriter) log(format string, a ...any) {
+	if f.Writer != nil {
+		f.logMu.Lock()
+		defer f.logMu.Unlock()
+		fmt.Fprintf(f.Writer, format, a...)
+	}
+}
+
 // ResolverFactory creates a dns.Resolver from a dnsEntryConfig.
 type ResolverFactory interface {
 	NewResolver(entry dnsEntryConfig) (dns.Resolver, bool, error)
@@ -63,10 +94,9 @@ type ConfigParser interface {
 
 type StrategyFinder struct {
 	TestTimeout  time.Duration
-	LogWriter    io.Writer
+	LogWriter    *CancellableLogWriter
 	StreamDialer transport.StreamDialer
 	PacketDialer transport.PacketDialer
-	logMu        sync.Mutex
 	ResolverFactory ResolverFactory
 	DialerFactory DialerFactory
 	PsiphonDialerFactory PsiphonDialerFactory
@@ -74,38 +104,25 @@ type StrategyFinder struct {
 	ConfigParser ConfigParser
 }
 
-func NewStrategyFinder(streamDialer transport.StreamDialer, packetDialer transport.PacketDialer, logWriter io.Writer) *StrategyFinder {
+func NewStrategyFinder(ctx context.Context, streamDialer transport.StreamDialer, packetDialer transport.PacketDialer, logWriter io.Writer) *StrategyFinder {
+	cancellableLogWriter := NewCancellableLogWriter(ctx, logWriter)
 	return &StrategyFinder{
 		TestTimeout:  5 * time.Second,
-		LogWriter:    logWriter,
+		LogWriter:    cancellableLogWriter,
 		StreamDialer: streamDialer,
 		PacketDialer: packetDialer,
 		ResolverFactory: &DefaultResolverFactory{streamDialer, packetDialer},
 		DialerFactory: &DefaultDialerFactory{},
 		PsiphonDialerFactory: &DefaultPsiphonDialerFactory{},
-		TestRunner: &DefaultTestRunner{},
+		TestRunner: &DefaultTestRunner{cancellableLogWriter},
 		ConfigParser: &DefaultConfigParser{},
 	}
 }
 
 func (f *StrategyFinder) log(format string, a ...any) {
 	if f.LogWriter != nil {
-		f.logMu.Lock()
-		defer f.logMu.Unlock()
-		fmt.Fprintf(f.LogWriter, format, a...)
+		f.LogWriter.log(format, a...)
 	}
-}
-
-// Only log if context is not done
-func (f *StrategyFinder) logCtx(ctx context.Context, format string, a ...any) {
-	if ctx != nil {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-	}
-	f.log(format, a...)
 }
 
 type httpsEntryConfig struct {
@@ -257,30 +274,32 @@ func (f *DefaultPsiphonDialerFactory) NewPsiphonDialer(ctx context.Context, psip
 }
 
 // DefaultTestRunner is the default implementation of TestRunner.
-type DefaultTestRunner struct{}
+type DefaultTestRunner struct{
+	logWriter *CancellableLogWriter
+}
 
 func (f *DefaultTestRunner) TestDialer(ctx context.Context, dialer transport.StreamDialer, testDomains []string, transportCfg string) error {
 	for _, testDomain := range testDomains {
 		startTime := time.Now()
 
 		testAddr := net.JoinHostPort(testDomain, "443")
-		//f.logCtx(ctx, "🏃 running test: '%v' (domain: %v)\n", transportCfg, testDomain)
+		f.logWriter.logCtx(ctx, "🏃 running test: '%v' (domain: %v)\n", transportCfg, testDomain)
 
 		ctx, cancel := context.WithTimeout(ctx, 5 * time.Second)
 		defer cancel()
 		testConn, err := dialer.DialStream(ctx, testAddr)
 		if err != nil {
-			//f.logCtx(ctx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+			f.logWriter.logCtx(ctx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 			return err
 		}
 		tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
 		err = tlsConn.HandshakeContext(ctx)
 		tlsConn.Close()
 		if err != nil {
-			//f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+			f.logWriter.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 			return err
 		}
-		//f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
+		f.logWriter.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
 	}
 	return nil
 }
@@ -388,7 +407,7 @@ func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsC
 			default:
 			}
 
-			//f.logCtx(ctx, "🏃 run DNS: %v (domain: %v)\n", resolver.ID, testDomain)
+			f.LogWriter.logCtx(ctx, "🏃 run DNS: %v (domain: %v)\n", resolver.ID, testDomain)
 			startTime := time.Now()
 			ips, err := testDNSResolver(ctx, f.TestTimeout, resolver, testDomain)
 			duration := time.Since(startTime)
@@ -398,7 +417,7 @@ func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsC
 				status = fmt.Sprintf("%v ❌", err)
 			}
 			// Only output log if the search is not done yet.
-			//f.logCtx(ctx, "🏁 got DNS: %v (domain: %v), duration=%v, ips=%v, status=%v\n", resolver.ID, testDomain, duration, ips, status)
+			f.LogWriter.logCtx(ctx, "🏁 got DNS: %v (domain: %v), duration=%v, ips=%v, status=%v\n", resolver.ID, testDomain, duration, ips, status)
 
 			if err != nil {
 				return nil, err
@@ -409,7 +428,7 @@ func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsC
 	if err != nil {
 		return nil, fmt.Errorf("could not find working resolver: %w", err)
 	}
-	f.log("🏆 selected DNS resolver %v in %0.2fs\n\n", resolver.ID, time.Since(raceStart).Seconds())
+	f.LogWriter.logCtx(ctx, "🏆 selected DNS resolver %v in %0.2fs\n\n", resolver.ID, time.Since(raceStart).Seconds())
 	return resolver.Resolver, nil
 }
 
@@ -441,7 +460,7 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 	if err != nil {
 		return nil, fmt.Errorf("could not find TLS strategy: %w", err)
 	}
-	f.log("🏆 selected TLS strategy '%v' in %0.2fs\n\n", result.Config, time.Since(raceStart).Seconds())
+	f.LogWriter.logCtx(ctx, "🏆 selected TLS strategy '%v' in %0.2fs\n\n", result.Config, time.Since(raceStart).Seconds())
 	tlsDialer := result.Dialer
 	return transport.FuncStreamDialer(func(ctx context.Context, raddr string) (transport.StreamConn, error) {
 		_, portStr, err := net.SplitHostPort(raddr)
@@ -494,7 +513,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 				psiphonCfg := v.Psiphon
 				psiphonJSON, err := json.Marshal(psiphonCfg)
 				if err != nil {
-					f.logCtx(ctx, "Error marshaling to JSON: %v, %v\n", psiphonCfg, err)
+					f.LogWriter.logCtx(ctx, "Error marshaling to JSON: %v, %v\n", psiphonCfg, err)
 				}
 				psiphonSignature := f.getPsiphonConfigSignature(psiphonJSON)
 
@@ -520,7 +539,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 	if err != nil {
 		return nil, fmt.Errorf("could not find a working fallback: %w", err)
 	}
-	f.log("🏆 selected fallback '%v' in %0.2fs\n\n", fallback.Config, time.Since(raceStart).Seconds())
+	f.LogWriter.logCtx(ctx, "🏆 selected fallback '%v' in %0.2fs\n\n", fallback.Config, time.Since(raceStart).Seconds())
 
 	return fallback.Dialer, nil
 }
