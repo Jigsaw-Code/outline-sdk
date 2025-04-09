@@ -74,7 +74,7 @@ type ResolverFactory interface {
 
 // DialerFactory creates a transport.StreamDialer from a string config.
 type DialerFactory interface {
-	NewStreamDialer(ctx context.Context, config string) (transport.StreamDialer, error)
+	NewStreamDialer(ctx context.Context, baseDialer transport.StreamDialer, config string) (transport.StreamDialer, error)
 }
 
 // PsiphonDialerFactory creates a transport.StreamDialer from a psiphon config.
@@ -261,8 +261,9 @@ func (f *DefaultResolverFactory) NewResolver(entry dnsEntryConfig) (dns.Resolver
 // DefaultDialerFactory is the default implementation of DialerFactory.
 type DefaultDialerFactory struct{}
 
-func (f *DefaultDialerFactory) NewStreamDialer(ctx context.Context, config string) (transport.StreamDialer, error) {
+func (f *DefaultDialerFactory) NewStreamDialer(ctx context.Context, baseDialer transport.StreamDialer, config string) (transport.StreamDialer, error) {
 	var configModule = configurl.NewDefaultProviders()
+	configModule.StreamDialers.BaseInstance = baseDialer
 	return configModule.NewStreamDialer(ctx, config)
 }
 
@@ -445,7 +446,7 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 		Config string
 	}
 	result, err := raceTests(ctx, 250*time.Millisecond, tlsConfig, func(transportCfg string) (*SearchResult, error) {
-		tlsDialer, err := f.DialerFactory.NewStreamDialer(ctx, transportCfg)
+		tlsDialer, err := f.DialerFactory.NewStreamDialer(ctx, baseDialer, transportCfg)
 		if err != nil {
 			return nil, fmt.Errorf("WrapStreamDialer failed: %w", err)
 		}
@@ -497,7 +498,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 		switch v := fallbackConfig.(type) {
 		case string:
 			configUrl := v
-			dialer, err := f.DialerFactory.NewStreamDialer(raceCtx, configUrl)
+			dialer, err := f.DialerFactory.NewStreamDialer(raceCtx, nil, configUrl)
 			if err != nil {
 				return nil, fmt.Errorf("getStreamDialer failed: %w", err)
 			}
