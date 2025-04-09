@@ -35,9 +35,9 @@ import (
 
 // CancellableLogWriter is a log writer that can be cancelled.
 type CancellableLogWriter struct {
-	io.Writer
-	ctx context.Context
-	logMu        sync.Mutex
+	Writer	io.Writer
+	ctx 	context.Context
+	logMu   sync.Mutex
 }
 
 func NewCancellableLogWriter(ctx context.Context, writer io.Writer) *CancellableLogWriter {

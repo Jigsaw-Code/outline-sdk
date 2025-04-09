@@ -110,12 +110,7 @@ func main() {
 			return innerDialer.DialStream(ctx, addr)
 		})
 	}
-	finder := smart.StrategyFinder{
-		LogWriter:    debugLog.Writer(),
-		TestTimeout:  5 * time.Second,
-		StreamDialer: streamDialer,
-		PacketDialer: packetDialer,
-	}
+	finder := smart.NewStrategyFinder(context.Background(), streamDialer, packetDialer, debugLog.Writer())
 
 	fmt.Println("Finding strategy")
 	startTime := time.Now()
