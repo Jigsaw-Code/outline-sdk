@@ -33,6 +33,9 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
 )
 
+// To test one strategy:
+// go run -C ./x/examples/smart-proxy/ . -v -localAddr=localhost:1080 --transport="" --domain www.rferl.org  --config=<(echo '{"dns": [{"https": {"name": "doh.sb"}}]}')
+
 // CancellableLogWriter is a log writer that can be cancelled.
 type CancellableLogWriter struct {
 	Writer	io.Writer
@@ -88,9 +91,6 @@ type TestRunner interface {
 type ConfigParser interface {
 	ParseConfig(configBytes []byte) (configConfig, error)
 }
-
-// To test one strategy:
-// go run -C ./x/examples/smart-proxy/ . -v -localAddr=localhost:1080 --transport="" --domain www.rferl.org  --config=<(echo '{"dns": [{"https": {"name": "doh.sb"}}]}')
 
 type StrategyFinder struct {
 	TestTimeout  time.Duration

@@ -64,7 +64,7 @@ dns:
   - randomkey: {}
 `
 	configBytes := []byte(config)
-	finder := &StrategyFinder{}
+	finder := NewStrategyFinder(nil, nil, nil, nil)
 	_, err := finder.ConfigParser.ParseConfig(configBytes)
 	require.Error(t, err)
 }
@@ -98,7 +98,7 @@ fallback:
   - socks5://192.168.1.10:1080
 `
 	configBytes := []byte(config)
-	finder := &StrategyFinder{}
+	finder := NewStrategyFinder(nil, nil, nil, nil)
 	parsedConfig, err := finder.ConfigParser.ParseConfig(configBytes)
 	require.NoError(t, err)
 
@@ -131,9 +131,9 @@ fallback:
 func TestParseConfig_YamlPsiphonConfig(t *testing.T) {
 	config := `
 fallback:
-  - psiphon: 
-	  PropagationChannelId: FFFFFFFFFFFFFFFF
-	  SponsorId: FFFFFFFFFFFFFFFF
+  - psiphon:
+      PropagationChannelId: FFFFFFFFFFFFFFFF
+      SponsorId: FFFFFFFFFFFFFFFF
 `
 	configBytes := []byte(config)
 	finder := NewStrategyFinder(context.Background(), &transport.TCPDialer{}, &transport.UDPDialer{}, nil)
