@@ -234,5 +234,5 @@ func TestNewDialer_BrokenConfig(t *testing.T) {
 
 	_, err = finder.NewDialer(context.Background(), testDomains, configBytes)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "could not find working resolver: all tests failed")
+	require.Contains(t, err.Error(), "could not find a working fallback: all tests failed")
 }
