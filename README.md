@@ -89,6 +89,8 @@ The Outline Client uses a **generated mobile library** on Android, iOS and macOS
 Below we provide more details on each integration approach. For more details about setting up and using Outline SDK features, see the [Discussions tab](https://github.com/Jigsaw-Code/outline-sdk/discussions).
 
 
+## Create a 
+
 ### Generated Mobile Library
 
 See our [MobileProxy page](./x/mobileproxy/) to learn about the easiest way to integrate the Outline SDK into a mobile app. It runs a local forward proxy that implements resillience strategies that you can use to configure your app's networking libraries.

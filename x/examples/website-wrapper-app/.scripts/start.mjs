@@ -27,8 +27,8 @@ import chalk from "chalk";
     throw new Error(`Parameter \`--platform\` not provided.`);
   }
 
-  if (!args.entryDomain) {
-    throw new Error(`Parameter \`--entryDomain\` not provided.`);
+  if (!args.entryUrl) {
+    throw new Error(`Parameter \`--entryUrl\` not provided.`);
   }
 
   if (args.output) {

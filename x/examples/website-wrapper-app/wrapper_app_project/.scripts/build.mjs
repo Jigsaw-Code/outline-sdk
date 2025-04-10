@@ -40,16 +40,13 @@ export default async function main(
     additionalDomains = [],
     appId,
     appName,
-    entryDomain = "www.example.com",
+    entryUrl = "https://www.example.com",
     navigationUrl,
     output = OUTPUT_DIR,
     platform,
     smartDialerConfig = DEFAULT_SMART_DIALER_CONFIG,
   },
 ) {
-  // Manually expand the '~' character in the output path.
-  output = output.replace("~", process.env.HOME);
-
   const WRAPPER_APP_OUTPUT_DIR = path.resolve(output, "wrapper_app_project");
   const WRAPPER_APP_OUTPUT_ZIP = path.resolve(output, "wrapper_app_project.zip");
   
@@ -100,6 +97,10 @@ export default async function main(
       additionalDomains = [additionalDomains];
     }
 
+    const entryUrlParts = new URL(entryUrl);
+
+    const entryDomain = entryUrlParts.hostname;
+
     const [entryTld, ...entryDomainParts] = entryDomain.split(".").reverse();
 
     // Infer an app name from the base entry domain part 
@@ -113,7 +114,7 @@ export default async function main(
     )
   
     // Infer an app ID from the entry domain by reversing it (e.g. `www.example.com` becomes `com.example.www`)
-    const defaultAppId = entryTld + "." + entryDomainParts.join(".").replaceAll("-", "");
+    const defaultAppId = entryTld + "." + entryDomainParts.join(".").replaceAll("-", "").toLocaleLowerCase();
 
     fs.writeFileSync(
       destinationFilepath.replace(/\.handlebars$/, ""),
@@ -122,9 +123,7 @@ export default async function main(
         entryDomain,
         appId: appId ?? defaultAppId,
         appName: appName ?? defaultAppName,
-        navigationUrl: navigationUrl
-          ? navigationUrl
-          : `https://${entryDomain}/`,
+        entryUrl: navigationUrl || entryUrl,
         domainList: [entryDomain, ...additionalDomains].join("\\n"),
         smartDialerConfig: typeof smartDialerConfig === "object" ? JSON.stringify(smartDialerConfig).replaceAll('"',  '\\"') : smartDialerConfig,
         additionalDomains,
@@ -179,7 +178,7 @@ if (import.meta.url.endsWith(process.argv[1])) {
   }
 
   if (!args.entryDomain) {
-    throw new Error(`Parameter \`--entryDomain\` not provided.`);
+    throw new Error(`Parameter \`--entryUrl\` not provided.`);
   }
 
   main({
