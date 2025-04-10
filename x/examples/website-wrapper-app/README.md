@@ -135,7 +135,7 @@ npm run start -- --platform=android  --entryUrl="https://www.example.com" \
 | `--entryUrl`     | **(Required)** The primary url of your website.                                             | Any valid url    |
 | `--appId`           | The unique identifier for the app (e.g., iOS Bundle ID, Android Application ID). | A reverse domain name string (e.g., `com.company.appname`) |
 | `--appName`         | The user-visible name of the application.                                       | Any valid application name string (e.g., "My Awesome App") |
-| `--output`          | The directory where the generated app project files will be saved.              | A valid file path (e.g., `./my-generated-app`) |
+| `--output`          | The directory where the generated app project files will be saved.              | A valid, absolute file path (e.g., `/users/me/my-generated-app`) |
 | `--additionalDomains` | A list of other domains that should be accessible within the app.               | Comma-separated domains |
 | `--smartDialerConfig` | A JSON string containing the configuration for the [smart dialer feature](../../smart#yaml-config-for-the-smart-dialer).       | Valid JSON string       |
 | `--navigatorToken`  | Your ngrok authentication token for using the navigation proxy.                 | Your [ngrok auth token](https://dashboard.ngrok.com/get-started/your-authtoken)    |
