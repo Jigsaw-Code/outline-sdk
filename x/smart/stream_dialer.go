@@ -340,7 +340,7 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 // Return the fastest fallback dialer that is able to access all the testDomans
 func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string, fallbackConfigs []fallbackEntryConfig) (transport.StreamDialer, error) {
 	if len(fallbackConfigs) == 0 {
-		return nil, errors.New("no fallback was specified")
+		return nil, errors.New("attempted to find fallback but no fallback configuration was specified")
 	}
 
 	ctx, searchDone := context.WithCancel(ctx)
@@ -473,7 +473,7 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 	}
 
 	dialer, err := f.newProxylessDialer(ctx, testDomains, parsedConfig)
-	if err != nil {
+	if err != nil && parsedConfig.Fallback != nil {
 		return f.findFallback(ctx, testDomains, parsedConfig.Fallback)
 	}
 	return dialer, err
