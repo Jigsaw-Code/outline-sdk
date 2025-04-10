@@ -179,7 +179,7 @@ if (import.meta.url.endsWith(process.argv[1])) {
     throw new Error(`Parameter \`--platform\` not provided.`);
   }
 
-  if (!args.entryDomain) {
+  if (!args.entryUrl) {
     throw new Error(`Parameter \`--entryUrl\` not provided.`);
   }
 
