@@ -35,7 +35,8 @@ go build -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/c
 ```
 
 > [!WARNING]
-> The psiphon library is not included in the build by default because the psiphon codebase uses GPL. To support psiphon configuration in smart-proxy please build using the `psiphon` build tag.
+> The Psiphon library is not included in the build by default because the Psiphon codebase uses GPL. To support Psiphon configuration in the Mobile Proxy please build using the [`psiphon` build tag](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/psiphon).
+> When integrating Psiphon into your application please work with the Psiphon team at sponsor@psiphon.ca
 
 ```bash
 go build -tags psiphon -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind

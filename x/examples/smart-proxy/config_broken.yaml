@@ -32,6 +32,8 @@ fallback:
       "DisableLocalSocksProxy" : true,
       "DisableLocalHTTPProxy" : true,
       "EstablishTunnelTimeoutSeconds": 1,
+      # URL points to google.com
+      "RemoteServerListURLs" : [{"URL": "aHR0cHM6Ly9nb29nbGUuY29t", "OnlyAfterAttempts": 0, "SkipVerify": false}],
     }
   # Nonexistant local socks5 proxy
   - socks5://192.168.1.10:1080
