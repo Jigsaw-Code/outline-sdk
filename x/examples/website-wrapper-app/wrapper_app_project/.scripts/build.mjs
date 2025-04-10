@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 import { glob } from "glob";
 import { promisify } from "node:util";
 import chalk from "chalk";
@@ -37,8 +37,6 @@ const DEFAULT_SMART_DIALER_CONFIG = {
 
 export default async function main(
   {
-    platform,
-    sdkVersion = "x/v0.0.1",
     additionalDomains = [],
     appId,
     appName,
@@ -46,12 +44,16 @@ export default async function main(
     navigationUrl,
     output = OUTPUT_DIR,
     platform,
+    sdkVersion = "x/v0.0.1",
     smartDialerConfig = DEFAULT_SMART_DIALER_CONFIG,
   },
 ) {
   const WRAPPER_APP_OUTPUT_DIR = path.resolve(output, "wrapper_app_project");
-  const WRAPPER_APP_OUTPUT_ZIP = path.resolve(output, "wrapper_app_project.zip");
-  
+  const WRAPPER_APP_OUTPUT_ZIP = path.resolve(
+    output,
+    "wrapper_app_project.zip",
+  );
+
   const SDK_MOBILEPROXY_OUTPUT_DIR = path.resolve(output, "mobileproxy");
   const WRAPPER_APP_OUTPUT_SDK_MOBILEPROXY_DIR = path.resolve(
     WRAPPER_APP_OUTPUT_DIR,
@@ -59,9 +61,17 @@ export default async function main(
   );
 
   if (!fs.existsSync(SDK_MOBILEPROXY_OUTPUT_DIR)) {
-    console.log(`Building the Outline SDK mobileproxy library for ${platform}...`);
+    console.log(
+      `Building the Outline SDK mobileproxy library for ${platform}...`,
+    );
 
-    await promisify(exec)(`npm run build:mobileproxy ${platform} ${sdkVersion} ${output}`);
+    await promisify(execFile)("npm", [
+      "run",
+      "build:mobileproxy",
+      platform,
+      sdkVersion,
+      output,
+    ], { shell: false });
   }
 
   const sourceFilepaths = await glob(
@@ -73,6 +83,24 @@ export default async function main(
   );
 
   console.log("Building project from template...");
+
+  let templateArguments;
+
+  try {
+    templateArguments = resolveTemplateArguments({
+      additionalDomains,
+      appId,
+      appName,
+      entryUrl,
+      navigationUrl,
+      platform,
+      smartDialerConfig,
+    });
+  } catch (cause) {
+    throw new TypeError("Failed to resolve the project template arguments", {
+      cause,
+    });
+  }
 
   for (const sourceFilepath of sourceFilepaths) {
     const destinationFilepath = path.join(
@@ -95,41 +123,9 @@ export default async function main(
       fs.readFileSync(sourceFilepath, "utf8"),
     );
 
-    if (typeof additionalDomains === "string") {
-      additionalDomains = [additionalDomains];
-    }
-
-    const entryUrlParts = new URL(entryUrl);
-
-    const entryDomain = entryUrlParts.hostname;
-
-    const [entryTld, ...entryDomainParts] = entryDomain.split(".").reverse();
-
-    // Infer an app name from the base entry domain part 
-    const defaultAppName = entryDomainParts[0].toLocaleLowerCase().replaceAll(
-      /\w[a-z0-9]*[-_]*/g,
-      match => {
-        match = match.replace(/[-_]+/, " ");
-
-        return match.charAt(0).toUpperCase() + match.slice(1).toLowerCase();
-      }
-    )
-  
-    // Infer an app ID from the entry domain by reversing it (e.g. `www.example.com` becomes `com.example.www`)
-    const defaultAppId = entryTld + "." + entryDomainParts.join(".").replaceAll("-", "").toLocaleLowerCase();
-
     fs.writeFileSync(
       destinationFilepath.replace(/\.handlebars$/, ""),
-      template({
-        platform,
-        entryDomain,
-        appId: appId ?? defaultAppId,
-        appName: appName ?? defaultAppName,
-        entryUrl: navigationUrl || entryUrl,
-        domainList: [entryDomain, ...additionalDomains].join("\\n"),
-        smartDialerConfig: typeof smartDialerConfig === "object" ? JSON.stringify(smartDialerConfig).replaceAll('"',  '\\"') : smartDialerConfig,
-        additionalDomains,
-      }),
+      template(templateArguments),
       "utf8",
     );
   }
@@ -172,6 +168,72 @@ function zip(root, destination) {
   });
 }
 
+function resolveTemplateArguments(
+  {
+    platform,
+    appId,
+    appName,
+    entryUrl,
+    navigationUrl,
+    additionalDomains,
+    smartDialerConfig,
+  },
+) {  
+  const result = {
+    platform,
+    entryUrl,
+    entryDomain: new URL(entryUrl).hostname,
+    smartDialerConfig,
+  };
+
+  if (!appId) {
+    // Infer an app ID from the entry domain by reversing it (e.g. `www.example.com` becomes `com.example.www`)
+    // It must be lower case, and hyphens are not allowed.
+    result.appId = result.entryDomain.replaceAll("-", ""),
+      toLocaleLowerCase().split(".").reverse().join(".");
+  }
+
+  if (!appName) {
+    // Infer an app name from the base entry domain part by title casing the root domain:
+    // (e.g. `www.my-example-app.com` becomes "My Example App")
+    const rootDomain = result.entryDomain.split(".").reverse()[1];
+
+    result.appName = rootDomain.toLocaleLowerCase().replaceAll(
+      /\w[a-z0-9]*[-_]*/g,
+      (match) => {
+        match = match.replace(/[-_]+/, " ");
+
+        return match.charAt(0).toUpperCase() + match.slice(1).toLowerCase();
+      },
+    );
+  }
+
+  if (navigationUrl) {
+    result.entryUrl = navigationUrl;
+  }
+
+  if (typeof additionalDomains === "string") {
+    result.additionalDomains = additionalDomains.split(/,\s*/);
+    result.domainList = [result.entryDomain, ...result.additionalDomains].join("\\n");
+  } else if (typeof additionalDomains === "object") {
+    result.additionalDomains = additionalDomains;
+    result.domainList = [result.entryDomain, ...result.additionalDomains].join("\\n");
+  } else {
+    result.domainList = [result.entryDomain];
+  }
+
+  if (typeof smartDialerConfig === "string") {
+    result.smartDialerConfig = smartDialerConfig.replaceAll('"', '\\"');
+  } else if (typeof smartDialerConfig === "object") {
+    result.smartDialerConfig = JSON.stringify(smartDialerConfig).replaceAll(
+      '"',
+      '\\"',
+    );
+  }
+
+  return result;
+}
+
 if (import.meta.url.endsWith(process.argv[1])) {
   const args = minimist(process.argv.slice(2));
 
@@ -186,7 +248,9 @@ if (import.meta.url.endsWith(process.argv[1])) {
   main({
     ...args,
     additionalDomains: args.additionalDomains?.split(/,\s*/) ?? [],
-    smartDialerConfig: args.smartDialerConfig ? JSON.parse(args.smartDialerConfig) : undefined,
+    smartDialerConfig: args.smartDialerConfig
+      ? JSON.parse(args.smartDialerConfig)
+      : undefined,
   })
     .catch(console.error);
 }

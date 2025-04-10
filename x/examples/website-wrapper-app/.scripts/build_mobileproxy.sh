@@ -18,13 +18,13 @@ PLATFORM="$1"
 TAG="${2:-"x/v0.0.1"}"
 OUTPUT="${3:-output}"
 
-if [ "$OUTPUT" = "/" ] || [ "$OUTPUT" = "*" ]; then
+if [[ "$OUTPUT" = "/" ]] || [[ "$OUTPUT" = "*" ]]; then
   echo "Error: OUTPUT cannot be '/' or '*'. These are dangerous values."
   exit 1
 fi
 
-git clone --depth 1 --branch "${TAG}" https://github.com/Jigsaw-Code/outline-sdk.git $OUTPUT/outline-sdk
-cd $OUTPUT/outline-sdk/x
+git clone --depth 1 --branch "$TAG" https://github.com/Jigsaw-Code/outline-sdk.git "$OUTPUT/outline-sdk"
+cd "$OUTPUT/outline-sdk/x" || exit
 go build -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
 
 if [ "$PLATFORM" = "ios" ]; then
