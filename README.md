@@ -20,6 +20,9 @@ The Outline SDK allows you to:
 
 ## Table of Contents
 
+<details>
+<summary>Click to expand</summary>
+
 - [Advantages](#advantages)
   - [Interoperable and Reusable](#interoperable-and-reusable)
   - [Bypass DNS-based Blocking](#bypass-dns-based-blocking)
@@ -38,6 +41,8 @@ The Outline SDK allows you to:
   - [Run a Local Forward Proxy](#run-a-local-forward-proxy)
   - [Test Proxy Connectivity](#test-proxy-connectivity)
   - [Test Download Speed](#test-download-speed)
+
+</details>
 
 ## Advantages
 
