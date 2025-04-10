@@ -87,13 +87,11 @@ export default async function main(
   let templateArguments;
 
   try {
-    templateArguments = resolveTemplateArguments({
+    templateArguments = resolveTemplateArguments(platform, entryUrl, {
       additionalDomains,
       appId,
       appName,
-      entryUrl,
       navigationUrl,
-      platform,
       smartDialerConfig,
     });
   } catch (cause) {
@@ -169,21 +167,20 @@ function zip(root, destination) {
 }
 
 function resolveTemplateArguments(
+  platform,
+  entryUrl,
   {
-    platform,
     appId,
     appName,
-    entryUrl,
     navigationUrl,
     additionalDomains,
     smartDialerConfig,
   },
-) {  
+) {
   const result = {
     platform,
     entryUrl,
     entryDomain: new URL(entryUrl).hostname,
-    smartDialerConfig,
   };
 
   if (!appId) {
@@ -214,10 +211,14 @@ function resolveTemplateArguments(
 
   if (typeof additionalDomains === "string") {
     result.additionalDomains = additionalDomains.split(/,\s*/);
-    result.domainList = [result.entryDomain, ...result.additionalDomains].join("\\n");
+    result.domainList = [result.entryDomain, ...result.additionalDomains].join(
+      "\\n",
+    );
   } else if (typeof additionalDomains === "object") {
     result.additionalDomains = additionalDomains;
-    result.domainList = [result.entryDomain, ...result.additionalDomains].join("\\n");
+    result.domainList = [result.entryDomain, ...result.additionalDomains].join(
+      "\\n",
+    );
   } else {
     result.domainList = [result.entryDomain];
   }
