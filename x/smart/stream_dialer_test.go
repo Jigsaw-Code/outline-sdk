@@ -23,11 +23,11 @@ func (m *MockResolverFactory) NewResolver(entry dnsEntryConfig) (dns.Resolver, b
 
 // MockDialerFactory is a mock implementation of DialerFactory.
 type MockDialerFactory struct {
-    NewStreamDialerFunc func(ctx context.Context, config string) (transport.StreamDialer, error)
+    NewStreamDialerFunc func(ctx context.Context, baseDialer transport.StreamDialer, config string) (transport.StreamDialer, error)
 }
 
-func (m *MockDialerFactory) NewStreamDialer(ctx context.Context, config string) (transport.StreamDialer, error) {
-    return m.NewStreamDialerFunc(ctx, config)
+func (m *MockDialerFactory) NewStreamDialer(ctx context.Context, baseDialer transport.StreamDialer, config string) (transport.StreamDialer, error) {
+    return m.NewStreamDialerFunc(ctx, baseDialer, config)
 }
 
 // MockPsiphonDialerFactory is a mock implementation of PsiphonDialerFactory.
