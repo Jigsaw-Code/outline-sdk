@@ -15,7 +15,7 @@
 # limitations under the License.
 
 PLATFORM="$1"
-TAG="${2:-"x/v0.0.1"}"
+TAG="${2:-"x/v0.0.2"}"
 
 git clone --depth 1 --branch "${TAG}" https://github.com/Jigsaw-Code/outline-sdk.git output/outline-sdk
 cd output/outline-sdk/x
