@@ -18,6 +18,27 @@ The Outline SDK allows you to:
 - [Add network-level interference protection to existing apps](#add-the-sdk-to-your-app), such as content or communication apps.
 - Troubleshoot connectivity and measure interference with a collection of [command-line tools](#command-line-tools).
 
+## Table of Contents
+
+- [Advantages](#advantages)
+  - [Interoperable and Reusable](#interoperable-and-reusable)
+  - [Bypass DNS-based Blocking](#bypass-dns-based-blocking)
+  - [Bypass SNI-based Blocking](#bypass-sni-based-blocking)
+  - [Tunnel Connections over a Proxy](#tunnel-connections-over-a-proxy)
+  - [Build a VPN](#build-a-vpn)
+- [Add the SDK to Your App](#add-the-sdk-to-your-app)
+  - [Generated Mobile Library](#generated-mobile-library)
+  - [Side Service](#side-service)
+  - [Go Library](#go-library)
+  - [Generated C Library](#generated-c-library)
+- [Wrap your website in a SDK-enabled App](#wrap-your-website-in-a-sdk-enabled-app)
+- [Command-line Tools](#command-line-tools)
+  - [Resolve a Domain Name](#resolve-a-domain-name)
+  - [Fetch a Web Page](#fetch-a-web-page)
+  - [Run a Local Forward Proxy](#run-a-local-forward-proxy)
+  - [Test Proxy Connectivity](#test-proxy-connectivity)
+  - [Test Download Speed](#test-download-speed)
+
 ## Advantages
 
 | Multi-Platform | Proven Technology | Composable |
@@ -88,7 +109,6 @@ The Outline Client uses a **generated mobile library** on Android, iOS and macOS
 
 Below we provide more details on each integration approach. For more details about setting up and using Outline SDK features, see the [Discussions tab](https://github.com/Jigsaw-Code/outline-sdk/discussions).
 
-
 ### Generated Mobile Library
 
 See our [MobileProxy page](./x/mobileproxy/) to learn about the easiest way to integrate the Outline SDK into a mobile app. It runs a local forward proxy that implements resillience strategies that you can use to configure your app's networking libraries.
@@ -138,6 +158,9 @@ Steps:
 
 You can find detailed steps at the tutorial [Go for beginners: Getting started](https://github.com/Jigsaw-Code/outline-sdk/discussions/67).
 
+## Wrap your website in a SDK-enabled App
+
+See our [Web Wrapper example](./x/examples/website-wrapper-app/) for a simple way to package your existing website into a mobile app with built-in resilience features provided by the Outline SDK.
 
 ## Command-line Tools
 
