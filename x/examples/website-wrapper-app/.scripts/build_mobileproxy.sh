@@ -15,14 +15,15 @@
 # limitations under the License.
 
 PLATFORM="$1"
-OUTPUT="${2:-output}"
+TAG="${2:-"x/v0.0.1"}"
+OUTPUT="${3:-output}"
 
 if [ "$OUTPUT" = "/" ] || [ "$OUTPUT" = "*" ]; then
   echo "Error: OUTPUT cannot be '/' or '*'. These are dangerous values."
   exit 1
 fi
 
-git clone https://github.com/Jigsaw-Code/outline-sdk.git $OUTPUT/outline-sdk
+git clone --depth 1 --branch "${TAG}" https://github.com/Jigsaw-Code/outline-sdk.git $OUTPUT/outline-sdk
 cd $OUTPUT/outline-sdk/x
 go build -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
 

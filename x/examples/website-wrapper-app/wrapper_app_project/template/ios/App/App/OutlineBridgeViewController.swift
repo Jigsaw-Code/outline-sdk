@@ -1,22 +1,12 @@
-//
-//  OutlineBridgeViewController.swift
-//  App
-//
-//  Created by Daniel LaCosse on 10/9/24.
-//
-
 import UIKit
 import Capacitor
 
 class OutlineBridgeViewController: CAPBridgeViewController {
-    private let proxyHost: String = "127.0.0.1"
-    private let proxyPort: String = "8080"
-    
     override func webView(with frame: CGRect, configuration: WKWebViewConfiguration) -> WKWebView {
         if #available(iOS 17.0, *) {
             let endpoint = NWEndpoint.hostPort(
-                host: NWEndpoint.Host(self.proxyHost),
-                port: NWEndpoint.Port(self.proxyPort)!
+                host: NWEndpoint.Host(Config.proxyHost),
+                port: NWEndpoint.Port(Config.proxyPort)!
             )
             let proxyConfig = ProxyConfiguration.init(httpCONNECTProxy: endpoint)
 

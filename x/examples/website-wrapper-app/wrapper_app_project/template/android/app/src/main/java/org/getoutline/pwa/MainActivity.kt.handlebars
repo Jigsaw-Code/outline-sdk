@@ -17,6 +17,22 @@ class MainActivity : BridgeActivity() {
         super.onCreate(savedInstanceState)
 
         if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
+            if (!this.tryProxy()) {
+                // try one more time
+                this.tryProxy()
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        this.proxy?.stop(3000)
+        this.proxy = null
+
+        super.onDestroy()
+    }
+
+    private fun tryProxy(): Boolean {
+        try {
             this.proxy = Mobileproxy.runProxy(
                 "127.0.0.1:0",
                 Mobileproxy.newSmartStreamDialer(
@@ -41,13 +57,10 @@ class MainActivity : BridgeActivity() {
                     },
                     {}
                 )
+        } catch (e: Exception) {
+            return false
         }
-    }
 
-    override fun onDestroy() {
-        this.proxy?.stop(3000)
-        this.proxy = null
-
-        super.onDestroy()
+        return true
     }
 }

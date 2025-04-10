@@ -37,6 +37,8 @@ const DEFAULT_SMART_DIALER_CONFIG = {
 
 export default async function main(
   {
+    platform,
+    sdkVersion = "x/v0.0.1",
     additionalDomains = [],
     appId,
     appName,
@@ -59,7 +61,7 @@ export default async function main(
   if (!fs.existsSync(SDK_MOBILEPROXY_OUTPUT_DIR)) {
     console.log(`Building the Outline SDK mobileproxy library for ${platform}...`);
 
-    await promisify(exec)(`npm run build:mobileproxy ${platform} ${output}`);
+    await promisify(exec)(`npm run build:mobileproxy ${platform} ${sdkVersion} ${output}`);
   }
 
   const sourceFilepaths = await glob(
