@@ -228,7 +228,7 @@ fallback:
     }
 
     mockDialerFactory := &MockDialerFactory{
-        NewStreamDialerFunc: func(ctx context.Context, config string) (transport.StreamDialer, error) {
+        NewStreamDialerFunc: func(ctx context.Context, baseDialer transport.StreamDialer, config string) (transport.StreamDialer, error) {
             return nil, errors.New("mock dialer error")
         },
     }
