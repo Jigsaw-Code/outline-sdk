@@ -25,10 +25,15 @@ tls:
 fallback:
   # Nonexistent Outline Server
   - ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1
-  # Nonexistant Psiphon Config JSON. Not yet supported
+  # Nonexistant Psiphon Config JSON
   - psiphon: {
-      "PropagationChannelId":"FFFFFFFFFFFFFFFF",
-      "SponsorId":"FFFFFFFFFFFFFFFF",
+      "PropagationChannelId":"ID1",
+      "SponsorId":"ID2",
+      "DisableLocalSocksProxy" : true,
+      "DisableLocalHTTPProxy" : true,
+      "EstablishTunnelTimeoutSeconds": 1,
+      # URL points to google.com
+      "RemoteServerListURLs" : [{"URL": "aHR0cHM6Ly9nb29nbGUuY29t", "OnlyAfterAttempts": 0, "SkipVerify": false}],
     }
   # Nonexistant local socks5 proxy
   - socks5://192.168.1.10:1080

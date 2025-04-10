@@ -34,6 +34,14 @@ From the `x/` directory:
 go build -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
 ```
 
+> [!WARNING]
+> The Psiphon library is not included in the build by default because the Psiphon codebase uses GPL. To support Psiphon configuration in the Mobile Proxy please build using the [`psiphon` build tag](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/psiphon).
+> When integrating Psiphon into your application please work with the Psiphon team at sponsor@psiphon.ca
+
+```bash
+go build -tags psiphon -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
+```
+
 Then build the iOS and Android libraries with [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile#hdr-Build_a_library_for_Android_and_iOS)
 
 ```bash
