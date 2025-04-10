@@ -14,7 +14,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
 
-        self.window?.rootViewController = OutlineBridgeViewController()
+        self.resetViewController()
 
         return true
     }
@@ -61,7 +61,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             MobileproxyNewStderrLogWriter(),
             &error
         ) {
-            if error {
+            if error != nil {
                 return false
             }
 
@@ -70,14 +70,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 dialer,
                 &error
             )
+
+            self.resetViewController()
             
             Config.proxyPort = String(self.proxy?.port() ?? 0)
 
-            if error {
+            if error != nil {
                 return false
             }
         }
 
         return true
+    }
+
+    private func resetViewController() {
+        self.window?.rootViewController = OutlineBridgeViewController()
     }
 }
