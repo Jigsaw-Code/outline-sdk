@@ -71,9 +71,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 &error
             )
 
-            self.resetViewController()
-            
             Config.proxyPort = String(self.proxy?.port() ?? 0)
+            
+            self.resetViewController()
 
             if error != nil {
                 return false

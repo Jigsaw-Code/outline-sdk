@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { execFile } from "node:child_process";
+import { exec, execFile } from "node:child_process";
 import { glob } from "glob";
 import { promisify } from "node:util";
 import chalk from "chalk";
@@ -186,8 +186,8 @@ function resolveTemplateArguments(
   if (!appId) {
     // Infer an app ID from the entry domain by reversing it (e.g. `www.example.com` becomes `com.example.www`)
     // It must be lower case, and hyphens are not allowed.
-    result.appId = result.entryDomain.replaceAll("-", ""),
-      toLocaleLowerCase().split(".").reverse().join(".");
+    result.appId = result.entryDomain.replaceAll("-", "")
+      .toLocaleLowerCase().split(".").reverse().join(".");
   }
 
   if (!appName) {
@@ -207,6 +207,7 @@ function resolveTemplateArguments(
 
   if (navigationUrl) {
     result.entryUrl = navigationUrl;
+    result.entryDomain = new URL(navigationUrl).hostname;
   }
 
   if (typeof additionalDomains === "string") {
