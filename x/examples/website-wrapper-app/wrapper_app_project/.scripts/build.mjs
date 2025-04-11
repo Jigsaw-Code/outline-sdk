@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { exec } from "node:child_process";
+import { exec, execFile } from "node:child_process";
 import { glob } from "glob";
 import { promisify } from "node:util";
 import chalk from "chalk";
@@ -23,18 +23,9 @@ import path from "node:path";
 import minimist from "minimist";
 
 const OUTPUT_DIR = path.join(process.cwd(), "output");
-
 const WRAPPER_APP_TEMPLATE_DIR = path.join(
   process.cwd(),
   "wrapper_app_project/template",
-);
-const WRAPPER_APP_OUTPUT_DIR = path.join(OUTPUT_DIR, "wrapper_app_project");
-const WRAPPER_APP_OUTPUT_ZIP = path.join(OUTPUT_DIR, "wrapper_app_project.zip");
-
-const SDK_MOBILEPROXY_OUTPUT_DIR = path.join(OUTPUT_DIR, "mobileproxy");
-const WRAPPER_APP_OUTPUT_SDK_MOBILEPROXY_DIR = path.join(
-  WRAPPER_APP_OUTPUT_DIR,
-  "mobileproxy",
 );
 
 const DEFAULT_SMART_DIALER_CONFIG = {
@@ -46,18 +37,41 @@ const DEFAULT_SMART_DIALER_CONFIG = {
 
 export default async function main(
   {
+    additionalDomains = [],
+    appId,
+    appName,
+    entryUrl = "https://www.example.com",
+    navigationUrl,
+    output = OUTPUT_DIR,
     platform,
     sdkVersion = "x/v0.0.1",
-    entryDomain = "www.example.com",
-    navigationUrl,
     smartDialerConfig = DEFAULT_SMART_DIALER_CONFIG,
-    additionalDomains = [],
   },
 ) {
-  if (!fs.existsSync(SDK_MOBILEPROXY_OUTPUT_DIR)) {
-    console.log(`Building the Outline SDK mobileproxy library for ${platform}...`);
+  const WRAPPER_APP_OUTPUT_DIR = path.resolve(output, "wrapper_app_project");
+  const WRAPPER_APP_OUTPUT_ZIP = path.resolve(
+    output,
+    "wrapper_app_project.zip",
+  );
 
-    await promisify(exec)(`npm run build:sdk_mobileproxy ${platform} ${sdkVersion}`);
+  const SDK_MOBILEPROXY_OUTPUT_DIR = path.resolve(output, "mobileproxy");
+  const WRAPPER_APP_OUTPUT_SDK_MOBILEPROXY_DIR = path.resolve(
+    WRAPPER_APP_OUTPUT_DIR,
+    "mobileproxy",
+  );
+
+  if (!fs.existsSync(SDK_MOBILEPROXY_OUTPUT_DIR)) {
+    console.log(
+      `Building the Outline SDK mobileproxy library for ${platform}...`,
+    );
+
+    await promisify(execFile)("npm", [
+      "run",
+      "build:mobileproxy",
+      platform,
+      sdkVersion,
+      output,
+    ], { shell: false });
   }
 
   const sourceFilepaths = await glob(
@@ -69,6 +83,22 @@ export default async function main(
   );
 
   console.log("Building project from template...");
+
+  let templateArguments;
+
+  try {
+    templateArguments = resolveTemplateArguments(platform, entryUrl, {
+      additionalDomains,
+      appId,
+      appName,
+      navigationUrl,
+      smartDialerConfig,
+    });
+  } catch (cause) {
+    throw new TypeError("Failed to resolve the project template arguments", {
+      cause,
+    });
+  }
 
   for (const sourceFilepath of sourceFilepaths) {
     const destinationFilepath = path.join(
@@ -91,22 +121,9 @@ export default async function main(
       fs.readFileSync(sourceFilepath, "utf8"),
     );
 
-    if (typeof additionalDomains === "string") {
-      additionalDomains = [additionalDomains];
-    }
-
     fs.writeFileSync(
       destinationFilepath.replace(/\.handlebars$/, ""),
-      template({
-        platform,
-        entryDomain,
-        navigationUrl: navigationUrl
-          ? navigationUrl
-          : `https://${entryDomain}/`,
-        domainList: [entryDomain, ...additionalDomains].join("\\n"),
-        smartDialerConfig: typeof smartDialerConfig === "object" ? JSON.stringify(smartDialerConfig).replaceAll('"',  '\\"') : smartDialerConfig,
-        additionalDomains,
-      }),
+      template(templateArguments),
       "utf8",
     );
   }
@@ -149,6 +166,76 @@ function zip(root, destination) {
   });
 }
 
+function resolveTemplateArguments(
+  platform,
+  entryUrl,
+  {
+    appId,
+    appName,
+    navigationUrl,
+    additionalDomains,
+    smartDialerConfig,
+  },
+) {
+  const result = {
+    platform,
+    entryUrl,
+    entryDomain: new URL(entryUrl).hostname,
+  };
+
+  if (!appId) {
+    // Infer an app ID from the entry domain by reversing it (e.g. `www.example.com` becomes `com.example.www`)
+    // It must be lower case, and hyphens are not allowed.
+    result.appId = result.entryDomain.replaceAll("-", "")
+      .toLocaleLowerCase().split(".").reverse().join(".");
+  }
+
+  if (!appName) {
+    // Infer an app name from the base entry domain part by title casing the root domain:
+    // (e.g. `www.my-example-app.com` becomes "My Example App")
+    const rootDomain = result.entryDomain.split(".").reverse()[1];
+
+    result.appName = rootDomain.toLocaleLowerCase().replaceAll(
+      /\w[a-z0-9]*[-_]*/g,
+      (match) => {
+        match = match.replace(/[-_]+/, " ");
+
+        return match.charAt(0).toUpperCase() + match.slice(1).toLowerCase();
+      },
+    );
+  }
+
+  if (navigationUrl) {
+    result.entryUrl = navigationUrl;
+    result.entryDomain = new URL(navigationUrl).hostname;
+  }
+
+  if (typeof additionalDomains === "string") {
+    result.additionalDomains = additionalDomains.split(/,\s*/);
+    result.domainList = [result.entryDomain, ...result.additionalDomains].join(
+      "\\n",
+    );
+  } else if (typeof additionalDomains === "object") {
+    result.additionalDomains = additionalDomains;
+    result.domainList = [result.entryDomain, ...result.additionalDomains].join(
+      "\\n",
+    );
+  } else {
+    result.domainList = [result.entryDomain];
+  }
+
+  if (typeof smartDialerConfig === "string") {
+    result.smartDialerConfig = smartDialerConfig.replaceAll('"', '\\"');
+  } else if (typeof smartDialerConfig === "object") {
+    result.smartDialerConfig = JSON.stringify(smartDialerConfig).replaceAll(
+      '"',
+      '\\"',
+    );
+  }
+
+  return result;
+}
+
 if (import.meta.url.endsWith(process.argv[1])) {
   const args = minimist(process.argv.slice(2));
 
@@ -156,14 +243,16 @@ if (import.meta.url.endsWith(process.argv[1])) {
     throw new Error(`Parameter \`--platform\` not provided.`);
   }
 
-  if (!args.entryDomain) {
-    throw new Error(`Parameter \`--entryDomain\` not provided.`);
+  if (!args.entryUrl) {
+    throw new Error(`Parameter \`--entryUrl\` not provided.`);
   }
 
   main({
     ...args,
     additionalDomains: args.additionalDomains?.split(/,\s*/) ?? [],
-    smartDialerConfig: args.smartDialerConfig ? JSON.parse(args.smartDialerConfig) : undefined,
+    smartDialerConfig: args.smartDialerConfig
+      ? JSON.parse(args.smartDialerConfig)
+      : undefined,
   })
     .catch(console.error);
 }
