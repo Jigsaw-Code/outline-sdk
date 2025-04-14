@@ -85,7 +85,7 @@ A fallback configuration is used if none of the proxyless strategies are able to
 The fallback strings should be:
 
 *   A valid StreamDialer config string as defined in [configurl](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Proxy_Protocols)
-*   A valid Psiphon configuration.
+*   A valid Psiphon configuration object as a child of a `psiphon` field.
 
 #### Shadowsocks server example
 
