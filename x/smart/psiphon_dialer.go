@@ -28,8 +28,6 @@ func newPsiphonDialer(ctx context.Context, psiphonJSON []byte, psiphonSignature 
 	fmt.Printf("Using data store in %v\n", config.DataRootDirectory)
 
 	dialer := psiphon.GetSingletonDialer()
-	// The psiphon singleton persists in the background across connections
-	ctx = context.WithoutCancel(ctx)
 	fmt.Printf("🏃 Attempting to start psiphon tunnel: %v\n", psiphonSignature)
 	if err := dialer.Start(ctx, config); err != nil {
 		return nil, fmt.Errorf("failed to start psiphon dialer: %w", err)

@@ -121,8 +121,6 @@ fallback:
       "SponsorId": "FFFFFFFFFFFFFFFF",
       "DisableLocalSocksProxy" : true,
       "DisableLocalHTTPProxy" : true,
-      # It's important to include an explicit timeout, otherwise an invalid connection will hang for a long time
-      "EstablishTunnelTimeoutSeconds": 5,
       ...
     }
 ```
