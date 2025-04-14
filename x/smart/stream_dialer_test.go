@@ -1,12 +1,12 @@
 package smart
 
 import (
+	"bytes"
     "context"
     "errors"
-    "fmt"
+	"strings"
     "testing"
 
-    "github.com/goccy/go-yaml"
     "github.com/Jigsaw-Code/outline-sdk/dns"
     "github.com/Jigsaw-Code/outline-sdk/transport"
     "github.com/stretchr/testify/require"
@@ -48,15 +48,6 @@ func (m *MockTestRunner) TestDialer(ctx context.Context, dialer transport.Stream
     return m.TestDialerFunc(ctx, dialer, testDomains, transportCfg)
 }
 
-// MockConfigParser is a mock implementation of ConfigParser.
-type MockConfigParser struct {
-    ParseConfigFunc func(configBytes []byte) (configConfig, error)
-}
-
-func (m *MockConfigParser) ParseConfig(configBytes []byte) (configConfig, error) {
-    return m.ParseConfigFunc(configBytes)
-}
-
 func TestParseConfig_InvalidConfig(t *testing.T) {
     config := `
 dns:
@@ -64,7 +55,7 @@ dns:
 `
     configBytes := []byte(config)
     finder := NewStrategyFinder(nil, nil, nil, nil)
-    _, err := finder.ConfigParser.ParseConfig(configBytes)
+    _, err := finder.parseConfig(configBytes)
     require.Error(t, err)
 }
 
@@ -98,7 +89,7 @@ fallback:
 `
     configBytes := []byte(config)
     finder := NewStrategyFinder(nil, nil, nil, nil)
-    parsedConfig, err := finder.ConfigParser.ParseConfig(configBytes)
+    parsedConfig, err := finder.parseConfig(configBytes)
     require.NoError(t, err)
 
     expectedConfig := configConfig{
@@ -136,7 +127,7 @@ fallback:
 `
     configBytes := []byte(config)
     finder := NewStrategyFinder(context.Background(), &transport.TCPDialer{}, &transport.UDPDialer{}, nil)
-    parsedConfig, err := finder.ConfigParser.ParseConfig(configBytes)
+    parsedConfig, err := finder.parseConfig(configBytes)
     require.NoError(t, err)
 
     expectedConfig := configConfig{
@@ -245,30 +236,35 @@ fallback:
         },
     }
 
-    mockConfigParser := &MockConfigParser{
-        ParseConfigFunc: func(configBytes []byte) (configConfig, error) {
-            var parsedConfig configConfig
-            err := yaml.Unmarshal(configBytes, &parsedConfig)
-            if err != nil {
-                return configConfig{}, fmt.Errorf("failed to unmarshal config to map: %w", err)
-            }
-            return parsedConfig, nil
-        },
-    }
+	// Initialize a log writer
+	var logBuffer bytes.Buffer
+	logWriter := NewCancellableLogWriter(context.Background(), &logBuffer)
 
     finder := &StrategyFinder{
         TestTimeout:            5,
-        LogWriter:            NewCancellableLogWriter(context.Background(), nil),
+        LogWriter:            logWriter,
         StreamDialer:         &transport.TCPDialer{},
         PacketDialer:         &transport.UDPDialer{},
         ResolverFactory:        mockResolverFactory,
         DialerFactory:          mockDialerFactory,
         PsiphonDialerFactory: mockPsiphonDialerFactory,
         TestRunner:             mockTestRunner,
-        ConfigParser:           mockConfigParser,
     }
 
     _, err := finder.NewDialer(context.Background(), testDomains, configBytes)
     require.Error(t, err)
     require.Contains(t, err.Error(), "could not find a working fallback: all tests failed")
+
+	// Check the content of the log writer
+	expectedLogs := []string{
+		"could not find working resolver",
+		"could not find TLS strategy",
+		"getStreamDialer failed",
+		"getPsiphonDialer failed",
+		"could not find a working fallback",
+	}
+	logContent := logBuffer.String()
+	for _, expectedLog := range expectedLogs {
+		require.True(t, strings.Contains(logContent, expectedLog), "Expected log '%s' not found in: %s", expectedLog, logContent)
+	}
 }

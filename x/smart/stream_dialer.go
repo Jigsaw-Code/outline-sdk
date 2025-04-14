@@ -87,11 +87,6 @@ type TestRunner interface {
 	TestDialer(ctx context.Context, dialer transport.StreamDialer, testDomains []string, transportCfg string) error
 }
 
-// ConfigParser parses the config.
-type ConfigParser interface {
-	ParseConfig(configBytes []byte) (configConfig, error)
-}
-
 type StrategyFinder struct {
 	TestTimeout  time.Duration
 	LogWriter    *CancellableLogWriter
@@ -101,7 +96,6 @@ type StrategyFinder struct {
 	DialerFactory DialerFactory
 	PsiphonDialerFactory PsiphonDialerFactory
 	TestRunner TestRunner
-	ConfigParser ConfigParser
 }
 
 func NewStrategyFinder(ctx context.Context, streamDialer transport.StreamDialer, packetDialer transport.PacketDialer, logWriter io.Writer) *StrategyFinder {
@@ -115,7 +109,6 @@ func NewStrategyFinder(ctx context.Context, streamDialer transport.StreamDialer,
 		DialerFactory: &DefaultDialerFactory{},
 		PsiphonDialerFactory: &DefaultPsiphonDialerFactory{},
 		TestRunner: &DefaultTestRunner{cancellableLogWriter},
-		ConfigParser: &DefaultConfigParser{},
 	}
 }
 
@@ -305,10 +298,7 @@ func (f *DefaultTestRunner) TestDialer(ctx context.Context, dialer transport.Str
 	return nil
 }
 
-// DefaultConfigParser is the default implementation of ConfigParser.
-type DefaultConfigParser struct{}
-
-func (f *DefaultConfigParser) ParseConfig(configBytes []byte) (configConfig, error) {
+func (f *StrategyFinder) parseConfig(configBytes []byte) (configConfig, error) {
 	var parsedConfig configConfig
 	var configMap map[string]any
 	err := yaml.Unmarshal(configBytes, &configMap)
@@ -575,7 +565,7 @@ func (f *StrategyFinder) newProxylessDialer(ctx context.Context, testDomains []s
 // It returns an error if no strategy was found that unblocks the testDomains.
 // The testDomains must be domains with a TLS service running on port 443.
 func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, configBytes []byte) (transport.StreamDialer, error) {
-	parsedConfig, err := f.ConfigParser.ParseConfig(configBytes)
+	parsedConfig, err := f.parseConfig(configBytes)
 	if err != nil {
 		return nil, err
 	}
