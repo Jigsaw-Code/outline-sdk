@@ -37,3 +37,14 @@ func (f *CancellableLogWriter) log(format string, a ...any) {
 		fmt.Fprintf(f.Writer, format, a...)
 	}
 }
+
+// Flush ensures that all logs have been written to the underlying writer.
+func (f *CancellableLogWriter) Flush() error {
+	if f.Writer == nil {
+		return nil
+	}
+	if flusher, ok := f.Writer.(interface{ Flush() error }); ok {
+		return flusher.Flush()
+	}
+	return nil
+}

@@ -2,65 +2,57 @@ package smart
 
 import (
 	"bytes"
-    "context"
-    "errors"
+	"context"
+	"errors"
 	"strings"
-    "testing"
+	"testing"
 
-    "github.com/Jigsaw-Code/outline-sdk/dns"
-    "github.com/Jigsaw-Code/outline-sdk/transport"
-    "github.com/stretchr/testify/require"
+	"github.com/Jigsaw-Code/outline-sdk/dns"
+	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockResolverFactory is a mock implementation of ResolverFactory.
 type MockResolverFactory struct {
-    NewResolverFunc func(entry dnsEntryConfig) (dns.Resolver, bool, error)
+	NewResolverFunc func(entry dnsEntryConfig) (dns.Resolver, bool, error)
 }
 
 func (m *MockResolverFactory) NewResolver(entry dnsEntryConfig) (dns.Resolver, bool, error) {
-    return m.NewResolverFunc(entry)
+	return m.NewResolverFunc(entry)
 }
 
 // MockDialerFactory is a mock implementation of DialerFactory.
 type MockDialerFactory struct {
-    NewStreamDialerFunc func(ctx context.Context, baseDialer transport.StreamDialer, config string) (transport.StreamDialer, error)
+	NewStreamDialerFunc func(ctx context.Context, baseDialer transport.StreamDialer, config string) (transport.StreamDialer, error)
 }
 
 func (m *MockDialerFactory) NewStreamDialer(ctx context.Context, baseDialer transport.StreamDialer, config string) (transport.StreamDialer, error) {
-    return m.NewStreamDialerFunc(ctx, baseDialer, config)
+	return m.NewStreamDialerFunc(ctx, baseDialer, config)
 }
 
 // MockPsiphonDialerFactory is a mock implementation of PsiphonDialerFactory.
 type MockPsiphonDialerFactory struct {
-    NewPsiphonDialerFunc func(ctx context.Context, psiphonJSON []byte, psiphonSignature string) (transport.StreamDialer, error)
+	NewPsiphonDialerFunc func(ctx context.Context, psiphonJSON []byte, psiphonSignature string) (transport.StreamDialer, error)
 }
 
 func (m *MockPsiphonDialerFactory) NewPsiphonDialer(ctx context.Context, psiphonJSON []byte, psiphonSignature string) (transport.StreamDialer, error) {
-    return m.NewPsiphonDialerFunc(ctx, psiphonJSON, psiphonSignature)
-}
-
-// MockTestRunner is a mock implementation of TestRunner.
-type MockTestRunner struct {
-    TestDialerFunc func(ctx context.Context, dialer transport.StreamDialer, testDomains []string, transportCfg string) error
-}
-
-func (m *MockTestRunner) TestDialer(ctx context.Context, dialer transport.StreamDialer, testDomains []string, transportCfg string) error {
-    return m.TestDialerFunc(ctx, dialer, testDomains, transportCfg)
+	return m.NewPsiphonDialerFunc(ctx, psiphonJSON, psiphonSignature)
 }
 
 func TestParseConfig_InvalidConfig(t *testing.T) {
-    config := `
+	config := `
 dns:
   - randomkey: {}
 `
-    configBytes := []byte(config)
-    finder := NewStrategyFinder(nil, nil, nil, nil)
-    _, err := finder.parseConfig(configBytes)
-    require.Error(t, err)
+	configBytes := []byte(config)
+	finder := NewStrategyFinder(nil, nil, nil, nil)
+	_, err := finder.parseConfig(configBytes)
+	require.Error(t, err)
 }
 
 func TestParseConfig_ValidConfig(t *testing.T) {
-    config := `
+	config := `
 dns:
   - system: {}
   - udp: { address: ns1.tic.ir }
@@ -87,89 +79,89 @@ fallback:
     }
   - socks5://192.168.1.10:1080
 `
-    configBytes := []byte(config)
-    finder := NewStrategyFinder(nil, nil, nil, nil)
-    parsedConfig, err := finder.parseConfig(configBytes)
-    require.NoError(t, err)
+	configBytes := []byte(config)
+	finder := NewStrategyFinder(nil, nil, nil, nil)
+	parsedConfig, err := finder.parseConfig(configBytes)
+	require.NoError(t, err)
 
-    expectedConfig := configConfig{
-        DNS: []dnsEntryConfig{
-            {System: &struct{}{}},
-            {UDP: &udpEntryConfig{Address: "ns1.tic.ir"}},
-            {TCP: &tcpEntryConfig{Address: "ns1.tic.ir"}},
-            {UDP: &udpEntryConfig{Address: "tmcell.tm"}},
-            {UDP: &udpEntryConfig{Address: "dns1.transtelecom.net."}},
-            {TLS: &tlsEntryConfig{Name: "captive-portal.badssl.com", Address: "captive-portal.badssl.com:443"}},
-            {HTTPS: &httpsEntryConfig{Name: "mitm-software.badssl.com"}},
-        },
-        TLS: []string{"", "split:1", "split:2", "split:5", "tlsfrag:1"},
-        Fallback: []fallbackEntryConfig{
-            "ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1",
-            fallbackEntryStructConfig{
-                Psiphon: map[string]any {
-                    "PropagationChannelId": "FFFFFFFFFFFFFFFF",
-                    "SponsorId":            "FFFFFFFFFFFFFFFF",
-                },
-            },
-            "socks5://192.168.1.10:1080",
-        },
-    }
+	expectedConfig := configConfig{
+		DNS: []dnsEntryConfig{
+			{System: &struct{}{}},
+			{UDP: &udpEntryConfig{Address: "ns1.tic.ir"}},
+			{TCP: &tcpEntryConfig{Address: "ns1.tic.ir"}},
+			{UDP: &udpEntryConfig{Address: "tmcell.tm"}},
+			{UDP: &udpEntryConfig{Address: "dns1.transtelecom.net."}},
+			{TLS: &tlsEntryConfig{Name: "captive-portal.badssl.com", Address: "captive-portal.badssl.com:443"}},
+			{HTTPS: &httpsEntryConfig{Name: "mitm-software.badssl.com"}},
+		},
+		TLS: []string{"", "split:1", "split:2", "split:5", "tlsfrag:1"},
+		Fallback: []fallbackEntryConfig{
+			"ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1",
+			fallbackEntryStructConfig{
+				Psiphon: map[string]any{
+					"PropagationChannelId": "FFFFFFFFFFFFFFFF",
+					"SponsorId":            "FFFFFFFFFFFFFFFF",
+				},
+			},
+			"socks5://192.168.1.10:1080",
+		},
+	}
 
-    require.Equal(t, expectedConfig, parsedConfig)
+	require.Equal(t, expectedConfig, parsedConfig)
 }
 
 func TestParseConfig_YamlPsiphonConfig(t *testing.T) {
-    config := `
+	config := `
 fallback:
   - psiphon:
       PropagationChannelId: FFFFFFFFFFFFFFFF
       SponsorId: FFFFFFFFFFFFFFFF
 `
-    configBytes := []byte(config)
-    finder := NewStrategyFinder(context.Background(), &transport.TCPDialer{}, &transport.UDPDialer{}, nil)
-    parsedConfig, err := finder.parseConfig(configBytes)
-    require.NoError(t, err)
+	configBytes := []byte(config)
+	finder := NewStrategyFinder(context.Background(), &transport.TCPDialer{}, &transport.UDPDialer{}, nil)
+	parsedConfig, err := finder.parseConfig(configBytes)
+	require.NoError(t, err)
 
-    expectedConfig := configConfig{
-        Fallback: []fallbackEntryConfig{
-            fallbackEntryStructConfig{
-                Psiphon: map[string]any{
-                    "PropagationChannelId": "FFFFFFFFFFFFFFFF",
-                    "SponsorId":            "FFFFFFFFFFFFFFFF",
-                },
-            },
-        },
-    }
+	expectedConfig := configConfig{
+		Fallback: []fallbackEntryConfig{
+			fallbackEntryStructConfig{
+				Psiphon: map[string]any{
+					"PropagationChannelId": "FFFFFFFFFFFFFFFF",
+					"SponsorId":            "FFFFFFFFFFFFFFFF",
+				},
+			},
+		},
+	}
 
-    require.Equal(t, expectedConfig, parsedConfig)
+	require.Equal(t, expectedConfig, parsedConfig)
 }
 
 func Test_getPsiphonConfigSignature_ValidFields(t *testing.T) {
-    finder := NewStrategyFinder(context.Background(), &transport.TCPDialer{}, &transport.UDPDialer{}, nil)
-    config := []byte(`{
+	finder := NewStrategyFinder(context.Background(), &transport.TCPDialer{}, &transport.UDPDialer{}, nil)
+	config := []byte(`{
         "PropagationChannelId": "FFFFFFFFFFFFFFFF",
         "SponsorId": "FFFFFFFFFFFFFFFF",
         "ClientPlatform": "outline",
         "ClientVersion": "1"
     }`)
-    expected := "{PropagationChannelId: FFFFFFFFFFFFFFFF, SponsorId: FFFFFFFFFFFFFFFF}"
-    actual := finder.getPsiphonConfigSignature(config)
-    require.Equal(t, expected, actual)
+	expected := "{PropagationChannelId: FFFFFFFFFFFFFFFF, SponsorId: FFFFFFFFFFFFFFFF}"
+	actual := finder.getPsiphonConfigSignature(config)
+	require.Equal(t, expected, actual)
 }
 
 func Test_getPsiphonConfigSignature_InvalidFields(t *testing.T) {
-    // If we don't understand the psiphon config we received for any reason
-    // then just output it as an opaque string
+	// If we don't understand the psiphon config we received for any reason
+	// then just output it as an opaque string
 
-    finder := NewStrategyFinder(context.Background(), &transport.TCPDialer{}, &transport.UDPDialer{}, nil)
-    config := []byte(`{"ClientPlatform": "outline", "ClientVersion": "1"}`)
-    expected := `{"ClientPlatform": "outline", "ClientVersion": "1"}`
-    actual := finder.getPsiphonConfigSignature(config)
-    require.Equal(t, expected, actual)
+	finder := NewStrategyFinder(context.Background(), &transport.TCPDialer{}, &transport.UDPDialer{}, nil)
+	config := []byte(`{"ClientPlatform": "outline", "ClientVersion": "1"}`)
+	expected := `{"ClientPlatform": "outline", "ClientVersion": "1"}`
+	actual := finder.getPsiphonConfigSignature(config)
+	require.Equal(t, expected, actual)
 }
 
 func TestNewDialer_BrokenConfig(t *testing.T) {
-    configBytes := []byte(`
+	configBytes := []byte(`
 dns:
     # We get censored DNS responses when we send queries to an IP in China.
     - udp: { address: china.cn }
@@ -209,51 +201,46 @@ fallback:
     - socks5://192.168.1.10:1080
 `)
 
-    testDomains := []string{"www.google.com"}
+	testDomains := []string{"www.google.com"}
 
-    // Mock dependencies
-    mockResolverFactory := &MockResolverFactory{
-        NewResolverFunc: func(entry dnsEntryConfig) (dns.Resolver, bool, error) {
-            return nil, false, errors.New("mock resolver error")
-        },
-    }
+	// Mock dependencies
+	mockResolverFactory := &MockResolverFactory{
+		NewResolverFunc: func(entry dnsEntryConfig) (dns.Resolver, bool, error) {
+			return nil, false, errors.New("mock resolver error")
+		},
+	}
 
-    mockDialerFactory := &MockDialerFactory{
-        NewStreamDialerFunc: func(ctx context.Context, baseDialer transport.StreamDialer, config string) (transport.StreamDialer, error) {
-            return nil, errors.New("mock dialer error")
-        },
-    }
+	mockDialerFactory := &MockDialerFactory{
+		NewStreamDialerFunc: func(ctx context.Context, baseDialer transport.StreamDialer, config string) (transport.StreamDialer, error) {
+			return nil, errors.New("mock dialer error")
+		},
+	}
 
-    mockPsiphonDialerFactory := &MockPsiphonDialerFactory{
-        NewPsiphonDialerFunc: func(ctx context.Context, psiphonJSON []byte, psiphonSignature string) (transport.StreamDialer, error) {
-            return nil, errors.New("mock psiphon dialer error")
-        },
-    }
-
-    mockTestRunner := &MockTestRunner{
-        TestDialerFunc: func(ctx context.Context, dialer transport.StreamDialer, testDomains []string, transportCfg string) error {
-            return errors.New("mock test runner error")
-        },
-    }
+	mockPsiphonDialerFactory := &MockPsiphonDialerFactory{
+		NewPsiphonDialerFunc: func(ctx context.Context, psiphonJSON []byte, psiphonSignature string) (transport.StreamDialer, error) {
+			return nil, errors.New("mock psiphon dialer error")
+		},
+	}
 
 	// Initialize a log writer
 	var logBuffer bytes.Buffer
 	logWriter := NewCancellableLogWriter(context.Background(), &logBuffer)
 
-    finder := &StrategyFinder{
-        TestTimeout:            5,
-        LogWriter:            logWriter,
-        StreamDialer:         &transport.TCPDialer{},
-        PacketDialer:         &transport.UDPDialer{},
-        ResolverFactory:        mockResolverFactory,
-        DialerFactory:          mockDialerFactory,
-        PsiphonDialerFactory: mockPsiphonDialerFactory,
-        TestRunner:             mockTestRunner,
-    }
+	finder := &StrategyFinder{
+		TestTimeout:          5,
+		LogWriter:            logWriter,
+		StreamDialer:         &transport.TCPDialer{},
+		PacketDialer:         &transport.UDPDialer{},
+		ResolverFactory:      mockResolverFactory,
+		DialerFactory:        mockDialerFactory,
+		PsiphonDialerFactory: mockPsiphonDialerFactory,
+	}
 
-    _, err := finder.NewDialer(context.Background(), testDomains, configBytes)
-    require.Error(t, err)
-    require.Contains(t, err.Error(), "could not find a working fallback: all tests failed")
+	_, err := finder.NewDialer(context.Background(), testDomains, configBytes)
+	logWriter.Flush()
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "could not find a working fallback: all tests failed")
 
 	// Check the content of the log writer
 	expectedLogs := []string{
@@ -263,8 +250,6 @@ fallback:
 		"getPsiphonDialer failed",
 		"could not find a working fallback",
 	}
-	logContent := logBuffer.String()
-	for _, expectedLog := range expectedLogs {
-		require.True(t, strings.Contains(logContent, expectedLog), "Expected log '%s' not found in: %s", expectedLog, logContent)
-	}
+	logContent := strings.Split(logBuffer.String(), "\n")
+	assert.ElementsMatch(t, logContent, expectedLogs)
 }
