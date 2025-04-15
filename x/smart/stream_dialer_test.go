@@ -64,7 +64,7 @@ fallback:
 		Fallback: []fallbackEntryConfig{
 			"ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1",
 			fallbackEntryStructConfig{
-				Psiphon: map[string]any {
+				Psiphon: map[string]any{
 					"PropagationChannelId": "FFFFFFFFFFFFFFFF",
 					"SponsorId":            "FFFFFFFFFFFFFFFF",
 				},
@@ -91,7 +91,7 @@ fallback:
 	expectedConfig := configConfig{
 		Fallback: []fallbackEntryConfig{
 			fallbackEntryStructConfig{
-				Psiphon: map[string]any {
+				Psiphon: map[string]any{
 					"PropagationChannelId": "FFFFFFFFFFFFFFFF",
 					"SponsorId":            "FFFFFFFFFFFFFFFF",
 				},
@@ -110,7 +110,7 @@ func Test_getPsiphonConfigSignature_ValidFields(t *testing.T) {
 		"ClientPlatform": "outline",
 		"ClientVersion": "1"
 	}`)
-	expected := "{PropagationChannelId: FFFFFFFFFFFFFFFF, SponsorId: FFFFFFFFFFFFFFFF}"
+	expected := "Psiphon: {PropagationChannelId: FFFFFFFFFFFFFFFF, SponsorId: FFFFFFFFFFFFFFFF}"
 	actual := finder.getPsiphonConfigSignature(config)
 	require.Equal(t, expected, actual)
 }
