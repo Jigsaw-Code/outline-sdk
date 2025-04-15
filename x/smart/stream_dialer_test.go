@@ -10,6 +10,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -192,13 +193,6 @@ fallback:
 
 	testDomains := []string{"www.google.com"}
 
-	// Mock dependencies
-	// mockResolverFactory := &MockResolverFactory{
-	// 	NewResolverFunc: func(entry dnsEntryConfig) (dns.Resolver, bool, error) {
-	// 		return nil, false, errors.New("mock resolver error")
-	// 	},
-	// }
-
 	mockDialerFactory := &MockDialerFactory{
 		NewStreamDialerFunc: func(ctx context.Context, baseDialer transport.StreamDialer, config string) (transport.StreamDialer, error) {
 			return nil, errors.New("mock dialer error")
@@ -215,20 +209,22 @@ fallback:
 	var logBuffer bytes.Buffer
 	logWriter := NewCancellableLogWriter(context.Background(), &logBuffer)
 
-	streamDialer := &transport.TCPDialer{}
-	packetDialer := &transport.UDPDialer{}
+	mockStreamDialer := &MockStreamDialer{}
+	mockPacketDialer := &MockPacketDialer{}
+	mockStreamDialer.On("DialStream", mock.Anything, mock.Anything).Return(&MockStreamConn{}, errors.New("mock stream dialer error"))
+	mockPacketDialer.On("DialPacket", mock.Anything, mock.Anything).Return(&MockPacketConn{}, errors.New("mock packet dialer error"))
+
 	finder := &StrategyFinder{
 		TestTimeout:          5,
 		LogWriter:            logWriter,
-		StreamDialer:         streamDialer,
-		PacketDialer:         packetDialer,
-		ResolverFactory:      &DefaultResolverFactory{streamDialer, packetDialer},
+		StreamDialer:         mockStreamDialer,
+		PacketDialer:         mockPacketDialer,
+		ResolverFactory:      &DefaultResolverFactory{mockStreamDialer, mockPacketDialer},
 		DialerFactory:        mockDialerFactory,
 		PsiphonDialerFactory: mockPsiphonDialerFactory,
 	}
 
 	_, err := finder.NewDialer(context.Background(), testDomains, configBytes)
-	logWriter.Flush()
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "could not find a working fallback: all tests failed")
