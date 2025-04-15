@@ -88,6 +88,7 @@ At the application layer:
 
 - Domain-fronting and SNI hiding with [transport/tls](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/transport/tls)
 
+
 ### Tunnel Connections over a Proxy
 
 The Outline SDK offers two protocols to create connections over proxies:
