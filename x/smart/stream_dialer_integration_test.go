@@ -56,7 +56,6 @@ fallback:
 	testDomains := []string{"www.nonexistant-canary-domain.sdfghshdfvbsdr.com"}
 	transportType := ""
 
-	// Create a buffer to capture log output
 	logBuffer := new(bytes.Buffer)
 	logger := log.New(logBuffer, "", log.LstdFlags)
 
@@ -77,20 +76,18 @@ fallback:
 		PacketDialer: packetDialer,
 	}
 
-	// Create a StrategyFinder and test starting it with this config
-	dialer, err := finder.NewDialer(context.Background(), testDomains, configBytes)
-
-	log.Printf("dialer: %v", dialer)
+	_, err := finder.NewDialer(context.Background(), testDomains, configBytes)
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "could not find a working fallback: all tests failed")
 
-	// Check the content of the log writer
+	// Check the content of the log writer. Different systems have different network error messages. So we only check the broad strokes
 	expectedLogs := []string{
 		"rcode is not success: RCodeNameError ❌",
-		"request for A query failed: dial DNS resolver failed: x509: certificate is valid for login.captive-portal.badssl.com, not captive-portal.badssl.com ❌",
+		"request for A query failed: dial DNS resolver failed: x509:",
 		`request for A query failed: receive DNS message failed: failed to get HTTP response: Post "https://mitm-software.badssl.com:443/dns-query": tls: failed to verify certificate: x509: “mitm-software.badssl.com” certificate is not trusted ❌`,
 		"🏃 running test: 'ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1'",
+		// TODO add psiphon attempt logging when it exists
 		"🏃 running test: 'socks5://192.168.1.10:1080' (domain: www.nonexistant-canary-domain.sdfghshdfvbsdr.com.)",
 	}
 	logContent := logBuffer.String()
