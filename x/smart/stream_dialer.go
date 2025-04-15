@@ -27,10 +27,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/goccy/go-yaml"
 	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
+	"github.com/goccy/go-yaml"
 )
 
 // To test one strategy:
@@ -97,7 +97,7 @@ type dnsEntryConfig struct {
 }
 
 type fallbackEntryStructConfig struct {
-	Psiphon any	`yaml:"psiphon,omitempty"`
+	Psiphon any `yaml:"psiphon,omitempty"`
 	// As we allow more fallback types beyond psiphon they will be added here
 }
 
@@ -106,9 +106,9 @@ type fallbackEntryStructConfig struct {
 type fallbackEntryConfig any
 
 type configConfig struct {
-	DNS      []dnsEntryConfig 		`yaml:"dns,omitempty"`
-	TLS      []string         		`yaml:"tls,omitempty"`
-	Fallback []fallbackEntryConfig 	`yaml:"fallback,omitempty"`
+	DNS      []dnsEntryConfig      `yaml:"dns,omitempty"`
+	TLS      []string              `yaml:"tls,omitempty"`
+	Fallback []fallbackEntryConfig `yaml:"fallback,omitempty"`
 }
 
 // mapToAny marshalls a map into a struct. It's a helper for parsers that want to
@@ -397,7 +397,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 				}
 				psiphonSignature := f.getPsiphonConfigSignature(psiphonJSON)
 
-				dialer, err := newPsiphonDialer(ctx, psiphonJSON, psiphonSignature)
+				dialer, err := newPsiphonDialer(f, ctx, psiphonJSON, psiphonSignature)
 				if err != nil {
 					return nil, fmt.Errorf("getPsiphonDialer failed: %w", err)
 				}
@@ -412,7 +412,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 				return nil, fmt.Errorf("unknown fallback type: %v", v)
 			}
 		default:
-			return nil, fmt.Errorf("unknown fallback type: %v\n", v)
+			return nil, fmt.Errorf("unknown fallback type: %v", v)
 		}
 	})
 
