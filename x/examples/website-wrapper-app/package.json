@@ -14,7 +14,7 @@
   },
   "license": "Apache-2.0",
   "scripts": {
-    "build:sdk_mobileproxy": "bash ./.scripts/build_sdk_mobileproxy.sh",
+    "build:mobileproxy": "bash ./.scripts/build_mobileproxy.sh",
     "build:project": "node ./wrapper_app_project/.scripts/build.mjs",
     "clean": "npx rimraf node_modules/ output/",
     "doctor": "./doctor",

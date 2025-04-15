@@ -20,7 +20,7 @@ To verify that your system has the necessary dependencies to generate your web w
 > [!WARNING]
 > You can only build iOS apps on MacOS.
 
-* You will need your site's domain.
+* You will need the url you want to load initially in your app.
 * You will need [go](https://golang.org/) to build the SDK library.
 * You will need [Node.js](https://nodejs.org/en/) for the project setup and web server.
 * You will need [XCode](https://developer.apple.com/xcode/). 
@@ -30,7 +30,7 @@ To verify that your system has the necessary dependencies to generate your web w
 
 ```sh
 npm run reset
-npm run build:project -- --platform=ios --entryDomain="www.example.com"
+npm run build:project -- --platform=ios --entryUrl="https://www.example.com"
 npm run open:ios
 ```
 
@@ -62,16 +62,20 @@ Many sites don't handle their own navigation - if this applies to you, you can r
 * You will need an [ngrok account](https://ngrok.com/), from which you can get your [`--navigatorToken`](https://dashboard.ngrok.com/get-started/your-authtoken)
 
 ```sh
-npm run start -- --platform=ios --entryDomain="www.example.com" \
+npm run start -- --platform=ios --entryUrl="https://www.example.com" \
   --navigatorToken="<YOUR_NGROK_AUTH_TOKEN>" --navigatorPath="/nav"
 ```
+
+### Publishing your app in the App Store
+
+[Follow these instructions on how to publish your app for beta testing and the App Store.](https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases)
 
 ## Building the app project for **Android**
 
 > [!WARNING]
 > If you want to build Android on Windows, please use [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/install)
 
-* You will need your site's domain.
+* You will need the url you want to load initially in your app.
 * You will need [Node.js](https://nodejs.org/en/) for the project setup and web server.
 * You will need [go](https://golang.org/) to build the SDK library.
 * You will need [JDK 17](https://stackoverflow.com/a/70649641) to build the app.
@@ -83,7 +87,7 @@ npm run start -- --platform=ios --entryDomain="www.example.com" \
 
 ```sh
 npm run reset
-npm run build:project -- --platform=android --entryDomain="www.example.com"
+npm run build:project -- --platform=android --entryUrl="https://www.example.com"
 npm run open:android
 ```
 
@@ -115,16 +119,23 @@ Many sites don't handle their own navigation - if this applies to you, you can r
 * You will need an [ngrok account](https://ngrok.com/), from which you can get your [`--navigatorToken`](https://dashboard.ngrok.com/get-started/your-authtoken)
 
 ```sh
-npm run start -- --platform=android  --entryDomain="www.example.com" \
+npm run start -- --platform=android  --entryUrl="https://www.example.com" \
   --navigatorToken="<YOUR_NGROK_AUTH_TOKEN>" --navigatorPath="/nav"
 ```
+
+### Publishing your app in the Google Play Store
+
+[Follow these instructions to learn how to publish your app to the Google Play Store](https://developer.android.com/studio/publish)
 
 ## Available Configuration Options
 
 | Option              | Description                                                                     | Possible Values          |
 | ------------------- | ------------------------------------------------------------------------------- | ------------------------ |
 | `--platform`        | **(Required)** Specifies the target platform for the build.                                    | `"ios"` or `"android"`   |
-| `--entryDomain`     | **(Required)** The primary domain of your website.                                             | Any valid domain name    |
+| `--entryUrl`     | **(Required)** The primary url of your website.                                             | Any valid url    |
+| `--appId`           | The unique identifier for the app (e.g., iOS Bundle ID, Android Application ID). | A reverse domain name string (e.g., `com.company.appname`) |
+| `--appName`         | The user-visible name of the application.                                       | Any valid application name string (e.g., "My Awesome App") |
+| `--output`          | The directory where the generated app project files will be saved.              | A valid, absolute file path (e.g., `/users/me/my-generated-app`) |
 | `--additionalDomains` | A list of other domains that should be accessible within the app.               | Comma-separated domains |
 | `--smartDialerConfig` | A JSON string containing the configuration for the [smart dialer feature](../../smart#yaml-config-for-the-smart-dialer).       | Valid JSON string       |
 | `--navigatorToken`  | Your ngrok authentication token for using the navigation proxy.                 | Your [ngrok auth token](https://dashboard.ngrok.com/get-started/your-authtoken)    |
