@@ -163,27 +163,16 @@ func Test_getPsiphonConfigSignature_InvalidFields(t *testing.T) {
 func TestNewDialer_BrokenConfig(t *testing.T) {
 	configBytes := []byte(`
 dns:
-    # We get censored DNS responses when we send queries to an IP in China.
-    - udp: { address: china.cn }
-    # We get censored DNS responses when we send queries to a resolver in Iran.
-    - udp: { address: ns1.tic.ir }
-    - tcp: { address: ns1.tic.ir }
-    # We get censored DNS responses when we send queries to an IP in Turkmenistan.
-    - udp: { address: tmcell.tm }
-    # We get censored DNS responses when we send queries to a resolver in Russia.
-    - udp: { address: dns1.transtelecom.net. }
-    # Testing captive portal.
+    - udp: { address: dns.does-not-exist.rthsdfvsdfg.com }
+    - tcp: { address: dns.does-not-exist.rthsdfvsdfg.com }
     - tls:
-        name: captive-portal.badssl.com
-        address: captive-portal.badssl.com:443
-    # Testing forged TLS certificate.
-    - https: { name: mitm-software.badssl.com }
+        name: dns.does-not-exist.rthsdfvsdfg.com
+        address: dns.does-not-exist.rthsdfvsdfg.com:443
+    - https: { name: dns.does-not-exist.rthsdfvsdfg.com }
 
 tls:
     - ""
     - split:1
-    - split:2
-    - split:5
     - tlsfrag:1
 
 fallback:
@@ -204,11 +193,11 @@ fallback:
 	testDomains := []string{"www.google.com"}
 
 	// Mock dependencies
-	mockResolverFactory := &MockResolverFactory{
-		NewResolverFunc: func(entry dnsEntryConfig) (dns.Resolver, bool, error) {
-			return nil, false, errors.New("mock resolver error")
-		},
-	}
+	// mockResolverFactory := &MockResolverFactory{
+	// 	NewResolverFunc: func(entry dnsEntryConfig) (dns.Resolver, bool, error) {
+	// 		return nil, false, errors.New("mock resolver error")
+	// 	},
+	// }
 
 	mockDialerFactory := &MockDialerFactory{
 		NewStreamDialerFunc: func(ctx context.Context, baseDialer transport.StreamDialer, config string) (transport.StreamDialer, error) {
@@ -226,12 +215,14 @@ fallback:
 	var logBuffer bytes.Buffer
 	logWriter := NewCancellableLogWriter(context.Background(), &logBuffer)
 
+	streamDialer := &transport.TCPDialer{}
+	packetDialer := &transport.UDPDialer{}
 	finder := &StrategyFinder{
 		TestTimeout:          5,
 		LogWriter:            logWriter,
-		StreamDialer:         &transport.TCPDialer{},
-		PacketDialer:         &transport.UDPDialer{},
-		ResolverFactory:      mockResolverFactory,
+		StreamDialer:         streamDialer,
+		PacketDialer:         packetDialer,
+		ResolverFactory:      &DefaultResolverFactory{streamDialer, packetDialer},
 		DialerFactory:        mockDialerFactory,
 		PsiphonDialerFactory: mockPsiphonDialerFactory,
 	}
