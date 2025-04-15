@@ -209,7 +209,7 @@ func (f *StrategyFinder) getPsiphonConfigSignature(psiphonJSON []byte) string {
 	sponsorId, ok2 := psiphonConfig["SponsorId"].(string)
 
 	if ok1 && ok2 {
-		return fmt.Sprintf("{PropagationChannelId: %v, SponsorId: %v}", propagationChannelId, sponsorId)
+		return fmt.Sprintf("Psiphon: {PropagationChannelId: %v, SponsorId: %v}", propagationChannelId, sponsorId)
 	}
 	return string(psiphonJSON)
 }
