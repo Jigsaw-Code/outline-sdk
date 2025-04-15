@@ -24,48 +24,16 @@ import (
 	"io"
 	"net"
 	"net/url"
-	"sync"
 	"time"
 
-	"github.com/goccy/go-yaml"
 	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
+	"github.com/goccy/go-yaml"
 )
 
 // To test one strategy:
 // go run -C ./x/examples/smart-proxy/ . -v -localAddr=localhost:1080 --transport="" --domain www.rferl.org  --config=<(echo '{"dns": [{"https": {"name": "doh.sb"}}]}')
-
-// CancellableLogWriter is a log writer that can be cancelled.
-type CancellableLogWriter struct {
-	Writer	io.Writer
-	ctx 	context.Context
-	logMu   sync.Mutex
-}
-
-func NewCancellableLogWriter(ctx context.Context, writer io.Writer) *CancellableLogWriter {
-	return &CancellableLogWriter{Writer: writer, ctx: ctx}
-}
-
-// Only log if context is not done
-func (f *CancellableLogWriter) logCtx(ctx context.Context, format string, a ...any) {
-	if ctx != nil {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-	}
-	f.log(format, a...)
-}
-
-func (f *CancellableLogWriter) log(format string, a ...any) {
-	if f.Writer != nil {
-		f.logMu.Lock()
-		defer f.logMu.Unlock()
-		fmt.Fprintf(f.Writer, format, a...)
-	}
-}
 
 // ResolverFactory creates a dns.Resolver from a dnsEntryConfig.
 type ResolverFactory interface {
@@ -88,27 +56,27 @@ type TestRunner interface {
 }
 
 type StrategyFinder struct {
-	TestTimeout  time.Duration
-	LogWriter    *CancellableLogWriter
-	StreamDialer transport.StreamDialer
-	PacketDialer transport.PacketDialer
-	ResolverFactory ResolverFactory
-	DialerFactory DialerFactory
+	TestTimeout          time.Duration
+	LogWriter            *CancellableLogWriter
+	StreamDialer         transport.StreamDialer
+	PacketDialer         transport.PacketDialer
+	ResolverFactory      ResolverFactory
+	DialerFactory        DialerFactory
 	PsiphonDialerFactory PsiphonDialerFactory
-	TestRunner TestRunner
+	TestRunner           TestRunner
 }
 
 func NewStrategyFinder(ctx context.Context, streamDialer transport.StreamDialer, packetDialer transport.PacketDialer, logWriter io.Writer) *StrategyFinder {
 	cancellableLogWriter := NewCancellableLogWriter(ctx, logWriter)
 	return &StrategyFinder{
-		TestTimeout:  5 * time.Second,
-		LogWriter:    cancellableLogWriter,
-		StreamDialer: streamDialer,
-		PacketDialer: packetDialer,
-		ResolverFactory: &DefaultResolverFactory{streamDialer, packetDialer},
-		DialerFactory: &DefaultDialerFactory{},
+		TestTimeout:          5 * time.Second,
+		LogWriter:            cancellableLogWriter,
+		StreamDialer:         streamDialer,
+		PacketDialer:         packetDialer,
+		ResolverFactory:      &DefaultResolverFactory{streamDialer, packetDialer},
+		DialerFactory:        &DefaultDialerFactory{},
 		PsiphonDialerFactory: &DefaultPsiphonDialerFactory{},
-		TestRunner: &DefaultTestRunner{cancellableLogWriter},
+		TestRunner:           &DefaultTestRunner{cancellableLogWriter},
 	}
 }
 
@@ -151,7 +119,7 @@ type dnsEntryConfig struct {
 }
 
 type fallbackEntryStructConfig struct {
-	Psiphon any	`yaml:"psiphon,omitempty"`
+	Psiphon any `yaml:"psiphon,omitempty"`
 	// As we allow more fallback types beyond psiphon they will be added here
 }
 
@@ -160,9 +128,9 @@ type fallbackEntryStructConfig struct {
 type fallbackEntryConfig any
 
 type configConfig struct {
-	DNS      []dnsEntryConfig 		`yaml:"dns,omitempty"`
-	TLS      []string         		`yaml:"tls,omitempty"`
-	Fallback []fallbackEntryConfig 	`yaml:"fallback,omitempty"`
+	DNS      []dnsEntryConfig      `yaml:"dns,omitempty"`
+	TLS      []string              `yaml:"tls,omitempty"`
+	Fallback []fallbackEntryConfig `yaml:"fallback,omitempty"`
 }
 
 // mapToAny marshalls a map into a struct. It's a helper for parsers that want to
@@ -268,7 +236,7 @@ func (f *DefaultPsiphonDialerFactory) NewPsiphonDialer(ctx context.Context, psip
 }
 
 // DefaultTestRunner is the default implementation of TestRunner.
-type DefaultTestRunner struct{
+type DefaultTestRunner struct {
 	logWriter *CancellableLogWriter
 }
 
@@ -279,7 +247,7 @@ func (f *DefaultTestRunner) TestDialer(ctx context.Context, dialer transport.Str
 		testAddr := net.JoinHostPort(testDomain, "443")
 		f.logWriter.logCtx(ctx, "🏃 running test: '%v' (domain: %v)\n", transportCfg, testDomain)
 
-		ctx, cancel := context.WithTimeout(ctx, 5 * time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 		testConn, err := dialer.DialStream(ctx, testAddr)
 		if err != nil {
