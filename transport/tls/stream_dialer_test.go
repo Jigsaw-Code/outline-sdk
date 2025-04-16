@@ -77,7 +77,7 @@ func TestIP(t *testing.T) {
 }
 
 func TestIPOverride(t *testing.T) {
-	sd, err := NewStreamDialer(&transport.TCPDialer{}, WithCertificateName("8.8.8.8"))
+	sd, err := NewStreamDialer(&transport.TCPDialer{}, WithCertVerifier(&StandardCertVerifier{CertificateName: "8.8.8.8"}))
 	require.NoError(t, err)
 	conn, err := sd.DialStream(context.Background(), "dns.google:443")
 	require.NoError(t, err)
@@ -101,7 +101,7 @@ func TestNoSNI(t *testing.T) {
 }
 
 func TestAllCustom(t *testing.T) {
-	sd, err := NewStreamDialer(&transport.TCPDialer{}, WithSNI("decoy.android.com"), WithCertificateName("www.youtube.com"))
+	sd, err := NewStreamDialer(&transport.TCPDialer{}, WithSNI("decoy.android.com"), WithCertVerifier(&StandardCertVerifier{CertificateName: "www.youtube.com"}))
 	require.NoError(t, err)
 	conn, err := sd.DialStream(context.Background(), "www.google.com:443")
 	require.NoError(t, err)

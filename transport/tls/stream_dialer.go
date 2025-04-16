@@ -84,16 +84,25 @@ func normalizeHost(host string) string {
 	return strings.ToLower(host)
 }
 
-// ClientConfig encodes the parameters for a TLS client connection.
+// ClientConfig holds configuration parameters used for establishing a TLS client connection.
 type ClientConfig struct {
-	// The host name for the Server Name Indication (SNI).
+	// ServerName specifies the hostname sent for Server Name Indication (SNI).
+	// This is often the same as the dialed hostname but can be overridden using [WithSNI].
 	ServerName string
-	// The hostname to use for certificate validation.
-	CertificateName string
-	// The protocol id list for protocol negotiation (ALPN).
+
+	// NextProtos lists the application-layer protocols (e.g., "h2", "http/1.1")
+	// supported by the client for Application-Layer Protocol Negotiation (ALPN).
+	// See [WithALPN].
 	NextProtos []string
-	// The cache for sessin resumption.
+
+	// SessionCache enables TLS session resumption by providing a cache for session tickets.
+	// If nil, session resumption is disabled. See [WithSessionCache].
 	SessionCache tls.ClientSessionCache
+
+	// CertVerifier specifies a custom verifier for the peer's certificate chain.
+	// If nil, [StandardCertVerifier] is used by default, validating against the dialed
+	// server name. See [WithCertVerifier].
+	CertVerifier CertVerifier
 }
 
 // toStdConfig creates a [tls.Config] based on the configured parameters.
@@ -106,32 +115,24 @@ func (cfg *ClientConfig) toStdConfig() *tls.Config {
 		// replacing. This will not disable VerifyConnection.
 		InsecureSkipVerify: true,
 		VerifyConnection: func(cs tls.ConnectionState) error {
-			// This replicates the logic in the standard library verification:
-			// https://cs.opensource.google/go/go/+/master:src/crypto/tls/handshake_client.go;l=982;drc=b5f87b5407916c4049a3158cc944cebfd7a883a9
-			// And the documentation example:
-			// https://pkg.go.dev/crypto/tls#example-Config-VerifyConnection
-			opts := x509.VerifyOptions{
-				DNSName:       cfg.CertificateName,
-				Intermediates: x509.NewCertPool(),
-			}
-			for _, cert := range cs.PeerCertificates[1:] {
-				opts.Intermediates.AddCert(cert)
-			}
-			_, err := cs.PeerCertificates[0].Verify(opts)
-			return err
+			return cfg.CertVerifier.VerifyCertificate(&CertVerificationContext{
+				PeerCertificates: cs.PeerCertificates,
+			})
 		},
 	}
 }
 
-// ClientOption allows configuring the parameters to be used for a client TLS connection.
-type ClientOption func(serverName string, config *ClientConfig)
-
 // WrapConn wraps a [transport.StreamConn] in a TLS connection.
 func WrapConn(ctx context.Context, conn transport.StreamConn, serverName string, options ...ClientOption) (transport.StreamConn, error) {
-	cfg := ClientConfig{ServerName: serverName, CertificateName: serverName}
+	cfg := ClientConfig{ServerName: serverName}
 	normName := normalizeHost(serverName)
 	for _, option := range options {
 		option(normName, &cfg)
+	}
+	if cfg.CertVerifier == nil {
+		// If VerifyCertFunction is not provided, use the default verification logic,
+		// which validates the peer certificate against the SNI.
+		cfg.CertVerifier = &StandardCertVerifier{CertificateName: serverName}
 	}
 	tlsConn := tls.Client(conn, cfg.toStdConfig())
 	err := tlsConn.HandshakeContext(ctx)
@@ -181,10 +182,60 @@ func WithSessionCache(sessionCache tls.ClientSessionCache) ClientOption {
 	}
 }
 
-// WithCertificateName sets the hostname to be used for the certificate cerification.
-// If absent, defaults to the dialed hostname.
-func WithCertificateName(hostname string) ClientOption {
+// WithCertVerifier sets the verifier to be used for the certificate verification.
+func WithCertVerifier(verifier CertVerifier) ClientOption {
 	return func(_ string, config *ClientConfig) {
-		config.CertificateName = hostname
+		config.CertVerifier = verifier
 	}
 }
+
+// CertVerificationContext provides connection-time context for the certificate verification.
+type CertVerificationContext struct {
+	// PeerCertificates are the parsed certificates sent by the peer, in the
+	// order in which they were sent. The first element is the leaf certificate
+	// that the connection is verified against.
+	//
+	// On the client side, it can't be empty. On the server side, it can be
+	// empty if Config.ClientAuth is not RequireAnyClientCert or
+	// RequireAndVerifyClientCert.
+	//
+	// PeerCertificates and its contents should not be modified.
+	PeerCertificates []*x509.Certificate
+}
+
+// CertVerifier verifies peer certificates for TLS connections.
+type CertVerifier interface {
+	// VerifyCertificate verified a peer certificate given the context.
+	VerifyCertificate(info *CertVerificationContext) error
+}
+
+// StandardCertVerifier implements [CertVerifier] using standard TLS certificate chain verification.
+type StandardCertVerifier struct {
+	// CertificateName specifies the expected DNS name (or IP address) against which
+	// the peer's leaf certificate is verified.
+	CertificateName string
+	// Roots contains the set of trusted root certificate authorities.
+	// If nil, the host's default root CAs are used for certificate chain validation.
+	Roots *x509.CertPool
+}
+
+// VerifyCertificate implements [CertVerifier].
+func (v *StandardCertVerifier) VerifyCertificate(certContext *CertVerificationContext) error {
+	// This replicates the logic in the standard library verification:
+	// https://cs.opensource.google/go/go/+/master:src/crypto/tls/handshake_client.go;l=982;drc=b5f87b5407916c4049a3158cc944cebfd7a883a9
+	// And the documentation example:
+	// https://pkg.go.dev/crypto/tls#example-Config-VerifyConnection
+	opts := x509.VerifyOptions{
+		DNSName:       v.CertificateName,
+		Roots:         v.Roots,
+		Intermediates: x509.NewCertPool(),
+	}
+	for _, cert := range certContext.PeerCertificates[1:] {
+		opts.Intermediates.AddCert(cert)
+	}
+	_, err := certContext.PeerCertificates[0].Verify(opts)
+	return err
+}
+
+// ClientOption allows configuring the parameters to be used for a client TLS connection.
+type ClientOption func(serverName string, config *ClientConfig)
