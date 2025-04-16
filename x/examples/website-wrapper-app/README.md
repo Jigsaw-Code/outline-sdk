@@ -153,3 +153,48 @@ When encountering an issue, the first thing you'll want to do is run the doctor 
 
 > [!NOTE]
 > TODO: compile a list of commonly occuring issues.
+
+## How it works
+
+```mermaid
+flowchart TD
+    subgraph App Initialization
+        A[App Start] --> B{Call SDK Smart Dialer};
+    end
+
+    subgraph Strategy Probing
+        B --> C{Probe Strategies};
+        C -- Server-less First --> D{Probe Server-less};
+        D -- Found Viable Strategy? --> G[Start Local Proxy Server];
+        D -- No Viable Strategy --> E{Probe Server-based};
+        E -- Found Viable Strategy? --> G;
+        E -- No Viable Strategy --> H[Failure: Default to Plain Traffic];
+        C -- Error During Probing --> H;
+    end
+
+    subgraph Proxy & WebView
+        G -- Proxy Started Successfully --> I{Point WebView to Local Proxy};
+        G -- Failed to Start Proxy --> H;
+        I -- WebView Configured --> J[Load Site Content via Proxy];
+        I -- Failed to Configure WebView --> H;
+    end
+
+    subgraph Outcome
+        J --> K[Success: Site Loaded via Selected Strategy];
+        H --> L[Failure Outcome: Plain Traffic Used];
+    end
+
+    style K fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style L fill:#f2dede,stroke:#a94442,stroke-width:2px
+```
+
+
+1. On app start, a call to the SDK smart dialer searches for the best viable access strategy in the configuration you've provided by probing each of them.
+  1. The smart dialer starts by probing server-less strategies first, before falling back to server-based ones.
+1. Once a successful strategy is found, a proxy server, local to the app, is started employing that strategy.
+  1. On iOS: ...
+  1. On Android: ...
+1. The WebView that loads content in the app, provided by CapacitorJS and extended by us, is pointed at this proxy server. Now your site's content is safetly loaded via the selected strategy!
+  1. On iOS: ...
+  1. On Android: ...
+1. Any failure in this process results in the app defaulting back to sending plain traffic over the network.
