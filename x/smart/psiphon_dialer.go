@@ -15,7 +15,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/x/psiphon"
 )
 
-func newPsiphonDialer(finder *StrategyFinder, ctx context.Context, psiphonJSON []byte, psiphonSignature string) (transport.StreamDialer, error) {
+func newPsiphonDialer(finder *StrategyFinder, ctx context.Context, psiphonJSON []byte) (transport.StreamDialer, error) {
 	config := &psiphon.DialerConfig{ProviderConfig: psiphonJSON}
 
 	cacheBaseDir, err := os.UserCacheDir()
@@ -30,7 +30,6 @@ func newPsiphonDialer(finder *StrategyFinder, ctx context.Context, psiphonJSON [
 	finder.logCtx(ctx, "Using data store in %v\n", config.DataRootDirectory)
 
 	dialer := psiphon.GetSingletonDialer()
-	finder.logCtx(ctx, "🏃 Attempting to start psiphon tunnel: %v\n", psiphonSignature)
 	if err := dialer.Start(ctx, config); err != nil {
 		return nil, fmt.Errorf("failed to start psiphon dialer: %w", err)
 	}
