@@ -130,8 +130,8 @@ func WrapConn(ctx context.Context, conn transport.StreamConn, serverName string,
 		option(normName, &cfg)
 	}
 	if cfg.CertVerifier == nil {
-		// If VerifyCertFunction is not provided, use the default verification logic,
-		// which validates the peer certificate against the SNI.
+		// If CertVerifier is not provided, use the default verification logic,
+		// which validates the peer certificate against the provided serverName.
 		cfg.CertVerifier = &StandardCertVerifier{CertificateName: serverName}
 	}
 	tlsConn := tls.Client(conn, cfg.toStdConfig())
