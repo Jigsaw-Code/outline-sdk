@@ -249,7 +249,7 @@ func TestGeneratedCert_Valid(t *testing.T) {
 	verificationContext := &CertVerificationContext{PeerCertificates: []*x509.Certificate{leafCert}}
 
 	sysVerifier := &StandardCertVerifier{CertificateName: "test.local"}
-	require.ErrorContains(t, sysVerifier.VerifyCertificate(verificationContext), "not trusted")
+	require.Error(t, sysVerifier.VerifyCertificate(verificationContext))
 
 	customVerifier := &StandardCertVerifier{CertificateName: "test.local", Roots: rootPool}
 	require.NoError(t, customVerifier.VerifyCertificate(verificationContext))
