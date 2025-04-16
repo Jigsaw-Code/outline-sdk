@@ -358,6 +358,43 @@ func (f *StrategyFinder) findTLS(ctx context.Context, testDomains []string, base
 	}), nil
 }
 
+type SearchResult struct {
+	Dialer          transport.StreamDialer
+	ConfigSignature string
+}
+
+func (f *StrategyFinder) makeDialerFromConfig(ctx context.Context, configModule *configurl.ProviderContainer, fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
+	switch v := fallbackConfig.(type) {
+	case string:
+		configUrl := v
+		dialer, err := configModule.NewStreamDialer(ctx, configUrl)
+		if err != nil {
+			return nil, fmt.Errorf("getStreamDialer failed: %w", err)
+		}
+		return &SearchResult{dialer, v}, nil
+
+	case fallbackEntryStructConfig:
+		if v.Psiphon != nil {
+			psiphonCfg := v.Psiphon
+			psiphonJSON, err := json.Marshal(psiphonCfg)
+			if err != nil {
+				f.logCtx(ctx, "Error marshaling to JSON: %v, %v\n", psiphonCfg, err)
+			}
+			psiphonSignature := f.getPsiphonConfigSignature(psiphonJSON)
+
+			dialer, err := newPsiphonDialer(f, ctx, psiphonJSON, psiphonSignature)
+			if err != nil {
+				return nil, fmt.Errorf("getPsiphonDialer failed: %w", err)
+			}
+			return &SearchResult{dialer, psiphonSignature}, nil
+		} else {
+			return nil, fmt.Errorf("unknown fallback type: %v", fallbackConfig)
+		}
+	default:
+		return nil, fmt.Errorf("unknown fallback type: %v", fallbackConfig)
+	}
+}
+
 // Return the fastest fallback dialer that is able to access all the testDomans
 func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string, fallbackConfigs []fallbackEntryConfig) (transport.StreamDialer, error) {
 	if len(fallbackConfigs) == 0 {
@@ -367,59 +404,27 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 	raceCtx, searchDone := context.WithCancel(ctx)
 	defer searchDone()
 	raceStart := time.Now()
-	type SearchResult struct {
-		Dialer transport.StreamDialer
-		Config fallbackEntryConfig
-	}
-	var configModule = configurl.NewDefaultProviders()
+
+	configModule := configurl.NewDefaultProviders()
 
 	fallback, err := raceTests(raceCtx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
-		switch v := fallbackConfig.(type) {
-		case string:
-			configUrl := v
-			dialer, err := configModule.NewStreamDialer(raceCtx, configUrl)
-			if err != nil {
-				return nil, fmt.Errorf("getStreamDialer failed: %w", err)
-			}
-
-			err = f.testDialer(raceCtx, dialer, testDomains, configUrl)
-			if err != nil {
-				return nil, err
-			}
-
-			return &SearchResult{dialer, fallbackConfig}, nil
-		case fallbackEntryStructConfig:
-			if v.Psiphon != nil {
-				psiphonCfg := v.Psiphon
-				psiphonJSON, err := json.Marshal(psiphonCfg)
-				if err != nil {
-					f.logCtx(ctx, "Error marshaling to JSON: %v, %v\n", psiphonCfg, err)
-				}
-				psiphonSignature := f.getPsiphonConfigSignature(psiphonJSON)
-
-				dialer, err := newPsiphonDialer(f, ctx, psiphonJSON, psiphonSignature)
-				if err != nil {
-					return nil, fmt.Errorf("getPsiphonDialer failed: %w", err)
-				}
-
-				err = f.testDialer(raceCtx, dialer, testDomains, psiphonSignature)
-				if err != nil {
-					return nil, err
-				}
-
-				return &SearchResult{dialer, psiphonSignature}, nil
-			} else {
-				return nil, fmt.Errorf("unknown fallback type: %v", v)
-			}
-		default:
-			return nil, fmt.Errorf("unknown fallback type: %v", v)
+		searchResult, err := f.makeDialerFromConfig(ctx, configModule, fallbackConfig)
+		if err != nil {
+			return nil, err
 		}
+
+		err = f.testDialer(raceCtx, searchResult.Dialer, testDomains, searchResult.ConfigSignature)
+		if err != nil {
+			return nil, err
+		}
+
+		return searchResult, err
 	})
 
 	if err != nil {
 		return nil, fmt.Errorf("could not find a working fallback: %w", err)
 	}
-	f.log("🏆 selected fallback '%v' in %0.2fs\n\n", fallback.Config, time.Since(raceStart).Seconds())
+	f.log("🏆 selected fallback '%v' in %0.2fs\n\n", fallback.ConfigSignature, time.Since(raceStart).Seconds())
 
 	return fallback.Dialer, nil
 }
