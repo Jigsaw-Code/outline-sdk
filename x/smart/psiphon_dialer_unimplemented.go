@@ -12,8 +12,6 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
-func newPsiphonDialer(finder *StrategyFinder, ctx context.Context, psiphonJSON []byte, psiphonSignature string) (transport.StreamDialer, error) {
-	finder.logCtx(ctx, "❌ Attempted to start psiphon tunnel %v but library was built without psiphon support. Please build using -tag psiphon.\n", psiphonSignature)
-
-	return nil, fmt.Errorf("to use psiphon configuration in x/smart the package must be built with the build tag `psiphon`: %w", errors.ErrUnsupported)
+func newPsiphonDialer(_ *StrategyFinder, _ context.Context, _ []byte) (transport.StreamDialer, error) {
+	return nil, fmt.Errorf("attempted to start psiphon tunnel but library was built without psiphon support. Please build using -tag psiphon: %w", errors.ErrUnsupported)
 }

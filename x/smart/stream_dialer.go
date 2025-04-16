@@ -363,7 +363,26 @@ type SearchResult struct {
 	ConfigSignature string
 }
 
-func (f *StrategyFinder) makeDialerFromConfig(ctx context.Context, configModule *configurl.ProviderContainer, fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
+// Returns a simplified string representation of the config for use in logging
+func (f *StrategyFinder) getConfigSignature(fallbackConfig fallbackEntryConfig) string {
+	switch v := fallbackConfig.(type) {
+	case string: // configurl
+		return v
+	case fallbackEntryStructConfig:
+		if v.Psiphon != nil {
+			psiphonCfg := v.Psiphon
+			psiphonJSON, err := json.Marshal(psiphonCfg)
+			if err != nil {
+				return fmt.Sprintf("Invalid Psiphon JSON: %v", psiphonCfg)
+			}
+			return f.getPsiphonConfigSignature(psiphonJSON)
+		}
+	}
+	return fmt.Sprintf("Unknown Config: %v", fallbackConfig)
+}
+
+// Make a fallback dialer (either from a configurl or a Psiphon config)
+func (f *StrategyFinder) makeDialerFromConfig(ctx context.Context, configModule *configurl.ProviderContainer, fallbackConfig fallbackEntryConfig) (transport.StreamDialer, error) {
 	switch v := fallbackConfig.(type) {
 	case string:
 		configUrl := v
@@ -371,7 +390,7 @@ func (f *StrategyFinder) makeDialerFromConfig(ctx context.Context, configModule 
 		if err != nil {
 			return nil, fmt.Errorf("getStreamDialer failed: %w", err)
 		}
-		return &SearchResult{dialer, v}, nil
+		return dialer, nil
 
 	case fallbackEntryStructConfig:
 		if v.Psiphon != nil {
@@ -380,13 +399,12 @@ func (f *StrategyFinder) makeDialerFromConfig(ctx context.Context, configModule 
 			if err != nil {
 				f.logCtx(ctx, "Error marshaling to JSON: %v, %v\n", psiphonCfg, err)
 			}
-			psiphonSignature := f.getPsiphonConfigSignature(psiphonJSON)
 
-			dialer, err := newPsiphonDialer(f, ctx, psiphonJSON, psiphonSignature)
+			dialer, err := newPsiphonDialer(f, ctx, psiphonJSON)
 			if err != nil {
-				return nil, fmt.Errorf("getPsiphonDialer failed: %w", err)
+				return nil, fmt.Errorf("newPsiphonDialer failed: %w", err)
 			}
-			return &SearchResult{dialer, psiphonSignature}, nil
+			return dialer, nil
 		} else {
 			return nil, fmt.Errorf("unknown fallback type: %v", fallbackConfig)
 		}
@@ -408,19 +426,21 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 	configModule := configurl.NewDefaultProviders()
 
 	fallback, err := raceTests(raceCtx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
-		searchResult, err := f.makeDialerFromConfig(ctx, configModule, fallbackConfig)
+		configSignature := f.getConfigSignature(fallbackConfig)
+
+		dialer, err := f.makeDialerFromConfig(ctx, configModule, fallbackConfig)
+		if err != nil {
+			f.logCtx(ctx, "❌ Failed to start dialer: %v %v\n", configSignature, err)
+			return nil, err
+		}
+
+		err = f.testDialer(raceCtx, dialer, testDomains, configSignature)
 		if err != nil {
 			return nil, err
 		}
 
-		err = f.testDialer(raceCtx, searchResult.Dialer, testDomains, searchResult.ConfigSignature)
-		if err != nil {
-			return nil, err
-		}
-
-		return searchResult, err
+		return &SearchResult{dialer, configSignature}, nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("could not find a working fallback: %w", err)
 	}
