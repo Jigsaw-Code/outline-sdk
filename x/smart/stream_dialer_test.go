@@ -64,7 +64,7 @@ fallback:
 		Fallback: []fallbackEntryConfig{
 			"ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1",
 			fallbackEntryStructConfig{
-				Psiphon: map[string]any {
+				Psiphon: map[string]any{
 					"PropagationChannelId": "FFFFFFFFFFFFFFFF",
 					"SponsorId":            "FFFFFFFFFFFFFFFF",
 				},
@@ -74,4 +74,62 @@ fallback:
 	}
 
 	require.Equal(t, expectedConfig, parsedConfig)
+}
+
+func TestParseConfig_YamlPsiphonConfig(t *testing.T) {
+	config := `
+fallback:
+  - psiphon: 
+      PropagationChannelId: FFFFFFFFFFFFFFFF
+      SponsorId: FFFFFFFFFFFFFFFF
+`
+	configBytes := []byte(config)
+	finder := &StrategyFinder{}
+	parsedConfig, err := finder.parseConfig(configBytes)
+	require.NoError(t, err)
+
+	expectedConfig := configConfig{
+		Fallback: []fallbackEntryConfig{
+			fallbackEntryStructConfig{
+				Psiphon: map[string]any{
+					"PropagationChannelId": "FFFFFFFFFFFFFFFF",
+					"SponsorId":            "FFFFFFFFFFFFFFFF",
+				},
+			},
+		},
+	}
+
+	require.Equal(t, expectedConfig, parsedConfig)
+}
+
+func Test_getPsiphonConfigSignature_ValidFields(t *testing.T) {
+	finder := &StrategyFinder{}
+	config := []byte(`{
+		"PropagationChannelId": "FFFFFFFFFFFFFFFF",
+		"SponsorId": "FFFFFFFFFFFFFFFF",
+		"ClientPlatform": "outline",
+		"ClientVersion": "1"
+	}`)
+	expected := "Psiphon: {PropagationChannelId: FFFFFFFFFFFFFFFF, SponsorId: FFFFFFFFFFFFFFFF, [...]}"
+	actual := finder.getPsiphonConfigSignature(config)
+	require.Equal(t, expected, actual)
+}
+
+func Test_getPsiphonConfigSignature_InvalidFields(t *testing.T) {
+	// If we don't understand the psiphon config we received for any reason
+	// then just output it as an opaque string
+
+	finder := &StrategyFinder{}
+	config := []byte(`{"ClientPlatform": "outline", "ClientVersion": "1"}`)
+	expected := `{"ClientPlatform": "outline", "ClientVersion": "1"}`
+	actual := finder.getPsiphonConfigSignature(config)
+	require.Equal(t, expected, actual)
+}
+
+func Test_getPsiphonConfigSignature_InvalidJson(t *testing.T) {
+	finder := &StrategyFinder{}
+	config := []byte(`invalid json`)
+	expected := `invalid json`
+	actual := finder.getPsiphonConfigSignature(config)
+	require.Equal(t, expected, actual)
 }

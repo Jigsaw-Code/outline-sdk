@@ -26,8 +26,7 @@ For testing, you can [generate a Psiphon config yourself].
 Psiphon code is licensed as GPLv3, which you will have to take into account if you incorporate Psiphon logic into your app.
 If you don't want your app to be GPL, consider acquiring an appropriate license when acquiring their services.
 
-Note that a few of Psiphon's dependencies may impose additional restrictions. For example, github.com/hashicorp/golang-lru is MPL-2.0
-and github.com/juju/ratelimit is LGPL-3.0. You can use [go-licenses] to analyze the licenses of your Go code dependencies.
+Note that a few of Psiphon's dependencies may impose additional restrictions. You can use [go-licenses] to analyze the licenses of your Go code dependencies.
 
 To prevent accidental inclusion of unvetted licenses, you must use the "psiphon" build tag in order to use this package. Typically you do that with
 "-tags psiphon".
