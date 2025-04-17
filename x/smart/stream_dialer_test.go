@@ -110,7 +110,7 @@ func Test_getPsiphonConfigSignature_ValidFields(t *testing.T) {
 		"ClientPlatform": "outline",
 		"ClientVersion": "1"
 	}`)
-	expected := "Psiphon: {PropagationChannelId: FFFFFFFFFFFFFFFF, SponsorId: FFFFFFFFFFFFFFFF}"
+	expected := "Psiphon: {PropagationChannelId: FFFFFFFFFFFFFFFF, SponsorId: FFFFFFFFFFFFFFFF, [...]}"
 	actual := finder.getPsiphonConfigSignature(config)
 	require.Equal(t, expected, actual)
 }
