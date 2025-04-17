@@ -196,7 +196,7 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryConfig) (dns.Reso
 // Takes a (potentially very long) psiphon config and outputs
 // a short signature string for logging identification purposes
 // with only the PropagationChannelId and SponsorId (required fields)
-// ex: {PropagationChannelId: FFFFFFFFFFFFFFFF, SponsorId: FFFFFFFFFFFFFFFF}
+// ex: {PropagationChannelId: FFFFFFFFFFFFFFFF, SponsorId: FFFFFFFFFFFFFFFF, [...]}
 // If the config does not contains these fields
 // output the whole config as a string
 func (f *StrategyFinder) getPsiphonConfigSignature(psiphonJSON []byte) string {
@@ -209,7 +209,7 @@ func (f *StrategyFinder) getPsiphonConfigSignature(psiphonJSON []byte) string {
 	sponsorId, ok2 := psiphonConfig["SponsorId"].(string)
 
 	if ok1 && ok2 {
-		return fmt.Sprintf("Psiphon: {PropagationChannelId: %v, SponsorId: %v}", propagationChannelId, sponsorId)
+		return fmt.Sprintf("Psiphon: {PropagationChannelId: %v, SponsorId: %v, [...]}", propagationChannelId, sponsorId)
 	}
 	return string(psiphonJSON)
 }
