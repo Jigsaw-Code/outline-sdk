@@ -430,7 +430,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 
 		dialer, err := f.makeDialerFromConfig(ctx, configModule, fallbackConfig)
 		if err != nil {
-			f.logCtx(ctx, "❌ Failed to start dialer: %v %v\n", configSignature, err)
+			f.logCtx(raceCtx, "❌ Failed to start dialer: %v %v\n", configSignature, err)
 			return nil, err
 		}
 

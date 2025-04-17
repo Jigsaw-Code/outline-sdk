@@ -29,8 +29,12 @@ func newPsiphonDialer(finder *StrategyFinder, ctx context.Context, psiphonJSON [
 	}
 	finder.logCtx(ctx, "Using data store in %v\n", config.DataRootDirectory)
 
+	// Create a new context that propagates the original context cancellation, but only during the construction.
+	startCtx, cancel := context.WithCancel(ctx)
+	context.AfterFunc(startCtx, cancel)
+
 	dialer := psiphon.GetSingletonDialer()
-	if err := dialer.Start(ctx, config); err != nil {
+	if err := dialer.Start(startCtx, config); err != nil {
 		return nil, fmt.Errorf("failed to start psiphon dialer: %w", err)
 	}
 
