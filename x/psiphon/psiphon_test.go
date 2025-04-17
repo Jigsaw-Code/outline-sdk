@@ -129,6 +129,37 @@ func TestDialer_Start_Cancelled(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 }
 
+func TestDialer_CancelledAfterStart_DoesntCloseTunnel(t *testing.T) {
+	tempDir, _ := os.MkdirTemp("", "psiphon")
+	cfg := &DialerConfig{
+		DataRootDirectory: tempDir,
+		ProviderConfig: json.RawMessage(`{
+			"SponsorId" : "DB4A6B5E997A4E48",
+			"PropagationChannelId" : "60F2A5F62855A295",
+
+			"ClientPlatform" : "outline",
+			"ClientVersion" : "1",
+
+			"DisableLocalSocksProxy" : true,
+			"DisableLocalHTTPProxy" : true,
+			"EmitDiagnosticNotices" : true,
+			"EstablishTunnelTimeoutSeconds" : 10,
+
+			"ObfuscatedServerListRootURLs" : [{"URL": "aHR0cHM6Ly9zMy5hbWF6b25hd3MuY29tL3BzaXBob24vd2ViL29jdmwtMG9iai1zMnZnL29zbA==", "OnlyAfterAttempts": 0, "SkipVerify": false}, {"URL": "aHR0cHM6Ly93d3cucmVzdWx0c3VuaXZlcnNhbHVubGltaXRlZGpoLmNvbS93ZWIvb2N2bC0wb2JqLXMydmcvb3Ns", "OnlyAfterAttempts": 2, "SkipVerify": true}, {"URL": "aHR0cHM6Ly93d3cuYnJhbmRpbmd1c2FnYW1lcmVwLmNvbS93ZWIvb2N2bC0wb2JqLXMydmcvb3Ns", "OnlyAfterAttempts": 2, "SkipVerify": true}, {"URL": "aHR0cHM6Ly93d3cuYmxvZ3NmbWNhbmNlcmNpdGl6ZW4uY29tL3dlYi9vY3ZsLTBvYmotczJ2Zy9vc2w=", "OnlyAfterAttempts": 2, "SkipVerify": true}],
+			"RemoteServerListURLs" : [{"URL": "aHR0cHM6Ly9zMy5hbWF6b25hd3MuY29tL3BzaXBob24vd2ViL29jdmwtMG9iai1zMnZnL3NlcnZlcl9saXN0X2NvbXByZXNzZWQ=", "OnlyAfterAttempts": 0, "SkipVerify": false}, {"URL": "aHR0cHM6Ly93d3cucmVzdWx0c3VuaXZlcnNhbHVubGltaXRlZGpoLmNvbS93ZWIvb2N2bC0wb2JqLXMydmcvc2VydmVyX2xpc3RfY29tcHJlc3NlZA==", "OnlyAfterAttempts": 2, "SkipVerify": true}, {"URL": "aHR0cHM6Ly93d3cuYnJhbmRpbmd1c2FnYW1lcmVwLmNvbS93ZWIvb2N2bC0wb2JqLXMydmcvc2VydmVyX2xpc3RfY29tcHJlc3NlZA==", "OnlyAfterAttempts": 2, "SkipVerify": true}, {"URL": "aHR0cHM6Ly93d3cuYmxvZ3NmbWNhbmNlcmNpdGl6ZW4uY29tL3dlYi9vY3ZsLTBvYmotczJ2Zy9zZXJ2ZXJfbGlzdF9jb21wcmVzc2Vk", "OnlyAfterAttempts": 2, "SkipVerify": true}],
+			"RemoteServerListSignaturePublicKey" : "MIICIDANBgkqhkiG9w0BAQEFAAOCAg0AMIICCAKCAgEAt7Ls+/39r+T6zNW7GiVpJfzq/xvL9SBH5rIFnk0RXYEYavax3WS6HOD35eTAqn8AniOwiH+DOkvgSKF2caqk/y1dfq47Pdymtwzp9ikpB1C5OfAysXzBiwVJlCdajBKvBZDerV1cMvRzCKvKwRmvDmHgphQQ7WfXIGbRbmmk6opMBh3roE42KcotLFtqp0RRwLtcBRNtCdsrVsjiI1Lqz/lH+T61sGjSjQ3CHMuZYSQJZo/KrvzgQXpkaCTdbObxHqb6/+i1qaVOfEsvjoiyzTxJADvSytVtcTjijhPEV6XskJVHE1Zgl+7rATr/pDQkw6DPCNBS1+Y6fy7GstZALQXwEDN/qhQI9kWkHijT8ns+i1vGg00Mk/6J75arLhqcodWsdeG/M/moWgqQAnlZAGVtJI1OgeF5fsPpXu4kctOfuZlGjVZXQNW34aOzm8r8S0eVZitPlbhcPiR4gT/aSMz/wd8lZlzZYsje/Jr8u/YtlwjjreZrGRmG8KMOzukV3lLmMppXFMvl4bxv6YFEmIuTsOhbLTwFgh7KYNjodLj/LsqRVfwz31PgWQFTEPICV7GCvgVlPRxnofqKSjgTWI4mxDhBpVcATvaoBl1L/6WLbFvBsoAUBItWwctO2xalKxF5szhGm8lccoc5MZr8kfE0uxMgsxz4er68iCID+rsCAQM=",
+			"ServerEntrySignaturePublicKey" : "sHuUVTWaRyh5pZwy4UguSgkwmBe0EHtJJkoF5WrxmvA=",
+
+			"TargetApiProtocol" : "ssh"
+		}`),
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	dialer := GetSingletonDialer()
+	dialer.Start(ctx, cfg)
+	cancel()
+	require.NotNil(t, dialer.tunnel)
+}
+
 func TestDialer_Start_Timeout(t *testing.T) {
 	cfg, delete := newTestConfig(t)
 	defer delete()
@@ -139,7 +170,7 @@ func TestDialer_Start_Timeout(t *testing.T) {
 		errCh <- GetSingletonDialer().Start(ctx, cfg)
 	}()
 	err := <-errCh
-	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 type errorTunnel struct {

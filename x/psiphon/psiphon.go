@@ -133,7 +133,7 @@ func (d *Dialer) Start(startCtx context.Context, config *DialerConfig) error {
 		}
 
 		// startCtx is intended for the lifetime of the startup.
-		// dialerCtx is intented for the lifetime of the tunnel.
+		// dialerCtx is intended for the lifetime of the tunnel.
 		dialerCtx, dialerCancel := context.WithCancel(context.Background())
 		defer dialerCancel()
 
