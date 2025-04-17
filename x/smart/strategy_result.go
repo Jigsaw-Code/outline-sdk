@@ -14,7 +14,14 @@
 
 package smart
 
-import "time"
+import (
+	"bytes"
+
+	"github.com/goccy/go-yaml"
+)
+
+// StrategyResultCacheKey is the key associated with a strategy result in [StrategyResultCache].
+const StrategyResultCacheKey = "smart-strategy-result"
 
 // StrategyResultCache is a cache of strategy results that can be used by [StrategyFinder]
 // to resume a strategy efficiently.
@@ -41,8 +48,40 @@ type winningStrategy struct {
 type strategyResult struct {
 	// Winner contains the details of the winning strategy.
 	Winner *winningStrategy `yaml:"winner"`
+}
 
-	// Timestamp records when this result was generated.
-	// Useful for potential TTL implementations.
-	Timestamp time.Time `yaml:"timestamp"`
+// marshalStrategyResultToCache stores the given strategyResult in the cache.
+// If called with nil result, it removes the entry from the cache.
+func marshalStrategyResultToCache(cache StrategyResultCache, result *strategyResult) bool {
+	if cache == nil {
+		return false
+	}
+	if result == nil {
+		cache.Put(StrategyResultCacheKey, "")
+		return true
+	}
+	data, err := yaml.Marshal(result)
+	if err != nil {
+		return false
+	}
+	cache.Put(StrategyResultCacheKey, string(data))
+	return true
+}
+
+// unmarshalStrategyResultFromCache retrieves a cached strategy result from the cache.
+// It returns nil and false if no valid strategy results are found in the cache.
+func unmarshalStrategyResultFromCache(cache StrategyResultCache) (*strategyResult, bool) {
+	if cache == nil {
+		return nil, false
+	}
+	data, ok := cache.Get(StrategyResultCacheKey)
+	if !ok || data == "" {
+		return nil, false
+	}
+	result := &strategyResult{}
+	decoder := yaml.NewDecoder(bytes.NewReader([]byte(data)), yaml.DisallowUnknownField())
+	if err := decoder.Decode(result); err != nil {
+		return nil, false
+	}
+	return result, true
 }
