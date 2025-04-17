@@ -428,16 +428,31 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 	fallback, err := raceTests(raceCtx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
 		configSignature := f.getConfigSignature(fallbackConfig)
 
-		dialer, err := f.makeDialerFromConfig(ctx, configModule, fallbackConfig)
+		// dialer.Start needs a long lived context for Psiphon to run in the background
+		startDialerCtx, startDialerCancel := context.WithCancel(context.Background())
+
+		dialer, err := f.makeDialerFromConfig(startDialerCtx, configModule, fallbackConfig)
 		if err != nil {
-			f.logCtx(ctx, "❌ Failed to start dialer: %v %v\n", configSignature, err)
+			startDialerCancel()
+			f.logCtx(raceCtx, "❌ Failed to start dialer: %v %v\n", configSignature, err)
 			return nil, err
 		}
 
 		err = f.testDialer(raceCtx, dialer, testDomains, configSignature)
 		if err != nil {
+			startDialerCancel()
 			return nil, err
 		}
+
+		// If ctx is cancelled while we're still in this function then cancel Start
+		select {
+		case <-raceCtx.Done():
+			startDialerCancel()
+			return nil, ctx.Err()
+		default:
+		}
+
+		// If startDialerCancel is not cancelled by here then it never cancels
 
 		return &SearchResult{dialer, configSignature}, nil
 	})

@@ -30,7 +30,8 @@ func newPsiphonDialer(finder *StrategyFinder, ctx context.Context, psiphonJSON [
 	finder.logCtx(ctx, "Using data store in %v\n", config.DataRootDirectory)
 
 	dialer := psiphon.GetSingletonDialer()
-	if err := dialer.Start(ctx, config); err != nil {
+	err = dialer.Start(ctx, config)
+	if err != nil {
 		return nil, fmt.Errorf("failed to start psiphon dialer: %w", err)
 	}
 
