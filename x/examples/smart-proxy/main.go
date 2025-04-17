@@ -119,7 +119,10 @@ func main() {
 
 	fmt.Println("Finding strategy")
 	startTime := time.Now()
-	dialer, err := finder.NewDialer(context.Background(), domainsFlag, finderConfig)
+	findCtx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
+	dialer, err := finder.NewDialer(findCtx, domainsFlag, finderConfig)
 	if err != nil {
 		log.Fatalf("Failed to find dialer: %v\n", err)
 	}
