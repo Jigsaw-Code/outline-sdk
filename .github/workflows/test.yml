@@ -63,3 +63,6 @@ jobs:
       - name: Test x
         # Enable nettests, which executes external network requests.
         run: go test -C x -tags nettest,psiphon -race -bench '.' ./... -benchtime=100ms
+
+      - name: Integration Tests in X
+        run: go test -C x/smart -tags nettest,integration,psiphon ./...
