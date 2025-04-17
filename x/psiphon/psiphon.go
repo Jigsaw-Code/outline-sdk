@@ -101,7 +101,7 @@ func getClientPlatform() string {
 // Allows for overriding in tests.
 var startTunnel func(ctx context.Context, config *DialerConfig) (psiphonTunnel, error) = psiphonStartTunnel
 
-func psiphonStartTunnel(ctx context.Context, config *DialerConfig) (psiphonTunnel, error) {
+func psiphonStartTunnel(tunnelCtx context.Context, config *DialerConfig) (psiphonTunnel, error) {
 	if config == nil {
 		return nil, errors.New("config must not be nil")
 	}
@@ -117,11 +117,11 @@ func psiphonStartTunnel(ctx context.Context, config *DialerConfig) (psiphonTunne
 		DisableLocalHTTPProxy:  &trueValue,
 	}
 
-	return clientlib.StartTunnel(ctx, config.ProviderConfig, "", params, nil, nil)
+	return clientlib.StartTunnel(tunnelCtx, config.ProviderConfig, "", params, nil, nil)
 }
 
 // Start configures and runs the Dialer. It must be called before you can use the Dialer. It returns when the tunnel is ready.
-func (d *Dialer) Start(ctx context.Context, config *DialerConfig) error {
+func (d *Dialer) Start(startCtx context.Context, config *DialerConfig) error {
 	resultCh := make(chan error)
 	go func() {
 		d.mu.Lock()
@@ -132,13 +132,23 @@ func (d *Dialer) Start(ctx context.Context, config *DialerConfig) error {
 			return
 		}
 
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
+		// startCtx is intended for the lifetime of the startup.
+		// dialerCtx is intented for the lifetime of the tunnel.
+		dialerCtx, dialerCancel := context.WithCancel(context.Background())
+		defer dialerCancel()
+
+		// This ties startCtx and dialerCtx together
+		// so dialerCtx will be cancelled if startCtx is cancelled.
+		// We run detatchContexts after startTunnel to disconnect them.
+		detatchContexts := context.AfterFunc(startCtx, func() {
+			dialerCancel()
+		})
+
 		tunnelDone := make(chan struct{})
 		defer close(tunnelDone)
 		d.stop = func() {
 			// Tell start to stop.
-			cancel()
+			dialerCancel()
 			// Wait for tunnel to be done.
 			<-tunnelDone
 		}
@@ -148,13 +158,13 @@ func (d *Dialer) Start(ctx context.Context, config *DialerConfig) error {
 		}()
 
 		d.mu.Unlock()
-
-		tunnel, err := startTunnel(ctx, config)
+		tunnel, err := startTunnel(dialerCtx, config)
 
 		d.mu.Lock()
+		detatchContexts()
 
-		if ctx.Err() != nil {
-			err = context.Cause(ctx)
+		if dialerCtx.Err() != nil {
+			err = context.Cause(dialerCtx)
 		}
 		if err != nil {
 			resultCh <- err
@@ -169,7 +179,7 @@ func (d *Dialer) Start(ctx context.Context, config *DialerConfig) error {
 
 		d.mu.Unlock()
 		// wait for Stop
-		<-ctx.Done()
+		<-dialerCtx.Done()
 		d.mu.Lock()
 	}()
 	return <-resultCh
