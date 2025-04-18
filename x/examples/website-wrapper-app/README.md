@@ -130,12 +130,16 @@ npm run start -- --platform=ios --entryUrl="https://www.example.com" \
   --navigatorToken="<YOUR_NGROK_AUTH_TOKEN>" --navigatorPath="/nav"
 ```
 
+The command will open a web wrapper project in XCode so you can view the demo site there.
+
 ### Android
 
 ```sh
 npm run start -- --platform=android  --entryUrl="https://www.example.com" \
   --navigatorToken="<YOUR_NGROK_AUTH_TOKEN>" --navigatorPath="/nav"
 ```
+
+The command will open a web wrapper project in Android Studio so you can view the demo site there.
 
 ## Available Configuration Options
 
