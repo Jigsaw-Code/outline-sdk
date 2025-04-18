@@ -14,14 +14,7 @@
 
 package smart
 
-import (
-	"bytes"
-
-	"github.com/goccy/go-yaml"
-)
-
-// StrategyResultCacheKey is the key associated with a strategy result in [StrategyResultCache].
-const StrategyResultCacheKey = "smart-strategy-result"
+import "github.com/goccy/go-yaml"
 
 // StrategyResultCache is a cache of strategy results that can be used by [StrategyFinder]
 // to resume a strategy efficiently.
@@ -36,51 +29,46 @@ type StrategyResultCache interface {
 	Put(key string, value string)
 }
 
-// winningStrategy contains the detailed configurations of a winning strategy.
+const WinningStrategyCacheKey = "winning_strategy"
+
+type proxylessEntryConfig struct {
+	DNS *dnsEntryConfig `yaml:"dns,omitempty"`
+	TLS string          `yaml:"tls,omitempty"`
+}
+
 type winningStrategy struct {
-	DNS      *dnsEntryConfig     `yaml:"dns,omitempty"`
-	TLS      string              `yaml:"tls,omitempty"`
-	Fallback fallbackEntryConfig `yaml:"fallback,omitempty"`
+	Proxyless *proxylessEntryConfig `yaml:"proxyless,omitempty"`
+	Fallback  fallbackEntryConfig   `yaml:"fallback,omitempty"`
 }
 
-// strategyResult holds the details of a successful strategy found by [StrategyFinder].
-// It is designed to be serializable to YAML for caching.
-type strategyResult struct {
-	// Winner contains the details of the winning strategy.
-	Winner *winningStrategy `yaml:"winner"`
-}
-
-// marshalStrategyResultToCache stores the given strategyResult in the cache.
-// If called with nil result, it removes the entry from the cache.
-func marshalStrategyResultToCache(cache StrategyResultCache, result *strategyResult) bool {
+func marshalWinningStrategyToCache(cache StrategyResultCache, winner *winningStrategy) bool {
 	if cache == nil {
 		return false
 	}
-	if result == nil {
-		cache.Put(StrategyResultCacheKey, "")
+	if winner == nil {
+		cache.Put(WinningStrategyCacheKey, "")
 		return true
 	}
-	data, err := yaml.Marshal(result)
+
+	data, err := yaml.MarshalWithOptions(winner, yaml.Flow(true))
 	if err != nil {
 		return false
 	}
-	cache.Put(StrategyResultCacheKey, string(data))
+	cache.Put(WinningStrategyCacheKey, string(data))
 	return true
 }
 
-// unmarshalStrategyResultFromCache retrieves a cached strategy result from the cache.
-// It returns nil and false if no valid strategy results are found in the cache.
-func unmarshalStrategyResultFromCache(cache StrategyResultCache) (*strategyResult, bool) {
+func unmarshalWinningStrategyFromCache(cache StrategyResultCache) (*winningStrategy, bool) {
 	if cache == nil {
 		return nil, false
 	}
-	data, ok := cache.Get(StrategyResultCacheKey)
+	data, ok := cache.Get(WinningStrategyCacheKey)
 	if !ok || data == "" {
 		return nil, false
 	}
-	result := &strategyResult{}
-	decoder := yaml.NewDecoder(bytes.NewReader([]byte(data)), yaml.DisallowUnknownField())
-	if err := decoder.Decode(result); err != nil {
+
+	result := &winningStrategy{}
+	if yaml.UnmarshalWithOptions([]byte(data), result, yaml.DisallowUnknownField()) != nil {
 		return nil, false
 	}
 	return result, true
