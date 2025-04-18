@@ -55,17 +55,6 @@ Then, run the following command to generate and place the assets in the appropri
 npx capacitor-assets generate --ios
 ```
 
-### Viewing your site in the example navigation iframe
-
-Many sites don't handle their own navigation - if this applies to you, you can run a proxy to demonstrate what your site would look like in an example same-origin navigation iframe.
-
-* You will need an [ngrok account](https://ngrok.com/), from which you can get your [`--navigatorToken`](https://dashboard.ngrok.com/get-started/your-authtoken)
-
-```sh
-npm run start -- --platform=ios --entryUrl="https://www.example.com" \
-  --navigatorToken="<YOUR_NGROK_AUTH_TOKEN>" --navigatorPath="/nav"
-```
-
 ### Publishing your app in the App Store
 
 [Follow these instructions on how to publish your app for beta testing and the App Store.](https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases)
@@ -112,20 +101,41 @@ Then, run the following command to generate and place the assets in the appropri
 npx capacitor-assets generate --android
 ```
 
-### Viewing your site in the example navigation iframe
+### Publishing your app in the Google Play Store
+
+[Follow these instructions to learn how to publish your app to the Google Play Store](https://developer.android.com/studio/publish)
+
+## Available Configuration Options
+
+| Option              | Description                                                                     | Possible Values          |
+| ------------------- | ------------------------------------------------------------------------------- | ------------------------ |
+| `--platform`        | **(Required)** Specifies the target platform for the build.                                    | `"ios"` or `"android"`   |
+| `--entryUrl`     | **(Required)** The primary url of your website.                                             | Any valid url    |
+| `--appId`           | The unique identifier for the app (e.g., iOS Bundle ID, Android Application ID). | A reverse domain name string (e.g., `com.company.appname`) |
+| `--appName`         | The user-visible name of the application.                                       | Any valid application name string (e.g., "My Awesome App") |
+| `--output`          | The directory where the generated app project files will be saved.              | A valid, absolute file path (e.g., `/users/me/my-generated-app`) |
+| `--additionalDomains` | A list of other domains that should be accessible within the app.               | Comma-separated domains |
+| `--smartDialerConfig` | A JSON string containing the configuration for the [smart dialer feature](../../smart#yaml-config-for-the-smart-dialer).       | Valid JSON string       |
+
+## Viewing your site in the example navigation iframe
 
 Many sites don't handle their own navigation - if this applies to you, you can run a proxy to demonstrate what your site would look like in an example same-origin navigation iframe.
 
 * You will need an [ngrok account](https://ngrok.com/), from which you can get your [`--navigatorToken`](https://dashboard.ngrok.com/get-started/your-authtoken)
 
+### iOS
+
+```sh
+npm run start -- --platform=ios --entryUrl="https://www.example.com" \
+  --navigatorToken="<YOUR_NGROK_AUTH_TOKEN>" --navigatorPath="/nav"
+```
+
+### Android
+
 ```sh
 npm run start -- --platform=android  --entryUrl="https://www.example.com" \
   --navigatorToken="<YOUR_NGROK_AUTH_TOKEN>" --navigatorPath="/nav"
 ```
-
-### Publishing your app in the Google Play Store
-
-[Follow these instructions to learn how to publish your app to the Google Play Store](https://developer.android.com/studio/publish)
 
 ## Available Configuration Options
 
@@ -153,3 +163,4 @@ When encountering an issue, the first thing you'll want to do is run the doctor 
 
 > [!NOTE]
 > TODO: compile a list of commonly occuring issues.
+
