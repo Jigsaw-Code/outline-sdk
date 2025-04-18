@@ -29,6 +29,8 @@ type StrategyResultCache interface {
 	Put(key string, value string)
 }
 
+// WinningStrategyCacheKey is the key for storing the winning strategy in the
+// [StrategyResultCache] each time [StrategyFinder].NewDialer is invoked.
 const WinningStrategyCacheKey = "winning_strategy"
 
 type proxylessEntryConfig struct {
@@ -71,5 +73,17 @@ func unmarshalWinningStrategyFromCache(cache StrategyResultCache) (*winningStrat
 	if yaml.UnmarshalWithOptions([]byte(data), result, yaml.DisallowUnknownField()) != nil {
 		return nil, false
 	}
+
+	// Convert to strongly typed fallback config
+	if result.Fallback != nil {
+		if v, ok := result.Fallback.(map[string]any); ok {
+			var fallbackEntry fallbackEntryStructConfig
+			if mapToAny(v, &fallbackEntry) != nil {
+				return nil, false
+			}
+			result.Fallback = fallbackEntry
+		}
+	}
+
 	return result, true
 }

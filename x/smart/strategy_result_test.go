@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStrategyResult_Serialization_WinnerDNS(t *testing.T) {
+func TestWinningStrategy_MarshalDNS(t *testing.T) {
 	cases := []struct {
 		name string
 		conf *dnsEntryConfig
@@ -60,7 +60,7 @@ func TestStrategyResult_Serialization_WinnerDNS(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		t.Run("Marshal"+tc.name, func(t *testing.T) {
+		t.Run("Marshal_"+tc.name, func(t *testing.T) {
 			cache := newMockCache()
 			result := &winningStrategy{
 				Proxyless: &proxylessEntryConfig{
@@ -71,7 +71,7 @@ func TestStrategyResult_Serialization_WinnerDNS(t *testing.T) {
 			require.True(t, ok)
 			require.Equal(t, tc.yaml, strings.TrimSpace(cache.entries[WinningStrategyCacheKey]))
 		})
-		t.Run("Unmarshal"+tc.name, func(t *testing.T) {
+		t.Run("Unmarshal_"+tc.name, func(t *testing.T) {
 			cache := newMockCache()
 			cache.entries[WinningStrategyCacheKey] = tc.yaml
 			actual, ok := unmarshalWinningStrategyFromCache(cache)
@@ -80,6 +80,102 @@ func TestStrategyResult_Serialization_WinnerDNS(t *testing.T) {
 			require.Equal(t, tc.conf, actual.Proxyless.DNS)
 			require.Empty(t, actual.Proxyless.TLS)
 			require.Nil(t, actual.Fallback)
+		})
+	}
+}
+
+func TestWinningStrategy_MarshalTLS(t *testing.T) {
+	cases := []struct {
+		name    string
+		dnsConf *dnsEntryConfig
+		tlsConf string
+		yaml    string
+	}{
+		{
+			name:    "Split&NilDNS",
+			dnsConf: nil,
+			tlsConf: "split:5",
+			yaml:    `{proxyless: {tls: "split:5"}}`,
+		},
+		{
+			name:    "TLSFrag&SysDNS",
+			dnsConf: &dnsEntryConfig{System: &struct{}{}},
+			tlsConf: "tlsfrag:8",
+			yaml:    `{proxyless: {dns: {system: {}}, tls: "tlsfrag:8"}}`,
+		},
+		{
+			name:    "Pipe&DoH",
+			dnsConf: &dnsEntryConfig{HTTPS: &httpsEntryConfig{Name: "mitm-software.badssl.com"}},
+			tlsConf: "split:314|tlsfrag:159",
+			yaml:    `{proxyless: {dns: {https: {name: mitm-software.badssl.com}}, tls: "split:314|tlsfrag:159"}}`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run("Marshal_"+tc.name, func(t *testing.T) {
+			cache := newMockCache()
+			result := &winningStrategy{
+				Proxyless: &proxylessEntryConfig{
+					DNS: tc.dnsConf,
+					TLS: tc.tlsConf,
+				},
+			}
+			ok := marshalWinningStrategyToCache(cache, result)
+			require.True(t, ok)
+			require.Equal(t, tc.yaml, strings.TrimSpace(cache.entries[WinningStrategyCacheKey]))
+		})
+		t.Run("Unmarshal_"+tc.name, func(t *testing.T) {
+			cache := newMockCache()
+			cache.entries[WinningStrategyCacheKey] = tc.yaml
+			actual, ok := unmarshalWinningStrategyFromCache(cache)
+			require.True(t, ok)
+			require.NotNil(t, actual.Proxyless)
+			require.Equal(t, tc.dnsConf, actual.Proxyless.DNS)
+			require.Equal(t, tc.tlsConf, actual.Proxyless.TLS)
+			require.Nil(t, actual.Fallback)
+		})
+	}
+}
+
+func TestWinningStrategy_MarshalFallback(t *testing.T) {
+	cases := []struct {
+		name string
+		conf fallbackEntryConfig
+		yaml string
+	}{
+		{
+			name: "Shadowsocks",
+			conf: "ss://Y2hhY2hh@1.2.3.4:9999/?outline=1",
+			yaml: `{fallback: "ss://Y2hhY2hh@1.2.3.4:9999/?outline=1"}`,
+		},
+		{
+			name: "StructPsiphon",
+			conf: fallbackEntryStructConfig{
+				Psiphon: map[string]any{
+					"PropagationChannelId": "42",
+					"SponsorId":            "TBD",
+				},
+			},
+			yaml: `{fallback: {psiphon: {PropagationChannelId: "42", SponsorId: TBD}}}`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run("Marshal"+tc.name, func(t *testing.T) {
+			cache := newMockCache()
+			result := &winningStrategy{Fallback: tc.conf}
+			ok := marshalWinningStrategyToCache(cache, result)
+			require.True(t, ok)
+			require.Equal(t, tc.yaml, strings.TrimSpace(cache.entries[WinningStrategyCacheKey]))
+		})
+		t.Run("Unmarshal"+tc.name, func(t *testing.T) {
+			cache := newMockCache()
+			cache.entries[WinningStrategyCacheKey] = tc.yaml
+			actual, ok := unmarshalWinningStrategyFromCache(cache)
+			require.True(t, ok)
+			require.NotNil(t, actual.Fallback)
+			require.Equal(t, tc.conf, actual.Fallback)
+			require.Nil(t, actual.Proxyless)
 		})
 	}
 }
