@@ -124,7 +124,7 @@ Many sites don't handle their own navigation - if this applies to you, you can r
 * You will need an [ngrok account](https://ngrok.com/), from which you can get your [`--navigatorToken`](https://dashboard.ngrok.com/get-started/your-authtoken)
 
 ```sh
-npm run start -- --entryUrl="https://www.example.com" \
+npm run start:navigator -- --entryUrl="https://www.example.com" \
   --navigatorToken="<YOUR_NGROK_AUTH_TOKEN>" --navigatorPath="/nav"
 ```
 
