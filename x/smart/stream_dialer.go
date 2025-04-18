@@ -448,15 +448,14 @@ func (f *StrategyFinder) newProxylessDialer(
 	if err != nil {
 		return nil, nil, "", err
 	}
-	var dnsDialer transport.StreamDialer
 	if resolver == nil {
 		if _, ok := f.StreamDialer.(*transport.TCPDialer); !ok {
 			return nil, nil, "", fmt.Errorf("cannot use system resolver with base dialer of type %T", f.StreamDialer)
 		}
-		dnsDialer = f.StreamDialer
+		sd = f.StreamDialer
 	} else {
 		resolver = newSimpleLRUCacheResolver(resolver, 100)
-		dnsDialer, err = dns.NewStreamDialer(resolver, f.StreamDialer)
+		sd, err = dns.NewStreamDialer(resolver, f.StreamDialer)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf("dns.NewStreamDialer failed: %w", err)
 		}
