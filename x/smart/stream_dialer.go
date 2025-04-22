@@ -42,8 +42,7 @@ type StrategyFinder struct {
 	StreamDialer transport.StreamDialer
 	PacketDialer transport.PacketDialer
 	Cache        StrategyResultCache
-
-	logMu sync.Mutex
+	logMu        sync.Mutex
 }
 
 func (f *StrategyFinder) log(format string, a ...any) {
@@ -408,30 +407,33 @@ func (f *StrategyFinder) findFallback(
 // Attempts to create a new Dialer using only proxyless (DNS and TLS) strategies
 func (f *StrategyFinder) newProxylessDialer(
 	ctx context.Context, testDomains []string, config configConfig,
-) (sd transport.StreamDialer, dnsConfig *dnsEntryConfig, tlsConfig string, err error) {
+) (transport.StreamDialer, *dnsEntryConfig, string, error) {
 	resolver, dnsConfig, err := f.findDNS(ctx, testDomains, config.DNS)
 	if err != nil {
-		return
+		return nil, nil, "", err
 	}
+	var dnsDialer transport.StreamDialer
 	if resolver == nil {
 		if _, ok := f.StreamDialer.(*transport.TCPDialer); !ok {
-			err = fmt.Errorf("cannot use system resolver with base dialer of type %T", f.StreamDialer)
-			return
+			return nil, nil, "", fmt.Errorf("cannot use system resolver with base dialer of type %T", f.StreamDialer)
 		}
-		sd = f.StreamDialer
+		dnsDialer = f.StreamDialer
 	} else {
 		resolver = newSimpleLRUCacheResolver(resolver, 100)
-		sd, err = dns.NewStreamDialer(resolver, f.StreamDialer)
+		dnsDialer, err = dns.NewStreamDialer(resolver, f.StreamDialer)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf("dns.NewStreamDialer failed: %w", err)
 		}
 	}
 
 	if len(config.TLS) == 0 {
-		return
+		return dnsDialer, dnsConfig, "", nil
 	}
-	sd, tlsConfig, err = f.findTLS(ctx, testDomains, sd, config.TLS)
-	return
+	sd, tlsConfig, err := f.findTLS(ctx, testDomains, dnsDialer, config.TLS)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	return sd, dnsConfig, tlsConfig, err
 }
 
 func (f *StrategyFinder) parseConfig(configBytes []byte) (configConfig, error) {

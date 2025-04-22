@@ -69,11 +69,11 @@ func TestWinningStrategy_MarshalDNS(t *testing.T) {
 			}
 			ok := marshalWinningStrategyToCache(cache, result)
 			require.True(t, ok)
-			require.Equal(t, tc.yaml, strings.TrimSpace(cache.entries[winningStrategyCacheKey]))
+			cache.expectExistIgnoreSpace(t, winningStrategyCacheKey, tc.yaml)
 		})
 		t.Run("Unmarshal_"+tc.name, func(t *testing.T) {
 			cache := newMockCache()
-			cache.entries[winningStrategyCacheKey] = tc.yaml
+			cache.entries[winningStrategyCacheKey] = []byte(tc.yaml)
 			actual, ok := unmarshalWinningStrategyFromCache(cache)
 			require.True(t, ok)
 			require.NotNil(t, actual.Proxyless)
@@ -122,11 +122,11 @@ func TestWinningStrategy_MarshalTLS(t *testing.T) {
 			}
 			ok := marshalWinningStrategyToCache(cache, result)
 			require.True(t, ok)
-			require.Equal(t, tc.yaml, strings.TrimSpace(cache.entries[winningStrategyCacheKey]))
+			cache.expectExistIgnoreSpace(t, winningStrategyCacheKey, tc.yaml)
 		})
 		t.Run("Unmarshal_"+tc.name, func(t *testing.T) {
 			cache := newMockCache()
-			cache.entries[winningStrategyCacheKey] = tc.yaml
+			cache.entries[winningStrategyCacheKey] = []byte(tc.yaml)
 			actual, ok := unmarshalWinningStrategyFromCache(cache)
 			require.True(t, ok)
 			require.NotNil(t, actual.Proxyless)
@@ -166,11 +166,11 @@ func TestWinningStrategy_MarshalFallback(t *testing.T) {
 			result := &winningStrategy{Fallback: tc.conf}
 			ok := marshalWinningStrategyToCache(cache, result)
 			require.True(t, ok)
-			require.Equal(t, tc.yaml, strings.TrimSpace(cache.entries[winningStrategyCacheKey]))
+			cache.expectExistIgnoreSpace(t, winningStrategyCacheKey, tc.yaml)
 		})
 		t.Run("Unmarshal"+tc.name, func(t *testing.T) {
 			cache := newMockCache()
-			cache.entries[winningStrategyCacheKey] = tc.yaml
+			cache.entries[winningStrategyCacheKey] = []byte(tc.yaml)
 			actual, ok := unmarshalWinningStrategyFromCache(cache)
 			require.True(t, ok)
 			require.NotNil(t, actual.Fallback)
@@ -183,18 +183,24 @@ func TestWinningStrategy_MarshalFallback(t *testing.T) {
 // --- Helpers ---
 
 type mockCache struct {
-	entries map[string]string
+	entries map[string][]byte
 }
 
 func newMockCache() *mockCache {
-	return &mockCache{entries: make(map[string]string)}
+	return &mockCache{entries: make(map[string][]byte)}
 }
 
-func (c *mockCache) Get(key string) (string, bool) {
+func (c *mockCache) Get(key string) ([]byte, bool) {
 	v, ok := c.entries[key]
 	return v, ok
 }
 
-func (c *mockCache) Put(key string, value string) {
+func (c *mockCache) Put(key string, value []byte) {
 	c.entries[key] = value
+}
+
+func (c *mockCache) expectExistIgnoreSpace(t *testing.T, key string, val string) {
+	v, ok := c.entries[key]
+	require.True(t, ok)
+	require.Equal(t, val, strings.TrimSpace(string(v)))
 }
