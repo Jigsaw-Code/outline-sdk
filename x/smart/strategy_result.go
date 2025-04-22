@@ -21,17 +21,17 @@ import "github.com/goccy/go-yaml"
 // Implementations are expected to be called concurrently from different goroutines.
 type StrategyResultCache interface {
 	// Get retrieves a strategy result value associated with the given key.
-	// It returns the value and true if found.
-	Get(key string) (value string, ok bool)
+	// It returns the value text encoded in UTF-8 and true if found.
+	Get(key string) (value []byte, ok bool)
 
-	// Put adds the strategy result value to the cache with the given key.
-	// If called with an empty value string, it should remove the cache entry.
-	Put(key string, value string)
+	// Put adds the strategy result value encoded in UTF-8 to the cache with the given key.
+	// If called with nil value, it should remove the cache entry.
+	Put(key string, value []byte)
 }
 
-// WinningStrategyCacheKey is the key for storing the winning strategy in the
+// winningStrategyCacheKey is the key for storing the winning strategy in the
 // [StrategyResultCache] each time [StrategyFinder].NewDialer is invoked.
-const WinningStrategyCacheKey = "winning_strategy"
+const winningStrategyCacheKey = "winning_strategy"
 
 type proxylessEntryConfig struct {
 	DNS *dnsEntryConfig `yaml:"dns,omitempty"`
@@ -48,7 +48,7 @@ func marshalWinningStrategyToCache(cache StrategyResultCache, winner *winningStr
 		return false
 	}
 	if winner == nil {
-		cache.Put(WinningStrategyCacheKey, "")
+		cache.Put(winningStrategyCacheKey, nil)
 		return true
 	}
 
@@ -56,7 +56,7 @@ func marshalWinningStrategyToCache(cache StrategyResultCache, winner *winningStr
 	if err != nil {
 		return false
 	}
-	cache.Put(WinningStrategyCacheKey, string(data))
+	cache.Put(winningStrategyCacheKey, data)
 	return true
 }
 
@@ -64,8 +64,8 @@ func unmarshalWinningStrategyFromCache(cache StrategyResultCache) (*winningStrat
 	if cache == nil {
 		return nil, false
 	}
-	data, ok := cache.Get(WinningStrategyCacheKey)
-	if !ok || data == "" {
+	data, ok := cache.Get(winningStrategyCacheKey)
+	if !ok || len(data) == 0 {
 		return nil, false
 	}
 

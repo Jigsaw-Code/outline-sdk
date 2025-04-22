@@ -69,11 +69,11 @@ func TestWinningStrategy_MarshalDNS(t *testing.T) {
 			}
 			ok := marshalWinningStrategyToCache(cache, result)
 			require.True(t, ok)
-			require.Equal(t, tc.yaml, strings.TrimSpace(cache.entries[WinningStrategyCacheKey]))
+			require.Equal(t, tc.yaml, strings.TrimSpace(cache.entries[winningStrategyCacheKey]))
 		})
 		t.Run("Unmarshal_"+tc.name, func(t *testing.T) {
 			cache := newMockCache()
-			cache.entries[WinningStrategyCacheKey] = tc.yaml
+			cache.entries[winningStrategyCacheKey] = tc.yaml
 			actual, ok := unmarshalWinningStrategyFromCache(cache)
 			require.True(t, ok)
 			require.NotNil(t, actual.Proxyless)
@@ -122,11 +122,11 @@ func TestWinningStrategy_MarshalTLS(t *testing.T) {
 			}
 			ok := marshalWinningStrategyToCache(cache, result)
 			require.True(t, ok)
-			require.Equal(t, tc.yaml, strings.TrimSpace(cache.entries[WinningStrategyCacheKey]))
+			require.Equal(t, tc.yaml, strings.TrimSpace(cache.entries[winningStrategyCacheKey]))
 		})
 		t.Run("Unmarshal_"+tc.name, func(t *testing.T) {
 			cache := newMockCache()
-			cache.entries[WinningStrategyCacheKey] = tc.yaml
+			cache.entries[winningStrategyCacheKey] = tc.yaml
 			actual, ok := unmarshalWinningStrategyFromCache(cache)
 			require.True(t, ok)
 			require.NotNil(t, actual.Proxyless)
@@ -166,11 +166,11 @@ func TestWinningStrategy_MarshalFallback(t *testing.T) {
 			result := &winningStrategy{Fallback: tc.conf}
 			ok := marshalWinningStrategyToCache(cache, result)
 			require.True(t, ok)
-			require.Equal(t, tc.yaml, strings.TrimSpace(cache.entries[WinningStrategyCacheKey]))
+			require.Equal(t, tc.yaml, strings.TrimSpace(cache.entries[winningStrategyCacheKey]))
 		})
 		t.Run("Unmarshal"+tc.name, func(t *testing.T) {
 			cache := newMockCache()
-			cache.entries[WinningStrategyCacheKey] = tc.yaml
+			cache.entries[winningStrategyCacheKey] = tc.yaml
 			actual, ok := unmarshalWinningStrategyFromCache(cache)
 			require.True(t, ok)
 			require.NotNil(t, actual.Fallback)
