@@ -267,3 +267,9 @@ func TestWinningStrategy_GetFallbackIfExclusive(t *testing.T) {
 		})
 	}
 }
+
+func (c *mockCache) expectExistIgnoreSpace(t *testing.T, key string, val string) {
+	v, ok := c.entries[key]
+	require.True(t, ok)
+	require.Equal(t, val, strings.TrimSpace(string(v)))
+}
