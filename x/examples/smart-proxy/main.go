@@ -119,7 +119,7 @@ func main() {
 
 	fmt.Println("Finding strategy")
 	startTime := time.Now()
-	findCtx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	findCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	dialer, err := finder.NewDialer(findCtx, domainsFlag, finderConfig)

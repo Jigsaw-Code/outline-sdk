@@ -428,9 +428,9 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 	fallback, err := raceTests(raceCtx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
 		configSignature := f.getConfigSignature(fallbackConfig)
 
-		dialer, err := f.makeDialerFromConfig(ctx, configModule, fallbackConfig)
+		dialer, err := f.makeDialerFromConfig(raceCtx, configModule, fallbackConfig)
 		if err != nil {
-			f.logCtx(ctx, "❌ Failed to start dialer: %v %v\n", configSignature, err)
+			f.logCtx(raceCtx, "❌ Failed to start dialer: %v %v\n", configSignature, err)
 			return nil, err
 		}
 
