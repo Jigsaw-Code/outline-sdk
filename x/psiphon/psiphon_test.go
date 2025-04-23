@@ -139,7 +139,7 @@ func TestDialer_Start_Timeout(t *testing.T) {
 		errCh <- GetSingletonDialer().Start(ctx, cfg)
 	}()
 	err := <-errCh
-	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 type errorTunnel struct {
