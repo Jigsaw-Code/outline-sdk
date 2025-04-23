@@ -56,7 +56,7 @@ func parseOptions(configURL url.URL) ([]tls.ClientOption, error) {
 			if len(values) != 1 {
 				return nil, fmt.Errorf("certName option must has one value, found %v", len(values))
 			}
-			options = append(options, tls.WithCertificateName(values[0]))
+			options = append(options, tls.WithCertVerifier(&tls.StandardCertVerifier{CertificateName: values[0]}))
 		default:
 			return nil, fmt.Errorf("unsupported option %v", key)
 
