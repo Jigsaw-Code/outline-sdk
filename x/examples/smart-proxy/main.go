@@ -83,17 +83,17 @@ func main() {
 
 	finderConfig, err := os.ReadFile(*configFlag)
 	if err != nil {
-		log.Fatalf("Could not read config: %v\n", err)
+		log.Fatalf("Could not read config: %v", err)
 	}
 
 	providers := configurl.NewDefaultProviders()
 	packetDialer, err := providers.NewPacketDialer(context.Background(), *transportFlag)
 	if err != nil {
-		log.Fatalf("Could not create packet dialer: %v\n", err)
+		log.Fatalf("Could not create packet dialer: %v", err)
 	}
 	streamDialer, err := providers.NewStreamDialer(context.Background(), *transportFlag)
 	if err != nil {
-		log.Fatalf("Could not create stream dialer: %v\n", err)
+		log.Fatalf("Could not create stream dialer: %v", err)
 	}
 	if !supportsHappyEyeballs(streamDialer) {
 		fmt.Println("⚠️ Warning: base transport is not compatible with Happy Eyeballs. Disabling IPv6.")
@@ -124,7 +124,7 @@ func main() {
 
 	dialer, err := finder.NewDialer(findCtx, domainsFlag, finderConfig)
 	if err != nil {
-		log.Fatalf("Failed to find dialer: %v\n", err)
+		log.Fatalf("Failed to find dialer: %v", err)
 	}
 	fmt.Printf("Found strategy in %0.2fs\n", time.Since(startTime).Seconds())
 	logDialer := transport.FuncStreamDialer(func(ctx context.Context, address string) (transport.StreamConn, error) {
@@ -137,7 +137,7 @@ func main() {
 
 	listener, err := net.Listen("tcp", *addrFlag)
 	if err != nil {
-		log.Fatalf("Could not listen on address %v: %v\n", *addrFlag, err)
+		log.Fatalf("Could not listen on address %v: %v", *addrFlag, err)
 	}
 	defer listener.Close()
 	fmt.Printf("Proxy listening on %v\n", listener.Addr().String())
@@ -148,7 +148,7 @@ func main() {
 	}
 	go func() {
 		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Error running web server: %v\n", err)
+			log.Fatalf("Error running web server: %v", err)
 		}
 	}()
 
@@ -161,6 +161,6 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Failed to shutdown gracefully: %v\n", err)
+		log.Fatalf("Failed to shutdown gracefully: %v", err)
 	}
 }
