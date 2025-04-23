@@ -489,7 +489,7 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 		if data, ok := f.Cache.Get(winningStrategyCacheKey); ok {
 			f.log("💾 resume strategy from cache\n")
 			if cachedCfg, err := f.parseConfig(data); err == nil {
-				if fbCfg, ok := winningConfig(cachedCfg).getFallback(&parsedConfig); ok {
+				if fbCfg, ok := winningConfig(cachedCfg).applyFallback(&parsedConfig); ok {
 					if dialer, _, err := f.findFallback(ctx, testDomains, fbCfg); err == nil {
 						return dialer, nil
 					}

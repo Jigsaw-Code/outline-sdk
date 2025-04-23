@@ -59,7 +59,7 @@ func newFallbackWinningConfig(fallback fallbackEntryConfig) winningConfig {
 	return w
 }
 
-func (w winningConfig) getFallback(cfg *configConfig) ([]fallbackEntryConfig, bool) {
+func (w winningConfig) applyFallback(cfg *configConfig) ([]fallbackEntryConfig, bool) {
 	if len(w.Fallback) != 1 || len(w.DNS) != 0 || len(w.TLS) != 0 {
 		return nil, false
 	}
