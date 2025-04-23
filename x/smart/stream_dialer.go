@@ -472,27 +472,7 @@ func (f *StrategyFinder) parseConfig(configBytes []byte) (configConfig, error) {
 // It returns an error if no strategy was found that unblocks the testDomains.
 // The testDomains must be domains with a TLS service running on port 443.
 func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, configBytes []byte) (transport.StreamDialer, error) {
-	if winner, ok := unmarshalWinningStrategyFromCache(f.Cache); ok {
-		f.log("💾 resuming strategy from cache ...\n")
-		if winner.Proxyless != nil {
-			if dialer, _, _, err := f.newProxylessDialer(ctx, testDomains, configConfig{
-				DNS: []dnsEntryConfig{*winner.Proxyless.DNS},
-				TLS: []string{winner.Proxyless.TLS},
-			}); err == nil {
-				f.log("💾 strategy resumed successfully\n")
-				return dialer, nil
-			}
-		}
-		if winner.Fallback != nil {
-			dialer, _, err := f.findFallback(ctx, testDomains, []fallbackEntryConfig{winner.Fallback})
-			if err == nil {
-				f.log("💾 strategy resumed successfully\n")
-				return dialer, nil
-			}
-		}
-		f.log("❌ cached strategy didn't work, trying to find a new one\n")
-	}
-
+	// Parse the config and make sure it's valid
 	parsedConfig, err := f.parseConfig(configBytes)
 	if err != nil {
 		return nil, err
@@ -504,17 +484,37 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 		testDomains[di] = makeFullyQualified(domain)
 	}
 
-	winner := &winningStrategy{}
+	// Fast resume the winning strategy from the cache
+	if f.Cache != nil {
+		if data, ok := f.Cache.Get(winningStrategyCacheKey); ok {
+			f.log("💾 resume strategy from cache\n")
+			if cachedCfg, err := f.parseConfig(data); err == nil {
+				if fbCfg, ok := winningConfig(cachedCfg).getFallback(&parsedConfig); ok {
+					if dialer, _, err := f.findFallback(ctx, testDomains, fbCfg); err == nil {
+						return dialer, nil
+					}
+				}
+				winningConfig(cachedCfg).applyProxyless(&parsedConfig)
+			}
+		}
+	}
+
+	// Find a working strategy and persist it to the cache
+	var winner winningConfig
 	dialer, dnsConf, tlsConf, err := f.newProxylessDialer(ctx, testDomains, parsedConfig)
 	if err == nil {
-		winner.Proxyless = &proxylessEntryConfig{DNS: dnsConf, TLS: tlsConf}
+		winner = newProxylessWinningConfig(dnsConf, tlsConf)
 	} else if parsedConfig.Fallback != nil {
 		var fbConf fallbackEntryConfig
 		dialer, fbConf, err = f.findFallback(ctx, testDomains, parsedConfig.Fallback)
-		winner.Fallback = fbConf
+		winner = newFallbackWinningConfig(fbConf)
 	}
-	if marshalWinningStrategyToCache(f.Cache, winner) {
-		f.log("💾 strategy stored to cache\n")
+	if f.Cache != nil {
+		if data, err := winner.marshal(); err == nil {
+			f.Cache.Put(winningStrategyCacheKey, data)
+			f.log("💾 strategy stored to cache\n")
+		}
 	}
+
 	return dialer, err
 }

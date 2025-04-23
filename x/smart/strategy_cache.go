@@ -14,7 +14,12 @@
 
 package smart
 
-import "github.com/goccy/go-yaml"
+import (
+	"reflect"
+	"slices"
+
+	"github.com/goccy/go-yaml"
+)
 
 // StrategyResultCache is a cache of strategy results that can be used by [StrategyFinder]
 // to resume a strategy efficiently.
@@ -33,57 +38,50 @@ type StrategyResultCache interface {
 // [StrategyResultCache] each time [StrategyFinder].NewDialer is invoked.
 const winningStrategyCacheKey = "winning_strategy"
 
-type proxylessEntryConfig struct {
-	DNS *dnsEntryConfig `yaml:"dns,omitempty"`
-	TLS string          `yaml:"tls,omitempty"`
+type winningConfig configConfig
+
+func newProxylessWinningConfig(dns *dnsEntryConfig, tls string) winningConfig {
+	w := winningConfig{}
+	if dns != nil {
+		w.DNS = []dnsEntryConfig{*dns}
+	}
+	if tls != "" {
+		w.TLS = []string{tls}
+	}
+	return w
 }
 
-type winningStrategy struct {
-	Proxyless *proxylessEntryConfig `yaml:"proxyless,omitempty"`
-	Fallback  fallbackEntryConfig   `yaml:"fallback,omitempty"`
+func newFallbackWinningConfig(fallback fallbackEntryConfig) winningConfig {
+	w := winningConfig{}
+	if fallback != nil {
+		w.Fallback = []fallbackEntryConfig{fallback}
+	}
+	return w
 }
 
-func marshalWinningStrategyToCache(cache StrategyResultCache, winner *winningStrategy) bool {
-	if cache == nil {
-		return false
+func (w winningConfig) getFallback(cfg *configConfig) ([]fallbackEntryConfig, bool) {
+	if len(w.Fallback) != 1 || len(w.DNS) != 0 || len(w.TLS) != 0 {
+		return nil, false
 	}
-	if winner == nil {
-		cache.Put(winningStrategyCacheKey, nil)
-		return true
+	if !slices.ContainsFunc(cfg.Fallback, func(e fallbackEntryConfig) bool {
+		return reflect.DeepEqual(e, w.Fallback[0])
+	}) {
+		return nil, false
 	}
-
-	data, err := yaml.MarshalWithOptions(winner, yaml.Flow(true))
-	if err != nil {
-		return false
-	}
-	cache.Put(winningStrategyCacheKey, data)
-	return true
+	return []fallbackEntryConfig{w.Fallback[0]}, true
 }
 
-func unmarshalWinningStrategyFromCache(cache StrategyResultCache) (*winningStrategy, bool) {
-	if cache == nil {
-		return nil, false
+func (w winningConfig) applyProxyless(cfg *configConfig) {
+	if len(w.DNS) == 1 {
+		moveToFront(cfg.DNS, slices.IndexFunc(cfg.DNS, func(e dnsEntryConfig) bool {
+			return reflect.DeepEqual(e, w.DNS[0])
+		}))
 	}
-	data, ok := cache.Get(winningStrategyCacheKey)
-	if !ok || len(data) == 0 {
-		return nil, false
+	if len(w.TLS) == 1 {
+		moveToFront(cfg.TLS, slices.Index(cfg.TLS, w.TLS[0]))
 	}
+}
 
-	result := &winningStrategy{}
-	if yaml.UnmarshalWithOptions([]byte(data), result, yaml.DisallowUnknownField()) != nil {
-		return nil, false
-	}
-
-	// Convert to strongly typed fallback config
-	if result.Fallback != nil {
-		if v, ok := result.Fallback.(map[string]any); ok {
-			var fallbackEntry fallbackEntryStructConfig
-			if mapToAny(v, &fallbackEntry) != nil {
-				return nil, false
-			}
-			result.Fallback = fallbackEntry
-		}
-	}
-
-	return result, true
+func (w winningConfig) marshal() ([]byte, error) {
+	return yaml.MarshalWithOptions(w, yaml.Flow(true))
 }
