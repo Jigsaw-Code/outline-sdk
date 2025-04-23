@@ -82,7 +82,10 @@ tcp:
 
 A fallback configuration is used if none of the proxyless strategies are able to connect. For example it can specify a backup proxy server to attempt the user's connection. Using a fallback will be slower to start, since first the other DNS/TLS strategies must fail/timeout.
 
-The fallback strings should be a valid StreamDialer configs as defined in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Proxy_Protocols
+The fallback strings should be:
+
+*   A valid StreamDialer config string as defined in [configurl](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Proxy_Protocols)
+*   A valid Psiphon configuration object as a child of a `psiphon` field.
 
 #### Shadowsocks server example
 
@@ -96,6 +99,30 @@ fallback:
 ```yaml
 fallback:
   - socks5://[USERINFO]@[HOST]:[PORT]
+```
+
+#### Psiphon config example
+
+> [!WARNING]
+> The Psiphon library is not included in the build by default because the Psiphon codebase uses GPL. To support Psiphon configuration please build using the [`psiphon` build tag](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/psiphon).
+> When integrating Psiphon into your application please work with the Psiphon team at sponsor@psiphon.ca
+
+JSON is a subset of YAML. If you have an existing psiphon JSON configuration file you can simply copy-and-paste it into your smart-proxy config.yaml file like so:
+
+```yaml
+fallback:
+  - psiphon: <YOUR_PSIPHON_CONFIG_HERE>
+```
+
+```yaml
+fallback:
+  - psiphon: {
+      "PropagationChannelId": "FFFFFFFFFFFFFFFF",
+      "SponsorId": "FFFFFFFFFFFFFFFF",
+      "DisableLocalSocksProxy" : true,
+      "DisableLocalHTTPProxy" : true,
+      ...
+    }
 ```
 
 ### Using the Smart Dialer
