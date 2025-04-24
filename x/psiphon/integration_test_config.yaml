@@ -1,5 +1,1 @@
-# It's useful to test actually starting psiphon connections,
-# but doing so requires supplying a valid psiphon config with private information.
-# To run these tests please supply your own config here.
-
 {<YOUR_CONFIG_HERE>}
