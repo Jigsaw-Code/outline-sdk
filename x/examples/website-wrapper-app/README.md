@@ -29,6 +29,7 @@ To verify that your system has the necessary dependencies to generate your web w
 [Please refer to CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#ios-requirements) and run `./doctor` to check to see if you have all the required dependencies.
 
 ```sh
+# make sure to run `npm run reset` between each build!
 npm run reset
 npm run build:project -- --platform=ios --entryUrl="https://www.example.com"
 npm run open:ios
@@ -75,6 +76,7 @@ npx capacitor-assets generate --ios
 [Please refer to CapacitorJS's environment setup guide](https://capacitorjs.com/docs/getting-started/environment-setup#android-requirements) and run `./doctor` to check to see if you have all the required dependencies.
 
 ```sh
+# make sure to run `npm run reset` between each build!
 npm run reset
 npm run build:project -- --platform=android --entryUrl="https://www.example.com"
 npm run open:android
@@ -116,6 +118,7 @@ npx capacitor-assets generate --android
 | `--output`          | The directory where the generated app project files will be saved.              | A valid, absolute file path (e.g., `/users/me/my-generated-app`) |
 | `--additionalDomains` | A list of other domains that should be accessible within the app.               | Comma-separated domains |
 | `--smartDialerConfig` | A JSON string containing the configuration for the [smart dialer feature](../../smart#yaml-config-for-the-smart-dialer).       | Valid JSON string       |
+| `--sdkVersion`      | The version of the SDK | Valid SDK version (e.g. `x/v0.0.3`)|
 
 ## Viewing your site in the example navigation iframe
 

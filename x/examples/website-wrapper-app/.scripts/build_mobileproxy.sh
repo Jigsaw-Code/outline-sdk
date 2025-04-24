@@ -15,7 +15,7 @@
 # limitations under the License.
 
 PLATFORM="$1"
-TAG="${2:-"x/v0.0.1"}"
+TAG="${2:-"x/v0.0.3"}"
 OUTPUT="${3:-output}"
 
 if [[ "$OUTPUT" = "/" ]] || [[ "$OUTPUT" = "*" ]]; then
