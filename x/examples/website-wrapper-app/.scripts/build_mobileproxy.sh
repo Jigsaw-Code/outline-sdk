@@ -15,29 +15,24 @@
 # limitations under the License.
 
 PLATFORM="$1"
-TAG="${2:-"x/v0.0.3"}"
-OUTPUT="${3:-output}"
+OUTPUT="${2:-output}"
 
 if [[ "$OUTPUT" = "/" ]] || [[ "$OUTPUT" = "*" ]]; then
   echo "Error: OUTPUT cannot be '/' or '*'. These are dangerous values."
   exit 1
 fi
 
-git clone --depth 1 --branch "$TAG" https://github.com/Jigsaw-Code/outline-sdk.git "$OUTPUT/outline-sdk"
-cd "$OUTPUT/outline-sdk/x" || exit
-go build -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
+mkdir -p "$(pwd)/$OUTPUT/mobileproxy"
+
+go build -o "$(pwd)/$OUTPUT/mobileproxy" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
 
 if [ "$PLATFORM" = "ios" ]; then
   echo "Building for iOS..."
-  PATH="$(pwd)/out/:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -o "$(pwd)/out/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+  PATH="$(pwd)/$OUTPUT/mobileproxy/:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -o "$(pwd)/$OUTPUT/mobileproxy/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
 elif [ "$PLATFORM" = "android" ]; then
   echo "Building for Android..."
-  PATH="$(pwd)/out/:$PATH" gomobile bind -ldflags='-s -w' -target=android -androidapi=21 -o "$(pwd)/out/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+  PATH="$(pwd)/$OUTPUT/mobileproxy/:$PATH" gomobile bind -ldflags='-s -w' -target=android -androidapi=21 -o "$(pwd)/$OUTPUT/mobileproxy/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
 else
   echo "Invalid platform: $PLATFORM. Must be 'ios' or 'android'."
   exit 1
 fi
-
-cd ../..
-rm -rf "$OUTPUT/mobileproxy"
-mv "$(pwd)/outline-sdk/x/out" "mobileproxy"

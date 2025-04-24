@@ -44,7 +44,6 @@ export default async function main(
     navigationUrl,
     output = OUTPUT_DIR,
     platform,
-    sdkVersion = "x/v0.0.3",
     smartDialerConfig = DEFAULT_SMART_DIALER_CONFIG,
   },
 ) {
@@ -69,7 +68,6 @@ export default async function main(
       "run",
       "build:mobileproxy",
       platform,
-      sdkVersion,
       output,
     ], { shell: false });
   }
