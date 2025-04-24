@@ -1,4 +1,19 @@
-//go:build psiphon
+// Copyright 2023 The Outline Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//go:build psiphon && nettest
+// +build psiphon,nettest
 
 package psiphon
 
@@ -9,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -20,7 +36,8 @@ func readPsiphonConfigFromFile(tb testing.TB) string {
 	// It's useful to test actually starting psiphon connections,
 	// but doing so requires supplying a valid psiphon config with private information.
 	// To run these tests please supply your own config in integration_test_config.yaml
-	configBytes, err := os.ReadFile("./integration_test_config.yaml")
+	configPath := filepath.Join("testdata", "integration_test_config.yaml")
+	configBytes, err := os.ReadFile(configPath)
 	if err != nil {
 		require.NoError(tb, err)
 	}
@@ -40,7 +57,7 @@ func newValidTestConfig(tb testing.TB) (*DialerConfig, func()) {
 	}, func() { os.RemoveAll(tempDir) }
 }
 
-func TestDialer_CancelledAfterStart_DoesntCloseTunnel(t *testing.T) {
+func TestDialer_CancelinledAfterStart_DoesntCloseTunnel(t *testing.T) {
 	cfg, delete := newValidTestConfig(t)
 	defer delete()
 	startCtx, startCancel := context.WithCancel(context.Background())
@@ -73,7 +90,7 @@ func TestDialer_FetchExample(t *testing.T) {
 	}
 	httpClient := &http.Client{Transport: &http.Transport{DialContext: dialContext}, Timeout: 5 * time.Second}
 
-	req, err := http.NewRequest("GET", "https://example.com", nil)
+	req, err := http.NewRequest("GET", "http://www.gstatic.com/generate_204", nil)
 	require.NoError(t, err)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
