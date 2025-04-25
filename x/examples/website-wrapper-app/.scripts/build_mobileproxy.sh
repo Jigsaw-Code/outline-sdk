@@ -15,7 +15,7 @@
 # limitations under the License.
 
 PLATFORM="$1"
-OUTPUT="${2:-output}"
+OUTPUT="${2:-$(pwd)/output}"
 
 if [[ "$OUTPUT" = "/" ]] || [[ "$OUTPUT" = "*" ]]; then
   echo "Error: OUTPUT cannot be '/' or '*'. These are dangerous values."
