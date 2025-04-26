@@ -73,7 +73,7 @@ func TestWinningStrategy_MarshalProxyless(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			w := newProxylessWinningConfig(tc.dns, tc.tls)
-			actual, err := w.marshal()
+			actual, err := w.toYAML()
 			require.NoError(t, err)
 			require.Equal(t, tc.yaml, strings.TrimSpace(string(actual)))
 		})
@@ -106,7 +106,7 @@ func TestWinningStrategy_MarshalFallback(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			w := newFallbackWinningConfig(tc.conf)
-			actual, err := w.marshal()
+			actual, err := w.toYAML()
 			require.NoError(t, err)
 			require.Equal(t, tc.yaml, strings.TrimSpace(string(actual)))
 		})
