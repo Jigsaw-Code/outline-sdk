@@ -26,12 +26,13 @@ func TestTLS_SNI(t *testing.T) {
 	require.NoError(t, err)
 	options, err := parseOptions(config.URL)
 	require.NoError(t, err)
-	cfg := tls.ClientConfig{ServerName: "host", CertificateName: "host"}
+	certVerifier := &tls.StandardCertVerifier{CertificateName: "host"}
+	cfg := tls.ClientConfig{ServerName: "host", CertVerifier: certVerifier}
 	for _, option := range options {
 		option("host", &cfg)
 	}
 	require.Equal(t, "www.google.com", cfg.ServerName)
-	require.Equal(t, "host", cfg.CertificateName)
+	require.Equal(t, certVerifier, cfg.CertVerifier)
 }
 
 func TestTLS_NoSNI(t *testing.T) {
@@ -39,12 +40,13 @@ func TestTLS_NoSNI(t *testing.T) {
 	require.NoError(t, err)
 	options, err := parseOptions(config.URL)
 	require.NoError(t, err)
-	cfg := tls.ClientConfig{ServerName: "host", CertificateName: "host"}
+	certVerifier := &tls.StandardCertVerifier{CertificateName: "host"}
+	cfg := tls.ClientConfig{ServerName: "host", CertVerifier: certVerifier}
 	for _, option := range options {
 		option("host", &cfg)
 	}
 	require.Equal(t, "", cfg.ServerName)
-	require.Equal(t, "host", cfg.CertificateName)
+	require.Equal(t, certVerifier, cfg.CertVerifier)
 }
 
 func TestTLS_MultipleSNI(t *testing.T) {
@@ -59,12 +61,12 @@ func TestTLS_CertName(t *testing.T) {
 	require.NoError(t, err)
 	options, err := parseOptions(config.URL)
 	require.NoError(t, err)
-	cfg := tls.ClientConfig{ServerName: "host", CertificateName: "host"}
+	cfg := tls.ClientConfig{ServerName: "host", CertVerifier: &tls.StandardCertVerifier{CertificateName: "host"}}
 	for _, option := range options {
 		option("host", &cfg)
 	}
 	require.Equal(t, "host", cfg.ServerName)
-	require.Equal(t, "www.google.com", cfg.CertificateName)
+	require.Equal(t, "www.google.com", cfg.CertVerifier.(*tls.StandardCertVerifier).CertificateName)
 }
 
 func TestTLS_Combined(t *testing.T) {
@@ -72,12 +74,12 @@ func TestTLS_Combined(t *testing.T) {
 	require.NoError(t, err)
 	options, err := parseOptions(config.URL)
 	require.NoError(t, err)
-	cfg := tls.ClientConfig{ServerName: "host", CertificateName: "host"}
+	cfg := tls.ClientConfig{ServerName: "host", CertVerifier: &tls.StandardCertVerifier{CertificateName: "host"}}
 	for _, option := range options {
 		option("host", &cfg)
 	}
 	require.Equal(t, "sni.example.com", cfg.ServerName)
-	require.Equal(t, "certname.example.com", cfg.CertificateName)
+	require.Equal(t, "certname.example.com", cfg.CertVerifier.(*tls.StandardCertVerifier).CertificateName)
 }
 
 func TestTLS_UnsupportedOption(t *testing.T) {

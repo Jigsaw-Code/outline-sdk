@@ -21,9 +21,9 @@ import { createServer } from "vite";
 import minimist from "minimist";
 
 export default function main({
-  entryDomain = "www.example.com",
+  entryUrl = "https://www.example.com",
   navigatorToken,
-  navigatorPath = "/",
+  navigatorPath = "/nav",
 }) {
   return new Promise(async (resolve) => {
     const navigationServer = await createServer({
@@ -44,7 +44,7 @@ export default function main({
       }
 
       return proxyMiddleware.web(request, response, {
-        target: `https://${entryDomain}`,
+        target: entryUrl,
         changeOrigin: true,
       });
     });
@@ -85,10 +85,6 @@ if (import.meta.url.endsWith(process.argv[1])) {
 
   if (!args.navigatorToken) {
     throw new Error("`--navigatorToken` must be set!");
-  }
-
-  if (!args.navigatorPath) {
-    throw new Error("`--navigatorPath` must be set!");
   }
 
   main(args).catch(console.error);

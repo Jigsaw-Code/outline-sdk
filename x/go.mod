@@ -3,13 +3,13 @@ module github.com/Jigsaw-Code/outline-sdk/x
 go 1.23.0
 
 require (
-	github.com/Jigsaw-Code/outline-sdk v0.0.19
+	github.com/Jigsaw-Code/outline-sdk v0.0.20
 	// Use github.com/Psiphon-Labs/psiphon-tunnel-core@staging-client as per
 	// https://github.com/Psiphon-Labs/psiphon-tunnel-core/?tab=readme-ov-file#using-psiphon-with-go-modules
 	github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20250319154633-ceb78316d06e
-	github.com/goccy/go-yaml v1.16.0
+	github.com/goccy/go-yaml v1.17.1
 	github.com/gorilla/websocket v1.5.3
-	github.com/lmittmann/tint v1.0.5
+	github.com/lmittmann/tint v1.0.7
 	github.com/quic-go/quic-go v0.48.1
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/stretchr/testify v1.9.0
