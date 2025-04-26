@@ -38,6 +38,8 @@ type StrategyResultCache interface {
 // [StrategyResultCache] each time [StrategyFinder].NewDialer is invoked.
 const winningStrategyCacheKey = "winning_strategy"
 
+// winningConfig holds the configuration of a successful strategy.
+// It contains either one entry of proxyless or one entry of fallback.
 type winningConfig configConfig
 
 func newProxylessWinningConfig(dns *dnsEntryConfig, tls string) winningConfig {
@@ -59,7 +61,9 @@ func newFallbackWinningConfig(fallback fallbackEntryConfig) winningConfig {
 	return w
 }
 
-func (w winningConfig) applyFallback(cfg *configConfig) ([]fallbackEntryConfig, bool) {
+// getFallbackIfExclusive checks if the winningConfig is a fallback strategy.
+// It returns the fallback entry and true if these conditions are met, otherwise nil and false.
+func (w winningConfig) getFallbackIfExclusive(cfg *configConfig) ([]fallbackEntryConfig, bool) {
 	if len(w.Fallback) != 1 || len(w.DNS) != 0 || len(w.TLS) != 0 {
 		return nil, false
 	}
@@ -71,7 +75,9 @@ func (w winningConfig) applyFallback(cfg *configConfig) ([]fallbackEntryConfig, 
 	return []fallbackEntryConfig{w.Fallback[0]}, true
 }
 
-func (w winningConfig) applyProxyless(cfg *configConfig) {
+// promoteProxylessToFront reorders the DNS and TLS configs within the provided configConfig
+// to move the entries matching the winning strategy to the front.
+func (w winningConfig) promoteProxylessToFront(cfg *configConfig) {
 	if len(w.DNS) == 1 {
 		moveToFront(cfg.DNS, slices.IndexFunc(cfg.DNS, func(e dnsEntryConfig) bool {
 			return reflect.DeepEqual(e, w.DNS[0])
@@ -82,6 +88,6 @@ func (w winningConfig) applyProxyless(cfg *configConfig) {
 	}
 }
 
-func (w winningConfig) marshal() ([]byte, error) {
+func (w winningConfig) toYAML() ([]byte, error) {
 	return yaml.MarshalWithOptions(w, yaml.Flow(true))
 }

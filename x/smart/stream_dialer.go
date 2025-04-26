@@ -364,6 +364,7 @@ func (f *StrategyFinder) findTLS(
 
 type SearchResult struct {
 	Dialer          transport.StreamDialer
+	Config          fallbackEntryConfig
 	ConfigSignature string
 }
 
@@ -404,7 +405,9 @@ func (f *StrategyFinder) makeDialerFromConfig(ctx context.Context, configModule 
 }
 
 // Return the fastest fallback dialer that is able to access all the testDomans
-func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string, fallbackConfigs []fallbackEntryConfig) (transport.StreamDialer, error) {
+func (f *StrategyFinder) findFallback(
+	ctx context.Context, testDomains []string, fallbackConfigs []fallbackEntryConfig,
+) (transport.StreamDialer, fallbackEntryConfig, error) {
 	if len(fallbackConfigs) == 0 {
 		return nil, nil, errors.New("attempted to find fallback but no fallback configuration was specified")
 	}
@@ -427,7 +430,7 @@ func (f *StrategyFinder) findFallback(ctx context.Context, testDomains []string,
 			return nil, err
 		}
 
-		return &SearchResult{dialer, configSignature}, nil
+		return &SearchResult{dialer, fallbackConfig, configSignature}, nil
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not find a working fallback: %w", err)
@@ -522,12 +525,12 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 		if data, ok := f.Cache.Get(winningStrategyCacheKey); ok {
 			f.log("💾 resume strategy from cache\n")
 			if cachedCfg, err := f.parseConfig(data); err == nil {
-				if fbCfg, ok := winningConfig(cachedCfg).applyFallback(&parsedConfig); ok {
+				if fbCfg, ok := winningConfig(cachedCfg).getFallbackIfExclusive(&parsedConfig); ok {
 					if dialer, _, err := f.findFallback(ctx, testDomains, fbCfg); err == nil {
 						return dialer, nil
 					}
 				}
-				winningConfig(cachedCfg).applyProxyless(&parsedConfig)
+				winningConfig(cachedCfg).promoteProxylessToFront(&parsedConfig)
 			}
 		}
 	}
@@ -543,7 +546,7 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 		winner = newFallbackWinningConfig(fbConf)
 	}
 	if f.Cache != nil {
-		if data, err := winner.marshal(); err == nil {
+		if data, err := winner.toYAML(); err == nil {
 			f.Cache.Put(winningStrategyCacheKey, data)
 			f.log("💾 strategy stored to cache\n")
 		}
