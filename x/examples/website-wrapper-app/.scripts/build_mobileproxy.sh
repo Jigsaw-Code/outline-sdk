@@ -22,16 +22,16 @@ if [[ "$OUTPUT" = "/" ]] || [[ "$OUTPUT" = "*" ]]; then
   exit 1
 fi
 
-mkdir -p "$(pwd)/$OUTPUT/mobileproxy"
+mkdir -p "$OUTPUT/mobileproxy"
 
-go build -o "$(pwd)/$OUTPUT/mobileproxy" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
+go build -o "$OUTPUT/mobileproxy" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
 
 if [ "$PLATFORM" = "ios" ]; then
   echo "Building for iOS..."
-  PATH="$(pwd)/$OUTPUT/mobileproxy/:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -o "$(pwd)/$OUTPUT/mobileproxy/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+  PATH="$OUTPUT/mobileproxy/:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -o "$OUTPUT/mobileproxy/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
 elif [ "$PLATFORM" = "android" ]; then
   echo "Building for Android..."
-  PATH="$(pwd)/$OUTPUT/mobileproxy/:$PATH" gomobile bind -ldflags='-s -w' -target=android -androidapi=21 -o "$(pwd)/$OUTPUT/mobileproxy/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+  PATH="$OUTPUT/mobileproxy/:$PATH" gomobile bind -ldflags='-s -w' -target=android -androidapi=21 -o "$OUTPUT/mobileproxy/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
 else
   echo "Invalid platform: $PLATFORM. Must be 'ios' or 'android'."
   exit 1
