@@ -28,12 +28,12 @@ const WRAPPER_APP_TEMPLATE_DIR = path.join(
   "wrapper_app_project/template",
 );
 
-const DEFAULT_SMART_DIALER_CONFIG = {
+const DEFAULT_SMART_DIALER_CONFIG = JSON.stringify({
   dns: [{
     https: { name: "9.9.9.9" },
   }],
   tls: ["", "split:1", "split:2", "tlsfrag:1"],
-};
+});
 
 export default async function main(
   {
@@ -44,7 +44,6 @@ export default async function main(
     navigationUrl,
     output = OUTPUT_DIR,
     platform,
-    sdkVersion = "x/v0.0.1",
     smartDialerConfig = DEFAULT_SMART_DIALER_CONFIG,
   },
 ) {
@@ -69,7 +68,6 @@ export default async function main(
       "run",
       "build:mobileproxy",
       platform,
-      sdkVersion,
       output,
     ], { shell: false });
   }
@@ -174,7 +172,7 @@ function resolveTemplateArguments(
     appName,
     navigationUrl,
     additionalDomains,
-    smartDialerConfig,
+    smartDialerConfig = DEFAULT_SMART_DIALER_CONFIG,
   },
 ) {
   const result = {
@@ -224,14 +222,7 @@ function resolveTemplateArguments(
     result.domainList = [result.entryDomain];
   }
 
-  if (typeof smartDialerConfig === "string") {
-    result.smartDialerConfig = smartDialerConfig.replaceAll('"', '\\"');
-  } else if (typeof smartDialerConfig === "object") {
-    result.smartDialerConfig = JSON.stringify(smartDialerConfig).replaceAll(
-      '"',
-      '\\"',
-    );
-  }
+  result.smartDialerConfig = Buffer.from(smartDialerConfig).toString("base64");
 
   return result;
 }
@@ -250,9 +241,6 @@ if (import.meta.url.endsWith(process.argv[1])) {
   main({
     ...args,
     additionalDomains: args.additionalDomains?.split(/,\s*/) ?? [],
-    smartDialerConfig: args.smartDialerConfig
-      ? JSON.parse(args.smartDialerConfig)
-      : undefined,
   })
     .catch(console.error);
 }

@@ -5,6 +5,9 @@ import com.getcapacitor.BridgeActivity
 
 import mobileproxy.*
 
+import android.util.Base64
+import java.nio.charset.StandardCharsets
+
 import androidx.webkit.ProxyConfig
 import androidx.webkit.ProxyController
 import androidx.webkit.WebViewFeature
@@ -33,11 +36,13 @@ class MainActivity : BridgeActivity() {
 
     private fun tryProxy(): Boolean {
         try {
+            val smartDialerConfig = Base64.decode(Config.smartDialer, Base64.DEFAULT)
+
             this.proxy = Mobileproxy.runProxy(
                 "127.0.0.1:0",
                 Mobileproxy.newSmartStreamDialer(
                     Mobileproxy.newListFromLines(Config.domainList),
-                    Config.smartDialer,
+                    String(smartDialerConfig, StandardCharsets.UTF_8),
                     Mobileproxy.newStderrLogWriter()
                 )
             )
