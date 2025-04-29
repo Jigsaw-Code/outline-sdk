@@ -27,8 +27,8 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/websocket"
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
-	"github.com/Jigsaw-Code/outline-sdk/x/websocket"
 	"github.com/lmittmann/tint"
 	"golang.org/x/term"
 )
