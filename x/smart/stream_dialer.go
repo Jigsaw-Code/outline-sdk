@@ -219,7 +219,7 @@ type smartResolver struct {
 	dns.Resolver
 	ID     string
 	Secure bool
-	Config *dnsEntryConfig
+	Config dnsEntryConfig
 }
 
 func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryConfig) ([]*smartResolver, error) {
@@ -237,7 +237,7 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryConfig) ([]*sma
 		if err != nil {
 			return nil, fmt.Errorf("failed to process entry %v: %w", ei, err)
 		}
-		rts = append(rts, &smartResolver{Resolver: resolver, ID: id, Secure: isSecure, Config: &entry})
+		rts = append(rts, &smartResolver{Resolver: resolver, ID: id, Secure: isSecure, Config: entry})
 	}
 	return rts, nil
 }
@@ -308,7 +308,7 @@ func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsC
 		return nil, nil, fmt.Errorf("could not find working resolver: %w", err)
 	}
 	f.log("🏆 selected DNS resolver %v in %0.2fs\n\n", resolver.ID, time.Since(raceStart).Seconds())
-	return resolver.Resolver, resolver.Config, nil
+	return resolver.Resolver, &resolver.Config, nil
 }
 
 func (f *StrategyFinder) findTLS(
@@ -504,12 +504,37 @@ func (f *StrategyFinder) parseConfig(configBytes []byte) (configConfig, error) {
 	return parsedConfig, nil
 }
 
+// rankStrategiesFromCache reads a winningStrategy from the cache and adjust the input config accordingly.
+// It returns the adjusted ranked config, and optionally a first2Try config that the caller should prioritize.
+func (f *StrategyFinder) rankStrategiesFromCache(
+	input configConfig,
+) (ranked configConfig, first2Try []fallbackEntryConfig) {
+	data, ok := f.Cache.Get(winningStrategyCacheKey)
+	if !ok {
+		return input, nil
+	}
+
+	cachedCfg, err := f.parseConfig(data)
+	if err != nil {
+		return input, nil
+	}
+
+	f.log("💾 resume strategy from cache\n")
+	winner := winningConfig(cachedCfg)
+
+	if fbCfg, ok := winner.getFallbackIfExclusive(&input); ok {
+		return input, fbCfg
+	}
+	winner.promoteProxylessToFront(&input)
+	return input, nil
+}
+
 // NewDialer uses the config in configBytes to search for a strategy that unblocks DNS and TLS for all of the testDomains, returning a dialer with the found strategy.
 // It returns an error if no strategy was found that unblocks the testDomains.
 // The testDomains must be domains with a TLS service running on port 443.
 func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, configBytes []byte) (transport.StreamDialer, error) {
 	// Parse the config and make sure it's valid
-	parsedConfig, err := f.parseConfig(configBytes)
+	inputConfig, err := f.parseConfig(configBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -522,33 +547,39 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 
 	// Fast resume the winning strategy from the cache
 	if f.Cache != nil {
-		if data, ok := f.Cache.Get(winningStrategyCacheKey); ok {
-			f.log("💾 resume strategy from cache\n")
-			if cachedCfg, err := f.parseConfig(data); err == nil {
-				if fbCfg, ok := winningConfig(cachedCfg).getFallbackIfExclusive(&parsedConfig); ok {
-					if dialer, _, err := f.findFallback(ctx, testDomains, fbCfg); err == nil {
-						return dialer, nil
-					}
-				}
-				winningConfig(cachedCfg).promoteProxylessToFront(&parsedConfig)
+		rankedConfig, first2Try := f.rankStrategiesFromCache(inputConfig)
+		if first2Try != nil {
+			if dialer, _, err := f.findFallback(ctx, testDomains, first2Try); err == nil {
+				return dialer, nil
 			}
 		}
+		inputConfig = rankedConfig
 	}
 
 	// Find a working strategy and persist it to the cache
 	var winner winningConfig
-	dialer, dnsConf, tlsConf, err := f.newProxylessDialer(ctx, testDomains, parsedConfig)
+	dialer, dnsConf, tlsConf, err := f.newProxylessDialer(ctx, testDomains, inputConfig)
 	if err == nil {
 		winner = newProxylessWinningConfig(dnsConf, tlsConf)
-	} else if parsedConfig.Fallback != nil {
+	} else if inputConfig.Fallback != nil {
 		var fbConf fallbackEntryConfig
-		dialer, fbConf, err = f.findFallback(ctx, testDomains, parsedConfig.Fallback)
-		winner = newFallbackWinningConfig(fbConf)
+		dialer, fbConf, err = f.findFallback(ctx, testDomains, inputConfig.Fallback)
+		if err == nil {
+			winner = newFallbackWinningConfig(fbConf)
+		}
 	}
+
+	// Persist the potential winner to cache
 	if f.Cache != nil {
-		if data, err := winner.toYAML(); err == nil {
-			f.Cache.Put(winningStrategyCacheKey, data)
+		var data []byte = nil
+		if err == nil {
+			data, err = winner.toYAML()
+		}
+		f.Cache.Put(winningStrategyCacheKey, data)
+		if data != nil {
 			f.log("💾 strategy stored to cache\n")
+		} else {
+			f.log("💾 strategy cache cleared\n")
 		}
 	}
 
