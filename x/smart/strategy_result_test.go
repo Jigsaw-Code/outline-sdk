@@ -76,6 +76,11 @@ func TestWinningStrategy_MarshalProxyless(t *testing.T) {
 			actual, err := w.toYAML()
 			require.NoError(t, err)
 			require.Equal(t, tc.yaml, strings.TrimSpace(string(actual)))
+
+			finder := &StrategyFinder{}
+			cfg, err := finder.parseConfig([]byte(tc.yaml))
+			require.NoError(t, err)
+			require.Equal(t, cfg, configConfig(w))
 		})
 	}
 }
@@ -109,6 +114,11 @@ func TestWinningStrategy_MarshalFallback(t *testing.T) {
 			actual, err := w.toYAML()
 			require.NoError(t, err)
 			require.Equal(t, tc.yaml, strings.TrimSpace(string(actual)))
+
+			finder := &StrategyFinder{}
+			cfg, err := finder.parseConfig([]byte(tc.yaml))
+			require.NoError(t, err)
+			require.Equal(t, cfg, configConfig(w))
 		})
 	}
 }
