@@ -36,13 +36,13 @@ class MainActivity : BridgeActivity() {
 
     private fun tryProxy(): Boolean {
         try {
-            val smartDialer = Base64.decode(Config.smartDialer, Base64.DEFAULT)
+            val smartDialerConfig = Base64.decode(Config.smartDialer, Base64.DEFAULT)
 
             this.proxy = Mobileproxy.runProxy(
                 "127.0.0.1:0",
                 Mobileproxy.newSmartStreamDialer(
                     Mobileproxy.newListFromLines(Config.domainList),
-                    String(smartDialer, StandardCharsets.UTF_8),
+                    String(smartDialerConfig, StandardCharsets.UTF_8),
                     Mobileproxy.newStderrLogWriter()
                 )
             )
