@@ -147,6 +147,8 @@ When encountering an issue, the first thing you'll want to do is run the doctor 
 ./doctor
 ```
 
+Additionally, you should run `npm run reset` to ensure your `output` and `node_modules` folders have not been tampered with!
+
 ### Commonly occuring issues
 
 > [!NOTE]
