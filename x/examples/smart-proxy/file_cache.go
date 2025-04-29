@@ -16,7 +16,9 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"sync"
 )
@@ -35,7 +37,7 @@ func NewJSONFileCache(path string) (*JSONFileCache, error) {
 		cache: make(map[string][]byte),
 	}
 	data, err := os.ReadFile(c.path)
-	if err != nil {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		fmt.Printf("failed to read the cache file: %v\n", err)
 		return nil, err
 	}
