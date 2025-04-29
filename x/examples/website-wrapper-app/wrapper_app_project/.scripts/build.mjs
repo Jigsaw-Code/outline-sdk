@@ -174,7 +174,7 @@ function resolveTemplateArguments(
     appName,
     navigationUrl,
     additionalDomains,
-    smartDialerConfig,
+    smartDialerConfig = DEFAULT_SMART_DIALER_CONFIG,
   },
 ) {
   const result = {
@@ -224,14 +224,11 @@ function resolveTemplateArguments(
     result.domainList = [result.entryDomain];
   }
 
-  if (typeof smartDialerConfig === "string") {
-    result.smartDialerConfig = smartDialerConfig.replaceAll('"', '\\"');
-  } else if (typeof smartDialerConfig === "object") {
-    result.smartDialerConfig = JSON.stringify(smartDialerConfig).replaceAll(
-      '"',
-      '\\"',
-    );
-  }
+  result.smartDialerConfig = Buffer.from(
+    typeof smartDialerConfig === "object"
+      ? JSON.stringify(smartDialerConfig)
+      : smartDialerConfig,
+  ).toString("base64");
 
   return result;
 }

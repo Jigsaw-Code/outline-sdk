@@ -1,3 +1,4 @@
+import Foundation
 import Capacitor
 import Mobileproxy
 import UIKit
@@ -54,10 +55,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     @discardableResult
     private func tryProxy() -> Bool {
+        guard let smartDialer = Data(base64Encoded: Config.smartDialer) else {
+            return false
+        }
+
         var error: NSError?
         if let dialer = MobileproxyNewSmartStreamDialer(
             MobileproxyNewListFromLines(Config.domainList),
-            Config.smartDialer,
+            String(data: smartDialer, encoding: .utf8),
             MobileproxyNewStderrLogWriter(),
             &error
         ) {
