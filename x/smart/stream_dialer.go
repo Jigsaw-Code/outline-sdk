@@ -508,7 +508,7 @@ func (f *StrategyFinder) parseConfig(configBytes []byte) (configConfig, error) {
 // It returns the adjusted ranked config, and optionally a first2Try config that the caller should prioritize.
 func (f *StrategyFinder) rankStrategiesFromCache(
 	input configConfig,
-) (ranked configConfig, first2Try []fallbackEntryConfig) {
+) (ranked configConfig, first2Try fallbackEntryConfig) {
 	data, ok := f.Cache.Get(winningStrategyCacheKey)
 	if !ok {
 		return input, nil
@@ -549,7 +549,7 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 	if f.Cache != nil {
 		rankedConfig, first2Try := f.rankStrategiesFromCache(inputConfig)
 		if first2Try != nil {
-			if dialer, _, err := f.findFallback(ctx, testDomains, first2Try); err == nil {
+			if dialer, _, err := f.findFallback(ctx, testDomains, []fallbackEntryConfig{first2Try}); err == nil {
 				return dialer, nil
 			}
 		}

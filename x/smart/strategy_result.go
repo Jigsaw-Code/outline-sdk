@@ -64,7 +64,7 @@ func newFallbackWinningConfig(fallback fallbackEntryConfig) winningConfig {
 // getFallbackIfExclusive checks if the winningConfig is a fallback strategy.
 // It returns the fallback entry and true if there is only one exclusive fallback entry
 // in the config; otherwise it returns nil and false.
-func (w winningConfig) getFallbackIfExclusive(cfg *configConfig) ([]fallbackEntryConfig, bool) {
+func (w winningConfig) getFallbackIfExclusive(cfg *configConfig) (fallbackEntryConfig, bool) {
 	if len(w.Fallback) != 1 || len(w.DNS) != 0 || len(w.TLS) != 0 {
 		return nil, false
 	}
@@ -73,7 +73,7 @@ func (w winningConfig) getFallbackIfExclusive(cfg *configConfig) ([]fallbackEntr
 	}) {
 		return nil, false
 	}
-	return []fallbackEntryConfig{w.Fallback[0]}, true
+	return w.Fallback[0], true
 }
 
 // promoteProxylessToFront reorders the DNS and TLS configs within the provided configConfig
