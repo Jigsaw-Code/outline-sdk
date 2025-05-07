@@ -31,10 +31,13 @@ jobs:
       - name: Create Output Directory
         run: mkdir -p $OUTPUT_DIR/mobileproxy
 
-      - name: Build gomobile and gobind
-        run: go build -o $OUTPUT_DIR/mobileproxy/gomobile golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
+      - name: Build gomobile
+        run: go build -o $OUTPUT_DIR/mobileproxy/gomobile golang.org/x/mobile/cmd/gomobile
         working-directory: ${{ github.workspace }}/x
 
+      - name: Build gobind
+        run: go build -o $OUTPUT_DIR/mobileproxy/gobind golang.org/x/mobile/cmd/gobind
+        working-directory: ${{ github.workspace }}/x
       - name: Build MobileProxy for iOS
         run: |
           echo "Building for iOS..."
