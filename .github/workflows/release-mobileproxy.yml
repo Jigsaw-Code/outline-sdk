@@ -29,33 +29,46 @@ jobs:
           go-version-file: "${{ github.workspace }}/x/go.mod"
 
       - name: Create Output Directory
-        run: mkdir -p $OUTPUT_DIR/mobileproxy
+        run: mkdir -p ${{ env.OUTPUT_DIR }}/mobileproxy
 
       - name: Build gomobile
-        run: go build -o $OUTPUT_DIR/mobileproxy/gomobile golang.org/x/mobile/cmd/gomobile
+        run: go build -o ${{ env.OUTPUT_DIR }}/mobileproxy/gomobile golang.org/x/mobile/cmd/gomobile
         working-directory: ${{ github.workspace }}/x
 
       - name: Build gobind
-        run: go build -o $OUTPUT_DIR/mobileproxy/gobind golang.org/x/mobile/cmd/gobind
+        run: go build -o ${{ env.OUTPUT_DIR }}/mobileproxy/gobind golang.org/x/mobile/cmd/gobind
         working-directory: ${{ github.workspace }}/x
 
-      - name: Build MobileProxy for iOS
+      - name: Build Mobileproxy for iOS
+        env: 
+          PATH: ${{ env.OUTPUT_DIR }}/mobileproxy:$PATH
         run: |
-          PATH="$OUTPUT_DIR/mobileproxy:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -o "$OUTPUT_DIR/mobileproxy/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+          gomobile bind -ldflags='-s -w' \
+            -target=ios -iosversion=11.0 \
+            -o "${{ env.OUTPUT_DIR }}/mobileproxy/mobileproxy.xcframework" \
+            github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
         working-directory: ${{ github.workspace }}/x
 
-      - name: Build MobileProxy for Android
+      - name: Zip Mobileproxy.xcframework for iOS
         run: |
-          PATH="$OUTPUT_DIR/mobileproxy:$PATH" gomobile bind -ldflags='-s -w' -target=android -androidapi=21 -o "$OUTPUT_DIR/mobileproxy/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
-        working-directory: ${{ github.workspace }}/x
+          cd "${{ env.OUTPUT_DIR }}/mobileproxy"
+          zip -qr mobileproxy.xcframework.zip mobileproxy.xcframework
 
-      - name: Install GitHub CLI
-        uses: actions4gh/setup-gh@v1
+      - name: Build Mobileproxy for Android
+        env: 
+          PATH: ${{ env.OUTPUT_DIR }}/mobileproxy:$PATH
+        run: |
+          gomobile bind -ldflags='-s -w' \
+            -target=android -androidapi=21 \
+            -o "${{ env.OUTPUT_DIR }}/mobileproxy/mobileproxy.aar" \
+            github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+        working-directory: ${{ github.workspace }}/x
 
       - name: Upload Artifacts to Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
-        run: |
-          gh release upload "$RELEASE_TAG" "$OUTPUT_DIR/mobileproxy/mobileproxy.xcframework" \
-          gh release upload "$RELEASE_TAG" "$OUTPUT_DIR/mobileproxy/mobileproxy.aar"
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ inputs.release_tag }}
+          files: |
+            ${{ env.OUTPUT_DIR }}/mobileproxy/mobileproxy.xcframework.zip
+            ${{ env.OUTPUT_DIR }}/mobileproxy/mobileproxy.aar
