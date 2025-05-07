@@ -12,63 +12,22 @@ permissions:
   contents: write
 
 jobs:
-  build_and_release_mobileproxy:
+  release_mobileproxy:
     runs-on: ubuntu-latest
-    env:
-      OUTPUT_DIR: ${{ github.workspace }}/out
     steps:
-      - name: Check out code for the specified tag
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ inputs.release_tag }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version-file: "${{ github.workspace }}/x/go.mod"
 
-      - name: Create Output Directory
-        run: mkdir -p ${{ env.OUTPUT_DIR }}/mobileproxy
+      - name: Install GitHub CLI
+        uses: cli/setup-gh@v2
 
-      - name: Build gomobile
-        run: go build -o ${{ env.OUTPUT_DIR }}/mobileproxy/gomobile golang.org/x/mobile/cmd/gomobile
-        working-directory: ${{ github.workspace }}/x
-
-      - name: Build gobind
-        run: go build -o ${{ env.OUTPUT_DIR }}/mobileproxy/gobind golang.org/x/mobile/cmd/gobind
-        working-directory: ${{ github.workspace }}/x
-
-      - name: Build Mobileproxy for iOS
-        env: 
-          PATH: ${{ env.OUTPUT_DIR }}/mobileproxy:$PATH
-        run: |
-          gomobile bind -ldflags='-s -w' \
-            -target=ios -iosversion=11.0 \
-            -o "${{ env.OUTPUT_DIR }}/mobileproxy/mobileproxy.xcframework" \
-            github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
-        working-directory: ${{ github.workspace }}/x
-
-      - name: Zip Mobileproxy.xcframework for iOS
-        run: |
-          cd "${{ env.OUTPUT_DIR }}/mobileproxy"
-          zip -qr mobileproxy.xcframework.zip mobileproxy.xcframework
-
-      - name: Build Mobileproxy for Android
-        env: 
-          PATH: ${{ env.OUTPUT_DIR }}/mobileproxy:$PATH
-        run: |
-          gomobile bind -ldflags='-s -w' \
-            -target=android -androidapi=21 \
-            -o "${{ env.OUTPUT_DIR }}/mobileproxy/mobileproxy.aar" \
-            github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
-        working-directory: ${{ github.workspace }}/x
-
-      - name: Upload Artifacts to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ inputs.release_tag }}
-          files: |
-            ${{ env.OUTPUT_DIR }}/mobileproxy/mobileproxy.xcframework.zip
-            ${{ env.OUTPUT_DIR }}/mobileproxy/mobileproxy.aar
+      # Using a separate bash script for easier testing
+      - name: Release Mobileproxy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: .github/scripts/release-mobileproxy.sh ${{ inputs.release_tag }}
