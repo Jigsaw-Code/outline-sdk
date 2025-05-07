@@ -72,9 +72,7 @@ func (r *simpleLRUCacheResolver) RemoveExpired() {
 }
 
 func (r *simpleLRUCacheResolver) moveToFront(index int) {
-	entry := r.cache[index]
-	copy(r.cache[1:], r.cache[:index])
-	r.cache[0] = entry
+	moveToFront(r.cache, index)
 }
 
 func makeCacheKey(q dnsmessage.Question) string {
