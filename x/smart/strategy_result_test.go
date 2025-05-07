@@ -122,3 +122,64 @@ func TestWinningStrategy_MarshalFallback(t *testing.T) {
 		})
 	}
 }
+
+func TestWinningStrategy_PromoteProxylessToFront(t *testing.T) {
+	var (
+		httpsDNS  = dnsEntryConfig{HTTPS: &httpsEntryConfig{Name: "h1.example.com", Address: "h1.example.com:443"}}
+		https2DNS = dnsEntryConfig{HTTPS: &httpsEntryConfig{Name: "failed DoH", Address: "failed.doh.com"}}
+		tcpDNS    = dnsEntryConfig{TCP: &tcpEntryConfig{Address: "12.34.43.21:53"}}
+		tcpSplit  = "split:888"
+		tlsFrag   = "tlsfrag:-314"
+	)
+	cases := []struct {
+		name     string
+		winner   string
+		input    configConfig
+		expected configConfig
+	}{{
+		name:     "Single DNS Entry",
+		winner:   `{dns: [{https: {name: "h1.example.com", address: "h1.example.com:443"}}]}`,
+		input:    configConfig{DNS: []dnsEntryConfig{httpsDNS}},
+		expected: configConfig{DNS: []dnsEntryConfig{httpsDNS}},
+	}, {
+		name:     "Single TLS Entry",
+		winner:   `{tls: ["tlsfrag:-314"]}`,
+		input:    configConfig{TLS: []string{tlsFrag}},
+		expected: configConfig{TLS: []string{tlsFrag}},
+	}, {
+		name:     "Multiple DNS and TLS Entries",
+		winner:   `{dns: [{https: {name: "h1.example.com", address: "h1.example.com:443"}}], tls: ["tlsfrag:-314"]}`,
+		input:    configConfig{DNS: []dnsEntryConfig{https2DNS, tcpDNS, httpsDNS}, TLS: []string{tcpSplit, tlsFrag}},
+		expected: configConfig{DNS: []dnsEntryConfig{httpsDNS, https2DNS, tcpDNS}, TLS: []string{tlsFrag, tcpSplit}},
+	}, {
+		name:     "Entries not Found",
+		winner:   `{dns: [{https: {name: "h1.example.com"}}], tls: ["tlsfrag:+314"]}`,
+		input:    configConfig{DNS: []dnsEntryConfig{https2DNS, tcpDNS, httpsDNS}, TLS: []string{tcpSplit, tlsFrag}},
+		expected: configConfig{DNS: []dnsEntryConfig{https2DNS, tcpDNS, httpsDNS}, TLS: []string{tcpSplit, tlsFrag}},
+	}, {
+		name:     "No Input Config",
+		winner:   `{dns: [{udp: {address: "88.88.88.88:53"}}], tls: ["tlsfrag:-314"]}`,
+		input:    configConfig{},
+		expected: configConfig{},
+	}, {
+		name:     "TLS only Winner",
+		winner:   `{tls: ["split:888"]}`,
+		input:    configConfig{DNS: []dnsEntryConfig{tcpDNS, httpsDNS}, TLS: []string{tlsFrag, tcpSplit}},
+		expected: configConfig{DNS: []dnsEntryConfig{tcpDNS, httpsDNS}, TLS: []string{tcpSplit, tlsFrag}},
+	}, {
+		name:     "DNS only Winner",
+		winner:   `{dns: [{https: {name: "h1.example.com", address: "h1.example.com:443"}}]}`,
+		input:    configConfig{DNS: []dnsEntryConfig{tcpDNS, httpsDNS}, TLS: []string{tlsFrag, tcpSplit}},
+		expected: configConfig{DNS: []dnsEntryConfig{httpsDNS, tcpDNS}, TLS: []string{tlsFrag, tcpSplit}},
+	}}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			winner, err := (&StrategyFinder{}).parseConfig([]byte(tc.winner))
+			require.NoError(t, err)
+			winningConfig(winner).promoteProxylessToFront(&tc.input)
+			require.Equal(t, tc.expected, tc.input)
+			require.Nil(t, tc.input.Fallback)
+		})
+	}
+}
