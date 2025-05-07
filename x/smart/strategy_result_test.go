@@ -122,3 +122,148 @@ func TestWinningStrategy_MarshalFallback(t *testing.T) {
 		})
 	}
 }
+
+func TestWinningStrategy_PromoteProxylessToFront(t *testing.T) {
+	var (
+		httpsDNS  = dnsEntryConfig{HTTPS: &httpsEntryConfig{Name: "h1.example.com", Address: "h1.example.com:443"}}
+		https2DNS = dnsEntryConfig{HTTPS: &httpsEntryConfig{Name: "failed DoH", Address: "failed.doh.com"}}
+		tcpDNS    = dnsEntryConfig{TCP: &tcpEntryConfig{Address: "12.34.43.21:53"}}
+		tcpSplit  = "split:888"
+		tlsFrag   = "tlsfrag:-314"
+	)
+	cases := []struct {
+		name     string
+		winner   string
+		input    configConfig
+		expected configConfig
+	}{{
+		name:     "Single DNS Entry",
+		winner:   `{dns: [{https: {name: "h1.example.com", address: "h1.example.com:443"}}]}`,
+		input:    configConfig{DNS: []dnsEntryConfig{httpsDNS}},
+		expected: configConfig{DNS: []dnsEntryConfig{httpsDNS}},
+	}, {
+		name:     "Single TLS Entry",
+		winner:   `{tls: ["tlsfrag:-314"]}`,
+		input:    configConfig{TLS: []string{tlsFrag}},
+		expected: configConfig{TLS: []string{tlsFrag}},
+	}, {
+		name:     "Multiple DNS and TLS Entries",
+		winner:   `{dns: [{https: {name: "h1.example.com", address: "h1.example.com:443"}}], tls: ["tlsfrag:-314"]}`,
+		input:    configConfig{DNS: []dnsEntryConfig{https2DNS, tcpDNS, httpsDNS}, TLS: []string{tcpSplit, tlsFrag}},
+		expected: configConfig{DNS: []dnsEntryConfig{httpsDNS, https2DNS, tcpDNS}, TLS: []string{tlsFrag, tcpSplit}},
+	}, {
+		name:     "Entries not Found",
+		winner:   `{dns: [{https: {name: "h1.example.com"}}], tls: ["tlsfrag:+314"]}`,
+		input:    configConfig{DNS: []dnsEntryConfig{https2DNS, tcpDNS, httpsDNS}, TLS: []string{tcpSplit, tlsFrag}},
+		expected: configConfig{DNS: []dnsEntryConfig{https2DNS, tcpDNS, httpsDNS}, TLS: []string{tcpSplit, tlsFrag}},
+	}, {
+		name:     "No Input Config",
+		winner:   `{dns: [{udp: {address: "88.88.88.88:53"}}], tls: ["tlsfrag:-314"]}`,
+		input:    configConfig{},
+		expected: configConfig{},
+	}, {
+		name:     "TLS only Winner",
+		winner:   `{tls: ["split:888"]}`,
+		input:    configConfig{DNS: []dnsEntryConfig{tcpDNS, httpsDNS}, TLS: []string{tlsFrag, tcpSplit}},
+		expected: configConfig{DNS: []dnsEntryConfig{tcpDNS, httpsDNS}, TLS: []string{tcpSplit, tlsFrag}},
+	}, {
+		name:     "DNS only Winner",
+		winner:   `{dns: [{https: {name: "h1.example.com", address: "h1.example.com:443"}}]}`,
+		input:    configConfig{DNS: []dnsEntryConfig{tcpDNS, httpsDNS}, TLS: []string{tlsFrag, tcpSplit}},
+		expected: configConfig{DNS: []dnsEntryConfig{httpsDNS, tcpDNS}, TLS: []string{tlsFrag, tcpSplit}},
+	}}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			winner, err := (&StrategyFinder{}).parseConfig([]byte(tc.winner))
+			require.NoError(t, err)
+
+			winningConfig(winner).promoteProxylessToFront(&tc.input)
+			require.Equal(t, tc.expected, tc.input)
+			require.Nil(t, tc.input.Fallback)
+
+			// No exclusive fallback config
+			fb, ok := winningConfig(winner).getFallbackIfExclusive(&tc.input)
+			require.False(t, ok)
+			require.Nil(t, fb)
+		})
+	}
+}
+
+func TestWinningStrategy_GetFallbackIfExclusive(t *testing.T) {
+	var (
+		shadowsocksFb  = "ss://Y2hhY2hh@11.22.33.44:19999/?outline=1"
+		shadowsocksFb2 = "ssconf://Here-is-the-dynamic-key.com"
+		psiphonFb      = fallbackEntryStructConfig{Psiphon: map[string]any{
+			"PropagationChannelId": "19980904",
+			"SponsorId":            "G00gle",
+		}}
+	)
+	cases := []struct {
+		name     string
+		winner   string
+		input    configConfig
+		expected fallbackEntryConfig
+	}{{
+		name:     "Single Shadowsocks",
+		winner:   `{fallback: ["ss://Y2hhY2hh@11.22.33.44:19999/?outline=1"]}`,
+		input:    configConfig{Fallback: []fallbackEntryConfig{shadowsocksFb}},
+		expected: shadowsocksFb,
+	}, {
+		name:     "Multiple Entries Found Shadowsocks",
+		winner:   `{fallback: ["ss://Y2hhY2hh@11.22.33.44:19999/?outline=1"]}`,
+		input:    configConfig{Fallback: []fallbackEntryConfig{psiphonFb, shadowsocksFb}},
+		expected: shadowsocksFb,
+	}, {
+		name:     "Multiple Entries Found Psiphon",
+		winner:   `{fallback: [{psiphon: {PropagationChannelId: "19980904", SponsorId: G00gle}}]}`,
+		input:    configConfig{Fallback: []fallbackEntryConfig{shadowsocksFb, psiphonFb}},
+		expected: psiphonFb,
+	}, {
+		name:     "Shadowsocks not Found",
+		winner:   `{fallback: ["https://a-different-dynamic-key.com"]}`,
+		input:    configConfig{Fallback: []fallbackEntryConfig{shadowsocksFb, shadowsocksFb2}},
+		expected: nil,
+	}, {
+		name:     "Psiphon not Found",
+		winner:   `{fallback: [{psiphon: {PropagationChannelId: "19980904", SponsorId: Google}}]}`,
+		input:    configConfig{Fallback: []fallbackEntryConfig{psiphonFb}},
+		expected: nil,
+	}, {
+		name:     "Fallback not Exclusive cuz DNS",
+		winner:   `{dns: [{https: {name: "h1.example.com"}}], fallback: ["not-really-matter"]}`,
+		input:    configConfig{Fallback: []fallbackEntryConfig{shadowsocksFb}},
+		expected: nil,
+	}, {
+		name:     "Fallback not Exclusive cuz TLS",
+		winner:   `{tls: ["n1.example.com"], fallback: ["not-really-matter"]}`,
+		input:    configConfig{Fallback: []fallbackEntryConfig{psiphonFb}},
+		expected: nil,
+	}, {
+		name:     "Fallback not Exclusive cuz Multiple Winners",
+		winner:   `{fallback: ["not-really-matter", "not-really-matter"]}`,
+		input:    configConfig{Fallback: []fallbackEntryConfig{shadowsocksFb, psiphonFb}},
+		expected: nil,
+	}}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			winner, err := (&StrategyFinder{}).parseConfig([]byte(tc.winner))
+			require.NoError(t, err)
+
+			actual, found := winningConfig(winner).getFallbackIfExclusive(&tc.input)
+			if tc.expected != nil {
+				require.True(t, found)
+				require.Equal(t, tc.expected, actual)
+			} else {
+				require.False(t, found)
+				require.Nil(t, actual)
+			}
+
+			// No changes for proxyless
+			winningConfig(winner).promoteProxylessToFront(&tc.input)
+			require.Nil(t, tc.input.DNS)
+			require.Nil(t, tc.input.TLS)
+		})
+	}
+}
