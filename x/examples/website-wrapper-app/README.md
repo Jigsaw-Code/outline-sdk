@@ -21,7 +21,6 @@ To verify that your system has the necessary dependencies to generate your web w
 > You can only build iOS apps on MacOS.
 
 * You will need the url you want to load initially in your app.
-* You will need [go](https://golang.org/) to build the SDK library.
 * You will need [Node.js](https://nodejs.org/en/) for the project setup and web server.
 * You will need [XCode](https://developer.apple.com/xcode/). 
 * You will need [cocoapods](https://cocoapods.org/). 
@@ -66,7 +65,6 @@ npx capacitor-assets generate --ios
 
 * You will need the url you want to load initially in your app.
 * You will need [Node.js](https://nodejs.org/en/) for the project setup and web server.
-* You will need [go](https://golang.org/) to build the SDK library.
 * You will need [JDK 17](https://stackoverflow.com/a/70649641) to build the app.
 * You will need [Android Studio](https://developer.android.com/studio/).
   * Make sure to [install the NDK](https://developer.android.com/studio/projects/install-ndk#default-version).

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { exec, execFile } from "node:child_process";
+import { exec } from "node:child_process";
 import { glob } from "glob";
 import { promisify } from "node:util";
 import chalk from "chalk";
@@ -52,25 +52,6 @@ export default async function main(
     output,
     "wrapper_app_project.zip",
   );
-
-  const SDK_MOBILEPROXY_OUTPUT_DIR = path.resolve(output, "mobileproxy");
-  const WRAPPER_APP_OUTPUT_SDK_MOBILEPROXY_DIR = path.resolve(
-    WRAPPER_APP_OUTPUT_DIR,
-    "mobileproxy",
-  );
-
-  if (!fs.existsSync(SDK_MOBILEPROXY_OUTPUT_DIR)) {
-    console.log(
-      `Building the Outline SDK mobileproxy library for ${platform}...`,
-    );
-
-    await promisify(execFile)("npm", [
-      "run",
-      "build:mobileproxy",
-      platform,
-      output,
-    ], { shell: false });
-  }
 
   const sourceFilepaths = await glob(
     path.join(WRAPPER_APP_TEMPLATE_DIR, "**", "*"),
