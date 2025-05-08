@@ -24,5 +24,6 @@ output-metadata.json
 #.yarn/unplugged
 #.yarn/build-state.yml
 
-# Builds
+# Tasks
+.task
 out
