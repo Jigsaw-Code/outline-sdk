@@ -27,14 +27,14 @@ import (
 type JSONFileCache struct {
 	path  string
 	mu    sync.RWMutex
-	cache map[string][]byte
+	cache map[string]string
 }
 
 // NewJSONFileCache creates a new JSONFileCache.
 func NewJSONFileCache(path string) (*JSONFileCache, error) {
 	c := &JSONFileCache{
 		path:  path,
-		cache: make(map[string][]byte),
+		cache: make(map[string]string),
 	}
 	data, err := os.ReadFile(c.path)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -67,12 +67,12 @@ func (c *JSONFileCache) flushNoLock() error {
 }
 
 // Get retrieves a strategy result string associated with the given key.
-func (c *JSONFileCache) Get(key string) (val []byte, ok bool) {
+func (c *JSONFileCache) Get(key string) ([]byte, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	val, ok = c.cache[key]
-	return
+	val, ok := c.cache[key]
+	return []byte(val), ok
 }
 
 // Put adds the strategy result string to the cache with the given key.
@@ -83,7 +83,7 @@ func (c *JSONFileCache) Put(key string, val []byte) {
 	if val == nil {
 		delete(c.cache, key)
 	} else {
-		c.cache[key] = val
+		c.cache[key] = string(val)
 	}
 	c.flushNoLock()
 }
