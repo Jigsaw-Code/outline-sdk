@@ -1,0 +1,74 @@
+version: '3'
+
+vars:
+  OUTPUT_DIR: 'out'
+
+  MOBILEPROXY_MODULE: github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+  MOBILEPROXY_ARTIFACT_DIR: '{{.OUTPUT_DIR}}/mobileproxy'
+  MOBILEPROXY_BUILD_TOOLS_DIR: '{{.OUTPUT_DIR}}/mobileproxy_build_tools'
+
+  IOS_MINIMUM_VERSION: 11.0
+  IOS_FRAMEWORK_NAME: mobileproxy.xcframework
+  IOS_FRAMEWORK_PATH: '{{.MOBILEPROXY_ARTIFACT_DIR}}/{{.IOS_FRAMEWORK_NAME}}'
+  IOS_ZIP_NAME: '{{.IOS_FRAMEWORK_NAME}}.zip'
+  IOS_ZIP_PATH: '{{.MOBILEPROXY_ARTIFACT_DIR}}/{{.IOS_ZIP_NAME}}'
+
+  ANDROID_MIN_SDK_VERSION: 21
+  ANDROID_AAR_NAME: mobileproxy.aar
+  ANDROID_AAR_PATH: '{{.MOBILEPROXY_ARTIFACT_DIR}}/{{.ANDROID_AAR_NAME}}'
+
+tasks:
+  build:mobileproxy:
+    desc: Builds and packages all mobileproxy artifacts.
+    deps: [build:mobileproxy:ios, build:mobileproxy:android]
+    cmds:
+      - echo "Mobileproxy build complete."
+      - 'echo "Artifacts are in: {{.ROOT_DIR}}/{{.MOBILEPROXY_ARTIFACT_DIR}}"'
+      - 'echo "  iOS (zipped): {{.ROOT_DIR}}/{{.IOS_ZIP_PATH}}"'
+      - 'echo "  Android AAR: {{.ROOT_DIR}}/{{.ANDROID_AAR_PATH}}"'
+
+  build:mobileproxy:ios:
+    desc: Builds Mobileproxy.xcframework for iOS.
+    deps: [setup:mobileproxy]
+    cmds:
+      - PATH={{.ROOT_DIR}}/{{.MOBILEPROXY_BUILD_TOOLS_DIR}}:$PATH gomobile bind -ldflags='-s -w' -target=ios -iosversion={{.IOS_MINIMUM_VERSION}} -o {{.ROOT_DIR}}/{{.IOS_FRAMEWORK_PATH}} {{.MOBILEPROXY_MODULE}}
+      - (cd {{.ROOT_DIR}}/{{.MOBILEPROXY_ARTIFACT_DIR}} && zip -qr {{.IOS_ZIP_NAME}} {{.IOS_FRAMEWORK_NAME}})
+    sources:
+      - mobileproxy/**/*.go
+      - go.mod
+      - go.sum
+    generates:
+      - '{{.ROOT_DIR}}/{{.IOS_FRAMEWORK_PATH}}'
+      - '{{.ROOT_DIR}}/{{.IOS_ZIP_PATH}}'
+
+  build:mobileproxy:android:
+    desc: Builds mobileproxy.aar for Android.
+    deps: [setup:mobileproxy]
+    cmds:
+      - PATH={{.ROOT_DIR}}/{{.MOBILEPROXY_BUILD_TOOLS_DIR}}:$PATH gomobile bind -ldflags='-s -w' -target=android -androidapi={{.ANDROID_MIN_SDK_VERSION}} -o {{.ROOT_DIR}}/{{.ANDROID_AAR_PATH}} {{.MOBILEPROXY_MODULE}}
+    sources:
+      - mobileproxy/**/*.go
+      - go.mod
+      - go.sum
+    generates:
+      - '{{.ROOT_DIR}}/{{.ANDROID_AAR_PATH}}'
+
+  setup:mobileproxy:
+    desc: Creates necessary output directories and local tools.
+    cmds:
+      - mkdir -p {{.ROOT_DIR}}/{{.MOBILEPROXY_BUILD_TOOLS_DIR}}
+      - mkdir -p {{.ROOT_DIR}}/{{.MOBILEPROXY_ARTIFACT_DIR}}
+      - go build -v -o {{.ROOT_DIR}}/{{.MOBILEPROXY_BUILD_TOOLS_DIR}}/gomobile golang.org/x/mobile/cmd/gomobile
+      - go build -v -o {{.ROOT_DIR}}/{{.MOBILEPROXY_BUILD_TOOLS_DIR}}/gobind golang.org/x/mobile/cmd/gobind
+    sources:
+      - go.mod
+      - go.sum
+    generates:
+      - '{{.ROOT_DIR}}/{{.MOBILEPROXY_BUILD_TOOLS_DIR}}/gomobile'
+      - '{{.ROOT_DIR}}/{{.MOBILEPROXY_BUILD_TOOLS_DIR}}/gobind'
+
+  clean:
+    desc: Removes all generated build artifacts and local tools.
+    cmds:
+      - 'echo "Cleaning output directory: {{.ROOT_DIR}}/{{.OUTPUT_DIR}}"'
+      - rm -rf {{.ROOT_DIR}}/{{.OUTPUT_DIR}}
