@@ -60,7 +60,7 @@ if [[ -n "${GH_TOKEN:-}" ]]; then
 else
   CLONE_URL="https://%s@${CLONE_URL_BASE}"
 fi
-git clone --depth 1 --branch "${RELEASE_TAG}" "${CLONE_URL}" "${CLONE_DIR}"
+git clone --depth 1 --branch "${RELEASE_TAG}" "https://github.com/Jigsaw-Code/outline-sdk.git" "${CLONE_DIR}"
 
 X_DIR_IN_CLONE="${CLONE_DIR}/x"
 MOBILEPROXY_BUILD_TOOLS_DIR="${OUTPUT_DIR}/mobileproxy_build_tools"
