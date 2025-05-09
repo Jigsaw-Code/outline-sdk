@@ -21,6 +21,7 @@ import fs from "node:fs";
 import handlebars from "handlebars";
 import path from "node:path";
 import minimist from "minimist";
+import YAML from 'yaml';
 
 const OUTPUT_DIR = path.join(process.cwd(), "output");
 const WRAPPER_APP_TEMPLATE_DIR = path.join(
@@ -227,7 +228,19 @@ function resolveTemplateArguments(
   return result;
 }
 
-if (decodeURI(import.meta.url).endsWith(process.argv[1])) {
+fs.readFile('config.yaml', 'utf8', (err, data) => {
+  if (err) {
+    throw new Error(err);
+    return;
+  }
+  const dict = YAML.parse(data);
+  console.log(dict);
+  console.log(dict.smartDialerConfig.dns)
+});
+
+
+
+if (false && decodeURI(import.meta.url).endsWith(process.argv[1])) {
   const args = minimist(process.argv.slice(2));
 
   if (!args.platform) {

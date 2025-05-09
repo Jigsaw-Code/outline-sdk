@@ -1,0 +1,16 @@
+platform: android
+entryUrl: https://www.example.com
+appName: 
+appId: 
+output: output
+additionalDomains:
+    - 
+smartDialerConfig:
+    dns:
+        - https:
+            name: 9.9.9.9
+    tls:
+        -
+        - split:1
+        - split:2
+        - tlsfrag:1

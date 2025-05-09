@@ -5,7 +5,8 @@
     "chalk": "^5.4.1",
     "http-proxy": "^1.18.1",
     "minimist": "^1.2.8",
-    "serve-handler": "6.1.6"
+    "serve-handler": "6.1.6",
+    "yaml": "^2.7.1"
   },
   "devDependencies": {
     "glob": "^11.0.1",
