@@ -136,7 +136,7 @@ export default async function main(
 
   console.log("Installing external dependencies for the project...");
   await promisify(exec)(`
-    cd ${WRAPPER_APP_OUTPUT_DIR}
+    cd ${WRAPPER_APP_OUTPUT_DIR.replaceAll(" ", "\\ ")}
     npm install
     npx cap sync ${platform}
   `);
@@ -227,7 +227,7 @@ function resolveTemplateArguments(
   return result;
 }
 
-if (import.meta.url.endsWith(process.argv[1])) {
+if (decodeURI(import.meta.url).endsWith(process.argv[1])) {
   const args = minimist(process.argv.slice(2));
 
   if (!args.platform) {
