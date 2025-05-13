@@ -248,22 +248,32 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 		testAddr := net.JoinHostPort(testDomain, "443")
 		f.logCtx(ctx, "🏃 running test: '%v' (domain: %v)\n", transportCfg, testDomain)
 
-		ctx, cancel := context.WithTimeout(ctx, f.TestTimeout)
+		testCtx, cancel := context.WithTimeout(ctx, f.TestTimeout)
 		defer cancel()
-		testConn, err := dialer.DialStream(ctx, testAddr)
+
+		timeoutChan := make(chan struct{})
+		go func() {
+			<-testCtx.Done()
+			if errors.Is(testCtx.Err(), context.DeadlineExceeded) {
+				f.logCtx(ctx, "⏱️ dialer failure, test timed out: '%v' (domain: %v), duration=%v ❌\n", transportCfg, testDomain, time.Since(startTime))
+				close(timeoutChan)
+			}
+		}()
+
+		testConn, err := dialer.DialStream(testCtx, testAddr)
 		if err != nil {
-			f.logCtx(ctx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+			f.logCtx(testCtx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 			return err
 		}
 		tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
-		err = tlsConn.HandshakeContext(ctx)
+		err = tlsConn.HandshakeContext(testCtx)
 		if err != nil {
-			f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+			f.logCtx(testCtx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 			return err
 		}
-		f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
+		f.logCtx(testCtx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
 
-		f.logCtx(ctx, "🏃 running response test: (resource: HEAD %v/)\n", testDomain)
+		f.logCtx(testCtx, "🏃 running response test: (resource: HEAD %v/)\n", testDomain)
 
 		request := "HEAD / HTTP/1.1\r\n" +
 			"Host: " + testDomain[:len(testDomain)-1] + "\r\n" +
@@ -271,23 +281,23 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 			"\r\n"
 		_, err = tlsConn.Write([]byte(request))
 		if err != nil {
-			f.logCtx(ctx, "🏁 failed to write request error=%v ❌ \n", err)
+			f.logCtx(testCtx, "🏁 failed to write request error=%v ❌ \n", err)
 			return err
 		}
 
 		response, err := io.ReadAll(tlsConn)
 		if err != nil {
-			f.logCtx(ctx, "🏁 reading response error=%v ❌ \n", err)
+			f.logCtx(testCtx, "🏁 reading response error=%v ❌ \n", err)
 			return err
 		}
 		tlsConn.Close()
 
 		sizeKB := float64(len(response)) / 1024.0
 		if sizeKB == 0 {
-			f.logCtx(ctx, "🏁 response had no content ❌ \n")
+			f.logCtx(testCtx, "🏁 response had no content ❌ \n")
 		}
 
-		f.logCtx(ctx, "🏁 success: '%v' (resource: HEAD %v/, response: %.2f KB), duration=%v, status=ok ✅\n", transportCfg, testDomain, sizeKB, time.Since(startTime))
+		f.logCtx(testCtx, "🏁 success: '%v' (resource: HEAD %v/, response: %.2f KB), duration=%v, status=ok ✅\n", transportCfg, testDomain, sizeKB, time.Since(startTime))
 	}
 	return nil
 }
