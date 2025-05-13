@@ -275,7 +275,7 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 
 		f.logCtx(testCtx, "🏃 running response test: (resource: HEAD %v/)\n", testDomain)
 
-		request := "HEAD / HTTP/1.1\r\n" +
+		request := "GET /image/69105246_605.webp HTTP/1.1\r\n" +
 			"Host: " + testDomain[:len(testDomain)-1] + "\r\n" +
 			"Connection: close\r\n" +
 			"\r\n"
