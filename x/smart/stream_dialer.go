@@ -263,6 +263,29 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 			return err
 		}
 		f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
+
+		// Check a valid path through the same TLS connection
+		path := "/image/69105246_605.webp"
+		f.logCtx(ctx, "🏃 running response test: (domain: %v, path: %v)\n", testDomain, path)
+
+		request := "GET " + path + " HTTP/1.1\r\n" +
+			"Host: " + testDomain[:len(testDomain)-1] + "\r\n" +
+			"Connection: close\r\n" +
+			"\r\n"
+		_, err = tlsConn.Write([]byte(request))
+
+		if err != nil {
+			f.logCtx(ctx, "🏁 failed to write request %v error=%v ❌ \n", path, err)
+		}
+
+		response, err := io.ReadAll(tlsConn)
+		if err != nil {
+			f.logCtx(ctx, "🏁 reading response error=%v ❌ \n", err)
+		}
+		tlsConn.Close()
+		sizeKB := float64(len(response)) / 1024.0
+
+		f.logCtx(ctx, "🏁 success: '%v' (domain: %v, path: %v, response: %.2f KB), duration=%v, status=ok ✅\n", transportCfg, testDomain, path, sizeKB, time.Since(startTime))
 	}
 	return nil
 }
