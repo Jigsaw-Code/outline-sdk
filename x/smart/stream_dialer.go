@@ -274,11 +274,13 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 
 		if err != nil {
 			f.logCtx(ctx, "🏁 failed to write request %v error=%v ❌ \n", resource, err)
+			return err
 		}
 
 		response, err := io.ReadAll(tlsConn)
 		if err != nil {
 			f.logCtx(ctx, "🏁 reading response error=%v ❌ \n", err)
+			return err
 		}
 		tlsConn.Close()
 		sizeKB := float64(len(response)) / 1024.0
