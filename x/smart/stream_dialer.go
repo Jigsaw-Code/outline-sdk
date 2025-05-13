@@ -263,17 +263,15 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 		}
 		f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
 
-		resource := "HEAD / HTTP/1.1"
-		f.logCtx(ctx, "🏃 running response test: (domain: %v, resource: %v)\n", testDomain, resource)
+		f.logCtx(ctx, "🏃 running response test: (resource: HEAD %v/)\n", testDomain)
 
-		request := resource + "\r\n" +
+		request := "HEAD / HTTP/1.1\r\n" +
 			"Host: " + testDomain[:len(testDomain)-1] + "\r\n" +
 			"Connection: close\r\n" +
 			"\r\n"
 		_, err = tlsConn.Write([]byte(request))
-
 		if err != nil {
-			f.logCtx(ctx, "🏁 failed to write request %v error=%v ❌ \n", resource, err)
+			f.logCtx(ctx, "🏁 failed to write request error=%v ❌ \n", err)
 			return err
 		}
 
@@ -283,12 +281,13 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 			return err
 		}
 		tlsConn.Close()
+
 		sizeKB := float64(len(response)) / 1024.0
 		if sizeKB == 0 {
 			f.logCtx(ctx, "🏁 response had no content ❌ \n")
 		}
 
-		f.logCtx(ctx, "🏁 success: '%v' (domain: %v, resource: %v, response: %.2f KB), duration=%v, status=ok ✅\n", transportCfg, testDomain, resource, sizeKB, time.Since(startTime))
+		f.logCtx(ctx, "🏁 success: '%v' (resource: HEAD %v/, response: %.2f KB), duration=%v, status=ok ✅\n", transportCfg, testDomain, sizeKB, time.Since(startTime))
 	}
 	return nil
 }
