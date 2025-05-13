@@ -17,6 +17,7 @@ import { glob } from "glob";
 import { promisify } from "node:util";
 import chalk from "chalk";
 import archiver from "archiver";
+import { promises as fsp } from 'fs';
 import fs from "node:fs";
 import handlebars from "handlebars";
 import path from "node:path";
@@ -29,12 +30,27 @@ const WRAPPER_APP_TEMPLATE_DIR = path.join(
   "wrapper_app_project/template",
 );
 
-const DEFAULT_SMART_DIALER_CONFIG = JSON.stringify({
+const DEFAULT_SMART_DIALER_CONFIG = {
   dns: [{
     https: { name: "9.9.9.9" },
   }],
   tls: ["", "split:1", "split:2", "tlsfrag:1"],
-});
+};
+
+const SMART_DIALER_CONFIG = await (async () => {
+  const data = await fsp.readFile('config.yaml', 'utf8')
+    .catch((e) => {
+      if (e?.code === 'ENOENT') { return undefined; }
+      else if (e) { throw new Error(e); }
+    });
+  
+  if (!data) return undefined;
+  
+  const dict = YAML.parse(data);
+  const config = dict?.smartDialerConfig;
+
+  return config ? JSON.stringify(config) : undefined;
+})() ?? JSON.stringify(DEFAULT_SMART_DIALER_CONFIG);
 
 export default async function main(
   {
@@ -45,7 +61,7 @@ export default async function main(
     navigationUrl,
     output = OUTPUT_DIR,
     platform,
-    smartDialerConfig = DEFAULT_SMART_DIALER_CONFIG,
+    smartDialerConfig = SMART_DIALER_CONFIG,
   },
 ) {
   const WRAPPER_APP_OUTPUT_DIR = path.resolve(output, "wrapper_app_project");
@@ -228,19 +244,7 @@ function resolveTemplateArguments(
   return result;
 }
 
-fs.readFile('config.yaml', 'utf8', (err, data) => {
-  if (err) {
-    throw new Error(err);
-    return;
-  }
-  const dict = YAML.parse(data);
-  console.log(dict);
-  console.log(dict.smartDialerConfig.dns)
-});
-
-
-
-if (false && decodeURI(import.meta.url).endsWith(process.argv[1])) {
+if (decodeURI(import.meta.url).endsWith(process.argv[1])) {
   const args = minimist(process.argv.slice(2));
 
   if (!args.platform) {
