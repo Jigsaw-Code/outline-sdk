@@ -32,9 +32,9 @@ import (
 
 	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
+	"github.com/goccy/go-yaml"
 	"github.com/lmittmann/tint"
 	"golang.org/x/term"
-	"gopkg.in/yaml.v3"
 )
 
 func init() {

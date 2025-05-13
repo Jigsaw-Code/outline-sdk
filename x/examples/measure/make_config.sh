@@ -17,14 +17,12 @@ cat <<EOF
 num_attempts: 1
 proto: tls
 domains:
-  # - www.youtube.com
-  - redirector.googlevideo.com
-  # - m.youtube.com
-  # - i.ytimg.com
+  # - example.com
+  - google.com
 strategies:
   - "tlsfrag:1"
   - "tlsfrag:2"
 isp_proxies:
-  - "socks5://package-${SOAX_PACKAGE_RESIDENTIAL}-sessionlength-3600-sessionid-RESTELECOM${SESSION_ID}-country-ru-isp-rostelecom:${SOAX_KEY_RESIDENTIAL}@proxy.soax.com:5000"
-  - "socks5://package-${SOAX_PACKAGE_RESIDENTIAL}-sessionlength-3600-sessionid-BEELINEHOME${SESSION_ID}-country-ru-isp-beeline%20home:${SOAX_KEY_RESIDENTIAL}@proxy.soax.com:5000"
+  - "socks5://package-${SOAX_PACKAGE_RESIDENTIAL}-sessionlength-3600-sessionid-ABC${SESSION_ID}:${SOAX_KEY_RESIDENTIAL}@proxy.soax.com:5000"
+  - "socks5://package-${SOAX_PACKAGE_RESIDENTIAL}-sessionlength-3600-sessionid-ABC${SESSION_ID}:${SOAX_KEY_RESIDENTIAL}@proxy.soax.com:5000"
 EOF
