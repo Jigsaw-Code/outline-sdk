@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/websocket"
+	"github.com/Jigsaw-Code/outline-sdk/websocket"
 )
 
 type wsConfig struct {
