@@ -260,44 +260,53 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 			}
 		}()
 
-		testConn, err := dialer.DialStream(testCtx, testAddr)
-		if err != nil {
-			f.logCtx(testCtx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-			return err
-		}
-		tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
-		err = tlsConn.HandshakeContext(testCtx)
-		if err != nil {
-			f.logCtx(testCtx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-			return err
-		}
-		f.logCtx(testCtx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
+		for i := 0; i < 10; i++ {
 
-		f.logCtx(testCtx, "🏃 running response test: (resource: HEAD %v/)\n", testDomain)
+			testConn, err := dialer.DialStream(testCtx, testAddr)
+			if err != nil {
+				f.logCtx(testCtx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+				return err
+			}
 
-		request := "GET /image/69105246_605.webp HTTP/1.1\r\n" +
-			"Host: " + testDomain[:len(testDomain)-1] + "\r\n" +
-			"Connection: close\r\n" +
-			"\r\n"
-		_, err = tlsConn.Write([]byte(request))
-		if err != nil {
-			f.logCtx(testCtx, "🏁 failed to write request error=%v ❌ \n", err)
-			return err
+			tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
+			err = tlsConn.HandshakeContext(testCtx)
+			if err != nil {
+				f.logCtx(testCtx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+				return err
+			}
+			f.logCtx(testCtx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
+
+			f.logCtx(testCtx, "🏃 running response test: (resource: HEAD %v/)\n", testDomain)
+
+			f.logCtx(testCtx, "looping %v\n", i)
+
+			request := "GET /image/69105246_605.webp HTTP/1.1\r\n" +
+				"Host: " + testDomain[:len(testDomain)-1] + "\r\n" +
+				"Connection: close\r\n" +
+				"\r\n"
+			_, err = tlsConn.Write([]byte(request))
+			if err != nil {
+				f.logCtx(testCtx, "🏁 failed to write request error=%v ❌ \n", err)
+				return err
+			}
+
+			response, err := io.ReadAll(tlsConn)
+			if err != nil {
+				f.logCtx(testCtx, "🏁 reading response error=%v ❌ \n", err)
+				return err
+			}
+
+			tlsConn.Close()
+
+			sizeKB := float64(len(response)) / 1024.0
+			if sizeKB == 0 {
+				f.logCtx(testCtx, "🏁 response had no content ❌ \n")
+			}
+
+			f.logCtx(testCtx, "🏁 success: '%v' (resource: HEAD %v/, response: %.2f KB), duration=%v, status=ok ✅\n", transportCfg, testDomain, sizeKB, time.Since(startTime))
+
 		}
 
-		response, err := io.ReadAll(tlsConn)
-		if err != nil {
-			f.logCtx(testCtx, "🏁 reading response error=%v ❌ \n", err)
-			return err
-		}
-		tlsConn.Close()
-
-		sizeKB := float64(len(response)) / 1024.0
-		if sizeKB == 0 {
-			f.logCtx(testCtx, "🏁 response had no content ❌ \n")
-		}
-
-		f.logCtx(testCtx, "🏁 success: '%v' (resource: HEAD %v/, response: %.2f KB), duration=%v, status=ok ✅\n", transportCfg, testDomain, sizeKB, time.Since(startTime))
 	}
 	return nil
 }
