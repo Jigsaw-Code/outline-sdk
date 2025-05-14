@@ -114,7 +114,7 @@ func main() {
 
 	finder := smart.StrategyFinder{
 		LogWriter:    debugLog.Writer(),
-		TestTimeout:  5 * time.Second,
+		TestTimeout:  60 * time.Second,
 		StreamDialer: streamDialer,
 		PacketDialer: packetDialer,
 	}
