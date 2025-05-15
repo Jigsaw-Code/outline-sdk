@@ -278,7 +278,7 @@ func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsC
 	ctx, searchDone := context.WithCancel(ctx)
 	defer searchDone()
 	raceStart := time.Now()
-	resolver, err := raceTests(ctx, 250*time.Millisecond, resolvers, func(resolver *smartResolver) (*smartResolver, error) {
+	resolver, _, err := raceTests(ctx, 250*time.Millisecond, resolvers, func(resolver *smartResolver) (*smartResolver, error) {
 		for _, testDomain := range testDomains {
 			select {
 			case <-ctx.Done():
@@ -327,7 +327,7 @@ func (f *StrategyFinder) findTLS(
 		Dialer transport.StreamDialer
 		Config string
 	}
-	result, err := raceTests(ctx, 250*time.Millisecond, tlsConfig, func(transportCfg string) (*SearchResult, error) {
+	result, _, err := raceTests(ctx, 250*time.Millisecond, tlsConfig, func(transportCfg string) (*SearchResult, error) {
 		tlsDialer, err := configModule.NewStreamDialer(ctx, transportCfg)
 		if err != nil {
 			return nil, fmt.Errorf("WrapStreamDialer failed: %w", err)
@@ -418,7 +418,7 @@ func (f *StrategyFinder) findFallback(
 
 	configModule := configurl.NewDefaultProviders()
 
-	fallback, err := raceTests(raceCtx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
+	fallback, _, err := raceTests(raceCtx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
 		dialer, configSignature, err := f.makeDialerFromConfig(raceCtx, configModule, fallbackConfig)
 		if err != nil {
 			f.logCtx(raceCtx, "❌ Failed to start dialer: %v %v\n", configSignature, err)

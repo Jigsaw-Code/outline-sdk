@@ -31,7 +31,12 @@ func newClosedChanel() <-chan struct{} {
 // That entry is returned. A test is only started after the previous test finished or maxWait is done, whichever
 // happens first. That way you bound the wait for a test, and they may overlap.
 // The test function should make use of the context to stop doing work when the race is done and it is no longer needed.
-func raceTests[E any, R any](ctx context.Context, maxWait time.Duration, entries []E, test func(entry E) (R, error)) (R, error) {
+// Returns:
+//
+//	r Result from the first successful test
+//	[]errors : list of any errors generated from the individual entries so far
+//	error : overall error, nil if any test succeeded, otherwise "all tests failed"
+func raceTests[E any, R any](ctx context.Context, maxWait time.Duration, entries []E, test func(entry E) (R, error)) (R, []error, error) {
 	type testResult struct {
 		Result R
 		Err    error
@@ -39,6 +44,7 @@ func raceTests[E any, R any](ctx context.Context, maxWait time.Duration, entries
 	// Communicates the result of each test.
 	resultChan := make(chan testResult, len(entries))
 	waitCh := newClosedChanel()
+	var errs []error
 
 	next := 0
 	for toTest := len(entries); toTest > 0; {
@@ -46,7 +52,7 @@ func raceTests[E any, R any](ctx context.Context, maxWait time.Duration, entries
 		// Search cancelled, quit.
 		case <-ctx.Done():
 			var empty R
-			return empty, ctx.Err()
+			return empty, errs, ctx.Err()
 
 		// Ready to start testing another resolver.
 		case <-waitCh:
@@ -71,11 +77,12 @@ func raceTests[E any, R any](ctx context.Context, maxWait time.Duration, entries
 		case result := <-resultChan:
 			toTest--
 			if result.Err != nil {
+				errs = append(errs, result.Err)
 				continue
 			}
-			return result.Result, nil
+			return result.Result, errs, nil
 		}
 	}
 	var empty R
-	return empty, errors.New("all tests failed")
+	return empty, errs, errors.New("all tests failed")
 }
