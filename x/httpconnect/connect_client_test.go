@@ -15,95 +15,286 @@
 package httpconnect
 
 import (
-	"bufio"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
-	"github.com/stretchr/testify/require"
+	"encoding/json"
+	"encoding/pem"
+	"io"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
+
+	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/quic-go/quic-go/http3"
+	"github.com/stretchr/testify/require"
+
+	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
 )
 
-func TestConnectClientOk(t *testing.T) {
-	t.Parallel()
-
-	creds := base64.StdEncoding.EncodeToString([]byte("username:password"))
-
-	targetSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodGet, r.Method, "Method")
+func newTargetSrv(t *testing.T, resp interface{}) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, err := w.Write([]byte("HTTP/1.1 200 OK\r\n"))
+
+		jsonResp, err := json.Marshal(resp)
+		require.NoError(t, err)
+
+		_, err = w.Write(jsonResp)
 		require.NoError(t, err)
 	}))
-	defer targetSrv.Close()
-
-	targetURL, err := url.Parse(targetSrv.URL)
-	require.NoError(t, err)
-
-	tcpDialer := &transport.TCPDialer{Dialer: net.Dialer{}}
-	connectHandler := httpproxy.NewConnectHandler(tcpDialer)
-	proxySrv := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		require.Equal(t, "Basic "+creds, request.Header.Get("Proxy-Authorization"))
-		connectHandler.ServeHTTP(writer, request)
-	}))
-	defer proxySrv.Close()
-
-	proxyURL, err := url.Parse(proxySrv.URL)
-	require.NoError(t, err, "Parse")
-
-	connClient, err := NewConnectClient(
-		tcpDialer,
-		proxyURL.Host,
-		WithHeaders(http.Header{"Proxy-Authorization": []string{"Basic " + creds}}),
-	)
-	require.NoError(t, err, "NewConnectClient")
-
-	streamConn, err := connClient.DialStream(context.Background(), targetURL.Host)
-	require.NoError(t, err, "DialStream")
-	require.NotNil(t, streamConn, "StreamConn")
-
-	req, err := http.NewRequest(http.MethodGet, targetSrv.URL, nil)
-	require.NoError(t, err, "NewRequest")
-
-	err = req.Write(streamConn)
-	require.NoError(t, err, "Write")
-
-	resp, err := http.ReadResponse(bufio.NewReader(streamConn), req)
-	require.NoError(t, err, "ReadResponse")
-
-	require.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
-func TestConnectClientFail(t *testing.T) {
+func Test_NewConnectClient_Ok(t *testing.T) {
 	t.Parallel()
 
-	targetURL := "somehost:1234"
+	type closeFunc func()
 
-	proxySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodConnect, r.Method, "Method")
-		require.Equal(t, targetURL, r.Host, "Host")
+	type TestCase struct {
+		name          string
+		prepareDialer func(t *testing.T) (transport.StreamDialer, closeFunc)
+	}
 
-		w.WriteHeader(http.StatusBadRequest)
-		_, err := w.Write([]byte("HTTP/1.1 400 Bad request\r\n\r\n"))
-		require.NoError(t, err, "Write")
-	}))
-	defer proxySrv.Close()
+	tests := []TestCase{
+		{
+			name: "ok. HTTP/1 with headers",
+			prepareDialer: func(t *testing.T) (transport.StreamDialer, closeFunc) {
+				creds := base64.StdEncoding.EncodeToString([]byte("username:password"))
 
-	proxyURL, err := url.Parse(proxySrv.URL)
-	require.NoError(t, err, "Parse")
+				tcpDialer := &transport.TCPDialer{}
+				connectHandler := httpproxy.NewConnectHandler(tcpDialer)
+				proxySrv := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+					require.Equal(t, "Basic "+creds, request.Header.Get("Proxy-Authorization"))
+					connectHandler.ServeHTTP(writer, request)
+				}))
 
-	connClient, err := NewConnectClient(
-		&transport.TCPDialer{
-			Dialer: net.Dialer{},
+				proxyURL, err := url.Parse(proxySrv.URL)
+				require.NoError(t, err, "Parse")
+
+				tr, err := NewHTTPProxyTransport(tcpDialer, proxyURL.Host)
+				require.NoError(t, err, "NewHTTPProxyTransport")
+
+				connClient, err := NewConnectClient(tr, WithHeaders(http.Header{
+					"Proxy-Authorization": []string{"Basic " + creds},
+				}))
+				require.NoError(t, err, "NewConnectClient")
+
+				return connClient, proxySrv.Close
+			},
 		},
-		proxyURL.Host,
-	)
-	require.NoError(t, err, "NewConnectClient")
+		{
+			name: "ok. HTTP/2 with TLS",
+			prepareDialer: func(t *testing.T) (transport.StreamDialer, closeFunc) {
+				tcpDialer := &transport.TCPDialer{}
+				proxySrv := httptest.NewUnstartedServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+					require.Equal(t, "HTTP/2.0", request.Proto, "Proto")
+					require.Equal(t, http.MethodConnect, request.Method, "Method")
 
-	_, err = connClient.DialStream(context.Background(), targetURL)
-	require.Error(t, err, "unexpected status code: 400")
+					conn, err := net.Dial("tcp", request.URL.Host)
+					require.NoError(t, err, "Dial")
+					defer conn.Close()
+
+					writer.WriteHeader(http.StatusOK)
+					writer.(http.Flusher).Flush()
+
+					go func() {
+						_, err := conn.(io.ReaderFrom).ReadFrom(request.Body)
+						require.Error(t, err, "NO_ERROR")
+					}()
+
+					// we can't use io.Copy, because it doesn't flush
+					fw := &flusherWriter{
+						Flusher: writer.(http.Flusher),
+						Writer:  writer,
+					}
+					_, err = fw.ReadFrom(conn)
+					require.NoError(t, err, "io.Copy")
+				}))
+
+				rootCA, key := generateRootCA(t)
+				proxySrv.TLS = &tls.Config{Certificates: []tls.Certificate{key}}
+				certPool := x509.NewCertPool()
+				certPool.AddCert(rootCA)
+
+				proxySrv.EnableHTTP2 = true
+				proxySrv.StartTLS()
+
+				proxyURL, err := url.Parse(proxySrv.URL)
+				require.NoError(t, err, "Parse")
+
+				tr, err := NewHTTPProxyTransport(tcpDialer, proxyURL.Host, WithTLS(&tls.Config{
+					RootCAs: certPool,
+				}))
+				require.NoError(t, err, "NewHTTPProxyTransport")
+
+				connClient, err := NewConnectClient(tr, WithHTTPS())
+				require.NoError(t, err, "NewConnectClient")
+
+				return connClient, proxySrv.Close
+			},
+		},
+		{
+			name: "ok. HTTP/3 over QUIC with TLS",
+			prepareDialer: func(t *testing.T) (transport.StreamDialer, closeFunc) {
+				rootCA, key := generateRootCA(t)
+				certPool := x509.NewCertPool()
+				certPool.AddCert(rootCA)
+
+				udpConn, err := net.ListenPacket("udp", "127.0.0.1:0")
+				require.NoError(t, err, "ListenPacket")
+
+				proxySrv := &http3.Server{
+					Addr: "127.0.0.1:0",
+					Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+						require.Equal(t, "HTTP/3.0", request.Proto, "Proto")
+						require.Equal(t, http.MethodConnect, request.Method, "Method")
+
+						conn, err := net.Dial("tcp", request.URL.Host)
+						require.NoError(t, err, "DialStream")
+
+						writer.WriteHeader(http.StatusOK)
+						writer.(http.Flusher).Flush()
+
+						go func() {
+							_, _ = io.Copy(conn, request.Body)
+							require.NoError(t, err, "io.Copy")
+						}()
+
+						_, _ = io.Copy(writer, conn)
+						require.NoError(t, err, "io.Copy")
+					}),
+					TLSConfig: &tls.Config{
+						Certificates: []tls.Certificate{key},
+					},
+				}
+				go func() {
+					_ = proxySrv.Serve(udpConn)
+				}()
+
+				tr, err := NewHTTP3ProxyTransport(&transport.UDPDialer{}, udpConn.LocalAddr().String(), WithTLS(&tls.Config{
+					RootCAs: certPool,
+				}))
+				require.NoError(t, err, "NewHTTP3ProxyTransport")
+
+				connClient, err := NewConnectClient(tr, WithHTTPS())
+				require.NoError(t, err, "NewConnectClient")
+
+				return connClient, func() {
+					_ = proxySrv.Close()
+					_ = udpConn.Close()
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			type Response struct {
+				Message string `json:"message"`
+			}
+			wantResp := Response{Message: "hello"}
+
+			targetSrv := newTargetSrv(t, wantResp)
+			defer targetSrv.Close()
+
+			connClient, srvCloser := tt.prepareDialer(t)
+			defer srvCloser()
+
+			hc := &http.Client{
+				Transport: &http.Transport{
+					DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
+						return connClient.DialStream(ctx, addr)
+					},
+				},
+			}
+
+			req, err := http.NewRequest(http.MethodGet, targetSrv.URL, nil)
+			req.Close = true // close the connection after the request to close the tunnel right away
+			require.NoError(t, err, "NewRequest")
+
+			resp, err := hc.Do(req)
+			require.NoError(t, err, "Do")
+			defer resp.Body.Close()
+
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+
+			var gotResp Response
+			err = json.NewDecoder(resp.Body).Decode(&gotResp)
+			require.NoError(t, err, "Decode")
+
+			require.Equal(t, wantResp, gotResp, "Response")
+		})
+	}
+}
+
+func generateRootCA(t *testing.T) (*x509.Certificate, tls.Certificate) {
+	t.Helper()
+
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	template := x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{Organization: []string{"Test Root CA"}},
+		NotBefore:             time.Now().Add(-1 * time.Hour),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privKey.PublicKey, privKey)
+	require.NoError(t, err)
+
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privKey)})
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+
+	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
+	require.NoError(t, err)
+
+	cert, err := x509.ParseCertificate(certDER)
+	require.NoError(t, err)
+
+	return cert, tlsCert
+}
+
+type flusherWriter struct {
+	http.Flusher
+	io.Writer
+}
+
+func (fw flusherWriter) ReadFrom(r io.Reader) (int64, error) {
+	var (
+		buf   = make([]byte, 32*1024)
+		total int64
+	)
+	for {
+		nr, er := r.Read(buf)
+		if nr > 0 {
+			nw, ew := fw.Writer.Write(buf[:nr])
+			total += int64(nw)
+			if ew != nil {
+				return total, ew
+			}
+			fw.Flush()
+		}
+		if er != nil {
+			if er == io.EOF {
+				return total, nil
+			}
+			return total, er
+		}
+	}
 }
