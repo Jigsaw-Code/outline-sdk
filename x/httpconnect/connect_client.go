@@ -16,73 +16,74 @@ package httpconnect
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"io"
 	"net"
 	"net/http"
+
+	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
-// connectClient is a [transport.StreamDialer] implementation that dials [proxyAddr] with the given [dialer]
-// and sends a CONNECT request to the dialed proxy.
-type connectClient struct {
-	dialer    transport.StreamDialer
-	proxyAddr string
+// ConnectClient is a [transport.StreamDialer] that establishes an HTTP CONNECT tunnel over an abstract HTTP transport.
+//
+// The package also includes transport builders:
+// - NewHTTPProxyTransport
+// - NewHTTP3ProxyTransport
+//
+// Options:
+// - WithHTTPS to send "https://" CONNECT requests instead of "http://". Make sure transport is configured to use TLS.
+// - WithHeaders appends the provided headers to every CONNECT request.
+type ConnectClient struct {
+	transport http.RoundTripper
+	scheme    string
 
 	headers http.Header
 }
 
-var _ transport.StreamDialer = (*connectClient)(nil)
+var _ transport.StreamDialer = (*ConnectClient)(nil)
 
-type ClientOption func(c *connectClient)
+type ClientOption func(c *clientConfig)
 
-func NewConnectClient(dialer transport.StreamDialer, proxyAddr string, opts ...ClientOption) (transport.StreamDialer, error) {
-	if dialer == nil {
-		return nil, errors.New("dialer must not be nil")
-	}
-	_, _, err := net.SplitHostPort(proxyAddr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse proxy address %s: %w", proxyAddr, err)
+func NewConnectClient(transport http.RoundTripper, opts ...ClientOption) (*ConnectClient, error) {
+	if transport == nil {
+		return nil, fmt.Errorf("transport must not be nil")
 	}
 
-	cc := &connectClient{
-		dialer:    dialer,
-		proxyAddr: proxyAddr,
-		headers:   make(http.Header),
+	cfg := &clientConfig{
+		scheme:  "http",
+		headers: make(http.Header),
 	}
-
 	for _, opt := range opts {
-		opt(cc)
+		opt(cfg)
 	}
 
-	return cc, nil
+	return &ConnectClient{
+		scheme:    cfg.scheme,
+		headers:   cfg.headers,
+		transport: transport,
+	}, nil
 }
 
-// WithHeaders appends the given [headers] to the CONNECT request
+// WithHeaders appends the given headers to the CONNECT request.
 func WithHeaders(headers http.Header) ClientOption {
-	return func(c *connectClient) {
+	return func(c *clientConfig) {
 		c.headers = headers.Clone()
 	}
 }
 
-// DialStream - connects to the proxy and sends a CONNECT request to it, closes the connection if the request fails
-func (cc *connectClient) DialStream(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
-	innerConn, err := cc.dialer.DialStream(ctx, cc.proxyAddr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to dial proxy %s: %w", cc.proxyAddr, err)
+// WithHTTPS sends "https://" CONNECT requests instead of "http://". Make sure transport is configured to use TLS.
+func WithHTTPS() ClientOption {
+	return func(c *clientConfig) {
+		c.scheme = "https"
 	}
-
-	conn, err := cc.doConnect(ctx, remoteAddr, innerConn)
-	if err != nil {
-		_ = innerConn.Close()
-		return nil, fmt.Errorf("doConnect %s: %w", remoteAddr, err)
-	}
-
-	return conn, nil
 }
 
-func (cc *connectClient) doConnect(ctx context.Context, remoteAddr string, conn transport.StreamConn) (transport.StreamConn, error) {
+type clientConfig struct {
+	scheme  string
+	headers http.Header
+}
+
+func (cc *ConnectClient) DialStream(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
 	_, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse remote address %s: %w", remoteAddr, err)
@@ -90,22 +91,15 @@ func (cc *connectClient) doConnect(ctx context.Context, remoteAddr string, conn 
 
 	pr, pw := io.Pipe()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodConnect, "http://"+remoteAddr, pr) // TODO: HTTPS support
+	req, err := http.NewRequestWithContext(ctx, http.MethodConnect, fmt.Sprintf("%s://%s", cc.scheme, remoteAddr), pr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.ContentLength = -1 // -1 means length unknown
 	mergeHeaders(req.Header, cc.headers)
 
-	tr := &http.Transport{
-		// TODO: HTTP/2 support with [http2.ConfigureTransport]
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return conn, nil
-		},
-	}
-
 	hc := http.Client{
-		Transport: tr,
+		Transport: cc.transport,
 	}
 
 	resp, err := hc.Do(req)
@@ -117,11 +111,7 @@ func (cc *connectClient) doConnect(ctx context.Context, remoteAddr string, conn 
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	return &pipeConn{
-		reader:     resp.Body,
-		writer:     pw,
-		StreamConn: conn,
-	}, nil
+	return newPipeConn(resp.Body, pw), nil
 }
 
 func mergeHeaders(dst http.Header, src http.Header) {
