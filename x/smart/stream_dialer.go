@@ -327,7 +327,7 @@ func (f *StrategyFinder) findTLS(
 		Dialer transport.StreamDialer
 		Config string
 	}
-	result, _, err := raceTests(ctx, 250*time.Millisecond, tlsConfig, func(transportCfg string) (*SearchResult, error) {
+	result, testErrors, err := raceTests(ctx, 250*time.Millisecond, tlsConfig, func(transportCfg string) (*SearchResult, error) {
 		tlsDialer, err := configModule.NewStreamDialer(ctx, transportCfg)
 		if err != nil {
 			return nil, fmt.Errorf("WrapStreamDialer failed: %w", err)
@@ -341,6 +341,7 @@ func (f *StrategyFinder) findTLS(
 		return &SearchResult{tlsDialer, transportCfg}, nil
 	})
 	if err != nil {
+		f.logCtx(ctx, "❌ Errors while finding TLS strategy: %v \n", testErrors)
 		return nil, "", fmt.Errorf("could not find TLS strategy: %w", err)
 	}
 	f.log("🏆 selected TLS strategy '%v' in %0.2fs\n\n", result.Config, time.Since(raceStart).Seconds())
