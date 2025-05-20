@@ -208,6 +208,26 @@ func toWriter(logWriter LogWriter) io.Writer {
 // The strategies to search are given in the searchConfig. An example can be found in
 // https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.yaml
 func NewSmartStreamDialer(testDomains *StringList, searchConfig string, logWriter LogWriter) (*StreamDialer, error) {
+	return NewSmartStreamDialerWithCache(testDomains, searchConfig, nil, logWriter)
+}
+
+// StrategyCache enables storing and retrieving successful strategies.
+// Clients are required to provide a platform-specific implementation of this interface.
+type StrategyCache interface {
+	// Get retrieves the string value associated with the given key.
+	// It should return an empty (or `null`) string if the key is not found.
+	Get(key string) string
+
+	// Put adds the string value with the given key to the cache.
+	// If called with empty (or `null`) value, it should remove the cache entry.
+	Put(key string, value string)
+}
+
+// NewSmartStreamDialerWithCache performs the same strategy selection as [NewSmartStreamDialer],
+// but uses a [StrategyCache] to improve performance, especially during app resume.
+func NewSmartStreamDialerWithCache(
+	testDomains *StringList, searchConfig string, cache StrategyCache, logWriter LogWriter,
+) (*StreamDialer, error) {
 	logBytesWriter := toWriter(logWriter)
 	// TODO: inject the base dialer for tests.
 	finder := smart.StrategyFinder{
@@ -215,6 +235,9 @@ func NewSmartStreamDialer(testDomains *StringList, searchConfig string, logWrite
 		TestTimeout:  5 * time.Second,
 		StreamDialer: &transport.TCPDialer{},
 		PacketDialer: &transport.UDPDialer{},
+	}
+	if cache != nil {
+		finder.Cache = &strategyCacheAdapter{impl: cache}
 	}
 	dialer, err := finder.NewDialer(context.Background(), testDomains.list, []byte(searchConfig))
 	if err != nil {
@@ -237,4 +260,24 @@ func (l *StringList) Append(value string) {
 // NewListFromLines creates a StringList by splitting the input string on new lines.
 func NewListFromLines(lines string) *StringList {
 	return &StringList{list: strings.Split(lines, "\n")}
+}
+
+// strategyCacheAdapter adapts a [StrategyCache] to the [smart.StrategyResultCache].
+// This is required because [smart.StrategyResultCache]'s Get returns multiple values,
+// which is not supported by gomobile.
+// This adapter also converts between []byte and string.
+type strategyCacheAdapter struct {
+	impl StrategyCache
+}
+
+func (sc *strategyCacheAdapter) Get(key string) (value []byte, ok bool) {
+	v := sc.impl.Get(key)
+	if v == "" {
+		return nil, false
+	}
+	return []byte(v), true
+}
+
+func (sc *strategyCacheAdapter) Put(key string, value []byte) {
+	sc.impl.Put(key, string(value))
 }
