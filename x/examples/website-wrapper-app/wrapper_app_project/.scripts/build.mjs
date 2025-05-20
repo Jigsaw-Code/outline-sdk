@@ -81,7 +81,7 @@ await fs.cp(SDK_MOBILEPROXY_OUTPUT_TARGET, WRAPPER_APP_OUTPUT_SDK_MOBILEPROXY_DI
 
 console.log(chalk.yellow('Installing external dependencies for the project...'))
 await promisify(exec)(`
-  cd ${WRAPPER_APP_OUTPUT_TARGET.replaceAll(' ', '\\ ')}
+  cd ${WRAPPER_APP_OUTPUT_TARGET.replaceAll(/\s+/g, '\\ ')}
   npm install --no-warnings
   npx cap sync ${config.platform}
 `)
@@ -93,6 +93,6 @@ console.log(chalk.bgGreen('Project ready!'))
 
 if ('android' == config.platform) {
   console.log('To open your project in Android Studio:')
-  console.log(`  cd ${WRAPPER_APP_OUTPUT_TARGET.replaceAll(' ', '\\ ')}`)
+  console.log(`  cd ${WRAPPER_APP_OUTPUT_TARGET.replaceAll(/\s+/g, '\\ ')}`)
   console.log('  npm run open:android')
 }
