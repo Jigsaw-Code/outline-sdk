@@ -1,7 +1,7 @@
 smartDialerConfig:
     dns:
         - https:
-            name: 9.9.9.9
+            name: 9.9.9.8
     tls:
         - ""
         - split:1
