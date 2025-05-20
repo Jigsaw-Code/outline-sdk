@@ -16,13 +16,14 @@ package httpconnect
 
 import (
 	"context"
-	"crypto/tls"
+	stdTLS "crypto/tls"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"golang.org/x/net/http2"
@@ -30,112 +31,148 @@ import (
 
 type TransportOption func(c *transportConfig)
 
-// WithTLS configures the transport to use TLS.
-func WithTLS(tlsConf *tls.Config) TransportOption {
+// WithTLSOptions configures the transport to use the given TLS options.
+// The default behavior is to use TLS.
+func WithTLSOptions(opts ...tls.ClientOption) TransportOption {
 	return func(c *transportConfig) {
-		c.tlsConf = tlsConf
+		c.tlsOptions = append(c.tlsOptions, opts...)
+		c.plainHTTP = false
 	}
 }
 
-type transportConfig struct {
-	tlsConf *tls.Config
+// WithPlainHTTP configures the transport to use HTTP instead of HTTPS.
+func WithPlainHTTP() TransportOption {
+	return func(c *transportConfig) {
+		c.plainHTTP = true
+	}
 }
 
 // NewHTTPProxyTransport creates a net/http Transport that establishes a connection to the proxy using the given [transport.StreamDialer].
 // The proxy address must be in the form "host:port".
 //
-// For HTTP/1 and HTTP/2 over a stream connection.
-func NewHTTPProxyTransport(dialer transport.StreamDialer, proxyAddr string, opts ...TransportOption) (*http.Transport, error) {
+// For HTTP/1 (plain and over TLS) and HTTP/2 (over TLS) over a stream connection.
+// When using TLS, pass WithTLSOptions(tls.WithALPN()) to enable or enforce HTTP/2.
+func NewHTTPProxyTransport(dialer transport.StreamDialer, proxyAddr string, opts ...TransportOption) (ProxyRoundTripper, error) {
 	if dialer == nil {
 		return nil, errors.New("dialer must not be nil")
 	}
-	_, _, err := net.SplitHostPort(proxyAddr)
+	host, _, err := net.SplitHostPort(proxyAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse proxy address %s: %w", proxyAddr, err)
 	}
 
 	cfg := &transportConfig{}
-	for _, opt := range opts {
-		opt(cfg)
+	cfg.applyOptions(opts...)
+
+	tlsCfg := tls.ClientConfig{ServerName: host}
+	for _, opt := range cfg.tlsOptions {
+		opt(host, &tlsCfg)
 	}
 
 	tr := &http.Transport{
-		DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
+		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 			return dialer.DialStream(ctx, proxyAddr)
 		},
-		TLSClientConfig: cfg.tlsConf,
 	}
-
 	err = http2.ConfigureTransport(tr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to configure http2 transport: %w", err)
 	}
 
-	return tr, nil
+	// TLS config must be applied AFTER http2.ConfigureTransport, as it appends h2 to the list of supported protocols.
+	tr.TLSClientConfig = toStdConfig(tlsCfg)
+
+	sch := schemeHTTPS
+	if cfg.plainHTTP {
+		sch = schemeHTTP
+	}
+
+	return proxyRT{
+		RoundTripper: tr,
+		scheme:       sch,
+	}, nil
 }
 
-// NewHTTP3ProxyTransport creates an HTTP/3 transport that establishes a QUIC connection to the proxy using the given [transport.PacketDialer].
+// NewHTTP3ProxyTransport creates an HTTP/3 transport that establishes a QUIC connection to the proxy using the given [net.PacketConn].
 // The proxy address must be in the form "host:port".
 //
 // For HTTP/3 over QUIC over a datagram connection.
-func NewHTTP3ProxyTransport(dialer transport.PacketDialer, proxyAddr string, opts ...TransportOption) (*http3.Transport, error) {
-	if dialer == nil {
-		return nil, errors.New("dialer must not be nil")
+func NewHTTP3ProxyTransport(conn net.PacketConn, proxyAddr string, opts ...TransportOption) (ProxyRoundTripper, error) {
+	if conn == nil {
+		return nil, errors.New("conn must not be nil")
 	}
-	_, _, err := net.SplitHostPort(proxyAddr)
+	host, _, err := net.SplitHostPort(proxyAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse proxy address %s: %w", proxyAddr, err)
 	}
 
 	cfg := &transportConfig{}
-	for _, opt := range opts {
-		opt(cfg)
+	cfg.applyOptions(opts...)
+
+	tlsConfig := tls.ClientConfig{ServerName: host}
+	for _, opt := range cfg.tlsOptions {
+		opt(host, &tlsConfig)
 	}
 
 	tr := &http3.Transport{
-		Dial: func(ctx context.Context, _ string, tlsCfg *tls.Config, quicCfg *quic.Config) (quic.EarlyConnection, error) {
+		Dial: func(ctx context.Context, _ string, tlsCfg *stdTLS.Config, quicCfg *quic.Config) (quic.EarlyConnection, error) {
 			parsedProxyAddr, err := transport.MakeNetAddr("udp", proxyAddr)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse proxy address %s: %w", proxyAddr, err)
 			}
 
-			conn, err := dialer.DialPacket(ctx, proxyAddr)
-			if err != nil {
-				return nil, fmt.Errorf("failed to dial proxy %s: %w", proxyAddr, err)
-			}
-
-			// quic.DialEarly expects a net.PacketConn, but transport.PacketDialer returns a net.Conn connection
-			// the connection by transport.PacketDialer is assumed to be "bound", so we wrap it with in a boundConn that implements net.PacketConn
-			packetConn := newBoundConn(conn, parsedProxyAddr)
-
-			return quic.DialEarly(ctx, packetConn, parsedProxyAddr, tlsCfg, quicCfg)
+			return quic.DialEarly(ctx, conn, parsedProxyAddr, tlsCfg, quicCfg)
 		},
-		TLSClientConfig: cfg.tlsConf,
+		TLSClientConfig: toStdConfig(tlsConfig),
 	}
 
-	return tr, nil
+	return proxyRT{
+		RoundTripper: tr,
+		scheme:       schemeHTTPS, // HTTP/3 is always over TLS
+	}, nil
 }
 
-var _ net.PacketConn = (*boundConn)(nil)
-
-type boundConn struct {
-	net.Conn
-	remoteAddr net.Addr
+type transportConfig struct {
+	tlsOptions []tls.ClientOption
+	plainHTTP  bool
 }
 
-// Used for [quic.DialEarly] to work with [transport.PacketDialer]'s [net.Conn].
-func newBoundConn(conn net.Conn, remoteAddr net.Addr) *boundConn {
-	return &boundConn{Conn: conn, remoteAddr: remoteAddr}
-}
-
-func (c *boundConn) ReadFrom(p []byte) (int, net.Addr, error) {
-	n, err := c.Conn.Read(p)
-	return n, c.remoteAddr, err
-}
-
-func (c *boundConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
-	if addr != c.remoteAddr {
-		return 0, fmt.Errorf("unexpected address: %v", addr)
+func (c *transportConfig) applyOptions(opts ...TransportOption) {
+	for _, opt := range opts {
+		opt(c)
 	}
-	return c.Conn.Write(p)
+}
+
+type scheme string
+
+const (
+	schemeHTTP  scheme = "http"
+	schemeHTTPS scheme = "https"
+)
+
+type proxyRT struct {
+	http.RoundTripper
+	scheme scheme
+}
+
+func (rt proxyRT) Scheme() string {
+	return string(rt.scheme)
+}
+
+// TODO: tls.ClientConfig.toStdConfig is an unexported function located is a separate Go module, so we can't make it exported right away
+// It is basically a copy of the implementation
+func toStdConfig(cfg tls.ClientConfig) *stdTLS.Config {
+	return &stdTLS.Config{
+		ServerName:         cfg.ServerName,
+		NextProtos:         cfg.NextProtos,
+		ClientSessionCache: cfg.SessionCache,
+		// Set InsecureSkipVerify to skip the default validation we are
+		// replacing. This will not disable VerifyConnection.
+		InsecureSkipVerify: true,
+		VerifyConnection: func(cs stdTLS.ConnectionState) error {
+			return cfg.CertVerifier.VerifyCertificate(&tls.CertVerificationContext{
+				PeerCertificates: cs.PeerCertificates,
+			})
+		},
+	}
 }

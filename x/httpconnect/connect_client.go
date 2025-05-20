@@ -31,26 +31,27 @@ import (
 // - NewHTTP3ProxyTransport
 //
 // Options:
-// - WithHTTPS to send "https://" CONNECT requests instead of "http://". Make sure transport is configured to use TLS.
 // - WithHeaders appends the provided headers to every CONNECT request.
 type ConnectClient struct {
-	transport http.RoundTripper
-	scheme    string
-
+	proxyRT ProxyRoundTripper
 	headers http.Header
 }
 
 var _ transport.StreamDialer = (*ConnectClient)(nil)
 
+type ProxyRoundTripper interface {
+	http.RoundTripper
+	Scheme() string
+}
+
 type ClientOption func(c *clientConfig)
 
-func NewConnectClient(transport http.RoundTripper, opts ...ClientOption) (*ConnectClient, error) {
-	if transport == nil {
+func NewConnectClient(proxyRT ProxyRoundTripper, opts ...ClientOption) (*ConnectClient, error) {
+	if proxyRT == nil {
 		return nil, fmt.Errorf("transport must not be nil")
 	}
 
 	cfg := &clientConfig{
-		scheme:  "http",
 		headers: make(http.Header),
 	}
 	for _, opt := range opts {
@@ -58,9 +59,8 @@ func NewConnectClient(transport http.RoundTripper, opts ...ClientOption) (*Conne
 	}
 
 	return &ConnectClient{
-		scheme:    cfg.scheme,
-		headers:   cfg.headers,
-		transport: transport,
+		proxyRT: proxyRT,
+		headers: cfg.headers,
 	}, nil
 }
 
@@ -71,15 +71,7 @@ func WithHeaders(headers http.Header) ClientOption {
 	}
 }
 
-// WithHTTPS sends "https://" CONNECT requests instead of "http://". Make sure transport is configured to use TLS.
-func WithHTTPS() ClientOption {
-	return func(c *clientConfig) {
-		c.scheme = "https"
-	}
-}
-
 type clientConfig struct {
-	scheme  string
 	headers http.Header
 }
 
@@ -91,7 +83,7 @@ func (cc *ConnectClient) DialStream(ctx context.Context, remoteAddr string) (tra
 
 	pr, pw := io.Pipe()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodConnect, fmt.Sprintf("%s://%s", cc.scheme, remoteAddr), pr)
+	req, err := http.NewRequestWithContext(ctx, http.MethodConnect, fmt.Sprintf("%s://%s", cc.proxyRT.Scheme(), remoteAddr), pr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -99,7 +91,7 @@ func (cc *ConnectClient) DialStream(ctx context.Context, remoteAddr string) (tra
 	mergeHeaders(req.Header, cc.headers)
 
 	hc := http.Client{
-		Transport: cc.transport,
+		Transport: cc.proxyRT,
 	}
 
 	resp, err := hc.Do(req)
@@ -115,7 +107,9 @@ func (cc *ConnectClient) DialStream(ctx context.Context, remoteAddr string) (tra
 }
 
 func mergeHeaders(dst http.Header, src http.Header) {
-	for k, v := range src {
-		dst[k] = append(dst[k], v...)
+	for k, vs := range src {
+		for _, v := range vs {
+			dst.Add(k, v)
+		}
 	}
 }

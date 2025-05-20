@@ -18,7 +18,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/tls"
+	stdTLS "crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/stretchr/testify/require"
 
@@ -56,16 +57,19 @@ func newTargetSrv(t *testing.T, resp interface{}) *httptest.Server {
 func Test_NewConnectClient_Ok(t *testing.T) {
 	t.Parallel()
 
+	var _ io.ReadWriteCloser = (net.Conn)(nil)
+
 	type closeFunc func()
 
 	type TestCase struct {
 		name          string
 		prepareDialer func(t *testing.T) (transport.StreamDialer, closeFunc)
+		wantErr       string
 	}
 
 	tests := []TestCase{
 		{
-			name: "ok. HTTP/1 with headers",
+			name: "ok. Plain HTTP/1 with headers",
 			prepareDialer: func(t *testing.T) (transport.StreamDialer, closeFunc) {
 				creds := base64.StdEncoding.EncodeToString([]byte("username:password"))
 
@@ -79,12 +83,44 @@ func Test_NewConnectClient_Ok(t *testing.T) {
 				proxyURL, err := url.Parse(proxySrv.URL)
 				require.NoError(t, err, "Parse")
 
-				tr, err := NewHTTPProxyTransport(tcpDialer, proxyURL.Host)
+				tr, err := NewHTTPProxyTransport(tcpDialer, proxyURL.Host, WithPlainHTTP())
 				require.NoError(t, err, "NewHTTPProxyTransport")
 
 				connClient, err := NewConnectClient(tr, WithHeaders(http.Header{
 					"Proxy-Authorization": []string{"Basic " + creds},
 				}))
+				require.NoError(t, err, "NewConnectClient")
+
+				return connClient, proxySrv.Close
+			},
+		},
+		{
+			name: "ok. HTTP/1 with TLS",
+			prepareDialer: func(t *testing.T) (transport.StreamDialer, closeFunc) {
+				tcpDialer := &transport.TCPDialer{}
+				connectHandler := httpproxy.NewConnectHandler(tcpDialer)
+				proxySrv := httptest.NewUnstartedServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+					connectHandler.ServeHTTP(writer, request)
+				}))
+
+				rootCA, key := generateRootCA(t)
+				proxySrv.TLS = &stdTLS.Config{Certificates: []stdTLS.Certificate{key}}
+				certPool := x509.NewCertPool()
+				certPool.AddCert(rootCA)
+
+				proxySrv.StartTLS()
+
+				proxyURL, err := url.Parse(proxySrv.URL)
+				require.NoError(t, err, "Parse")
+
+				tr, err := NewHTTPProxyTransport(
+					tcpDialer,
+					proxyURL.Host,
+					WithTLSOptions(tls.WithCertVerifier(&tls.StandardCertVerifier{Roots: certPool})),
+				)
+				require.NoError(t, err, "NewHTTPProxyTransport")
+
+				connClient, err := NewConnectClient(tr)
 				require.NoError(t, err, "NewConnectClient")
 
 				return connClient, proxySrv.Close
@@ -116,11 +152,11 @@ func Test_NewConnectClient_Ok(t *testing.T) {
 						Writer:  writer,
 					}
 					_, err = fw.ReadFrom(conn)
-					require.NoError(t, err, "io.Copy")
+					require.NoError(t, err, "ReadFrom")
 				}))
 
 				rootCA, key := generateRootCA(t)
-				proxySrv.TLS = &tls.Config{Certificates: []tls.Certificate{key}}
+				proxySrv.TLS = &stdTLS.Config{Certificates: []stdTLS.Certificate{key}}
 				certPool := x509.NewCertPool()
 				certPool.AddCert(rootCA)
 
@@ -130,16 +166,57 @@ func Test_NewConnectClient_Ok(t *testing.T) {
 				proxyURL, err := url.Parse(proxySrv.URL)
 				require.NoError(t, err, "Parse")
 
-				tr, err := NewHTTPProxyTransport(tcpDialer, proxyURL.Host, WithTLS(&tls.Config{
-					RootCAs: certPool,
-				}))
+				tr, err := NewHTTPProxyTransport(
+					tcpDialer,
+					proxyURL.Host,
+					WithTLSOptions(
+						tls.WithCertVerifier(&tls.StandardCertVerifier{Roots: certPool}),
+						tls.WithALPN([]string{"h2"}),
+					),
+				)
 				require.NoError(t, err, "NewHTTPProxyTransport")
 
-				connClient, err := NewConnectClient(tr, WithHTTPS())
+				connClient, err := NewConnectClient(tr)
 				require.NoError(t, err, "NewConnectClient")
 
 				return connClient, proxySrv.Close
 			},
+		},
+		{
+			name: "fail. enforced HTTP/2, but server doesn't support it",
+			prepareDialer: func(t *testing.T) (transport.StreamDialer, closeFunc) {
+				tcpDialer := &transport.TCPDialer{}
+				connectHandler := httpproxy.NewConnectHandler(tcpDialer)
+				proxySrv := httptest.NewUnstartedServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+					connectHandler.ServeHTTP(writer, request)
+				}))
+
+				rootCA, key := generateRootCA(t)
+				proxySrv.TLS = &stdTLS.Config{Certificates: []stdTLS.Certificate{key}}
+				certPool := x509.NewCertPool()
+				certPool.AddCert(rootCA)
+
+				proxySrv.StartTLS()
+
+				proxyURL, err := url.Parse(proxySrv.URL)
+				require.NoError(t, err, "Parse")
+
+				tr, err := NewHTTPProxyTransport(
+					tcpDialer,
+					proxyURL.Host,
+					WithTLSOptions(
+						tls.WithCertVerifier(&tls.StandardCertVerifier{Roots: certPool}),
+						tls.WithALPN([]string{"h2"}),
+					),
+				)
+				require.NoError(t, err, "NewHTTPProxyTransport")
+
+				connClient, err := NewConnectClient(tr)
+				require.NoError(t, err, "NewConnectClient")
+
+				return connClient, proxySrv.Close
+			},
+			wantErr: "tls: no application protocol",
 		},
 		{
 			name: "ok. HTTP/3 over QUIC with TLS",
@@ -148,7 +225,7 @@ func Test_NewConnectClient_Ok(t *testing.T) {
 				certPool := x509.NewCertPool()
 				certPool.AddCert(rootCA)
 
-				udpConn, err := net.ListenPacket("udp", "127.0.0.1:0")
+				srvConn, err := net.ListenPacket("udp", "127.0.0.1:0")
 				require.NoError(t, err, "ListenPacket")
 
 				proxySrv := &http3.Server{
@@ -171,25 +248,31 @@ func Test_NewConnectClient_Ok(t *testing.T) {
 						_, _ = io.Copy(writer, conn)
 						require.NoError(t, err, "io.Copy")
 					}),
-					TLSConfig: &tls.Config{
-						Certificates: []tls.Certificate{key},
+					TLSConfig: &stdTLS.Config{
+						Certificates: []stdTLS.Certificate{key},
 					},
 				}
 				go func() {
-					_ = proxySrv.Serve(udpConn)
+					_ = proxySrv.Serve(srvConn)
 				}()
 
-				tr, err := NewHTTP3ProxyTransport(&transport.UDPDialer{}, udpConn.LocalAddr().String(), WithTLS(&tls.Config{
-					RootCAs: certPool,
-				}))
+				cliConn, err := net.ListenPacket("udp", "127.0.0.1:0")
+				require.NoError(t, err, "DialPacket")
+
+				tr, err := NewHTTP3ProxyTransport(
+					cliConn.(net.PacketConn),
+					srvConn.LocalAddr().String(),
+					WithTLSOptions(tls.WithCertVerifier(&tls.StandardCertVerifier{Roots: certPool})),
+				)
 				require.NoError(t, err, "NewHTTP3ProxyTransport")
 
-				connClient, err := NewConnectClient(tr, WithHTTPS())
+				connClient, err := NewConnectClient(tr)
 				require.NoError(t, err, "NewConnectClient")
 
 				return connClient, func() {
+					_ = cliConn.Close()
 					_ = proxySrv.Close()
-					_ = udpConn.Close()
+					_ = srvConn.Close()
 				}
 			},
 		},
@@ -224,6 +307,10 @@ func Test_NewConnectClient_Ok(t *testing.T) {
 			require.NoError(t, err, "NewRequest")
 
 			resp, err := hc.Do(req)
+			if tt.wantErr != "" {
+				require.Contains(t, err.Error(), tt.wantErr, "Do")
+				return
+			}
 			require.NoError(t, err, "Do")
 			defer resp.Body.Close()
 
@@ -238,7 +325,7 @@ func Test_NewConnectClient_Ok(t *testing.T) {
 	}
 }
 
-func generateRootCA(t *testing.T) (*x509.Certificate, tls.Certificate) {
+func generateRootCA(t *testing.T) (*x509.Certificate, stdTLS.Certificate) {
 	t.Helper()
 
 	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -261,7 +348,7 @@ func generateRootCA(t *testing.T) (*x509.Certificate, tls.Certificate) {
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privKey)})
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
 
-	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
+	tlsCert, err := stdTLS.X509KeyPair(certPEM, keyPEM)
 	require.NoError(t, err)
 
 	cert, err := x509.ParseCertificate(certDER)
