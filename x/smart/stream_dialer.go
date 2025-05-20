@@ -256,7 +256,7 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 		timeoutChan := make(chan struct{})
 		go func() {
 			<-testCtx.Done()
-			if errors.Is(testCtx.Err(), context.DeadlineExceeded) {
+			if errors.Is(context.Cause(testCtx), context.DeadlineExceeded) {
 				f.logCtx(testCtx, "⏱️ dialer failure, test timed out: '%v' (domain: %v), duration=%v ❌\n", transportCfg, testDomain, time.Since(startTime))
 				close(timeoutChan)
 			}
