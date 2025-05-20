@@ -16,10 +16,9 @@
   "license": "Apache-2.0",
   "scripts": {
     "build:mobileproxy": "bash ./.scripts/build_mobileproxy.sh",
-    "build:project": "node ./wrapper_app_project/.scripts/build.mjs",
+    "build": "node ./wrapper_app_project/.scripts/build.mjs",
     "clean": "npx rimraf node_modules/ output/",
     "doctor": "./doctor",
-    "open:android": "cd output/wrapper_app_project && npm run open:android",
     "open:ios": "cd output/wrapper_app_project && npm run open:ios",
     "reset": "npm run clean && npm ci",
     "start:navigator": "node ./basic_navigator_example/.scripts/start.mjs"

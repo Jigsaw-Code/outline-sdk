@@ -86,7 +86,13 @@ await promisify(exec)(`
   npx cap sync ${config.platform}
 `)
 
-console.log(chalk.gray(`Zipping project to ${chalk.blue(WRAPPER_APP_OUTPUT_ZIP)}...`))
+console.log(chalk.yellow(`Zipping project to ${chalk.blue(WRAPPER_APP_OUTPUT_ZIP)}...`))
 await zip(WRAPPER_APP_OUTPUT_TARGET, WRAPPER_APP_OUTPUT_ZIP)
 
 console.log(chalk.bgGreen('Project ready!'))
+
+if ('android' == config.platform) {
+  console.log('To open your project in Android Studio:')
+  console.log(`  cd ${WRAPPER_APP_OUTPUT_TARGET.replaceAll(' ', '\\ ')}`)
+  console.log('  npm run open:android')
+}

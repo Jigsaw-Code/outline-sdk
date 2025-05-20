@@ -21,18 +21,18 @@ export function resolveConfiguration(config) {
     // Infer an app ID from the entry domain by reversing it (e.g. `www.example.com` becomes `com.example.www`)
     // It must be lower case, and hyphens are not allowed.
     resolved.appId = resolved.entryDomain
-      .replaceAll("-", "")
+      .replaceAll('-', '')
       .toLocaleLowerCase()
-      .split(".")
+      .split('.')
       .reverse()
-      .join(".")
+      .join('.')
   }
 
   if (!config.appName) {
     // Infer an app name from the base entry domain part by title casing the root domain:
     // (e.g. `www.my-example-app.com` becomes "My Example App")
     resolved.appName = resolved.entryDomain
-      .split(".")
+      .split('.')
       .reverse()[1]
       .split(/[-_]+/)
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -41,7 +41,7 @@ export function resolveConfiguration(config) {
   
   resolved.additionalDomains = config.additionaldomain ?? []
   resolved.domainList = [resolved.entryDomain, ...resolved.additionalDomains].join('\n')
-  resolved.smartDialerConfig = Buffer.from(JSON.stringify(config.smartDialerConfig)).toString("base64")
+  resolved.smartDialerConfig = Buffer.from(JSON.stringify(config.smartDialerConfig)).toString('base64')
 
   return {
     ...config,
@@ -50,17 +50,17 @@ export function resolveConfiguration(config) {
 }
 
 export function zip(root, destination) {
-  const job = archiver("zip", { zlib: { level: 9 } })
+  const job = archiver('zip', { zlib: { level: 9 } })
   const destinationStream = fs.createWriteStream(destination)
 
   return new Promise((resolve, reject) => {
     job.directory(root, false)
     job.pipe(destinationStream)
   
-    destinationStream.on("close", resolve)
+    destinationStream.on('close', resolve)
   
-    job.on("error", reject)
-    destinationStream.on("error", reject)
+    job.on('error', reject)
+    destinationStream.on('error', reject)
   
     job.finalize()
   });

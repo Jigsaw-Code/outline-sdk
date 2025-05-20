@@ -10,14 +10,14 @@ export const DEFAULT_CONFIG = {
   smartDialerConfig: JSON.stringify({
     dns: [
       {
-      https: { name: "9.9.9.9" }
+      https: { name: '9.9.9.9' }
       }
     ],
     tls: [
-      "",
-      "split:1",
-      "split:2",
-      "tlsfrag:1"
+      '',
+      'split:1',
+      'split:2',
+      'tlsfrag:1'
     ],   
   })
 }
