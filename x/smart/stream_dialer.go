@@ -250,21 +250,22 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 		testAddr := net.JoinHostPort(testDomain, "443")
 		f.logCtx(ctx, "🏃 running test: '%v' (domain: %v)\n", transportCfg, testDomain)
 
-		ctx, cancel := context.WithTimeout(ctx, f.TestTimeout)
+		testCtx, cancel := context.WithTimeout(ctx, f.TestTimeout)
 		defer cancel()
-		testConn, err := dialer.DialStream(ctx, testAddr)
+
+		testConn, err := dialer.DialStream(testCtx, testAddr)
 		if err != nil {
 			f.logCtx(ctx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 			return err
 		}
 		tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
-		err = tlsConn.HandshakeContext(ctx)
+		err = tlsConn.HandshakeContext(testCtx)
 		tlsConn.Close()
 		if err != nil {
 			f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 			return err
 		}
-		f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
+		f.logCtx(testCtx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
 	}
 	return nil
 }
@@ -320,20 +321,21 @@ func (f *StrategyFinder) findTLS(
 	var configModule = configurl.NewDefaultProviders()
 	configModule.StreamDialers.BaseInstance = baseDialer
 
-	ctx, searchDone := context.WithCancel(ctx)
+	searchCtx, searchDone := context.WithCancel(ctx)
 	defer searchDone()
 	raceStart := time.Now()
 	type SearchResult struct {
 		Dialer transport.StreamDialer
 		Config string
 	}
-	result, err := raceTests(ctx, 250*time.Millisecond, tlsConfig, func(transportCfg string) (*SearchResult, error) {
-		tlsDialer, err := configModule.NewStreamDialer(ctx, transportCfg)
+	result, err := raceTests(searchCtx, 250*time.Millisecond, tlsConfig, func(transportCfg string) (*SearchResult, error) {
+		tlsDialer, err := configModule.NewStreamDialer(searchCtx, transportCfg)
 		if err != nil {
-			return nil, fmt.Errorf("WrapStreamDialer failed: %w", err)
+			f.logCtx(searchCtx, "❌ dialer creation failed: %v, error=%v\n", transportCfg, err)
+			return nil, fmt.Errorf("NewStreamDialer failed: %w", err)
 		}
 
-		err = f.testDialer(ctx, tlsDialer, testDomains, transportCfg)
+		err = f.testDialer(searchCtx, tlsDialer, testDomains, transportCfg)
 		if err != nil {
 			return nil, err
 		}
@@ -345,12 +347,12 @@ func (f *StrategyFinder) findTLS(
 	}
 	f.log("🏆 selected TLS strategy '%v' in %0.2fs\n\n", result.Config, time.Since(raceStart).Seconds())
 	tlsDialer := result.Dialer
-	return transport.FuncStreamDialer(func(ctx context.Context, raddr string) (transport.StreamConn, error) {
+	return transport.FuncStreamDialer(func(searchCtx context.Context, raddr string) (transport.StreamConn, error) {
 		_, portStr, err := net.SplitHostPort(raddr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse address: %w", err)
 		}
-		portNum, err := net.DefaultResolver.LookupPort(ctx, "tcp", portStr)
+		portNum, err := net.DefaultResolver.LookupPort(searchCtx, "tcp", portStr)
 		if err != nil {
 			return nil, fmt.Errorf("could not resolve port: %w", err)
 		}
@@ -358,7 +360,7 @@ func (f *StrategyFinder) findTLS(
 		if portNum == 443 || portNum == 853 {
 			selectedDialer = tlsDialer
 		}
-		return selectedDialer.DialStream(ctx, raddr)
+		return selectedDialer.DialStream(searchCtx, raddr)
 	}), result.Config, nil
 }
 
