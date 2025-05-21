@@ -21,10 +21,11 @@ import chalk from 'chalk'
 import { glob } from 'glob'
 import handlebars from 'handlebars'
 
-const TEMPLATE = path.join(process.cwd(), 'wrapper_app_project/template');
-
-import { getCliConfig, getFileConfig, DEFAULT_CONFIG } from './config.mjs'
+import { getCliConfig, getYAMLFileConfig, DEFAULT_CONFIG } from './config.mjs'
 import { resolveConfiguration, zip } from './util.mjs'
+
+const TEMPLATE_DIR = path.join(process.cwd(), 'wrapper_app_project/template');
+
 
 /* See https://stackoverflow.com/questions/57838022/detect-whether-es-module-is-run-from-command-line-in-node*/
 if (import.meta.url !== pathToFileURL(`${process.argv[1]}`).href) {
@@ -33,66 +34,70 @@ if (import.meta.url !== pathToFileURL(`${process.argv[1]}`).href) {
 
 const config = resolveConfiguration({
   ...DEFAULT_CONFIG,
-  ...(await getFileConfig('config.yaml')),
+  ...(await getYAMLFileConfig('config.yaml')),
   ...getCliConfig(process.argv)
 })
 
-const WRAPPER_APP_OUTPUT_TARGET = path.resolve(config.output, config.appName)
-const WRAPPER_APP_OUTPUT_ZIP = path.resolve(config.output, `${config.appName}.zip`)
+const APP_TARGET_DIR = path.resolve(config.output, config.appName)
+const APP_TARGET_ZIP = path.resolve(config.output, `${config.appName}.zip`)
 
-const SDK_MOBILEPROXY_OUTPUT_TARGET = path.resolve(config.output, 'mobileproxy')
-const WRAPPER_APP_OUTPUT_SDK_MOBILEPROXY_DIR = path.resolve(WRAPPER_APP_OUTPUT_TARGET, 'mobileproxy')
+const SDK_TARGET_BIN = path.resolve(config.output, 'mobileproxy')
+const SDK_TARGET_DIR = path.resolve(APP_TARGET_DIR, 'mobileproxy')
 
 try {
-  await fs.access(SDK_MOBILEPROXY_OUTPUT_TARGET, fs.constants.F_OK)
+  await fs.access(SDK_TARGET_BIN, fs.constants.F_OK)
 } catch (err) {
-  console.log(chalk.green(`Building the Outline SDK mobileproxy library for ${config.platform}...`))
+  console.log(chalk.bgGreen(`Building the Outline SDK mobileproxy library for ${config.platform}...`))
   await promisify(execFile)('npm', ['run', 'build:mobileproxy', config.platform, config.output])
 }
 
 const sourceFilepaths = await glob(
-  path.join(TEMPLATE, '**', '*'),
+  path.join(TEMPLATE_DIR, '**', '*'),
   {
     nodir: true,
     dot: true,
   },
 )
 
-console.log(chalk.green('Building project from template...'))
+console.log(chalk.bgGreen('Building the wrapper app project from template...'))
 
 for (const sourceFilepath of sourceFilepaths) {
-  const destinationFilepath = path.join(WRAPPER_APP_OUTPUT_TARGET, path.relative(TEMPLATE, sourceFilepath))
+  const destinationFilepath = path.join(APP_TARGET_DIR, path.relative(TEMPLATE_DIR, sourceFilepath))
 
   // ensure directory
   await fs.mkdir(path.dirname(destinationFilepath), { recursive: true })
 
-  if (!sourceFilepath.endsWith('.handlebars')) {
-    console.log(chalk.gray(`copy ${sourceFilepath}`))
-    await fs.cp(sourceFilepath, destinationFilepath)
-  } else {
-    console.log(chalk.blue(`render ${sourceFilepath}`))
+  if (sourceFilepath.endsWith('.handlebars')) {
+    console.log(chalk.white(`render ${sourceFilepath}`))
     const template = handlebars.compile(await fs.readFile(sourceFilepath, 'utf8'))
     await fs.writeFile(destinationFilepath.replace(/\.handlebars$/, ''), template(config), 'utf8')
+  } else {
+    console.log(chalk.gray(`copy ${sourceFilepath}`))
+    await fs.cp(sourceFilepath, destinationFilepath)
   }
 }
 
-console.log(chalk.yellow('Copying mobileproxy files into the project...'))
-await fs.cp(SDK_MOBILEPROXY_OUTPUT_TARGET, WRAPPER_APP_OUTPUT_SDK_MOBILEPROXY_DIR, { recursive: true })
+console.log(chalk.green('Copying mobileproxy files into the project...'))
+await fs.cp(SDK_TARGET_BIN, SDK_TARGET_DIR, { recursive: true })
 
-console.log(chalk.yellow('Installing external dependencies for the project...'))
+console.log(chalk.green('Installing external dependencies for the project...'))
 await promisify(exec)(`
-  cd ${WRAPPER_APP_OUTPUT_TARGET.replaceAll(/\s+/g, '\\ ')}
+  cd ${APP_TARGET_DIR.replaceAll(/\s+/g, '\\ ')}
   npm install --no-warnings
   npx cap sync ${config.platform}
 `)
 
-console.log(chalk.yellow(`Zipping project to ${chalk.blue(WRAPPER_APP_OUTPUT_ZIP)}...`))
-await zip(WRAPPER_APP_OUTPUT_TARGET, WRAPPER_APP_OUTPUT_ZIP)
+console.log(chalk.green(`Zipping project to ${chalk.blue(APP_TARGET_ZIP)}...`))
+await zip(APP_TARGET_DIR, APP_TARGET_ZIP)
 
 console.log(chalk.bgGreen('Project ready!'))
 
-if ('android' == config.platform) {
-  console.log('To open your project in Android Studio:')
-  console.log(`  cd ${WRAPPER_APP_OUTPUT_TARGET.replaceAll(/\s+/g, '\\ ')}`)
-  console.log('  npm run open:android')
+if ('android' === config.platform) {
+  console.log(chalk.white('To open your project in Android Studio:'))
+  console.log(chalk.gray(`  cd ${APP_TARGET_DIR.replaceAll(/\s+/g, '\\ ')}`))
+  console.log(chalk.gray('  npm run open:android'))
+} else if ('ios' === config.platform) {
+  console.log(chalk.white('To open your project in Xcode:)'))
+  console.log(chalk.gray(`  cd ${APP_TARGET_DIR.replaceAll(/\s+/g, '\\ ')}`))
+  console.log(chalk.gray('  npm run open:ios'))
 }
