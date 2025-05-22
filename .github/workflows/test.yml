@@ -43,10 +43,42 @@ jobs:
         working-directory: ${{ github.workspace }}/x
         run: PATH="${{ env.OUTPUT_DIR }}:$PATH" gomobile bind -ldflags='-s -w' -v -target=android -androidapi=21 -o "${{ env.OUTPUT_DIR }}/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
 
+      - name: Set up JDK 11
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Copy Android AAR to Test Project
+        if: matrix.os == 'ubuntu-latest'
+        run: mkdir -p ${{ github.workspace }}/x/mobileproxy/testing/android/app/libs && cp ${{ env.OUTPUT_DIR }}/mobileproxy.aar ${{ github.workspace }}/x/mobileproxy/testing/android/app/libs/mobileproxy.aar
+
+      - name: Setup Android SDK
+        if: matrix.os == 'ubuntu-latest'
+        uses: android-actions/setup-android@v3
+
+      - name: Run Android Instrumentation Tests
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: ${{ github.workspace }}/x/mobileproxy/testing/android
+        # The connectedCheck task will attempt to build the app and test APK,
+        # then install and run tests on any connected devices/emulators.
+        # The android-actions/setup-android action should make an emulator available.
+        run: ./gradlew app:connectedCheck
+
       - name: Build Mobileproxy (iOS)
         if: matrix.os == 'macos-latest'
         working-directory: ${{ github.workspace }}/x
         run: PATH="${{ env.OUTPUT_DIR }}:$PATH" gomobile bind -ldflags='-s -w' -v -target=ios -iosversion=11.0 -o "${{ env.OUTPUT_DIR }}/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+
+      - name: Copy iOS XCFramework to Test Project
+        if: matrix.os == 'macos-latest'
+        run: mkdir -p ${{ github.workspace }}/x/mobileproxy/testing/ios/MobileProxyTestApp/Frameworks && cp -R ${{ env.OUTPUT_DIR }}/mobileproxy.xcframework ${{ github.workspace }}/x/mobileproxy/testing/ios/MobileProxyTestApp/Frameworks/mobileproxy.xcframework
+
+      - name: Run iOS Tests
+        if: matrix.os == 'macos-latest'
+        working-directory: ${{ github.workspace }}/x/mobileproxy/testing/ios/MobileProxyTestApp
+        run: xcodebuild test -project MobileProxyTestApp.xcodeproj -scheme MobileProxyTestApp -destination 'platform=iOS Simulator,name=iPhone 14,OS=latest' CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
 
       - name: Check SDK licenses
         # We allow only "notice" type of licenses.

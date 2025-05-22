@@ -1,0 +1,28 @@
+// Top-level build file for the Android test application
+// Standard buildscript block for plugins
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.2.1' // Example: Use a recent stable version
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22" // Example: Use a recent stable version
+    }
+}
+
+plugins {
+    id 'com.android.application' version '8.2.1' apply false // Example: Use a recent stable version
+    id 'org.jetbrains.kotlin.android' version '1.9.22' apply false // Example: Use a recent stable version
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
