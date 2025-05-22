@@ -10,7 +10,7 @@ export const DEFAULT_CONFIG = {
   smartDialerConfig: JSON.stringify({
     dns: [
       {
-      https: { name: '9.9.9.9' }
+        https: { name: '9.9.9.9' }
       }
     ],
     tls: [
@@ -25,14 +25,14 @@ export const DEFAULT_CONFIG = {
 export async function getYAMLFileConfig(filepath) {
   const data = await fs.readFile(filepath, 'utf8')
   if (data) {
-	return YAML.parse(data)
+    return YAML.parse(data)
   }
 }
 
 export function getCliConfig(args) {
   const dict = minimist(args)
   return {
-	...dict,
-	additionalDomains: dict.additionalDomains?.split(',') ?? []
+    ...dict,
+    additionalDomains: dict.additionalDomains?.split(',') ?? []
   }
 }
