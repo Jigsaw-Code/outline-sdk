@@ -40,9 +40,10 @@ class MainActivity : BridgeActivity() {
 
             this.proxy = Mobileproxy.runProxy(
                 "127.0.0.1:0",
-                Mobileproxy.newSmartStreamDialer(
+                Mobileproxy.newSmartStreamDialerWithCache(
                     Mobileproxy.newListFromLines(Config.domainList),
                     String(smartDialerConfig, StandardCharsets.UTF_8),
+                    SharedPreferencesStrategyCache(getPreferences(MODE_PRIVATE)),
                     Mobileproxy.newStderrLogWriter()
                 )
             )
