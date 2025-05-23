@@ -15,10 +15,12 @@ import androidx.webkit.WebViewFeature
 // TODO: resize webview so the web content is not occluded by the device UI
 class MainActivity : BridgeActivity() {
     private var proxy: Proxy? = null;
+    private lateinit var strategyCache: SharedPreferencesStrategyCache
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        this.strategyCache = SharedPreferencesStrategyCache(getPreferences(MODE_PRIVATE))
         if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
             if (!this.tryProxy()) {
                 // try one more time
@@ -43,7 +45,7 @@ class MainActivity : BridgeActivity() {
                 Mobileproxy.newSmartStreamDialerWithCache(
                     Mobileproxy.newListFromLines(Config.domainList),
                     String(smartDialerConfig, StandardCharsets.UTF_8),
-                    SharedPreferencesStrategyCache(getPreferences(MODE_PRIVATE)),
+                    this.strategyCache,
                     Mobileproxy.newStderrLogWriter()
                 )
             )
