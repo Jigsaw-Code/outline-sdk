@@ -9,12 +9,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     private var proxy: MobileproxyProxy? = nil
+    private var strategyCache: UserDefaultsStrategyCache? = nil
 
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
 
+        self.strategyCache = UserDefaultsStrategyCache()
         self.resetViewController()
 
         return true
@@ -60,9 +62,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
 
         var error: NSError?
-        if let dialer = MobileproxyNewSmartStreamDialer(
+        if let dialer = MobileproxyNewSmartStreamDialerWithCache(
             MobileproxyNewListFromLines(Config.domainList),
             String(data: smartDialerConfig, encoding: .utf8),
+            self.strategyCache,
             MobileproxyNewStderrLogWriter(),
             &error
         ) {
