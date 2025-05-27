@@ -15,6 +15,7 @@
 package smart
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -23,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"net/url"
 	"sync"
 	"time"
@@ -258,13 +260,82 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 			f.logCtx(ctx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 			return err
 		}
+
 		tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
 		err = tlsConn.HandshakeContext(testCtx)
-		tlsConn.Close()
 		if err != nil {
 			f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 			return err
 		}
+
+		defer tlsConn.Close()
+
+		// Create the HTTPS GET request.
+		req, err := http.NewRequestWithContext(testCtx, http.MethodGet, "https://"+testDomain+"/", nil)
+		if err != nil {
+			f.logCtx(ctx, "🏁 failed to create HTTP request: '%v' (domain: %v), duration=%v, request_creation_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+			// tlsConn.Close() is handled by defer
+			return err
+		}
+		// Set a User-Agent.
+		req.Header.Set("User-Agent", "OutlineSDK-SmartStrategyFinder/1.0")
+		// Explicitly request the connection to be closed after this request.
+		// This is important for http.ReadResponse to know the server will close
+		// the connection, preventing it from trying to read ahead for keep-alive.
+		req.Close = true
+
+		// Write the HTTP request to the TLS connection.
+		err = req.Write(tlsConn)
+		if err != nil {
+			logMsgPrefix := "🏁 failed to write HTTP request"
+			logDetailKey := "http_request_write_error"
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				logMsgPrefix = "🏁 HTTP request write context error"
+				logDetailKey = "context_error"
+			}
+			f.logCtx(ctx, "%s: '%v' (domain: %v), duration=%v, %s=%v ❌\n", logMsgPrefix, transportCfg, testDomain, time.Since(startTime), logDetailKey, err)
+			// tlsConn.Close() is handled by defer
+			return err
+		}
+
+		// Read the HTTP response from the TLS connection.
+		// http.ReadResponse requires a bufio.Reader.
+		resp, err := http.ReadResponse(bufio.NewReader(tlsConn), req)
+		if err != nil {
+			logMsgPrefix := "🏁 failed to read HTTP response"
+			logDetailKey := "http_response_read_error"
+			// Check if the error is due to context cancellation or network issues like EOF.
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				logMsgPrefix = "🏁 HTTP response read context error"
+				logDetailKey = "context_error"
+			} else if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+				logMsgPrefix = "🏁 failed to read HTTP response (EOF)"
+				logDetailKey = "http_response_eof_error"
+			}
+			f.logCtx(ctx, "%s: '%v' (domain: %v), duration=%v, %s=%v ❌\n", logMsgPrefix, transportCfg, testDomain, time.Since(startTime), logDetailKey, err)
+			// tlsConn.Close() is handled by defer
+			return err
+		}
+		defer resp.Body.Close() // Ensure the response body is closed.
+
+		// Check for a successful HTTP status code.
+		if resp.StatusCode != http.StatusOK {
+			f.logCtx(ctx, "🏁 HTTP GET status %d: '%v' (domain: %v), duration=%v ❌\n", resp.StatusCode, transportCfg, testDomain, time.Since(startTime))
+			// Attempt to drain some of the body before returning, which is good practice.
+			io.CopyN(io.Discard, resp.Body, 4096)
+			// tlsConn.Close() is handled by defer
+			return fmt.Errorf("HTTP GET failed with status code: %d", resp.StatusCode)
+		}
+
+		// Try to read at least one byte from the body to confirm data transfer.
+		// We discard the data as its content is not needed for this test.
+		_, readErr := io.CopyN(io.Discard, resp.Body, 1)
+		if readErr != nil && readErr != io.EOF { // io.EOF is acceptable here (body might be empty or fully read).
+			f.logCtx(ctx, "🏁 failed to read HTTP response body: '%v' (domain: %v), duration=%v, body_read_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), readErr)
+			// tlsConn.Close() is handled by defer
+			return readErr
+		}
+
 		f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
 	}
 	return nil
