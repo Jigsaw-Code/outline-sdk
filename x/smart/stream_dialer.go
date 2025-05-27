@@ -329,7 +329,7 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 
 		// Try to read at least one byte from the body to confirm data transfer.
 		// We discard the data as its content is not needed for this test.
-		_, readErr := io.CopyN(io.Discard, resp.Body, 1)
+		_, readErr := io.CopyN(io.Discard, resp.Body, 100)
 		if readErr != nil && readErr != io.EOF { // io.EOF is acceptable here (body might be empty or fully read).
 			f.logCtx(ctx, "🏁 failed to read HTTP response body: '%v' (domain: %v), duration=%v, body_read_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), readErr)
 			// tlsConn.Close() is handled by defer
