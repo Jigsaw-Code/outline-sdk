@@ -1,7 +1,6 @@
-package {{appId}}
+package org.getoutline.sdk.mobileproxy
 
 import android.content.SharedPreferences
-
 import androidx.core.content.edit
 
 import mobileproxy.StrategyCache
