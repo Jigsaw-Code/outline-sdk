@@ -9,14 +9,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     private var proxy: MobileproxyProxy? = nil
-    private var strategyCache: UserDefaultsStrategyCache? = nil
+    private var smartOptions: MobileproxySmartDialerOptions? = nil
 
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
 
-        self.strategyCache = UserDefaultsStrategyCache()
+        guard let decodedConfig = Data(base64Encoded: Config.smartDialer) else {
+            return false
+        }
+        let testDomains = MobileproxyNewListFromLines(Config.domainList)
+        self.smartOptions = MobileproxySmartDialerOptions(testDomains, config: String(data: decodedConfig, encoding: .utf8))
+        self.smartOptions!.logWriter = MobileproxyNewStderrLogWriter()
+        self.smartOptions!.strategyCache = UserDefaultsStrategyCache()
         self.resetViewController()
 
         return true
@@ -57,38 +63,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     @discardableResult
     private func tryProxy() -> Bool {
-        guard let smartDialerConfig = Data(base64Encoded: Config.smartDialer) else {
+        guard let dialer = try? self.smartOptions?.newStreamDialer() else {
             return false
         }
 
         var error: NSError?
-        if let dialer = MobileproxyNewSmartStreamDialerWithCache(
-            MobileproxyNewListFromLines(Config.domainList),
-            String(data: smartDialerConfig, encoding: .utf8),
-            self.strategyCache,
-            MobileproxyNewStderrLogWriter(),
+        self.proxy = MobileproxyRunProxy(
+            "127.0.0.1:0",
+            dialer,
             &error
-        ) {
-            if error != nil {
-                return false
-            }
+        )
 
-            self.proxy = MobileproxyRunProxy(
-                "127.0.0.1:0",
-                dialer,
-                &error
-            )
+        Config.proxyPort = String(self.proxy?.port() ?? 0)
 
-            Config.proxyPort = String(self.proxy?.port() ?? 0)
-            
-            self.resetViewController()
+        self.resetViewController()
 
-            if error != nil {
-                return false
-            }
-        }
-
-        return true
+        return error == nil
     }
 
     private func resetViewController() {
