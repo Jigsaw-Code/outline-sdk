@@ -1,0 +1,176 @@
+// Copyright 2025 The Outline Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package mobileproxy
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"strings"
+	"time"
+
+	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
+	"github.com/Jigsaw-Code/outline-sdk/x/smart"
+)
+
+// StreamDialer encapsulates the logic to create stream connections (like TCP).
+type StreamDialer struct {
+	transport.StreamDialer
+}
+
+var configModule = configurl.NewDefaultProviders()
+
+// NewStreamDialerFromConfig creates a [StreamDialer] based on the given config.
+// The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format.
+func NewStreamDialerFromConfig(transportConfig string) (*StreamDialer, error) {
+	dialer, err := configModule.NewStreamDialer(context.Background(), transportConfig)
+	if err != nil {
+		return nil, err
+	}
+	return &StreamDialer{dialer}, nil
+}
+
+// SmartDialerOptions specifies the options for creating a "Smart Dialer".
+// A "Smart Dialer" automatically selects the best DNS/TLS strategy to connect to the internet.
+type SmartDialerOptions struct {
+	// An optional LogWriter is used to output logs during the strategy selection process.
+	LogWriter LogWriter
+
+	// An optional StrategyCache stores successful strategies, speeding up future NewDialer calls.
+	StrategyCache StrategyCache
+
+	testDomains []string
+	config      []byte
+}
+
+// NewSmartDialerOptions creates the options for a "Smart Dialer".
+// `testDomains` is a list of domains used to test connectivity of each DNS/TLS strategy.
+// `config` is a string defining the strategies to search, an example can be found at:
+// https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.yaml
+func NewSmartDialerOptions(testDomains *StringList, config string) (*SmartDialerOptions, error) {
+	return &SmartDialerOptions{
+		testDomains: testDomains.list,
+		config:      []byte(config),
+	}, nil
+}
+
+// NewDialer uses the SmartDialerOptions to create a new "Smart" StreamDialer.
+// It finds the best-performing DNS/TLS strategy and returns a StreamDialer that uses this strategy.
+func (opt *SmartDialerOptions) NewDialer() (*StreamDialer, error) {
+	logBytesWriter := toWriter(opt.LogWriter)
+
+	// TODO: inject the base dialer for tests.
+	finder := smart.StrategyFinder{
+		LogWriter:    logBytesWriter,
+		TestTimeout:  5 * time.Second,
+		StreamDialer: &transport.TCPDialer{},
+		PacketDialer: &transport.UDPDialer{},
+	}
+
+	if opt.StrategyCache != nil {
+		finder.Cache = &strategyCacheAdapter{impl: opt.StrategyCache}
+	}
+	dialer, err := finder.NewDialer(context.Background(), opt.testDomains, opt.config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dialer: %w", err)
+	}
+	return &StreamDialer{dialer}, nil
+}
+
+// NewSmartStreamDialer automatically selects a DNS and TLS strategy to use, and returns a [StreamDialer]
+// that will use the selected strategy.
+// It uses testDomains to find a strategy that works when accessing those domains.
+// The strategies to search are given in the searchConfig. An example can be found in
+// https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.yaml
+func NewSmartStreamDialer(testDomains *StringList, searchConfig string, logWriter LogWriter) (*StreamDialer, error) {
+	opt, err := NewSmartDialerOptions(testDomains, searchConfig)
+	if err != nil {
+		return nil, err
+	}
+	opt.LogWriter = logWriter
+	return opt.NewDialer()
+}
+
+// StringList allows us to pass a list of strings to the Go Mobile functions, since Go Mobile doesn't
+// support slices as parameters.
+type StringList struct {
+	list []string
+}
+
+// Append adds the string value to the end of the list.
+func (l *StringList) Append(value string) {
+	l.list = append(l.list, value)
+}
+
+// NewListFromLines creates a StringList by splitting the input string on new lines.
+func NewListFromLines(lines string) *StringList {
+	return &StringList{list: strings.Split(lines, "\n")}
+}
+
+// LogWriter is used as a sink for logging.
+type LogWriter io.StringWriter
+
+// Adaptor to convert an [io.Writer] to a [io.StringWriter].
+type bytestoStringWriter struct {
+	sw io.StringWriter
+}
+
+// Write implements [io.Writer].
+func (w *bytestoStringWriter) Write(b []byte) (int, error) {
+	return w.sw.WriteString(string(b))
+}
+
+func toWriter(logWriter LogWriter) io.Writer {
+	if logWriter == nil {
+		return nil
+	}
+	if w, ok := logWriter.(io.Writer); ok {
+		return w
+	}
+	return &bytestoStringWriter{logWriter}
+}
+
+// StrategyCache enables storing and retrieving successful strategies.
+// Clients are required to provide a platform-specific implementation of this interface.
+type StrategyCache interface {
+	// Get retrieves the string value associated with the given key.
+	// It should return an empty (or `null`) string if the key is not found.
+	Get(key string) string
+
+	// Put adds the string value with the given key to the cache.
+	// If called with empty (or `null`) value, it should remove the cache entry.
+	Put(key string, value string)
+}
+
+// strategyCacheAdapter adapts a [StrategyCache] to the [smart.StrategyResultCache].
+// This is required because [smart.StrategyResultCache]'s Get returns multiple values,
+// which is not supported by gomobile.
+// This adapter also converts between []byte and string.
+type strategyCacheAdapter struct {
+	impl StrategyCache
+}
+
+func (sc *strategyCacheAdapter) Get(key string) (value []byte, ok bool) {
+	v := sc.impl.Get(key)
+	if v == "" {
+		return nil, false
+	}
+	return []byte(v), true
+}
+
+func (sc *strategyCacheAdapter) Put(key string, value []byte) {
+	sc.impl.Put(key, string(value))
+}
