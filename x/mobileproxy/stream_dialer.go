@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -67,9 +68,9 @@ func NewSmartDialerOptions(testDomains *StringList, config string) (*SmartDialer
 	}, nil
 }
 
-// NewDialer uses the SmartDialerOptions to create a new "Smart" StreamDialer.
+// NewStreamDialer uses the SmartDialerOptions to create a new "Smart" StreamDialer.
 // It finds the best-performing DNS/TLS strategy and returns a StreamDialer that uses this strategy.
-func (opt *SmartDialerOptions) NewDialer() (*StreamDialer, error) {
+func (opt *SmartDialerOptions) NewStreamDialer() (*StreamDialer, error) {
 	logBytesWriter := toWriter(opt.LogWriter)
 
 	// TODO: inject the base dialer for tests.
@@ -101,7 +102,7 @@ func NewSmartStreamDialer(testDomains *StringList, searchConfig string, logWrite
 		return nil, err
 	}
 	opt.LogWriter = logWriter
-	return opt.NewDialer()
+	return opt.NewStreamDialer()
 }
 
 // StringList allows us to pass a list of strings to the Go Mobile functions, since Go Mobile doesn't
@@ -122,6 +123,21 @@ func NewListFromLines(lines string) *StringList {
 
 // LogWriter is used as a sink for logging.
 type LogWriter io.StringWriter
+
+// NewStderrLogWriter creates a [LogWriter] that writes to the standard error output.
+func NewStderrLogWriter() LogWriter {
+	return &stringToBytesWriter{os.Stderr}
+}
+
+// Adaptor to convert an [io.StringWriter] to a [io.Writer].
+type stringToBytesWriter struct {
+	w io.Writer
+}
+
+// WriteString implements [io.StringWriter].
+func (w *stringToBytesWriter) WriteString(logText string) (int, error) {
+	return io.WriteString(w.w, logText)
+}
 
 // Adaptor to convert an [io.Writer] to a [io.StringWriter].
 type bytestoStringWriter struct {

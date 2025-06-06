@@ -15,13 +15,18 @@ import androidx.webkit.WebViewFeature
 
 // TODO: resize webview so the web content is not occluded by the device UI
 class MainActivity : BridgeActivity() {
-    private var proxy: Proxy? = null;
-    private lateinit var strategyCache: SharedPreferencesStrategyCache
+    private var proxy: Proxy? = null
+    private lateinit var smartOptions: SmartDialerOptions
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        this.strategyCache = SharedPreferencesStrategyCache(getPreferences(MODE_PRIVATE))
+        val testDomains = Mobileproxy.newListFromLines(Config.domainList)
+        val decodedConfig = Base64.decode(Config.smartDialer, Base64.DEFAULT)
+        this.smartOptions = SmartDialerOptions(testDomains, String(decodedConfig, StandardCharsets.UTF_8))
+        this.smartOptions.logWriter = Mobileproxy.newStderrLogWriter()
+        this.smartOptions.strategyCache = SharedPreferencesStrategyCache(getPreferences(MODE_PRIVATE))
+
         if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
             if (!this.tryProxy()) {
                 // try one more time
@@ -43,12 +48,7 @@ class MainActivity : BridgeActivity() {
 
             this.proxy = Mobileproxy.runProxy(
                 "127.0.0.1:0",
-                Mobileproxy.newSmartStreamDialerWithCache(
-                    Mobileproxy.newListFromLines(Config.domainList),
-                    String(smartDialerConfig, StandardCharsets.UTF_8),
-                    this.strategyCache,
-                    Mobileproxy.newStderrLogWriter()
-                )
+                this.smartOptions.newStreamDialer()
             )
 
             // NOTE: this affects all requests in the application
