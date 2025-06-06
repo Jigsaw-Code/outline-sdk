@@ -96,6 +96,8 @@ func (opt *SmartDialerOptions) NewStreamDialer() (*StreamDialer, error) {
 // It uses testDomains to find a strategy that works when accessing those domains.
 // The strategies to search are given in the searchConfig. An example can be found in
 // https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.yaml
+//
+// Deprecated: Use [SmartDialerOptions] NewStreamDialer instead.
 func NewSmartStreamDialer(testDomains *StringList, searchConfig string, logWriter LogWriter) (*StreamDialer, error) {
 	opt, err := NewSmartDialerOptions(testDomains, searchConfig)
 	if err != nil {
