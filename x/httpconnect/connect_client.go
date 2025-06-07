@@ -81,9 +81,9 @@ func (cc *ConnectClient) DialStream(ctx context.Context, remoteAddr string) (tra
 		return nil, fmt.Errorf("failed to parse remote address %s: %w", remoteAddr, err)
 	}
 
-	pr, pw := io.Pipe()
+	reqReader, reqWriter := net.Pipe()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodConnect, fmt.Sprintf("%s://%s", cc.proxyRT.Scheme(), remoteAddr), pr)
+	req, err := http.NewRequestWithContext(ctx, http.MethodConnect, fmt.Sprintf("%s://%s", cc.proxyRT.Scheme(), remoteAddr), reqReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -103,7 +103,14 @@ func (cc *ConnectClient) DialStream(ctx context.Context, remoteAddr string) (tra
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	return newPipeConn(resp.Body, pw), nil
+	// to provide the SetReadDeadline function of the returned connection, at the expense of an extra copy
+	respReader, respWriter := net.Pipe()
+	go func() {
+		defer resp.Body.Close()
+		_, _ = io.Copy(respWriter, resp.Body)
+	}()
+
+	return newPipeConn(reqWriter, respReader), nil
 }
 
 func mergeHeaders(dst http.Header, src http.Header) {

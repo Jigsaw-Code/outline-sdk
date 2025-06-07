@@ -30,6 +30,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 
@@ -59,6 +60,9 @@ func Test_NewConnectClient_Ok(t *testing.T) {
 
 	var _ io.ReadWriteCloser = (net.Conn)(nil)
 
+	tcpDialer := &transport.TCPDialer{}
+	h1ConnectHandler := httpproxy.NewConnectHandler(tcpDialer)
+
 	type closeFunc func()
 
 	type TestCase struct {
@@ -73,11 +77,9 @@ func Test_NewConnectClient_Ok(t *testing.T) {
 			prepareDialer: func(t *testing.T) (transport.StreamDialer, closeFunc) {
 				creds := base64.StdEncoding.EncodeToString([]byte("username:password"))
 
-				tcpDialer := &transport.TCPDialer{}
-				connectHandler := httpproxy.NewConnectHandler(tcpDialer)
 				proxySrv := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 					require.Equal(t, "Basic "+creds, request.Header.Get("Proxy-Authorization"))
-					connectHandler.ServeHTTP(writer, request)
+					h1ConnectHandler.ServeHTTP(writer, request)
 				}))
 
 				proxyURL, err := url.Parse(proxySrv.URL)
@@ -95,13 +97,9 @@ func Test_NewConnectClient_Ok(t *testing.T) {
 			},
 		},
 		{
-			name: "ok. HTTP/1 with TLS",
+			name: "ok. HTTP/1.1 with TLS",
 			prepareDialer: func(t *testing.T) (transport.StreamDialer, closeFunc) {
-				tcpDialer := &transport.TCPDialer{}
-				connectHandler := httpproxy.NewConnectHandler(tcpDialer)
-				proxySrv := httptest.NewUnstartedServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-					connectHandler.ServeHTTP(writer, request)
-				}))
+				proxySrv := httptest.NewUnstartedServer(h1ConnectHandler)
 
 				rootCA, key := generateRootCA(t)
 				proxySrv.TLS = &stdTLS.Config{Certificates: []stdTLS.Certificate{key}}
@@ -129,7 +127,6 @@ func Test_NewConnectClient_Ok(t *testing.T) {
 		{
 			name: "ok. HTTP/2 with TLS",
 			prepareDialer: func(t *testing.T) (transport.StreamDialer, closeFunc) {
-				tcpDialer := &transport.TCPDialer{}
 				proxySrv := httptest.NewUnstartedServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 					require.Equal(t, "HTTP/2.0", request.Proto, "Proto")
 					require.Equal(t, http.MethodConnect, request.Method, "Method")
@@ -141,18 +138,26 @@ func Test_NewConnectClient_Ok(t *testing.T) {
 					writer.WriteHeader(http.StatusOK)
 					writer.(http.Flusher).Flush()
 
+					wg := &sync.WaitGroup{}
+
+					wg.Add(1)
 					go func() {
-						_, err := conn.(io.ReaderFrom).ReadFrom(request.Body)
-						require.Error(t, err, "NO_ERROR")
+						defer wg.Done()
+						io.Copy(conn, request.Body)
 					}()
 
-					// we can't use io.Copy, because it doesn't flush
-					fw := &flusherWriter{
-						Flusher: writer.(http.Flusher),
-						Writer:  writer,
-					}
-					_, err = fw.ReadFrom(conn)
-					require.NoError(t, err, "ReadFrom")
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						// we can't use io.Copy, because it doesn't flush
+						fw := &flusherWriter{
+							Flusher: writer.(http.Flusher),
+							Writer:  writer,
+						}
+						fw.ReadFrom(conn)
+					}()
+
+					wg.Wait()
 				}))
 
 				rootCA, key := generateRootCA(t)
@@ -185,11 +190,8 @@ func Test_NewConnectClient_Ok(t *testing.T) {
 		{
 			name: "fail. enforced HTTP/2, but server doesn't support it",
 			prepareDialer: func(t *testing.T) (transport.StreamDialer, closeFunc) {
-				tcpDialer := &transport.TCPDialer{}
 				connectHandler := httpproxy.NewConnectHandler(tcpDialer)
-				proxySrv := httptest.NewUnstartedServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-					connectHandler.ServeHTTP(writer, request)
-				}))
+				proxySrv := httptest.NewUnstartedServer(connectHandler)
 
 				rootCA, key := generateRootCA(t)
 				proxySrv.TLS = &stdTLS.Config{Certificates: []stdTLS.Certificate{key}}
@@ -236,17 +238,33 @@ func Test_NewConnectClient_Ok(t *testing.T) {
 
 						conn, err := net.Dial("tcp", request.URL.Host)
 						require.NoError(t, err, "DialStream")
+						defer conn.Close()
 
 						writer.WriteHeader(http.StatusOK)
 						writer.(http.Flusher).Flush()
 
+						streamer, ok := writer.(http3.HTTPStreamer)
+						if !ok {
+							t.Fatal("http.ResponseWriter expected to implement http3.HTTPStreamer")
+						}
+						stream := streamer.HTTPStream()
+						defer stream.Close()
+
+						wg := &sync.WaitGroup{}
+
+						wg.Add(1)
 						go func() {
-							_, _ = io.Copy(conn, request.Body)
-							require.NoError(t, err, "io.Copy")
+							defer wg.Done()
+							io.Copy(stream, conn)
 						}()
 
-						_, _ = io.Copy(writer, conn)
-						require.NoError(t, err, "io.Copy")
+						wg.Add(1)
+						go func() {
+							defer wg.Done()
+							io.Copy(conn, stream)
+						}()
+
+						wg.Wait()
 					}),
 					TLSConfig: &stdTLS.Config{
 						Certificates: []stdTLS.Certificate{key},
@@ -302,7 +320,9 @@ func Test_NewConnectClient_Ok(t *testing.T) {
 				},
 			}
 
-			req, err := http.NewRequest(http.MethodGet, targetSrv.URL, nil)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, targetSrv.URL, nil)
 			req.Close = true // close the connection after the request to close the tunnel right away
 			require.NoError(t, err, "NewRequest")
 

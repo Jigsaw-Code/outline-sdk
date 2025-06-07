@@ -97,6 +97,7 @@ func NewHTTPProxyTransport(dialer transport.StreamDialer, proxyAddr string, opts
 // The proxy address must be in the form "host:port".
 //
 // For HTTP/3 over QUIC over a datagram connection.
+// [tls.WithALPN] has no effect on this transport.
 func NewHTTP3ProxyTransport(conn net.PacketConn, proxyAddr string, opts ...TransportOption) (ProxyRoundTripper, error) {
 	if conn == nil {
 		return nil, errors.New("conn must not be nil")
@@ -159,8 +160,8 @@ func (rt proxyRT) Scheme() string {
 	return string(rt.scheme)
 }
 
-// TODO: tls.ClientConfig.toStdConfig is an unexported function located is a separate Go module, so we can't make it exported right away
-// It is basically a copy of the implementation
+// TODO: Replace with tls.ToGoTLSConfig call once outline-sdk dependency version for this module is bumped.
+// It is basically a copy of the implementation ToGoTLSConfig
 func toStdConfig(cfg tls.ClientConfig) *stdTLS.Config {
 	return &stdTLS.Config{
 		ServerName:         cfg.ServerName,

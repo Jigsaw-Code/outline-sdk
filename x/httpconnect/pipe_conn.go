@@ -25,15 +25,23 @@ import (
 
 var _ transport.StreamConn = (*pipeConn)(nil)
 
-var ErrDeadlineNotSupported = errors.New("deadline not supported")
-
 type pipeConn struct {
-	reader io.ReadCloser
-	writer io.WriteCloser
+	reader readCloseDeadliner
+	writer writeCloseDeadliner
 }
 
-func newPipeConn(r io.ReadCloser, w io.WriteCloser) *pipeConn {
-	return &pipeConn{reader: r, writer: w}
+type readCloseDeadliner interface {
+	io.ReadCloser
+	SetDeadline(deadline time.Time) error
+}
+
+type writeCloseDeadliner interface {
+	io.WriteCloser
+	SetDeadline(deadline time.Time) error
+}
+
+func newPipeConn(writer writeCloseDeadliner, reader readCloseDeadliner) *pipeConn {
+	return &pipeConn{reader: reader, writer: writer}
 }
 
 func (p *pipeConn) Read(b []byte) (n int, err error) {
@@ -65,13 +73,13 @@ func (p *pipeConn) RemoteAddr() net.Addr {
 }
 
 func (p *pipeConn) SetDeadline(t time.Time) error {
-	return ErrDeadlineNotSupported
+	return errors.Join(p.writer.SetDeadline(t), p.reader.SetDeadline(t))
 }
 
 func (p *pipeConn) SetReadDeadline(t time.Time) error {
-	return ErrDeadlineNotSupported
+	return p.reader.SetDeadline(t)
 }
 
 func (p *pipeConn) SetWriteDeadline(t time.Time) error {
-	return ErrDeadlineNotSupported
+	return p.writer.SetDeadline(t)
 }
