@@ -23,9 +23,10 @@ class MainActivity : BridgeActivity() {
 
         val testDomains = Mobileproxy.newListFromLines(Config.domainList)
         val decodedConfig = Base64.decode(Config.smartDialer, Base64.DEFAULT)
-        this.smartOptions = SmartDialerOptions(testDomains, String(decodedConfig, StandardCharsets.UTF_8))
-        this.smartOptions.logWriter = Mobileproxy.newStderrLogWriter()
-        this.smartOptions.strategyCache = SharedPreferencesStrategyCache(getPreferences(MODE_PRIVATE))
+        val options = SmartDialerOptions(testDomains, String(decodedConfig, StandardCharsets.UTF_8))
+        options.setLogWriter(Mobileproxy.newStderrLogWriter())
+        options.setStrategyCache(SharedPreferencesStrategyCache(getPreferences(MODE_PRIVATE)))
+        this.smartOptions = options
 
         if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
             if (!this.tryProxy()) {
