@@ -19,10 +19,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         guard let decodedConfig = Data(base64Encoded: Config.smartDialer) else {
             return false
         }
+        let configString = String(data: decodedConfig, encoding: .utf8)
         let testDomains = MobileproxyNewListFromLines(Config.domainList)
-        self.smartOptions = MobileproxySmartDialerOptions(testDomains, config: String(data: decodedConfig, encoding: .utf8))
-        self.smartOptions!.logWriter = MobileproxyNewStderrLogWriter()
-        self.smartOptions!.strategyCache = UserDefaultsStrategyCache()
+        guard let options = MobileproxySmartDialerOptions(testDomains, config: configString) else {
+            return false
+        }
+        options.setLogWriter(MobileproxyNewStderrLogWriter())
+        options.setStrategyCache(UserDefaultsStrategyCache())
+        self.smartOptions = options
         self.resetViewController()
 
         return true
