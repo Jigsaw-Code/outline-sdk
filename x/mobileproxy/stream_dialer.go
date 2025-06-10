@@ -47,43 +47,63 @@ func NewStreamDialerFromConfig(transportConfig string) (*StreamDialer, error) {
 // SmartDialerOptions specifies the options for creating a "Smart Dialer".
 // A "Smart Dialer" automatically selects the best DNS/TLS strategy to connect to the internet.
 type SmartDialerOptions struct {
-	// An optional LogWriter is used to output logs during the strategy selection process.
-	LogWriter LogWriter
-
-	// An optional StrategyCache stores successful strategies, speeding up future NewDialer calls.
-	StrategyCache StrategyCache
-
 	testDomains []string
 	config      []byte
+	testTimeout time.Duration
+
+	baseSD transport.StreamDialer
+	basePD transport.PacketDialer
+
+	logWriter io.Writer
+	cache     *strategyCacheAdapter
 }
 
-// NewSmartDialerOptions creates the options for a "Smart Dialer".
-// `testDomains` is a list of domains used to test connectivity of each DNS/TLS strategy.
-// `config` is a string defining the strategies to search, an example can be found at:
+// NewSmartDialerOptions initializes the required options for creating a "Smart Dialer".
+//
+// `testDomains` are used to test connectivity for each DNS/TLS strategy.
+// `config` defines the strategies to test. For an example, see:
 // https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.yaml
-func NewSmartDialerOptions(testDomains *StringList, config string) (*SmartDialerOptions, error) {
+func NewSmartDialerOptions(testDomains *StringList, config string) *SmartDialerOptions {
 	return &SmartDialerOptions{
 		testDomains: testDomains.list,
 		config:      []byte(config),
-	}, nil
+		testTimeout: 5 * time.Second,
+		baseSD:      &transport.TCPDialer{},
+		basePD:      &transport.UDPDialer{},
+	}
 }
 
-// NewStreamDialer uses the SmartDialerOptions to create a new "Smart" StreamDialer.
+// SetLogWriter configures an optional LogWriter for logging the strategy selection process.
+func (opt *SmartDialerOptions) SetLogWriter(logw LogWriter) {
+	if logw == nil {
+		opt.logWriter = nil
+	} else {
+		opt.logWriter = toWriter(logw)
+	}
+}
+
+// SetStrategyCache configures an optional StrategyCache to store successful strategies,
+// speeding up NewDialer calls.
+func (opt *SmartDialerOptions) SetStrategyCache(cache StrategyCache) {
+	if cache == nil {
+		opt.cache = nil
+	} else {
+		opt.cache = &strategyCacheAdapter{cache}
+	}
+}
+
+// NewStreamDialer creates a new "Smart" StreamDialer using the configured options.
 // It finds the best-performing DNS/TLS strategy and returns a StreamDialer that uses this strategy.
 func (opt *SmartDialerOptions) NewStreamDialer() (*StreamDialer, error) {
-	logBytesWriter := toWriter(opt.LogWriter)
-
 	// TODO: inject the base dialer for tests.
 	finder := smart.StrategyFinder{
-		LogWriter:    logBytesWriter,
-		TestTimeout:  5 * time.Second,
-		StreamDialer: &transport.TCPDialer{},
-		PacketDialer: &transport.UDPDialer{},
+		LogWriter:    opt.logWriter,
+		TestTimeout:  opt.testTimeout,
+		StreamDialer: opt.baseSD,
+		PacketDialer: opt.basePD,
+		Cache:        opt.cache,
 	}
 
-	if opt.StrategyCache != nil {
-		finder.Cache = &strategyCacheAdapter{impl: opt.StrategyCache}
-	}
 	dialer, err := finder.NewDialer(context.Background(), opt.testDomains, opt.config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dialer: %w", err)
@@ -99,11 +119,8 @@ func (opt *SmartDialerOptions) NewStreamDialer() (*StreamDialer, error) {
 //
 // Deprecated: Use [SmartDialerOptions] NewStreamDialer instead.
 func NewSmartStreamDialer(testDomains *StringList, searchConfig string, logWriter LogWriter) (*StreamDialer, error) {
-	opt, err := NewSmartDialerOptions(testDomains, searchConfig)
-	if err != nil {
-		return nil, err
-	}
-	opt.LogWriter = logWriter
+	opt := NewSmartDialerOptions(testDomains, searchConfig)
+	opt.SetLogWriter(logWriter)
 	return opt.NewStreamDialer()
 }
 
