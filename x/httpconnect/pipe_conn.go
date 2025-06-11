@@ -26,8 +26,9 @@ import (
 var _ transport.StreamConn = (*pipeConn)(nil)
 
 type pipeConn struct {
-	reader readCloseDeadliner
-	writer writeCloseDeadliner
+	reader     readCloseDeadliner
+	writer     writeCloseDeadliner
+	remoteAddr net.Addr
 }
 
 type readCloseDeadliner interface {
@@ -40,8 +41,12 @@ type writeCloseDeadliner interface {
 	SetDeadline(deadline time.Time) error
 }
 
-func newPipeConn(writer writeCloseDeadliner, reader readCloseDeadliner) *pipeConn {
-	return &pipeConn{reader: reader, writer: writer}
+func newPipeConn(writer writeCloseDeadliner, reader readCloseDeadliner, remoteAddr net.Addr) *pipeConn {
+	return &pipeConn{
+		reader:     reader,
+		writer:     writer,
+		remoteAddr: remoteAddr,
+	}
 }
 
 func (p *pipeConn) Read(b []byte) (n int, err error) {
@@ -69,7 +74,7 @@ func (p *pipeConn) LocalAddr() net.Addr {
 }
 
 func (p *pipeConn) RemoteAddr() net.Addr {
-	return nil
+	return p.remoteAddr
 }
 
 func (p *pipeConn) SetDeadline(t time.Time) error {

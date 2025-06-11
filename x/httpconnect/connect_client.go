@@ -76,7 +76,7 @@ type clientConfig struct {
 }
 
 func (cc *ConnectClient) DialStream(ctx context.Context, remoteAddr string) (transport.StreamConn, error) {
-	_, _, err := net.SplitHostPort(remoteAddr)
+	raddr, err := transport.MakeNetAddr("tcp", remoteAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse remote address %s: %w", remoteAddr, err)
 	}
@@ -110,7 +110,7 @@ func (cc *ConnectClient) DialStream(ctx context.Context, remoteAddr string) (tra
 		_, _ = io.Copy(respWriter, resp.Body)
 	}()
 
-	return newPipeConn(reqWriter, respReader), nil
+	return newPipeConn(reqWriter, respReader, raddr), nil
 }
 
 func mergeHeaders(dst http.Header, src http.Header) {

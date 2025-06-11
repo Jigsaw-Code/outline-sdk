@@ -315,7 +315,13 @@ func Test_NewConnectClient_Ok(t *testing.T) {
 			hc := &http.Client{
 				Transport: &http.Transport{
 					DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
-						return connClient.DialStream(ctx, addr)
+						conn, err := connClient.DialStream(ctx, addr)
+						if err != nil {
+							return nil, err
+						}
+						require.Equal(t, conn.RemoteAddr().String(), addr)
+
+						return conn, nil
 					},
 				},
 			}
