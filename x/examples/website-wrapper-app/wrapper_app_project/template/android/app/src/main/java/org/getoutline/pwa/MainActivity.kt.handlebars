@@ -4,6 +4,7 @@ import android.os.Bundle
 import com.getcapacitor.BridgeActivity
 
 import mobileproxy.*
+import org.getoutline.sdk.mobileproxy.SharedPreferencesStrategyCache
 
 import android.util.Base64
 import java.nio.charset.StandardCharsets
@@ -14,10 +15,18 @@ import androidx.webkit.WebViewFeature
 
 // TODO: resize webview so the web content is not occluded by the device UI
 class MainActivity : BridgeActivity() {
-    private var proxy: Proxy? = null;
+    private var proxy: Proxy? = null
+    private lateinit var smartOptions: SmartDialerOptions
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val testDomains = Mobileproxy.newListFromLines(Config.domainList)
+        val decodedConfig = Base64.decode(Config.smartDialer, Base64.DEFAULT)
+        val options = SmartDialerOptions(testDomains, String(decodedConfig, StandardCharsets.UTF_8))
+        options.setLogWriter(Mobileproxy.newStderrLogWriter())
+        options.setStrategyCache(SharedPreferencesStrategyCache(getPreferences(MODE_PRIVATE)))
+        this.smartOptions = options
 
         if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
             if (!this.tryProxy()) {
@@ -40,11 +49,7 @@ class MainActivity : BridgeActivity() {
 
             this.proxy = Mobileproxy.runProxy(
                 "127.0.0.1:0",
-                Mobileproxy.newSmartStreamDialer(
-                    Mobileproxy.newListFromLines(Config.domainList),
-                    String(smartDialerConfig, StandardCharsets.UTF_8),
-                    Mobileproxy.newStderrLogWriter()
-                )
+                this.smartOptions.newStreamDialer()
             )
 
             // NOTE: this affects all requests in the application
