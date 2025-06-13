@@ -105,6 +105,11 @@ type ClientConfig struct {
 	CertVerifier CertVerifier
 }
 
+// ToGoTLSConfig converts the ClientConfig to a [tls.Config].
+func ToGoTLSConfig(cfg *ClientConfig) *tls.Config {
+	return cfg.toStdConfig()
+}
+
 // toStdConfig creates a [tls.Config] based on the configured parameters.
 func (cfg *ClientConfig) toStdConfig() *tls.Config {
 	return &tls.Config{

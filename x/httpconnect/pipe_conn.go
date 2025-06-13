@@ -16,17 +16,37 @@ package httpconnect
 
 import (
 	"errors"
-	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"io"
+	"net"
+	"time"
+
+	"github.com/Jigsaw-Code/outline-sdk/transport"
 )
 
 var _ transport.StreamConn = (*pipeConn)(nil)
 
-// pipeConn is a [transport.StreamConn] that overrides [Read], [Write] (and corresponding [Close]) functions with the given [reader] and [writer]
 type pipeConn struct {
-	reader io.ReadCloser
-	writer io.WriteCloser
-	transport.StreamConn
+	reader     readCloseDeadliner
+	writer     writeCloseDeadliner
+	remoteAddr net.Addr
+}
+
+type readCloseDeadliner interface {
+	io.ReadCloser
+	SetDeadline(deadline time.Time) error
+}
+
+type writeCloseDeadliner interface {
+	io.WriteCloser
+	SetDeadline(deadline time.Time) error
+}
+
+func newPipeConn(writer writeCloseDeadliner, reader readCloseDeadliner, remoteAddr net.Addr) *pipeConn {
+	return &pipeConn{
+		reader:     reader,
+		writer:     writer,
+		remoteAddr: remoteAddr,
+	}
 }
 
 func (p *pipeConn) Read(b []byte) (n int, err error) {
@@ -38,13 +58,33 @@ func (p *pipeConn) Write(b []byte) (n int, err error) {
 }
 
 func (p *pipeConn) CloseRead() error {
-	return errors.Join(p.reader.Close(), p.StreamConn.CloseRead())
+	return p.reader.Close()
 }
 
 func (p *pipeConn) CloseWrite() error {
-	return errors.Join(p.writer.Close(), p.StreamConn.CloseWrite())
+	return p.writer.Close()
 }
 
 func (p *pipeConn) Close() error {
-	return errors.Join(p.reader.Close(), p.writer.Close(), p.StreamConn.Close())
+	return errors.Join(p.reader.Close(), p.writer.Close())
+}
+
+func (p *pipeConn) LocalAddr() net.Addr {
+	return nil
+}
+
+func (p *pipeConn) RemoteAddr() net.Addr {
+	return p.remoteAddr
+}
+
+func (p *pipeConn) SetDeadline(t time.Time) error {
+	return errors.Join(p.writer.SetDeadline(t), p.reader.SetDeadline(t))
+}
+
+func (p *pipeConn) SetReadDeadline(t time.Time) error {
+	return p.reader.SetDeadline(t)
+}
+
+func (p *pipeConn) SetWriteDeadline(t time.Time) error {
+	return p.writer.SetDeadline(t)
 }
