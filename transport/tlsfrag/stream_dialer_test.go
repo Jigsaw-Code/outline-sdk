@@ -142,6 +142,57 @@ func TestFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 	}
 }
 
+// Make sure only the first Client Hello is splitted by a fixed length.
+func TestSniSplittingStreamDialerSplitsSni(t *testing.T) {
+	hello := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00, 0x03, 0xaa, 0xbb, 0xcc})
+	cipher := constructTLSRecord(t, layers.TLSChangeCipherSpec, 0x0303, []byte{0x01})
+	req1 := constructTLSRecord(t, layers.TLSApplicationData, 0x0303, []byte{0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88})
+
+	cases := []struct {
+		msg                string
+		original, splitted net.Buffers
+		splitLen           int
+	}{
+		{
+			msg:      "split leading bytes",
+			original: net.Buffers{hello, cipher, req1, hello, cipher, req1},
+			splitLen: 2,
+			splitted: net.Buffers{
+				// Fragmented record header and payload are written as two packets by FixedLenWriter
+				constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00}),
+				constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x00, 0x03, 0xaa, 0xbb, 0xcc}),
+				cipher, req1, hello, cipher, req1,
+			},
+		},
+		{
+			msg:      "split trailing bytes",
+			original: net.Buffers{hello, cipher, req1, hello, cipher, req1},
+			splitLen: -2,
+			splitted: net.Buffers{
+				// Fragmented record header and payload are written as two packets by FixedLenWriter
+				constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00, 0x03, 0xaa}),
+				constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0xbb, 0xcc}),
+				cipher, req1, hello, cipher, req1,
+			},
+		},
+		{
+			msg:      "no split",
+			original: net.Buffers{hello, cipher, req1, hello, cipher, req1},
+			splitLen: 0,
+			splitted: net.Buffers{hello, cipher, req1, hello, cipher, req1},
+		},
+	}
+
+	for _, tc := range cases {
+		inner := &collectStreamDialer{}
+		conn := assertCanDialSniSplitFrag(t, inner, "ipinfo.io:443", tc.splitLen)
+		defer conn.Close()
+
+		assertCanWriteAll(t, conn, tc.original)
+		require.Equal(t, tc.splitted, inner.bufs, tc.msg)
+	}
+}
+
 // Make sure the first Client Hello can be splitted multiple times.
 func TestNestedFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 	hello := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{
@@ -188,6 +239,17 @@ func assertCanDialFragFunc(t *testing.T, inner transport.StreamDialer, raddr str
 
 func assertCanDialFixedLenFrag(t *testing.T, inner transport.StreamDialer, raddr string, splitLen int) transport.StreamConn {
 	d, err := NewFixedLenStreamDialer(inner, splitLen)
+	require.NoError(t, err)
+	require.NotNil(t, d)
+	conn, err := d.DialStream(context.Background(), raddr)
+	require.NoError(t, err)
+	require.NotNil(t, conn)
+	return conn
+}
+
+func assertCanDialSniSplitFrag(t *testing.T, inner transport.StreamDialer, raddr string, splitLen int) transport.StreamConn {
+	splitSniFunc := MakeSplitSniFunc(splitLen)
+	d, err := NewStreamDialerFunc(inner, splitSniFunc)
 	require.NoError(t, err)
 	require.NotNil(t, d)
 	conn, err := d.DialStream(context.Background(), raddr)

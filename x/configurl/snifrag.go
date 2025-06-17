@@ -23,6 +23,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag"
 )
 
+// Writing this here since tlsfrag.MakeSplitSniFunc is not accessible without a release
 // TODO move this function into transport/tlsfrag/split_sni.go
 func MakeSplitSniFunc(sniSplit int) tlsfrag.FragFunc {
 	// takes in an int, and returns a FragFunc which splits the on the sni
@@ -45,11 +46,8 @@ func registerSNIFragStreamDialer(r TypeRegistry[transport.StreamDialer], typeID 
 		if err != nil {
 			return nil, fmt.Errorf("invalid snifrag option: %v. It should be in snifrag:<number> format", lenStr)
 		}
-		// fragFunc returns the pre-configured SNI split value.
-		// The clientHello parameter is ignored as the split is fixed.
-		// TODO calculate manually
-		fragFunc := MakeSplitSniFunc(sniSplit)
 
+		fragFunc := MakeSplitSniFunc(sniSplit)
 		return tlsfrag.NewStreamDialerFunc(sd, fragFunc)
 	})
 }
