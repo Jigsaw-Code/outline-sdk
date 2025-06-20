@@ -19,6 +19,7 @@ To verify that your system has the necessary dependencies to generate your web w
 
 > [!WARNING]
 > You can only build iOS apps on MacOS.
+> Currently only works with build targets of iOS 17.2 (and below?)
 
 * You will need the url you want to load initially in your app.
 * You will need [go](https://golang.org/) to build the SDK library.
