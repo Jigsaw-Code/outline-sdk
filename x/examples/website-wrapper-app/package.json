@@ -11,7 +11,7 @@
   "devDependencies": {
     "glob": "^11.0.1",
     "handlebars": "^4.7.8",
-    "vite": "^6.2.0"
+    "vite": "^6.2.7"
   },
   "license": "Apache-2.0",
   "scripts": {
