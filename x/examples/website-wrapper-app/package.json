@@ -9,8 +9,11 @@
     "yaml": "^2.7.1"
   },
   "devDependencies": {
+    "@types/archiver": "^6.0.3",
+    "@types/minimist": "^1.2.5",
     "glob": "^11.0.1",
     "handlebars": "^4.7.8",
+    "typescript": "^5.8.3",
     "vite": "^6.2.0"
   },
   "license": "Apache-2.0",
@@ -20,7 +23,8 @@
     "clean": "npx rimraf node_modules/ output/",
     "doctor": "./doctor",
     "reset": "npm run clean && npm ci",
-    "start:navigator": "node ./basic_navigator_example/.scripts/start.mjs"
+    "start:navigator": "node ./basic_navigator_example/.scripts/start.mjs",
+    "typescript:check": "tsc --noEmit"
   },
   "private": true
 }
