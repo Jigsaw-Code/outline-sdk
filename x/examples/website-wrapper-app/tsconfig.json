@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "module": "node16",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "**/*.cjs",
+    "**/*.mjs",
+    "**/*.js",
+    "**/.*/**/*.cjs",
+    "**/.*/**/*.mjs",
+    "**/.*/**/*.js",
+  ],
+  "exclude": [
+    "basic_navigator_example", // TODO: Remove this exclusion?
+    "node_modules",
+  ]
+}

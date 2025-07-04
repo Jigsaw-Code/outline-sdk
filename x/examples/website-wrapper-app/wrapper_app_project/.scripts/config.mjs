@@ -22,19 +22,37 @@ export const DEFAULT_CONFIG = {
   })
 }
 
+/**
+ * @param {string} filepath
+ * @returns {Promise<{}>}
+ */
 export async function getYAMLFileConfig(filepath) {
   try {
     const data = await fs.readFile(filepath, 'utf8')
-  } catch (e) {
-    if ('ENOENT' == e.code) {
-      return {}
+    
+    if (data) {
+      const parsedData = YAML.parse(data);
+
+      if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)) {
+        // This type assertion may not be 100% guaranteed but for the purposes
+        // of this use case should be correct
+        return /** @type {{}} */ (parsedData);
+      } else {
+        console.warn(`${filepath} contained invalid config data:`, parsedData)
+      }
+    } else {
+      console.warn(`${filepath} contained no data`)
     }
+  } catch (e) {
+    console.warn(`Error loading ${filepath}:`, e)
   }
-  if (data) {
-    return YAML.parse(data)
-  }
+
+  return {};
 }
 
+/**
+ * @param {NodeJS.Process["argv"]} args
+ */
 export function getCliConfig(args) {
   const dict = minimist(args)
   return {
