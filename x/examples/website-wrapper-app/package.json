@@ -13,6 +13,9 @@
     "handlebars": "^4.7.8",
     "vite": "^6.2.0"
   },
+  "engines": {
+    "node": "22.x"
+  },
   "license": "Apache-2.0",
   "scripts": {
     "build:mobileproxy": "bash ./.scripts/build_mobileproxy.sh",
