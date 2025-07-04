@@ -14,12 +14,16 @@
 
 package tlsfrag
 
+import "fmt"
+
 // Split SNI implemented FragFunc.
 
 func MakeSplitSniFunc(sniSplit int) FragFunc {
 	// takes in an int, and returns a FragFunc which splits the on the sni
 
 	fragFunc := func(clientHello []byte) int {
+		fmt.Printf("clientHello: %v\n", clientHello)
+		fmt.Printf("sniSplit: %d\n", sniSplit)
 		return sniSplit
 	}
 
