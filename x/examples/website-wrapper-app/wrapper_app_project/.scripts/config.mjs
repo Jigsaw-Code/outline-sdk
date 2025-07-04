@@ -25,13 +25,14 @@ export const DEFAULT_CONFIG = {
 export async function getYAMLFileConfig(filepath) {
   try {
     const data = await fs.readFile(filepath, 'utf8')
+    
+    if (data) {
+      return YAML.parse(data)
+    }
   } catch (e) {
     if ('ENOENT' == e.code) {
       return {}
     }
-  }
-  if (data) {
-    return YAML.parse(data)
   }
 }
 
