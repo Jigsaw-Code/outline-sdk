@@ -19,6 +19,8 @@
     "build": "node ./wrapper_app_project/.scripts/build.mjs",
     "clean": "npx rimraf node_modules/ output/",
     "doctor": "./doctor",
+    "open:android": "cd $(find output -mindepth 1 -maxdepth 1 -type d ! -name 'mobileproxy' | head -n 1) && npm run open:android",
+    "open:ios": "cd $(find output -mindepth 1 -maxdepth 1 -type d ! -name 'mobileproxy' | head -n 1) && npm run open:ios",
     "reset": "npm run clean && npm ci",
     "start:navigator": "node ./basic_navigator_example/.scripts/start.mjs"
   },
