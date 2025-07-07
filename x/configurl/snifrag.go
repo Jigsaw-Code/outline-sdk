@@ -16,7 +16,9 @@ package configurl
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
+	"regexp"
 	"strconv"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -28,8 +30,32 @@ import (
 func MakeSplitSniFunc(sniSplit int) tlsfrag.FragFunc {
 	// takes in an int, and returns a FragFunc which splits the on the sni
 
+	pattern := `\x00\x00\x00\x18\x00\x16\x00`
+	re := regexp.MustCompile(pattern)
+
 	fragFunc := func(clientHello []byte) int {
-		return sniSplit
+		fmt.Printf("clientHello: %#x\n", clientHello)
+		fmt.Printf("sniSplit: %d\n", sniSplit)
+
+		isMatch := re.Match(clientHello)
+		fmt.Printf("isMatch: %v\n", isMatch)
+
+		if isMatch {
+			sniExtensionIndex := re.FindIndex(clientHello)[0]
+			sniLengthBytes := clientHello[sniExtensionIndex+7 : sniExtensionIndex+9]
+			sniLength := int(binary.BigEndian.Uint16(sniLengthBytes))
+			sniStartIndex := sniExtensionIndex + 9
+
+			fmt.Printf("sniLength: %v\n", sniLength)
+			fmt.Printf("sniStartIndex: %v\n", sniStartIndex)
+
+			splitIndex := sniStartIndex + (sniSplit % sniLength)
+
+			fmt.Printf("splitIndex: %v\n", splitIndex)
+
+			return splitIndex
+		}
+		return 0
 	}
 
 	return fragFunc

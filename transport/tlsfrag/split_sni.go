@@ -47,22 +47,24 @@ func MakeSplitSniFunc(sniSplit int) FragFunc {
 		fmt.Printf("sniSplit: %d\n", sniSplit)
 
 		isMatch := re.Match(clientHello)
-
 		fmt.Printf("isMatch: %v\n", isMatch)
 
-		sniExtensionIndex := re.FindIndex(clientHello)[0]
-		sniLengthBytes := clientHello[sniExtensionIndex+7 : sniExtensionIndex+9]
-		sniLength := int(binary.BigEndian.Uint16(sniLengthBytes))
-		sniStartIndex := sniExtensionIndex + 9
+		if isMatch {
+			sniExtensionIndex := re.FindIndex(clientHello)[0]
+			sniLengthBytes := clientHello[sniExtensionIndex+7 : sniExtensionIndex+9]
+			sniLength := int(binary.BigEndian.Uint16(sniLengthBytes))
+			sniStartIndex := sniExtensionIndex + 9
 
-		fmt.Printf("sniLength: %v\n", sniLength)
-		fmt.Printf("sniStartIndex: %v\n", sniStartIndex)
+			fmt.Printf("sniLength: %v\n", sniLength)
+			fmt.Printf("sniStartIndex: %v\n", sniStartIndex)
 
-		splitIndex := sniStartIndex + (sniSplit % sniLength)
+			splitIndex := sniStartIndex + (sniSplit % sniLength)
 
-		fmt.Printf("splitIndex: %v\n", splitIndex)
+			fmt.Printf("splitIndex: %v\n", splitIndex)
 
-		return splitIndex
+			return splitIndex
+		}
+		return 0
 	}
 
 	return fragFunc
