@@ -14,28 +14,40 @@
 
 package tlsfrag
 
-import "fmt"
+import (
+	"fmt"
+	"regexp"
+)
 
 // Split SNI implemented FragFunc.
 
-// splitSNI can be positive or negative
+// sniSplit can be positive or negative
 // positive splits forward in the sni, negative splits backward
 // 2, example.com -> ex ample.com
 // -5, example.com -> exam ple.com
-// but must always return a positive index value in the payload
-
-// 00 00 00 18 00 16 00 00 13 ** 00
-// represents the SNI extension + sni + next message
-// ** (with no 00) represents the domain name
-
-// https://datatracker.ietf.org/doc/html/rfc6066#section-3
+// but must always return a positive index value in the clientHello
+// if the sniSplit is longer than the length of the SNI then no split happens
+// 15, example.com -> example.com
 
 func MakeSplitSniFunc(sniSplit int) FragFunc {
-	// takes in an int, and returns a FragFunc which splits on the sni
+	// takes in an int, and returns a FragFunc which splits on the SNI
 
-	fragFunc := func(payload []byte) int {
-		fmt.Printf("clientHello: %#x\n", payload)
+	// 00 00 00 18 00 16 00 00 13 ** 00
+	// represents the SNI extension + sni + next message
+	// ** (with no 00) represents the domain name
+	// https://datatracker.ietf.org/doc/html/rfc6066#section-3
+	//sniHeader := []byte{0x00, 0x00, 0x00, 0x18, 0x00, 0x16, 0x00, 0x00, 0x13}
+
+	pattern := `\x00\x00\x00\x18\x00\x16\x00\x00\x13`
+	re := regexp.MustCompile(pattern)
+
+	fragFunc := func(clientHello []byte) int {
+		fmt.Printf("clientHello: %#x\n", clientHello)
 		fmt.Printf("sniSplit: %d\n", sniSplit)
+
+		isMatch := re.Match(clientHello)
+		fmt.Printf("isMatch: %v\n", isMatch)
+
 		return sniSplit
 	}
 

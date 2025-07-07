@@ -15,6 +15,7 @@
 package tlsfrag
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -178,7 +179,9 @@ func TestFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 // Make sure only the first Client Hello is splitted by a fixed length.
 // ------------------------------------------------------------------------
 func TestSniSplittingStreamDialerSplitsSni(t *testing.T) {
-	hello := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00, 0x03, 0xaa, 0xbb, 0xcc})
+	sniExtension := constructTLSSNIExtension(t, "example.com")
+	helloBody := bytes.Join([][]byte{{0x01, 0x00, 0x00}, {byte(len(sniExtension))}, sniExtension}, nil)
+	hello := constructTLSRecord(t, layers.TLSHandshake, 0x0301, helloBody)
 	cipher := constructTLSRecord(t, layers.TLSChangeCipherSpec, 0x0303, []byte{0x01})
 	req1 := constructTLSRecord(t, layers.TLSApplicationData, 0x0303, []byte{0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88})
 
@@ -320,6 +323,23 @@ func constructTLSRecord(t *testing.T, typ layers.TLSType, ver layers.TLSVersion,
 	err := pkt.SerializeTo(buf, gopacket.SerializeOptions{})
 	require.NoError(t, err)
 	return buf.Bytes()
+}
+
+// https://datatracker.ietf.org/doc/html/rfc6066#section-3
+func constructTLSSNIExtension(t *testing.T, domainName string) []byte {
+	sniExtensionHeader := []byte{0x00, 0x00, 0x00, 0x18, 0x00, 0x16, 0x00}
+
+	// pad length of domain name to two bytes
+	//nameLength := uint16(len(domainName))
+	//nameLengthBytes := append(byte(nameLength>>8), byte(nameLength)...)
+
+	//fullExtension := append(header, nameLengthBytes, []byte(domainName)...)
+
+	//return fullExtension
+
+	nameLength := len(domainName)
+	result := append(sniExtensionHeader, byte(nameLength>>8), byte(nameLength))
+	return append(result, domainName...)
 }
 
 // collectStreamDialer collects all writes to this stream dialer and append it to bufs
