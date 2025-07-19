@@ -261,7 +261,7 @@ The [`fetch-speed` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x
 a URL, similar to `curl` and calculates the download speed. It could be used for troubleshooting.
 
 ```console
-$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch@latest -transport ss://[redacted]@[redacted]:80 http://speedtest.ftp.otenet.gr/files/test10Mb.db
+$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch-speed@latest -transport ss://[redacted]@[redacted]:80 http://speedtest.ftp.otenet.gr/files/test10Mb.db
 
 Downloaded 10.00 MB in 1.78s
 
