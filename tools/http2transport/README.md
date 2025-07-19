@@ -9,5 +9,5 @@ Flags:
 Example:
 ```
 KEY=ss://ENCRYPTION_KEY@HOST:PORT/
-go run github.com/Jigsaw-Code/outline-sdk/x/examples/http2transport@latest -transport "$KEY" -localAddr localhost:54321
+go run github.com/Jigsaw-Code/outline-sdk/tools/http2transport@latest -transport "$KEY" -localAddr localhost:54321
 ```
