@@ -62,7 +62,7 @@ type SmartDialerOptions struct {
 //
 // `testDomains` are used to test connectivity for each DNS/TLS strategy.
 // `config` defines the strategies to test. For an example, see:
-// https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.yaml
+// https://github.com/Jigsaw-Code/outline-sdk/blob/main/x/examples/smart-proxy/config.yaml
 func NewSmartDialerOptions(testDomains *StringList, config string) *SmartDialerOptions {
 	return &SmartDialerOptions{
 		testDomains: testDomains.list,
