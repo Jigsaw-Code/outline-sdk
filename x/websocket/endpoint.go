@@ -188,29 +188,23 @@ func (c *gorillaConn) Write(buf []byte) (int, error) {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 
-	if c.writeErr != nil {
-		return 0, c.writeErr
-	}
 	err := c.wsConn.WriteMessage(websocket.BinaryMessage, buf)
 	if err != nil {
+		if c.writeErr != nil {
+			return 0, c.writeErr
+		}
 		return 0, err
 	}
 	return len(buf), nil
 }
 
 func (c *gorillaConn) CloseRead() error {
-	c.readMu.Lock()
-	defer c.readMu.Unlock()
-
 	c.readErr = net.ErrClosed
 	c.wsConn.SetReadDeadline(time.Now())
 	return nil
 }
 
 func (c *gorillaConn) CloseWrite() error {
-	c.writeMu.Lock()
-	defer c.writeMu.Unlock()
-
 	// Send close message.
 	message := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
 	c.wsConn.WriteControl(websocket.CloseMessage, message, time.Now().Add(time.Second))
