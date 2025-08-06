@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -111,7 +112,11 @@ func newGorillaConn(wsConn *websocket.Conn) *gorillaConn {
 }
 
 type gorillaConn struct {
-	wsConn        *websocket.Conn
+	wsConn *websocket.Conn
+
+	// websocket.Conn is not safe for concurrent use
+	readMu, writeMu sync.Mutex
+
 	writeErr      error
 	readErr       error
 	pendingReader io.Reader
@@ -140,6 +145,9 @@ func (c *gorillaConn) SetWriteDeadline(deadline time.Time) error {
 }
 
 func (c *gorillaConn) Read(buf []byte) (int, error) {
+	c.readMu.Lock()
+	defer c.readMu.Unlock()
+
 	if c.readErr != nil {
 		return 0, c.readErr
 	}
@@ -177,23 +185,32 @@ func (c *gorillaConn) Read(buf []byte) (int, error) {
 }
 
 func (c *gorillaConn) Write(buf []byte) (int, error) {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+
+	if c.writeErr != nil {
+		return 0, c.writeErr
+	}
 	err := c.wsConn.WriteMessage(websocket.BinaryMessage, buf)
 	if err != nil {
-		if c.writeErr != nil {
-			return 0, c.writeErr
-		}
 		return 0, err
 	}
 	return len(buf), nil
 }
 
 func (c *gorillaConn) CloseRead() error {
+	c.readMu.Lock()
+	defer c.readMu.Unlock()
+
 	c.readErr = net.ErrClosed
 	c.wsConn.SetReadDeadline(time.Now())
 	return nil
 }
 
 func (c *gorillaConn) CloseWrite() error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+
 	// Send close message.
 	message := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
 	c.wsConn.WriteControl(websocket.CloseMessage, message, time.Now().Add(time.Second))

@@ -15,11 +15,17 @@
 package websocket
 
 import (
+	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"strconv"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -160,4 +166,109 @@ func Test_NewPacketEndpoint(t *testing.T) {
 	n, err = conn.Read(buf)
 	require.NoError(t, err)
 	require.Equal(t, []byte("Response"), buf[:n])
+}
+
+// Test_ConcurrentWritePacket tests if gorillaConn can concurrently write packets.
+func Test_ConcurrentWritePacket(t *testing.T) {
+	const numWrites = 100
+	recved := make([]bool, numWrites)
+	allFalse := make([]bool, numWrites)
+	allTrue := slices.Repeat([]bool{true}, numWrites)
+	var reqRecved sync.WaitGroup
+	reqRecved.Add(numWrites)
+
+	// Setup testing server, read requests and fill in recved
+	mux := http.NewServeMux()
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		clientConn, err := Upgrade(w, r, http.Header{})
+		require.NoError(t, err)
+		defer clientConn.Close()
+
+		scan := bufio.NewScanner(clientConn)
+		for scan.Scan() {
+			nStr, ok := strings.CutPrefix(scan.Text(), "write-")
+			require.True(t, ok)
+			n, err := strconv.Atoi(nStr)
+			require.NoError(t, err)
+			recved[n] = true
+			reqRecved.Done()
+		}
+		require.NoError(t, scan.Err())
+	})
+	mux.Handle("/udp", http.StripPrefix("/udp", handler))
+	ts := httptest.NewTLSServer(mux)
+	defer ts.Close()
+
+	// Connect to server
+	client := ts.Client()
+	endpoint := &transport.TCPEndpoint{Address: ts.Listener.Addr().String()}
+	connect, err := NewPacketEndpoint("wss"+ts.URL[5:]+"/udp", endpoint, WithTLSConfig(client.Transport.(*http.Transport).TLSClientConfig))
+	require.NoError(t, err)
+	conn, err := connect(context.Background())
+	require.NoError(t, err)
+
+	// Concurrent writes "write-xxx\n" messages
+	require.Equal(t, allFalse, recved)
+	for i := range numWrites {
+		go func() {
+			_, err := fmt.Fprintf(conn, "write-%d\n", i)
+			require.NoError(t, err)
+		}()
+	}
+	reqRecved.Wait()
+	require.NoError(t, conn.Close())
+	require.Equal(t, allTrue, recved)
+}
+
+// Test_ConcurrentReadPacket tests if gorillaConn can concurrently receive packets.
+func Test_ConcurrentReadPacket(t *testing.T) {
+	const numReads = 100
+	recved := make([]bool, numReads)
+	allFalse := make([]bool, numReads)
+	allTrue := slices.Repeat([]bool{true}, numReads)
+	var readsDone sync.WaitGroup
+	readsDone.Add(numReads)
+
+	// Setup testing server, writes sequential messages
+	mux := http.NewServeMux()
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		clientConn, err := Upgrade(w, r, http.Header{})
+		require.NoError(t, err)
+		defer clientConn.Close()
+		for i := range numReads {
+			_, err := fmt.Fprintf(clientConn, "read-%d\n", i)
+			require.NoError(t, err)
+		}
+	})
+	mux.Handle("/udp", http.StripPrefix("/udp", handler))
+	ts := httptest.NewTLSServer(mux)
+	defer ts.Close()
+
+	// Connect to the server
+	client := ts.Client()
+	endpoint := &transport.TCPEndpoint{Address: ts.Listener.Addr().String()}
+	connect, err := NewPacketEndpoint("wss"+ts.URL[5:]+"/udp", endpoint, WithTLSConfig(client.Transport.(*http.Transport).TLSClientConfig))
+	require.NoError(t, err)
+	conn, err := connect(context.Background())
+	require.NoError(t, err)
+
+	// A single goroutine reads from the connection and updates the shared slice.
+	// This is because bufio.Scanner is not safe for concurrent use.
+	require.Equal(t, allFalse, recved)
+	for range numReads {
+		go func() {
+			scan := bufio.NewScanner(conn)
+			for scan.Scan() {
+				nStr, ok := strings.CutPrefix(scan.Text(), "read-")
+				require.True(t, ok)
+				n, err := strconv.Atoi(nStr)
+				require.NoError(t, err)
+				recved[n] = true
+				readsDone.Done()
+			}
+		}()
+	}
+	readsDone.Wait()
+	require.NoError(t, conn.Close())
+	require.Equal(t, allTrue, recved)
 }
