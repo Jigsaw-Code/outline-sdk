@@ -207,7 +207,7 @@ func Test_ConcurrentWritePacket(t *testing.T) {
 	conn, err := connect(context.Background())
 	require.NoError(t, err)
 
-	// Concurrent writes "write-xxx\n" messages
+	// Concurrenly writes "write-xxx\n" messages
 	require.Equal(t, allFalse, recved)
 	for i := range numWrites {
 		go func() {
@@ -252,8 +252,7 @@ func Test_ConcurrentReadPacket(t *testing.T) {
 	conn, err := connect(context.Background())
 	require.NoError(t, err)
 
-	// A single goroutine reads from the connection and updates the shared slice.
-	// This is because bufio.Scanner is not safe for concurrent use.
+	// Concurrently reads "read-xxx\n" messages
 	require.Equal(t, allFalse, recved)
 	for range numReads {
 		go func() {
