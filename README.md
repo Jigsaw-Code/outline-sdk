@@ -125,7 +125,7 @@ For advanced users, it is possible to generate your own mobile library, followin
 1. **Generate mobile library**: Use [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile) to generate Android Archives (AAR) and Apple Frameworks with Java and Objective-C bindings.
     - Android examples: [Outline Android Archive](https://github.com/Jigsaw-Code/outline-go-tun2socks/blob/dada2652ae2c6205f2daa3f88c805bbd6b28a713/Makefile#L27), [Intra Android Archive](https://github.com/Jigsaw-Code/outline-go-tun2socks/blob/dada2652ae2c6205f2daa3f88c805bbd6b28a713/Makefile#L21).
     - Apple examples: [Outline iOS Framework](https://github.com/Jigsaw-Code/outline-go-tun2socks/blob/dada2652ae2c6205f2daa3f88c805bbd6b28a713/Makefile#L30), [Outline macOS Framework](https://github.com/Jigsaw-Code/outline-go-tun2socks/blob/dada2652ae2c6205f2daa3f88c805bbd6b28a713/Makefile#L36).
-1. **Integrate into your app**: Add the generated library to your app. For more details, see Go Mobile's [SDK applications and generating bindings](https://github.com/golang/go/wiki/Mobile#sdk-applications-and-generating-bindings).
+1. **Integrate into your app**: Add the generated library to your app. For more details, see Go Mobile's [SDK applications and generating bindings](https://go.dev/wiki/Mobile#sdk-applications-and-generating-bindings).
 
 > **Note**: You must use `gomobile bind` on the package you create, not directly on the SDK packages.
 
@@ -178,10 +178,10 @@ The config format can be found in [x/configurl](https://pkg.go.dev/github.com/Ji
 
 ### Resolve a Domain Name
 
-The [`resolve` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examples/resolve) resolves a domain name, similar to `dig`:
+The [`resolve` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/tools/resolve) resolves a domain name, similar to `dig`:
 
 ```console
-$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/resolve@latest -type A -transport "tls" -resolver 8.8.8.8:853 -tcp getoutline.org.
+$ go run github.com/Jigsaw-Code/outline-sdk/x/tools/resolve@latest -type A -transport "tls" -resolver 8.8.8.8:853 -tcp getoutline.org.
 216.239.34.21
 216.239.32.21
 216.239.38.21
@@ -191,11 +191,11 @@ $ go run github.com/Jigsaw-Code/outline-sdk/x/examples/resolve@latest -type A -t
 
 ### Fetch a Web Page
 
-The [`fetch` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examples/fetch) fetches
+The [`fetch` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/tools/fetch) fetches
 a URL, similar to `curl`. The example below would bypass blocking of `meduza.io` in Russia:
 
 ```console
-$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch@latest -transport "override:host=cloudflare.net|tlsfrag:1" -method HEAD -v https://meduza.io/
+$ go run github.com/Jigsaw-Code/outline-sdk/x/tools/fetch@latest -transport "override:host=cloudflare.net|tlsfrag:1" -method HEAD -v https://meduza.io/
 [DEBUG] 2023/12/28 18:44:56.490836 main.go:105: Cf-Ray: [83cdac8ecdccc40e-EWR]
 [DEBUG] 2023/12/28 18:44:56.491231 main.go:105: Alt-Svc: [h3=":443"; ma=86400]
 [DEBUG] 2023/12/28 18:44:56.491237 main.go:105: Date: [Thu, 28 Dec 2023 23:44:56 GMT]
@@ -211,14 +211,14 @@ $ go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch@latest -transport "
 
 ### Run a Local Forward Proxy
 
-The [`http2transport` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examples/http2transport) runs a local proxy that creates connections according to the transport. It's effectively a circumvention tool.
+The [`http2transport` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/tools/http2transport) runs a local proxy that creates connections according to the transport. It's effectively a circumvention tool.
 
 The example below is analogous to the previous fetch example.
 
 Start the local proxy:
 
 ```console
-$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/http2transport@latest -transport "override:host=cloudflare.net|tlsfrag:1" -localAddr localhost:8080
+$ go run github.com/Jigsaw-Code/outline-sdk/x/tools/http2transport@latest -transport "override:host=cloudflare.net|tlsfrag:1" -localAddr localhost:8080
 2023/12/28 18:50:48 Proxy listening on 127.0.0.1:8080
 ```
 
@@ -244,10 +244,10 @@ alt-svc: h3=":443"; ma=86400
 
 ### Test Proxy Connectivity
 
-The [`test-connectivity` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examples/test-connectivity) is useful to test connectivity to a proxy. It uses DNS resolutions over TCP and UDP using the transport to test if there is stream and datagram connectivity.
+The [`test-connectivity` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/tools/test-connectivity) is useful to test connectivity to a proxy. It uses DNS resolutions over TCP and UDP using the transport to test if there is stream and datagram connectivity.
 
 ```console
-$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/test-connectivity@latest -transport "$OUTLINE_KEY" && echo success || echo failure
+$ go run github.com/Jigsaw-Code/outline-sdk/x/tools/test-connectivity@latest -transport "$OUTLINE_KEY" && echo success || echo failure
 {"resolver":"8.8.8.8:53","proto":"tcp","time":"2023-12-28T23:57:45Z","duration_ms":39,"error":null}
 {"resolver":"8.8.8.8:53","proto":"udp","time":"2023-12-28T23:57:45Z","duration_ms":17,"error":null}
 {"resolver":"[2001:4860:4860::8888]:53","proto":"tcp","time":"2023-12-28T23:57:45Z","duration_ms":31,"error":null}
@@ -257,11 +257,11 @@ success
 
 ### Test Download Speed
 
-The [`fetch-speed` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/examples/fetch-speed) fetches
+The [`fetch-speed` tool](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/tools/fetch-speed) fetches
 a URL, similar to `curl` and calculates the download speed. It could be used for troubleshooting.
 
 ```console
-$ go run github.com/Jigsaw-Code/outline-sdk/x/examples/fetch@latest -transport ss://[redacted]@[redacted]:80 http://speedtest.ftp.otenet.gr/files/test10Mb.db
+$ go run github.com/Jigsaw-Code/outline-sdk/x/tools/fetch-speed@latest -transport ss://[redacted]@[redacted]:80 http://speedtest.ftp.otenet.gr/files/test10Mb.db
 
 Downloaded 10.00 MB in 1.78s
 
