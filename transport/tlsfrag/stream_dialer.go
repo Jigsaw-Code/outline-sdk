@@ -33,8 +33,7 @@ type FragFunc func(record []byte) (n int)
 // NewStreamDialerFunc creates a [transport.StreamDialer] that intercepts the initial [TLS Client Hello]
 // [handshake record] and splits it into two separate records before sending them. The split point is determined by the
 // callback function frag. The dialer then adds appropriate headers to each record and transmits them sequentially
-// using the base dialer. Following the fragmented Client Hello, all subsequent data is passed through directly without
-// modification.
+// using the base dialer. Following the fragmented Client Hello, all subsequent data is passed through directly without modification.
 //
 // If you just want to split the record at a fixed position (e.g., always at the 5th byte or 2nd from the last byte),
 // use [NewFixedLenStreamDialer]. It consumes less resources and is more efficient.

@@ -17,6 +17,7 @@ package tlsfrag
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -152,6 +153,9 @@ func (w *clientHelloFragWriter) splitHelloBufToRecord() {
 	original := w.helloBuf.Bytes()
 	content := original[recordHeaderLen:]
 	headLen := w.frag(content)
+
+	fmt.Printf("headLen: %d\n", headLen)
+
 	if headLen <= 0 || headLen >= len(content) {
 		w.copyHelloBufToRecord()
 		return
