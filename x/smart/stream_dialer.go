@@ -292,7 +292,7 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 		}
 		defer resp.Body.Close()
 
-		// We cannot validate the response code, since many bare domains return i.e. 301 redirects, or even 404
+		// Many bare domains return i.e. 301 redirects, so we don't validate anything about the response here, just that the request succeeded.
 
 		f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
 	}
