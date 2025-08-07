@@ -63,11 +63,39 @@ func getSNIExtension(clientHello []byte) ([]byte, error) {
 
 	fmt.Printf("extensions: %#v %v\n", extensionLengthIndex, extensionsLength)
 
-	extensionContent := clientHello[extensionLengthIndex+2 : extensionLengthIndex+2+extensionsLength]
+	allExtensionContent := clientHello[extensionLengthIndex+2 : extensionLengthIndex+2+extensionsLength]
 
-	fmt.Printf("extensionContent: %#v\n", extensionContent)
+	fmt.Printf("extensionContent: %#v\n", allExtensionContent)
 
-	return extensionContent, nil
+	//firstExtIdentifier = allExtensionContent[0:2]
+	//if firstExtIdentifier != []byte{0x00, 0x00} {
+	//	return nil, Error("no SNI extension found in client hello")
+	//)
+
+	// sniExtLength
+
+	// sniExtension =
+
+	//return extensionContent, nil
+	return nil, nil
+}
+
+// The regex for a potential domain name.
+const domainRegexPattern = `(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,6}|xn--[a-z0-9-]+(?:\.[a-z0-9-]+)*`
+
+// Pre-compile the regex once at the package level.
+var domainRegex = regexp.MustCompile(domainRegexPattern)
+
+// findFirstDomainIndex takes a byte slice and returns the starting index of the
+// first string that matches the domain regex. If no match is found, it returns -1.
+func findFirstDomainIndex(data []byte) int {
+	// Use the pre-compiled regex directly.
+	matchIndexes := domainRegex.FindStringIndex(string(data))
+	if matchIndexes == nil {
+		return -1
+	}
+
+	return matchIndexes[0]
 }
 
 func MakeSplitSniFunc(sniSplit int) FragFunc {
