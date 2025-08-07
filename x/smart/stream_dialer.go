@@ -292,12 +292,7 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 		}
 		defer resp.Body.Close()
 
-		// Validate that the response status is not empty, but don't require the content to be anything specific.
 		// We cannot validate the response code, since many bare domains return i.e. 301 redirects, or even 404
-		if resp.Status == "" {
-			f.logCtx(ctx, "🏁 failed to read HTTP response status: '%v' (domain: %v), duration=%v, error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-			return err
-		}
 
 		f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
 	}
