@@ -15,9 +15,12 @@
 package tlsfrag
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"regexp"
+
+	"src.agwa.name/tlshacks"
 )
 
 // Split SNI implemented FragFunc.
@@ -98,7 +101,7 @@ func findFirstDomainIndex(data []byte) int {
 	return matchIndexes[0]
 }
 
-func MakeSplitSniFunc(sniSplit int) FragFunc {
+func OldMakeSplitSniFunc(sniSplit int) FragFunc {
 	// takes in an int, and returns a FragFunc which splits on the SNI
 
 	// 00 00 00 18 00 16 00 [00 0n] ** 00
@@ -144,6 +147,78 @@ func MakeSplitSniFunc(sniSplit int) FragFunc {
 			return splitIndex
 		}
 		return 0
+	}
+
+	return fragFunc
+}
+
+func MakeSplitSniFunc(sniSplit int) FragFunc {
+
+	fragFunc := func(clientHello []byte) int {
+		hello := tlshacks.UnmarshalClientHello(clientHello)
+		// Failed parse
+		if hello == nil {
+			return 0
+		}
+
+		var serverName string
+		// Find the Server Name Indication extension (type 0)
+		for _, ext := range hello.Extensions {
+			if ext.Type == 0 { // 0 is the type for server_name extension
+				// The content of the SNI extension is a ServerNameList.
+				// See RFC 6066, Section 3.
+				if len(ext.Data) < 2 {
+					break // Malformed extension, cannot parse.
+				}
+				// First 2 bytes: length of the server_name_list.
+				listLen := int(binary.BigEndian.Uint16(ext.Data)[0:2])
+				if listLen != len(ext.Data)-2 {
+					break // Malformed extension.
+				}
+
+				serverNameList := ext.Data[2:]
+				// We only care about the first name in the list.
+				if len(serverNameList) < 3 {
+					break // Malformed list.
+				}
+				nameType := serverNameList[0]
+				nameLen := int(binary.BigEndian.Uint16(serverNameList[1:3]))
+				if nameLen > len(serverNameList)-3 {
+					break // Malformed name entry.
+				}
+				if nameType == 0 { // 0 is for host_name
+					serverName = string(serverNameList[3 : 3+nameLen])
+				}
+				// We found the SNI extension, so we can stop searching.
+				break
+			}
+		}
+
+		if serverName == "" {
+			// No SNI, don't split.
+			return 0
+		}
+
+		sniIndex := bytes.Index(clientHello, []byte(serverName))
+		if sniIndex == -1 {
+			// This should not happen if parsing was successful and ServerName is not empty.
+			// But as a safeguard, don't split.
+			return 0
+		}
+
+		sniLength := len(serverName)
+		splitOffset := sniSplit
+		if splitOffset < 0 {
+			// Handle negative split values, which count from the end of the SNI.
+			splitOffset = sniLength + splitOffset
+		}
+
+		if splitOffset <= 0 || splitOffset >= sniLength {
+			// Invalid split point (outside the SNI), don't split.
+			return 0
+		}
+
+		return sniIndex + splitOffset
 	}
 
 	return fragFunc

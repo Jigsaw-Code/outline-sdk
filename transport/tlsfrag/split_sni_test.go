@@ -108,7 +108,7 @@ func TestGetSNIExtension(t *testing.T) {
 	}
 }
 
-func NoTestMakeSplitSniFunc(t *testing.T) {
+func TestMakeSplitSniFunc(t *testing.T) {
 	// TODO: Implement test cases for MakeSplitSniFunc.
 	// This will likely involve creating different clientHello byte arrays
 	// and asserting that the split function behaves as expected.
