@@ -275,7 +275,7 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 
 		// HTTPS Get
 
-		req, err := http.NewRequestWithContext(testCtx, "GET", "https://"+testDomain, nil)
+		req, err := http.NewRequestWithContext(testCtx, http.MethodHead, "https://"+testDomain, nil)
 		if err != nil {
 			return fmt.Errorf("failed to create HTTP request: %w", err)
 		}
