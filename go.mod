@@ -6,6 +6,7 @@ require (
 	github.com/eycorsican/go-tun2socks v1.16.11
 	github.com/google/go-licenses v1.6.0
 	github.com/google/gopacket v1.1.19
+	github.com/gorilla/websocket v1.5.3
 	github.com/shadowsocks/go-shadowsocks2 v0.1.5
 	github.com/stretchr/testify v1.8.4
 	github.com/things-go/go-socks5 v0.0.5
