@@ -1,0 +1,34 @@
+/**
+ * Пример использования outline-sdk
+ * Автор: SvatValid2077
+ * Дата: 2025-07-26
+ */
+
+import { OutlineClient } from 'outline-sdk';
+
+// Создаем нового клиента
+const client = new OutlineClient({
+  apiUrl: 'https://api.example.com',
+  apiKey: 'your-api-key-here'
+});
+
+// Функция подключения к серверу
+async function connectToServer() {
+  try {
+    const serverList = await client.getServers();
+    console.log('Доступные серверы:', serverList);
+
+    if (serverList.length > 0) {
+      const server = serverList[0];
+      await client.connect(server.id);
+      console.log(`Подключено к серверу: ${server.name}`);
+    } else {
+      console.log('Нет доступных серверов для подключения.');
+    }
+  } catch (error) {
+    console.error('Ошибка подключения к серверу:', error);
+  }
+}
+
+// Запускаем подключение
+connectToServer();
