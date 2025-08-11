@@ -115,6 +115,7 @@ type gorillaConn struct {
 	wsConn *websocket.Conn
 
 	// websocket.Conn is not safe for concurrent use
+	// https://github.com/Jigsaw-Code/outline-apps/issues/2573
 	readMu, writeMu sync.Mutex
 
 	writeErr      error
