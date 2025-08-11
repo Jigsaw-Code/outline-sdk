@@ -240,8 +240,10 @@ func Test_ConcurrentReadPacket(t *testing.T) {
 	recved := make([]bool, numReads)
 	allFalse := make([]bool, numReads)
 	allTrue := slices.Repeat([]bool{true}, numReads)
-	var readsDone sync.WaitGroup
+	var readsDone, testDone sync.WaitGroup
 	readsDone.Add(numReads)
+	testDone.Add(1)
+	defer testDone.Done()
 
 	ts, conn := setupAndConnectToTestUDPWebSocketServer(t, func(svrConn transport.StreamConn) {
 		defer svrConn.Close()
@@ -249,7 +251,7 @@ func Test_ConcurrentReadPacket(t *testing.T) {
 			_, err := fmt.Fprintf(svrConn, "read-%d\n", i)
 			require.NoError(t, err)
 		}
-		readsDone.Wait()
+		testDone.Wait()
 	})
 	defer ts.Close()
 
