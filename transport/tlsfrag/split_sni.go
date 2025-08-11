@@ -164,30 +164,12 @@ func MakeSplitSniFunc(sniSplit int) FragFunc {
 		var serverName string
 		// Find the Server Name Indication extension (type 0)
 		for _, ext := range hello.Extensions {
-			if ext.Type == 0 { // 0 is the type for server_name extension
-				// The content of the SNI extension is a ServerNameList.
-				// See RFC 6066, Section 3.
-				if len(ext.Data) < 2 {
-					break // Malformed extension, cannot parse.
-				}
-				// First 2 bytes: length of the server_name_list.
-				listLen := int(binary.BigEndian.Uint16(ext.Data)[0:2])
-				if listLen != len(ext.Data)-2 {
-					break // Malformed extension.
-				}
-
-				serverNameList := ext.Data[2:]
-				// We only care about the first name in the list.
-				if len(serverNameList) < 3 {
-					break // Malformed list.
-				}
-				nameType := serverNameList[0]
-				nameLen := int(binary.BigEndian.Uint16(serverNameList[1:3]))
-				if nameLen > len(serverNameList)-3 {
-					break // Malformed name entry.
-				}
-				if nameType == 0 { // 0 is for host_name
-					serverName = string(serverNameList[3 : 3+nameLen])
+			if ext.Type == 0 { // 0 is the type for the ServerNameData extension
+				if sni, ok := ext.Data.(*tlshacks.ServerNameData); ok {
+					if len(sni.HostName) > 0 {
+						// We only care about the first hostname.
+						serverName = sni.HostName
+					}
 				}
 				// We found the SNI extension, so we can stop searching.
 				break
