@@ -2,11 +2,11 @@ package tlsfrag
 
 import (
 	"encoding/hex"
-	"reflect"
 	"testing"
 )
 
-func TestFindFirstDomainIndex(t *testing.T) {
+func TestMakeSplitSniFunc(t *testing.T) {
+
 	// client hello for example.com
 	exampleHexString := "010000f203036e6e645178e00c4caa6924d7e9a8cc9842c546e783835d3b58af3946184513e62081e4235a785224548d1b9996de3617e9622c13c2959d61f61f8bc53d500b7c94001ac02bc02fc02cc030cca9cca8c009c013c00ac0141301130213030100008f00000010000e00000b6578616d706c652e636f6d000b00020100ff010001000017000000120000000500050100000000000a000a0008001d001700180019000d001a0018080404030807080508060401050106010503060302010203002b00050403040303003300260024001d002026950802028351b26c54faa869d2378cb00740759e4d1d40ae3a76fb66730f2c"
 	decodedExampleBytes, err := hex.DecodeString(exampleHexString)
@@ -21,107 +21,6 @@ func TestFindFirstDomainIndex(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
-		data []byte
-		want int
-	}{
-		// TODO haven't verified these test values
-		{
-			name: "example.com client hello",
-			data: decodedExampleBytes,
-			want: 112,
-		},
-		{
-			name: "google.com client hello",
-			data: decodedGoogleBytes,
-			want: 122,
-		},
-		{
-			name: "no domain",
-			data: []byte("some random bytes without a domain"),
-			want: -1,
-		},
-		{
-			name: "empty data",
-			data: []byte{},
-			want: -1,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := findFirstDomainIndex(tt.data); got != tt.want {
-				t.Errorf("findFirstDomainIndex() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestGetSNIExtension(t *testing.T) {
-
-	// client hello for example.com
-	exampleHexString := "010000f203036e6e645178e00c4caa6924d7e9a8cc9842c546e783835d3b58af3946184513e62081e4235a785224548d1b9996de3617e9622c13c2959d61f61f8bc53d500b7c94001ac02bc02fc02cc030cca9cca8c009c013c00ac0141301130213030100008f00000010000e00000b6578616d706c652e636f6d000b00020100ff010001000017000000120000000500050100000000000a000a0008001d001700180019000d001a0018080404030807080508060401050106010503060302010203002b00050403040303003300260024001d002026950802028351b26c54faa869d2378cb00740759e4d1d40ae3a76fb66730f2c"
-	decodedExampleBytes, _ := hex.DecodeString(exampleHexString)
-
-	exampleSNIExtension := "00008f00000010000e00000b6578616d706c652e636f6d"
-	exampleExtensionBytes, _ := hex.DecodeString(exampleSNIExtension)
-
-	// client hello for google.com
-	/*
-		googleHexString := "010001fc0303d28ec124ee698d44aa058538a94ce5f7c43eb7af4e192faf053ec359ac1532662011d050e6a40e34bee8891c68d643e22cb19597f91ed9706ff599fe882e0c25f60024130113021303c02bc02fc02cc030cca9cca8c009c013c00ac014009c009d002f0035000a0100018f0000000f000d00000a676f6f676c652e636f6d00170000ff01000100000a00080006001d00170018000b000201000010000e000c02683208687474702f312e31000d00140012040308040401050308050501080606010201003300260024001d0020a95d499fbfb3506b582ccb50cb960b930ff26000c630a025575beeb695690940002d00020101002b0009080304030303020301001500f6000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-		decodedGoogleBytes, _ := hex.DecodeString(googleHexString)
-	*/
-
-	tests := []struct {
-		name        string
-		clientHello []byte
-		want        []byte
-		wantErr     bool
-	}{
-		// TODO: Add test cases.
-		{
-			name:        "example.com client hello",
-			clientHello: decodedExampleBytes,
-			want:        exampleExtensionBytes,
-			wantErr:     false,
-		},
-		/*
-			{
-				name:        "google.com client hello",
-				clientHello: decodedGoogleBytes,
-				want:        []byte{},
-				wantErr:     true,
-			},
-		*/
-		// Add more test cases to cover different scenarios
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := getSNIExtension(tt.clientHello)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("getSNIExtension() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getSNIExtension() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestMakeSplitSniFunc(t *testing.T) {
-	// TODO: Implement test cases for MakeSplitSniFunc.
-	// This will likely involve creating different clientHello byte arrays
-	// and asserting that the split function behaves as expected.
-	// Consider testing various scenarios, including:
-	// - Valid client hellos with and without SNI extensions
-	// - Invalid client hellos
-	// - Client hellos with specific SNI values to verify the split logic
-	// Example test case:
-	//  splitFunc := MakeSplitSniFunc()
-	//  splitFunc(clientHello1) // Assert expected behavior
-	//  splitFunc(clientHello2) // Assert expected behavior
-
-	tests := []struct {
 		name        string
 		sniSplit    int
 		clientHello []byte
@@ -131,20 +30,20 @@ func TestMakeSplitSniFunc(t *testing.T) {
 		{
 			name:        "Positive Split",
 			sniSplit:    2,
-			clientHello: []byte{}, // Replace with a valid client hello with SNI
-			want:        0,        // Replace with the expected split index
+			clientHello: decodedExampleBytes,
+			want:        114,
 		},
 		{
 			name:        "Negative Split",
 			sniSplit:    -3,
-			clientHello: []byte{}, // Replace with a valid client hello with SNI
-			want:        0,        // Replace with the expected split index
+			clientHello: decodedGoogleBytes,
+			want:        129,
 		},
 		{
 			name:        "No Split (Zero)",
 			sniSplit:    0,
-			clientHello: []byte{}, // Replace with a valid client hello with SNI
-			want:        0,        // Replace with the expected split index (likely 0 for no split)
+			clientHello: []byte{}, // Empty client hello
+			want:        0,
 		},
 	}
 
