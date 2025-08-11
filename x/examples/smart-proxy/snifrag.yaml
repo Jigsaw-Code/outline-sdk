@@ -2,4 +2,4 @@ dns:
   - system: {}
 
 tls:
-  - snifrag:10
+  - snifrag:5
