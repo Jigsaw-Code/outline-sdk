@@ -1,6 +1,16 @@
-// Copyright 2009 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
+// Copyright 2025 The Outline Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package tls
 
@@ -19,34 +29,34 @@ func GetSNI(clienthello []byte) (string, error) {
 	var s cryptobyte.String
 	// Skip uint8 ContentType and uint16 ProtocolVersion
 	if !plaintext.Skip(1+2) || !plaintext.ReadUint16LengthPrefixed(&s) {
-		return "", errors.New("Bad TLSPlaintext")
+		return "", errors.New("bad TLSPlaintext")
 	}
 
 	// Skip uint8 message type, uint24 length, uint16 version, and 32 byte random.
 	var sessionID cryptobyte.String
 	if !s.Skip(1+3+2+32) ||
 		!s.ReadUint8LengthPrefixed(&sessionID) {
-		return "", errors.New("Bad Handshake message")
+		return "", errors.New("bad Handshake message")
 	}
 
 	var cipherSuites cryptobyte.String
 	if !s.ReadUint16LengthPrefixed(&cipherSuites) {
-		return "", errors.New("Bad ciphersuites")
+		return "", errors.New("bad ciphersuites")
 	}
 
 	var compressionMethods cryptobyte.String
 	if !s.ReadUint8LengthPrefixed(&compressionMethods) {
-		return "", errors.New("Bad compression methods")
+		return "", errors.New("bad compression methods")
 	}
 
 	if s.Empty() {
 		// ClientHello is optionally followed by extension data
-		return "", errors.New("Short hello")
+		return "", errors.New("short hello")
 	}
 
 	var extensions cryptobyte.String
 	if !s.ReadUint16LengthPrefixed(&extensions) || !s.Empty() {
-		return "", errors.New("Bad extensions")
+		return "", errors.New("bad extensions")
 	}
 
 	for !extensions.Empty() {
@@ -54,7 +64,7 @@ func GetSNI(clienthello []byte) (string, error) {
 		var extData cryptobyte.String
 		if !extensions.ReadUint16(&extension) ||
 			!extensions.ReadUint16LengthPrefixed(&extData) {
-			return "", errors.New("Bad extension")
+			return "", errors.New("bad extension")
 		}
 
 		switch extension {
@@ -62,7 +72,7 @@ func GetSNI(clienthello []byte) (string, error) {
 			// RFC 6066, Section 3
 			var nameList cryptobyte.String
 			if !extData.ReadUint16LengthPrefixed(&nameList) || nameList.Empty() {
-				return "", errors.New("Bad namelist")
+				return "", errors.New("bad namelist")
 			}
 			for !nameList.Empty() {
 				var nameType uint8
@@ -70,7 +80,7 @@ func GetSNI(clienthello []byte) (string, error) {
 				if !nameList.ReadUint8(&nameType) ||
 					!nameList.ReadUint16LengthPrefixed(&serverName) ||
 					serverName.Empty() {
-					return "", errors.New("Bad SNI")
+					return "", errors.New("bad SNI")
 				}
 				if nameType != 0 {
 					continue
@@ -82,5 +92,5 @@ func GetSNI(clienthello []byte) (string, error) {
 			continue
 		}
 	}
-	return "", errors.New("No SNI")
+	return "", errors.New("no SNI")
 }
