@@ -249,6 +249,7 @@ func Test_ConcurrentReadPacket(t *testing.T) {
 			_, err := fmt.Fprintf(svrConn, "read-%d\n", i)
 			require.NoError(t, err)
 		}
+		readsDone.Wait()
 	})
 	defer ts.Close()
 
