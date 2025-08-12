@@ -17,7 +17,7 @@ package tlsfrag
 import (
 	"bytes"
 
-	"src.agwa.name/tlshacks"
+	"github.com/Jigsaw-Code/getsni"
 )
 
 // sniSplit can be positive or negative
@@ -29,37 +29,17 @@ import (
 func MakeSplitSniFunc(sniSplitOffset int) FragFunc {
 
 	fragFunc := func(clientHello []byte) int {
-		hello := tlshacks.UnmarshalClientHello(clientHello)
-		// Failed parse
-		if hello == nil {
+		sni, err := getsni.GetSNI(clientHello)
+		if err != nil || sni == "" {
 			return 0
 		}
 
-		var serverName string
-		// Find the Server Name Indication extension (type 0)
-		for _, ext := range hello.Extensions {
-			if ext.Type == 0 { // 0 is the type for the ServerNameData extension
-				if sni, ok := ext.Data.(*tlshacks.ServerNameData); ok {
-					if len(sni.HostName) > 0 {
-						// We only care about the first hostname.
-						serverName = sni.HostName
-					}
-				}
-				// We found the SNI extension, so we can stop searching.
-				break
-			}
-		}
-
-		if serverName == "" {
-			// No SNI, don't split.
-			return 0
-		}
-		sniLength := len(serverName)
+		sniLength := len(sni)
 
 		// Adjust sniSplits that are negative or longer than sniLength to the correct value
 		sniSplitOffset = sniSplitOffset % sniLength
 
-		sniIndex := bytes.Index(clientHello, []byte(serverName))
+		sniIndex := bytes.Index(clientHello, []byte(sni))
 		if sniIndex == -1 {
 			// This should not happen if parsing was successful and ServerName is not empty.
 			// But as a safeguard, don't split.
