@@ -15,11 +15,18 @@
 package websocket
 
 import (
+	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"strconv"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
@@ -160,4 +167,158 @@ func Test_NewPacketEndpoint(t *testing.T) {
 	n, err = conn.Read(buf)
 	require.NoError(t, err)
 	require.Equal(t, []byte("Response"), buf[:n])
+}
+
+// Test_ConcurrentWritePacket tests if gorillaConn can concurrently write packets.
+func Test_ConcurrentWritePacket(t *testing.T) {
+	const numWrites = 100
+	recved := make([]bool, numWrites)
+	allFalse := make([]bool, numWrites)
+	allTrue := slices.Repeat([]bool{true}, numWrites)
+	var reqRecved sync.WaitGroup
+	reqRecved.Add(numWrites)
+
+	ts, conn := setupAndConnectToTestUDPWebSocketServer(t, func(svrConn transport.StreamConn) {
+		defer svrConn.Close()
+		scan := bufio.NewScanner(svrConn)
+		for scan.Scan() {
+			nStr, ok := strings.CutPrefix(scan.Text(), "write-")
+			require.True(t, ok)
+			n, err := strconv.Atoi(nStr)
+			require.NoError(t, err)
+			if n > numWrites {
+				break
+			}
+			recved[n] = true
+			reqRecved.Done()
+		}
+		require.NoError(t, scan.Err())
+	})
+	defer ts.Close()
+
+	// Concurrenly writes "write-xxx\n" messages
+	require.Equal(t, allFalse, recved)
+	for i := range numWrites {
+		go func() {
+			_, err := fmt.Fprintf(conn, "write-%d\n", i)
+			require.NoError(t, err)
+		}()
+	}
+	reqRecved.Wait()
+	require.NoError(t, conn.Close())
+	require.Equal(t, allTrue, recved)
+}
+
+// Test_ConcurrentCloseWritePacket tests if gorillaConn can concurrently be closed while writing.
+func Test_ConcurrentCloseWritePacket(t *testing.T) {
+	t.Skip("TODO: figure out a good way to synchronize CloseWrite and Writes")
+
+	const numWrites = 100
+	var writesDone sync.WaitGroup
+	writesDone.Add(numWrites)
+
+	ts, conn := setupAndConnectToTestUDPWebSocketServer(t, func(svrConn transport.StreamConn) {
+		writesDone.Wait()
+		svrConn.Close()
+	})
+	defer ts.Close()
+
+	// Concurrently Close while writing
+	for range numWrites {
+		go func() {
+			defer writesDone.Done()
+			fmt.Fprintf(conn, "message\n")
+		}()
+	}
+	require.NoError(t, conn.Close())
+	writesDone.Wait()
+}
+
+// Test_ConcurrentReadPacket tests if gorillaConn can concurrently receive packets.
+func Test_ConcurrentReadPacket(t *testing.T) {
+	const numReads = 100
+	recved := make([]bool, numReads)
+	allFalse := make([]bool, numReads)
+	allTrue := slices.Repeat([]bool{true}, numReads)
+	var readsDone, testDone sync.WaitGroup
+	readsDone.Add(numReads)
+	testDone.Add(1)
+	defer testDone.Done()
+
+	ts, conn := setupAndConnectToTestUDPWebSocketServer(t, func(svrConn transport.StreamConn) {
+		defer svrConn.Close()
+		for i := range numReads {
+			_, err := fmt.Fprintf(svrConn, "read-%d\n", i)
+			require.NoError(t, err)
+		}
+		testDone.Wait()
+	})
+	defer ts.Close()
+
+	// Concurrently reads "read-xxx\n" messages
+	require.Equal(t, allFalse, recved)
+	for range numReads {
+		go func() {
+			defer readsDone.Done()
+			scan := bufio.NewScanner(conn)
+			for scan.Scan() {
+				nStr, ok := strings.CutPrefix(scan.Text(), "read-")
+				require.True(t, ok)
+				n, err := strconv.Atoi(nStr)
+				require.NoError(t, err)
+				recved[n] = true
+				break
+			}
+		}()
+	}
+	readsDone.Wait()
+	require.NoError(t, conn.Close())
+	require.Equal(t, allTrue, recved)
+}
+
+// Test_ConcurrentCloseReadPacket tests if gorillaConn can concurrently be closed while reading.
+func Test_ConcurrentCloseReadPacket(t *testing.T) {
+	t.Skip("TODO: figure out a good way to synchronize CloseRead and Reads")
+
+	const numReads = 100
+	var readsDone sync.WaitGroup
+	readsDone.Add(numReads)
+
+	ts, conn := setupAndConnectToTestUDPWebSocketServer(t, func(svrConn transport.StreamConn) {
+		readsDone.Wait()
+		svrConn.Close()
+	})
+	defer ts.Close()
+
+	// Concurrently Close while reading
+	for range numReads {
+		go func() {
+			defer readsDone.Done()
+			io.ReadAll(conn)
+		}()
+	}
+	require.NoError(t, conn.Close())
+	readsDone.Wait()
+}
+
+// --- Test Helpers ---
+
+func setupAndConnectToTestUDPWebSocketServer(t *testing.T, server func(transport.StreamConn)) (ts *httptest.Server, conn net.Conn) {
+	mux := http.NewServeMux()
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		svrConn, err := Upgrade(w, r, http.Header{})
+		require.NoError(t, err)
+		server(svrConn)
+	})
+	mux.Handle("/udp", http.StripPrefix("/udp", handler))
+	ts = httptest.NewTLSServer(mux)
+
+	client := ts.Client()
+	endpoint := &transport.TCPEndpoint{Address: ts.Listener.Addr().String()}
+	connect, err := NewPacketEndpoint("wss"+ts.URL[5:]+"/udp", endpoint, WithTLSConfig(client.Transport.(*http.Transport).TLSClientConfig))
+	require.NoError(t, err)
+	conn, err = connect(context.Background())
+	require.NoError(t, err)
+
+	return
 }
