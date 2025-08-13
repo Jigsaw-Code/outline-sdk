@@ -15,6 +15,7 @@
 package tlsfrag
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -28,6 +29,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func splitPayloadInHalf(payload []byte) int {
+	return len(payload) / 2
+}
+
 // Make sure only the first Client Hello is splitted in half.
 func TestStreamDialerFuncSplitsClientHello(t *testing.T) {
 	hello := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00, 0x03, 0xaa, 0xbb, 0xcc})
@@ -35,7 +40,7 @@ func TestStreamDialerFuncSplitsClientHello(t *testing.T) {
 	req1 := constructTLSRecord(t, layers.TLSApplicationData, 0x0303, []byte{0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88})
 
 	inner := &collectStreamDialer{}
-	conn := assertCanDialFragFunc(t, inner, "ipinfo.io:443", func(payload []byte) int { return len(payload) / 2 })
+	conn := assertCanDialFragFunc(t, inner, "ipinfo.io:443", splitPayloadInHalf)
 	defer conn.Close()
 
 	assertCanWriteAll(t, conn, net.Buffers{hello, cipher, req1, hello, cipher, req1})
@@ -51,25 +56,54 @@ func TestStreamDialerFuncSplitsClientHello(t *testing.T) {
 
 // Make sure we don't split if the first packet is not a Client Hello.
 func TestStreamDialerFuncDontSplitNonClientHello(t *testing.T) {
+	splitSniFunc := MakeSplitSniFunc(5)
+
 	cases := []struct {
-		msg string
-		pkt []byte
+		msg   string
+		pkt   []byte
+		split FragFunc
 	}{
+		// Test splitPayloadInHalf
 		{
-			msg: "application data",
-			pkt: constructTLSRecord(t, layers.TLSApplicationData, 0x0303, []byte{0x01, 0x00, 0x00, 0x03, 0xdd, 0xee, 0xff}),
+			msg:   "application data half split",
+			pkt:   constructTLSRecord(t, layers.TLSApplicationData, 0x0303, []byte{0x01, 0x00, 0x00, 0x03, 0xdd, 0xee, 0xff}),
+			split: splitPayloadInHalf,
 		},
 		{
-			msg: "cipher",
-			pkt: constructTLSRecord(t, layers.TLSChangeCipherSpec, 0x0303, []byte{0xff}),
+			msg:   "cipher half split",
+			pkt:   constructTLSRecord(t, layers.TLSChangeCipherSpec, 0x0303, []byte{0xff}),
+			split: splitPayloadInHalf,
 		},
 		{
-			msg: "invalid version",
-			pkt: constructTLSRecord(t, layers.TLSHandshake, 0x0305, []byte{0x01, 0x00, 0x00, 0x03, 0xdd, 0xee, 0xff}),
+			msg:   "invalid version half split",
+			pkt:   constructTLSRecord(t, layers.TLSHandshake, 0x0305, []byte{0x01, 0x00, 0x00, 0x03, 0xdd, 0xee, 0xff}),
+			split: splitPayloadInHalf,
 		},
 		{
-			msg: "invalid length",
-			pkt: constructTLSRecord(t, layers.TLSHandshake, 0x0305, []byte{}),
+			msg:   "invalid length half split",
+			pkt:   constructTLSRecord(t, layers.TLSHandshake, 0x0305, []byte{}),
+			split: splitPayloadInHalf,
+		},
+		//Test splitSniFunc
+		{
+			msg:   "application data SNI split",
+			pkt:   constructTLSRecord(t, layers.TLSApplicationData, 0x0303, []byte{0x01, 0x00, 0x00, 0x03, 0xdd, 0xee, 0xff}),
+			split: splitSniFunc,
+		},
+		{
+			msg:   "cipher SNI split",
+			pkt:   constructTLSRecord(t, layers.TLSChangeCipherSpec, 0x0303, []byte{0xff}),
+			split: splitSniFunc,
+		},
+		{
+			msg:   "invalid version SNI split",
+			pkt:   constructTLSRecord(t, layers.TLSHandshake, 0x0305, []byte{0x01, 0x00, 0x00, 0x03, 0xdd, 0xee, 0xff}),
+			split: splitSniFunc,
+		},
+		{
+			msg:   "invalid length SNI split",
+			pkt:   constructTLSRecord(t, layers.TLSHandshake, 0x0305, []byte{}),
+			split: splitSniFunc,
 		},
 	}
 
@@ -78,7 +112,7 @@ func TestStreamDialerFuncDontSplitNonClientHello(t *testing.T) {
 
 	for _, tc := range cases {
 		inner := &collectStreamDialer{}
-		conn := assertCanDialFragFunc(t, inner, "ipinfo.io:443", func(payload []byte) int { return len(payload) / 2 })
+		conn := assertCanDialFragFunc(t, inner, "ipinfo.io:443", tc.split)
 		defer conn.Close()
 
 		assertCanWriteAll(t, conn, net.Buffers{tc.pkt, cipher, req})
@@ -142,6 +176,62 @@ func TestFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 	}
 }
 
+// Make sure only the first Client Hello is splitted by a fixed length.
+// ------------------------------------------------------------------------
+func TestSniSplittingStreamDialerSplitsSni(t *testing.T) {
+	sniExtension := constructTLSSNIExtension(t, "example.com")
+	helloBody := bytes.Join([][]byte{{0x01, 0x00, 0x00}, {byte(len(sniExtension))}, sniExtension}, nil)
+	hello := constructTLSRecord(t, layers.TLSHandshake, 0x0301, helloBody)
+	cipher := constructTLSRecord(t, layers.TLSChangeCipherSpec, 0x0303, []byte{0x01})
+	req1 := constructTLSRecord(t, layers.TLSApplicationData, 0x0303, []byte{0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88})
+
+	cases := []struct {
+		msg                string
+		original, splitted net.Buffers
+		splitLen           int
+	}{
+		{
+			msg:      "split leading bytes",
+			original: net.Buffers{hello, cipher, req1, hello, cipher, req1},
+			splitLen: 3,
+			splitted: net.Buffers{
+				// First two fragments will be merged in one single Write
+				append(
+					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00}),
+					constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x03, 0xaa, 0xbb, 0xcc})...,
+				),
+				cipher, req1, hello, cipher, req1,
+			},
+		},
+		{
+			msg:      "no split",
+			original: net.Buffers{hello, cipher, req1, hello, cipher, req1},
+			splitLen: 0,
+			splitted: net.Buffers{hello, cipher, req1, hello, cipher, req1},
+		},
+		{
+			msg:      "split trailing bytes",
+			original: net.Buffers{hello, cipher, req1, hello, cipher, req1},
+			splitLen: -2,
+			splitted: net.Buffers{
+				// Fragmented record header and payload are written as two packets
+				constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0x01, 0x00, 0x00, 0x03, 0xaa}),
+				constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{0xbb, 0xcc}),
+				cipher, req1, hello, cipher, req1,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		inner := &collectStreamDialer{}
+		conn := assertCanDialSniSplitFrag(t, inner, "ipinfo.io:443", tc.splitLen)
+		defer conn.Close()
+
+		assertCanWriteAll(t, conn, tc.original)
+		require.Equal(t, tc.splitted, inner.bufs, tc.msg)
+	}
+}
+
 // Make sure the first Client Hello can be splitted multiple times.
 func TestNestedFixedLenStreamDialerSplitsClientHello(t *testing.T) {
 	hello := constructTLSRecord(t, layers.TLSHandshake, 0x0301, []byte{
@@ -196,6 +286,17 @@ func assertCanDialFixedLenFrag(t *testing.T, inner transport.StreamDialer, raddr
 	return conn
 }
 
+func assertCanDialSniSplitFrag(t *testing.T, inner transport.StreamDialer, raddr string, splitLen int) transport.StreamConn {
+	splitSniFunc := MakeSplitSniFunc(splitLen)
+	d, err := NewStreamDialerFunc(inner, splitSniFunc)
+	require.NoError(t, err)
+	require.NotNil(t, d)
+	conn, err := d.DialStream(context.Background(), raddr)
+	require.NoError(t, err)
+	require.NotNil(t, conn)
+	return conn
+}
+
 func assertCanWriteAll(t *testing.T, w io.Writer, buf net.Buffers) {
 	for _, p := range buf {
 		n, err := w.Write(p)
@@ -222,6 +323,23 @@ func constructTLSRecord(t *testing.T, typ layers.TLSType, ver layers.TLSVersion,
 	err := pkt.SerializeTo(buf, gopacket.SerializeOptions{})
 	require.NoError(t, err)
 	return buf.Bytes()
+}
+
+// https://datatracker.ietf.org/doc/html/rfc6066#section-3
+func constructTLSSNIExtension(t *testing.T, domainName string) []byte {
+	sniExtensionHeader := []byte{0x00, 0x00, 0x00, 0x18, 0x00, 0x16, 0x00}
+
+	// pad length of domain name to two bytes
+	//nameLength := uint16(len(domainName))
+	//nameLengthBytes := append(byte(nameLength>>8), byte(nameLength)...)
+
+	//fullExtension := append(header, nameLengthBytes, []byte(domainName)...)
+
+	//return fullExtension
+
+	nameLength := len(domainName)
+	result := append(sniExtensionHeader, byte(nameLength>>8), byte(nameLength))
+	return append(result, domainName...)
 }
 
 // collectStreamDialer collects all writes to this stream dialer and append it to bufs
