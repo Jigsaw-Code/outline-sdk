@@ -16,6 +16,7 @@ package tlsfrag
 
 import (
 	"bytes"
+	"log"
 
 	"github.com/Jigsaw-Code/getsni"
 )
@@ -30,6 +31,9 @@ func MakeSplitSniFunc(sniSplitOffset int) FragFunc {
 
 	fragFunc := func(clientHello []byte) int {
 		sni, err := getsni.GetSNI(clientHello)
+
+		log.Printf("SNI: %v %v\n", sni, err)
+
 		if err != nil || sni == "" {
 			return 0
 		}
