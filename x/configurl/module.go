@@ -62,6 +62,7 @@ func RegisterDefaultProviders(c *ProviderContainer) *ProviderContainer {
 	registerTLSStreamDialer(&c.StreamDialers, "tls", c.StreamDialers.NewInstance)
 
 	registerTLSFragStreamDialer(&c.StreamDialers, "tlsfrag", c.StreamDialers.NewInstance)
+	registerSNIFragStreamDialer(&c.StreamDialers, "snifrag", c.StreamDialers.NewInstance)
 
 	registerWebsocketStreamDialer(&c.StreamDialers, "ws", c.StreamDialers.NewInstance)
 	registerWebsocketPacketDialer(&c.PacketDialers, "ws", c.StreamDialers.NewInstance)
