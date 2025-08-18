@@ -6,6 +6,7 @@ package tlsfrag
 
 import (
 	"errors"
+	"log"
 
 	"golang.org/x/crypto/cryptobyte"
 )
@@ -15,6 +16,8 @@ import (
 // Derived from unmarshal() in crypto/tls.
 func GetSNI(clienthello []byte) (string, error) {
 	plaintext := cryptobyte.String(clienthello)
+
+	log.Printf("plaintext: %v \n", plaintext)
 
 	var s cryptobyte.String
 	// Skip uint8 ContentType and uint16 ProtocolVersion

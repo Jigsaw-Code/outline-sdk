@@ -16,9 +16,8 @@ package tlsfrag
 
 import (
 	"bytes"
+	"encoding/hex"
 	"log"
-
-	"github.com/Jigsaw-Code/getsni"
 )
 
 // sniSplit can be positive or negative
@@ -30,8 +29,15 @@ import (
 func MakeSplitSniFunc(sniSplitOffset int) FragFunc {
 
 	fragFunc := func(clientHello []byte) int {
-		sni, err := getsni.GetSNI(clientHello)
+		// The GetSNI function expects a full TLS record, but clientHello is just the payload.
+		// We prepend a fake record header to parse the SNI.
+		// The header is: record type (1) + version (2) + length (2).
+		header, _ := hex.DecodeString("1603010200") // Handshake, TLS 1.0, length 0
+		fullClientHello := append(header, clientHello...)
 
+		sni, err := GetSNI(fullClientHello)
+
+		log.Printf("clientHello: %x\n", fullClientHello)
 		log.Printf("SNI: %v %v\n", sni, err)
 
 		if err != nil || sni == "" {
@@ -43,7 +49,7 @@ func MakeSplitSniFunc(sniSplitOffset int) FragFunc {
 		// Adjust sniSplits that are negative or longer than sniLength to the correct value
 		sniSplitOffset = sniSplitOffset % sniLength
 
-		sniIndex := bytes.Index(clientHello, []byte(sni))
+		sniIndex := bytes.Index(fullClientHello, []byte(sni))
 		if sniIndex == -1 {
 			// This should not happen if parsing was successful and ServerName is not empty.
 			// But as a safeguard, don't split.
