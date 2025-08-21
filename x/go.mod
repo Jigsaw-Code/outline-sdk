@@ -2,7 +2,7 @@ module github.com/Jigsaw-Code/outline-sdk/x
 
 go 1.23.0
 
-// due to https://github.com/Jigsaw-Code/outline-sdk/issues/501
+// Due to https://github.com/Jigsaw-Code/outline-sdk/issues/501
 retract [v0.0.4, v0.0.6]
 
 require (
