@@ -101,7 +101,11 @@ func (opt *SmartDialerOptions) NewStreamDialer() (*StreamDialer, error) {
 		TestTimeout:  opt.testTimeout,
 		StreamDialer: opt.baseSD,
 		PacketDialer: opt.basePD,
-		Cache:        opt.cache,
+	}
+	// When assigning a nil concrete value to an interface, the interface is not nil
+	// but contains a nil value. The `if` check is necessary to avoid a panic.
+	if opt.cache != nil {
+		finder.Cache = opt.cache
 	}
 
 	dialer, err := finder.NewDialer(context.Background(), opt.testDomains, opt.config)
