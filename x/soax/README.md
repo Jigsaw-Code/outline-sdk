@@ -18,7 +18,7 @@ uses basic authentication ("username:password"), where the password is the Packa
 Proxy string:
 
 ```txt
-package-<pacakge_id>[-country-<country_iso>[-isp-<isp_name>][-region-<region_name>[-city-<city_name>]]][-sessionid-<session_id>-[sessionlength-<session_length>]]:<package_key>@proxy.soax.com:5000
+package-<package_id>[-country-<country_iso>[-isp-<isp_name>][-region-<region_name>[-city-<city_name>]]][-sessionid-<session_id>-[sessionlength-<session_length>]]:<package_key>@proxy.soax.com:5000
 ```
 
 The `isp_name`,`region_name` and `city_name` must be ones returned by the REST API. They may contain spaces, which should be replaced with `+` (e.g. `new+york`).
@@ -32,13 +32,13 @@ Here is an example of using SOCKS5 to connect from Germany:
 ```console
 $ curl --proxy "socks5h://package-${SOAX_PACKAGE_ID}-country-de-isp-o2+deutschland:${SOAX_PACKAGE_KEY}@proxy.soax.com:5000" https://checker.soax.com/api/ipinfo
 
-{"status":true,"reason":"","data":{"carrier":"O2 Deutschland","city":"Leipzig","country_code":"DE","country_name":"Germany","ip":"<redacted>","isp":"O2 Deutschland","region":"Saxony"}}                                         
+{"status":true,"reason":"","data":{"carrier":"O2 Deutschland","city":"Leipzig","country_code":"DE","country_name":"Germany","ip":"<redacted>","isp":"O2 Deutschland","region":"Saxony"}}
 ```
 
 Here is the same request using HTTP CONNECT:
 
 ```console
-$ curl --proxy "https://package-${SOAX_PACKAGE_ID}-country-de-isp-o2+deutschland:${SOAX_PACKAGE_KEY}@proxy.soax.com:5000" https://checker.soax.com/api/ipinfo 
+$ curl --proxy "https://package-${SOAX_PACKAGE_ID}-country-de-isp-o2+deutschland:${SOAX_PACKAGE_KEY}@proxy.soax.com:5000" https://checker.soax.com/api/ipinfo
 
 {"status":true,"reason":"","data":{"carrier":"O2 Deutschland","city":"Wuppertal","country_code":"DE","country_name":"Germany","ip":"176.1.206.77","isp":"O2 Deutschland","region":"North Rhine-Westphalia"}}
 ```
@@ -47,9 +47,9 @@ HTTP CONNECT is preferable because it can be done over HTTPS, which hides your c
 
 ### Sessions
 
-It's very important to use sessions in order to endure your requests are using the same proxy. By default, you will get a different proxy for each request.
+It's very important to use sessions in order to ensure your requests are using the same proxy. By default, you will get a different proxy for each request.
 
-To use the same proxy, craete a session by passing a `sessionid` and `sessionlength`, in seconds. Chasing the session ID changes the proxy used. When session length expires, you may get a new proxy.
+To use the same proxy, create a session by passing a `sessionid` and `sessionlength`, in seconds. Changing the session ID changes the proxy used. When session length expires, you may get a new proxy.
 
 For advanced session parameters, see [Understanding session parameters](https://helpcenter.soax.com/en/articles/9939557-understanding-session-parameters).
 
