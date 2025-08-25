@@ -10,9 +10,7 @@ SOAX is a provider of Residential, Mobile, and Datacenter proxy services. This d
 * **Package ID:** A unique 6-digit identifier shown on each package in the package list UI. Used in proxy requests.
 * **Package Key:** Unique key tied to a specific package you have purchased. It shows up as "Password" in the web UI, under "QUICK ACCESS". Used in the REST API and proxy requests. Keep it secret.
 
-## SOAX Reference
-
-### Proxy API
+## SOAX Proxy API
 
 SOAX supports both HTTP CONNECT proxies and SOCKS5 proxies. In both cases it
 uses basic authentication ("username:password"), where the password is the Package Key, and the username is a configuration string specifying the parameters of the connection.
@@ -55,7 +53,7 @@ To use the same proxy, craete a session by passing a `sessionid` and `sessionlen
 
 For advanced session parameters, see [Understanding session parameters](https://helpcenter.soax.com/en/articles/9939557-understanding-session-parameters).
 
-### REST API
+## SOAX REST API
 
 [API Reference](https://helpcenter.soax.com/en/collections/3470979-api).
 
@@ -63,7 +61,7 @@ API calls require both an API key, tied to the account, and a Package key, tied 
 
 Note that the APIs for mobile and residential packages differ a bit.
 
-#### Get list of mobile carriers
+### Get list of mobile carriers
 
 This is for Mobile packages only.
 
@@ -83,7 +81,7 @@ $ curl "https://api.soax.com/api/get-country-operators?api_key=$SOAX_API_KEY&pac
 ["pjsc megafon","mts pjsc","tele2 russia","beeline","rostelecom","jsc ufanet","edinos","ekaterinburg-2000","tbank jsc","er-telecom","t-mob","mcs","dom.ru","sberbank-telecom","llc sp abaza telecom","s.u.e. dpr republic operator of networks","tattelecom","edinos ltd.","invest mobile","isp balzer-telecom","innovation solutions center ltd.","novokuznetsk telecom","mobile trend","ooo network of data-centers selectel","dagnet","jv a-mobile","llc alfa-mobile","zao aquafon-gsm","ooo vtc-mobile"]
 ```
 
-#### Get list of residential ISPS
+### Get list of residential ISPS
 
 This is for Residential packages only. The official documentation refers to them as "WiFi ISPS".
 
@@ -95,7 +93,7 @@ Request format:
 https://api.soax.com/api/get-country-isp?api_key=<api_key>&package_key=<package_key>&country_iso=<country_iso>[&region=<region_name>[&city=<city_name>]]
 ```
 
-#### Get list of regions
+### Get list of regions
 
 [Reference](https://helpcenter.soax.com/en/articles/6227864-getting-a-list-of-regions)
 
@@ -115,7 +113,7 @@ $ curl  "https://api.soax.com/api/get-country-regions?api_key=$SOAX_API_KEY&pack
 ["tehran","razavi khorasan","fars","isfahan","khuzestan","east azerbaijan province","alborz province","mazandaran","west azerbaijan province","gilan province","qom province"]
 ```
 
-#### Get list of cities
+### Get list of cities
 
 [Reference](https://helpcenter.soax.com/en/articles/6228092-getting-a-list-of-cities)
 
