@@ -16,6 +16,7 @@ require (
 	github.com/quic-go/quic-go v0.48.1
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/stretchr/testify v1.9.0
+	github.com/things-go/go-socks5 v0.0.5
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	golang.org/x/mobile v0.0.0-20240520174638-fa72addaaa1b
 	golang.org/x/net v0.36.0
