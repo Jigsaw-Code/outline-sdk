@@ -38,7 +38,7 @@ $ curl --proxy "socks5h://package-${SOAX_PACKAGE_ID}-country-de-isp-o2+deutschla
 Here is the same request using HTTP CONNECT:
 
 ```console
-$curl --proxy "https://package-${SOAX_PACKAGE_ID}-country-de-isp-o2+deutschland:${SOAX_PACKAGE_KEY}@proxy.soax.com:5000" https://checker.soax.com/api/ipinfo 
+$ curl --proxy "https://package-${SOAX_PACKAGE_ID}-country-de-isp-o2+deutschland:${SOAX_PACKAGE_KEY}@proxy.soax.com:5000" https://checker.soax.com/api/ipinfo 
 
 {"status":true,"reason":"","data":{"carrier":"O2 Deutschland","city":"Wuppertal","country_code":"DE","country_name":"Germany","ip":"176.1.206.77","isp":"O2 Deutschland","region":"North Rhine-Westphalia"}}
 ```
