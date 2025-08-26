@@ -81,9 +81,9 @@ $ curl "https://api.soax.com/api/get-country-operators?api_key=$SOAX_API_KEY&pac
 ["pjsc megafon","mts pjsc","tele2 russia","beeline","rostelecom","jsc ufanet","edinos","ekaterinburg-2000","tbank jsc","er-telecom","t-mob","mcs","dom.ru","sberbank-telecom","llc sp abaza telecom","s.u.e. dpr republic operator of networks","tattelecom","edinos ltd.","invest mobile","isp balzer-telecom","innovation solutions center ltd.","novokuznetsk telecom","mobile trend","ooo network of data-centers selectel","dagnet","jv a-mobile","llc alfa-mobile","zao aquafon-gsm","ooo vtc-mobile"]
 ```
 
-### Get list of residential ISPS
+### Get list of residential ISPs
 
-This is for Residential packages only. The official documentation refers to them as "WiFi ISPS".
+This is for Residential packages only. The official documentation refers to them as "WiFi ISPs".
 
 [Reference](https://helpcenter.soax.com/en/articles/6228391-getting-a-list-of-wifi-isps)
 
