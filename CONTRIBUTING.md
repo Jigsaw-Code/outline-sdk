@@ -94,7 +94,7 @@ It also works with the [`go test` command](https://pkg.go.dev/cmd/go#hdr-Test_pa
 GOOS=android GOARCH=arm64 go test -exec "$(pwd)/run_on_android.sh"  ./...
 ```
 
-To build with cgo on Android, you need to set the `CC` environment variable to point to the `clang` compiler in the Android NDK.
+To build with [cgo](https://pkg.go.dev/cmd/cgo) on Android, you need to set the `CC` environment variable to point to the `clang` compiler in the Android NDK.
 The path to the C compiler depends on your Android NDK version, host OS, and target architecture. You can find the correct path within the NDK's `toolchains/llvm/prebuilt/` directory.
 
 For example, to run a tool on a 64-bit ARM Android 30 device:
