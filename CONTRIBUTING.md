@@ -80,7 +80,7 @@ Windows example:
 
 ## Running Android binaries
 
-To run Android binaries you must use an Android simulator or physical device.
+To run Android binaries, you must have an Android simulator running or a physical device plugged in.
 
 The easiest way is to run a binary is to use the [`go run` command](https://pkg.go.dev/cmd/go#hdr-Compile_and_run_Go_program) directly with the `-exec` flag and our convenience tool `run_on_android.sh`:
 
@@ -97,7 +97,13 @@ GOOS=android GOARCH=arm64 go test -exec "$(pwd)/run_on_android.sh"  ./...
 <details>
   <summary>Details and direct invocation</summary>
 
-The `run_on_android.sh` script uses the [Android Debug Bridge (`adb`)](https://developer.android.com/tools/adb) to run the binary on a connected Android device (physical or emulator). You must have `adb` in your `PATH`.
+The `run_on_android.sh` script uses the [Android Debug Bridge (`adb`)](https://developer.android.com/tools/adb) to run the binary on a connected Android device (physical or emulator). You must have `adb` in your `PATH`. You can check for connected devices using `adb devices`:
+
+```console
+% adb devices
+List of devices attached
+emulator-5554	device
+```
 
 The script will:
 1. Push the binary to a temporary location on the device (`/data/local/tmp/test/`).
