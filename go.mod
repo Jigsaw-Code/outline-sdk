@@ -4,7 +4,6 @@ go 1.24
 
 require (
 	github.com/eycorsican/go-tun2socks v1.16.11
-	github.com/google/go-licenses v1.6.0
 	github.com/google/gopacket v1.1.19
 	github.com/shadowsocks/go-shadowsocks2 v0.1.5
 	github.com/stretchr/testify v1.8.4
@@ -18,6 +17,7 @@ require (
 	github.com/emirpasic/gods v1.12.0 // indirect
 	github.com/go-logr/logr v1.2.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+	github.com/google/go-licenses v1.6.0 // indirect
 	github.com/google/licenseclassifier v0.0.0-20210722185704-3043a050f148 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
