@@ -28,16 +28,22 @@ import (
 )
 
 func TestSessionConfig_newUsername_AllFields(t *testing.T) {
-	config := SessionConfig{
-		PackageID:     123456,
-		PackageKey:    "my_package_key",
-		CountryCode:   "us",
-		RegionID:      "new york",
-		CityID:        "new york city",
-		ISPID:         "verizon",
-		SessionID:     "my_session",
-		SessionLength: 10 * time.Minute,
-		IdleTTL:       5 * time.Minute,
+	config := ProxySessionConfig{
+		Auth: ProxyAuthConfig{
+			PackageID:  123456,
+			PackageKey: "my_package_key",
+		},
+		Node: ProxyNodeConfig{
+			CountryCode: "us",
+			RegionID:    "new york",
+			CityID:      "new york city",
+			ISPID:       "verizon",
+		},
+		Session: SessionConfig{
+			ID:       "my_session",
+			Duration: 10 * time.Minute,
+			IdleTTL:  5 * time.Minute,
+		},
 	}
 	userinfo := config.newUserPassword()
 	require.Equal(t,
@@ -50,25 +56,46 @@ func TestSessionConfig_newUsername_AllFields(t *testing.T) {
 }
 
 func TestSessionConfig_newUsername_PackageOnly(t *testing.T) {
-	config := SessionConfig{
-		PackageID:  123456,
-		PackageKey: "my_package_key",
+	config := ProxySessionConfig{
+		Auth: ProxyAuthConfig{
+			PackageID:  123456,
+			PackageKey: "my_package_key",
+		},
 	}
 	require.Equal(t, "package-123456:my_package_key", config.newUserPassword().String())
 }
 
 func TestSessionConfig_newSession_SetsDefaults(t *testing.T) {
-	config := SessionConfig{
-		PackageID:  123456,
-		PackageKey: "my_package_key",
+	config := ProxySessionConfig{
+		Auth: ProxyAuthConfig{
+			PackageID:  123456,
+			PackageKey: "my_package_key",
+		},
 	}
 	session := config.NewSession()
 	require.NotNil(t, session)
-	require.NotContains(t, session.config.SessionID, "-")
-	require.NotEmpty(t, session.config.SessionID)
-	require.Equal(t, 1*time.Hour, session.config.SessionLength)
-	require.Equal(t, 1*time.Hour, session.config.IdleTTL)
+	require.NotContains(t, session.config.Session.ID, "-")
+	require.NotEmpty(t, session.config.Session.ID)
+	require.Equal(t, 1*time.Hour, session.config.Session.Duration)
+	require.Equal(t, 1*time.Hour, session.config.Session.IdleTTL)
 	require.Equal(t, proxyAddress, session.config.Endpoint)
+}
+
+func TestSessionConfig_newSession_NotPersistent(t *testing.T) {
+	config := ProxySessionConfig{
+		Auth: ProxyAuthConfig{
+			PackageID:  123456,
+			PackageKey: "my_package_key",
+		},
+		Session: SessionNotPersistent,
+	}
+	session := config.NewSession()
+	require.NotNil(t, session)
+	require.Empty(t, session.config.Session.ID)
+	require.Equal(t, time.Duration(-1), session.config.Session.Duration)
+	require.Equal(t, time.Duration(0), session.config.Session.IdleTTL)
+	require.Equal(t, proxyAddress, session.config.Endpoint)
+	require.Equal(t, "package-123456:my_package_key", session.config.newUserPassword().String())
 }
 
 type FuncCredentialStore func(user, password, userAddr string) bool
@@ -80,9 +107,11 @@ func (f FuncCredentialStore) Valid(user, password, userAddr string) bool {
 var _ socks5.CredentialStore = FuncCredentialStore(nil)
 
 func TestSession_NewSOCKS5Client(t *testing.T) {
-	config := SessionConfig{
-		PackageID:  123456,
-		PackageKey: "my_package_key",
+	config := ProxySessionConfig{
+		Auth: ProxyAuthConfig{
+			PackageID:  123456,
+			PackageKey: "my_package_key",
+		},
 	}
 	var userinfo url.Userinfo
 
