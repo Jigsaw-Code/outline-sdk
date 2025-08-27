@@ -81,7 +81,8 @@ jobs:
           java-version: "17"
       - name: Set up Android SDK
         uses: android-actions/setup-android@v2
-      - name: Run Android emulator
+
+      - name: Run Android unit tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 29
@@ -90,12 +91,7 @@ jobs:
           script: |
             adb wait-for-device
             adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done; input keyevent 82'
-      - name: Run Android unit tests
-        env:
-          GOOS: android
-          GOARCH: arm64
-          CGO_ENABLED: 1
-        run: |
-          export CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang"
-          go test -tags nettest -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
-          go test -C x -tags nettest,psiphon -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
+            export CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang"
+            export GOOS=android GOARCH=arm64 CGO_ENABLED=1
+            go test -tags nettest -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
+            go test -C x -tags nettest,psiphon -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
