@@ -116,6 +116,11 @@ jobs:
           script: echo "Generated AVD snapshot for caching."
 
       - name: Run Android unit tests
+        env:
+          GOOS: android
+          GOARCH: amd64
+          CGO_ENABLED: 1
+          CC: "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang"
         uses: reactivecircus/android-emulator-runner@v2
         with:
           arch: x86_64
@@ -124,8 +129,9 @@ jobs:
           profile: Nexus 6
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
-            # export CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang"
             uname -a
-            #export GOOS=android GOARCH=amd64 CGO_ENABLED=1
-            CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang" GOOS=android GOARCH=amd64 CGO_ENABLED=1 go test -tags nettest -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
-            CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang" GOOS=android GOARCH=amd64 CGO_ENABLED=1 go test -C x -tags nettest,psiphon -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
+            echo $GOOS $GOARCH $CGO_ENABLED $CC
+            go test -tags nettest -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
+            go test -C x -tags nettest,psiphon -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
+            # CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang" GOOS=android GOARCH=amd64 CGO_ENABLED=1 go test -tags nettest -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
+            # CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang" GOOS=android GOARCH=amd64 CGO_ENABLED=1 go test -C x -tags nettest,psiphon -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
