@@ -88,6 +88,7 @@ jobs:
           arch: x86_64
           profile: Nexus 6
           script: |
+            adb wait-for-device
             adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done; input keyevent 82'
       - name: Run Android unit tests
         env:
