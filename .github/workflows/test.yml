@@ -89,8 +89,6 @@ jobs:
           arch: x86_64
           profile: Nexus 6
           script: |
-            adb wait-for-device
-            adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done; input keyevent 82'
             export CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang"
             export GOOS=android GOARCH=arm64 CGO_ENABLED=1
             go test -tags nettest -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
