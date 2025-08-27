@@ -92,7 +92,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 29
-          arch: x86_64
+          arch: arm64-v8a
           profile: Nexus 6
           # From https://github.com/ReactiveCircus/android-emulator-runner/blob/v2/README.md#usage--examples
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
