@@ -17,6 +17,7 @@
 set -eu
 
 function main() {
+  set -x
   declare -r host_bin="$1"
   declare -r android_bin="/data/local/tmp/test/$(basename "${host_bin}")"
   adb shell mkdir -p "$(dirname "${android_bin}")"

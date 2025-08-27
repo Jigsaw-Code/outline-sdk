@@ -79,6 +79,12 @@ jobs:
         with:
           distribution: "zulu"
           java-version: "17"
+      # KVM makes the emulator faster.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
       - name: Set up Android SDK
         uses: android-actions/setup-android@v2
 
@@ -88,6 +94,8 @@ jobs:
           api-level: 29
           arch: x86_64
           profile: Nexus 6
+          # From https://github.com/ReactiveCircus/android-emulator-runner/blob/v2/README.md#usage--examples
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
             export CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang"
             export GOOS=android GOARCH=arm64 CGO_ENABLED=1
