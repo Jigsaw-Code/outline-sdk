@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2023 The Outline Authors
+# Copyright 2025 The Outline Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,11 +17,15 @@
 set -eu
 
 function main() {
-  declare -r bin="$1"
+  declare -r host_bin="$1"
+  declare -r android_bin="/data/local/tmp/test/$(basename "${host_bin}")"
+  adb push "${host_bin}" "${android_bin}"
+
   # Remove the binary name from the args
   shift 1
-  # We are using Google's ~2MB minimal image. See https://github.com/GoogleContainerTools/distroless.
-  podman run --arch $(uname -m) --rm -it -v "${bin}":/outline/bin gcr.io/distroless/static-debian11 /outline/bin "$@"
+  adb shell "${android_bin}" "$@"
+
+  adb shell rm "${android_bin}"
 }
 
 main "$@"

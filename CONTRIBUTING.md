@@ -78,6 +78,50 @@ Windows example:
 
 </details>
 
+## Running Android binaries
+
+To run Android binaries, you must have an Android simulator running or a physical device plugged in.
+
+The easiest way is to run a binary is to use the [`go run` command](https://pkg.go.dev/cmd/go#hdr-Compile_and_run_Go_program) directly with the `-exec` flag and our convenience tool `run_on_android.sh`:
+
+```sh
+GOOS=android GOARCH=arm64 go -C x run -exec "$(pwd)/run_on_android.sh" ./tools/resolve --resolver 8.8.8.8 example.com
+```
+
+It also works with the [`go test` command](https://pkg.go.dev/cmd/go#hdr-Test_packages):
+
+```sh
+GOOS=android GOARCH=arm64 go test -exec "$(pwd)/run_on_android.sh"  ./...
+```
+
+To build with [cgo](https://pkg.go.dev/cmd/cgo) on Android, you need to set the `CC` environment variable to point to the `clang` compiler in the Android NDK.
+The path to the C compiler depends on your Android NDK version, host OS, and target architecture. You can find the correct path within the NDK's `toolchains/llvm/prebuilt/` directory.
+
+For example, to run a tool on a 64-bit ARM Android 30 device from macOS:
+
+```sh
+CC="$ANDROID_HOME/ndk/21.3.6528147/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android30-clang" CGO_ENABLED=1 GOOS=android GOARCH=arm64 go -C x run -exec "$(pwd)/run_on_android.sh" ./tools/fetch "https://example.com"
+```
+
+
+<details>
+  <summary>Details and direct invocation</summary>
+
+The `run_on_android.sh` script uses the [Android Debug Bridge (`adb`)](https://developer.android.com/tools/adb) to run the binary on a connected Android device (physical or emulator). You must have `adb` in your `PATH`. You can check for connected devices using `adb devices`:
+
+```console
+% adb devices
+List of devices attached
+emulator-5554	device
+```
+
+The script will:
+1. Push the binary to a temporary location on the device (`/data/local/tmp/test/`).
+2. Execute the binary on the device with the provided arguments.
+3. Remove the binary from the device after execution.
+
+</details>
+
 ## Running Linux binaries
 
 To run Linux binaries you can use a Linux container via [Podman](https://podman.io/).
