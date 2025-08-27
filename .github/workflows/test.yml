@@ -100,7 +100,7 @@ jobs:
         id: avd-cache
         with:
           path: |
-            ~/.android/avd/*
+            ~/.android/avd
             ~/.android/adb*
           key: avd-${{ matrix.api-level }}
 
@@ -118,16 +118,7 @@ jobs:
             ls ~/.android/avd
             ls ~/.android/
       
-      # - name: Set env vars
-      #   # We need to dinamically set the CC env because the ${ANDROID_NDK_HOME} is only accessible from a command.
-      #   run: |
-      #     echo "CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang" >> "$GITHUB_ENV"
-
       - name: Run Android unit tests
-        env:
-          GOOS: android
-          GOARCH: amd64
-          CGO_ENABLED: 1
         uses: reactivecircus/android-emulator-runner@v2
         with:
           arch: x86_64
@@ -136,10 +127,7 @@ jobs:
           profile: Nexus 6
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
-            uname -a
-            export CC="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang"
-            echo $GOOS $GOARCH $CGO_ENABLED $CC
-            go test -tags nettest -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
-            go test -C x -tags nettest,psiphon -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
-            # CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang" GOOS=android GOARCH=amd64 CGO_ENABLED=1 go test -tags nettest -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
-            # CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang" GOOS=android GOARCH=amd64 CGO_ENABLED=1 go test -C x -tags nettest,psiphon -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
+            # We can't set environment variables in this script, nor refer to $ANDROID_NDK_HOME in the job.step.env block, so
+            # we set it explicitly here. (#pain)
+            CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang" GOOS=android GOARCH=amd64 CGO_ENABLED=1 go test -tags nettest -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
+            CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang" GOOS=android GOARCH=amd64 CGO_ENABLED=1 go test -C x -tags nettest,psiphon -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
