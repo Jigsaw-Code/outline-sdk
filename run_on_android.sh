@@ -19,6 +19,7 @@ set -eu
 function main() {
   declare -r host_bin="$1"
   declare -r android_bin="/data/local/tmp/test/$(basename "${host_bin}")"
+  adb shell mkdir -p "$(dirname "${android_bin}")"
   adb push "${host_bin}" "${android_bin}"
 
   # Remove the binary name from the args
