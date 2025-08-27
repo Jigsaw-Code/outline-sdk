@@ -123,6 +123,8 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           arch: x86_64
+          # Using Automated Test Device because they are leaner. See
+          # https://developer.android.com/studio/test/gradle-managed-devices#gmd-atd
           target: aosp_atd
           api-level: ${{ matrix.api-level }}
           force-avd-creation: false
