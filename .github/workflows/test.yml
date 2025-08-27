@@ -137,7 +137,7 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
             uname -a
-            echo "CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang" >> "$GITHUB_ENV"
+            export CC="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang"
             echo $GOOS $GOARCH $CGO_ENABLED $CC
             go test -tags nettest -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
             go test -C x -tags nettest,psiphon -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
