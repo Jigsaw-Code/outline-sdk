@@ -124,7 +124,6 @@ jobs:
           arch: x86_64
           api-level: ${{ matrix.api-level }}
           force-avd-creation: false
-          profile: Nexus 6
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
             # We can't set environment variables in this script, nor refer to $ANDROID_NDK_HOME in the job.step.env block, so
