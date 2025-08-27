@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -eu
+
 function main() {
   declare -r host_bin="$1"
   declare -r android_bin="/data/local/tmp/test/$(basename "${host_bin}")"
