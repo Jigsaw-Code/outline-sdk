@@ -31,7 +31,7 @@ tasks:
     desc: Builds Mobileproxy.xcframework for iOS.
     deps: [setup:mobileproxy]
     cmds:
-      - PATH={{.ROOT_DIR}}/{{.MOBILEPROXY_BUILD_TOOLS_DIR}}:$PATH gomobile bind -ldflags='-s -w' -tags=psiphon -target=ios -iosversion={{.IOS_MINIMUM_VERSION}} -o {{.ROOT_DIR}}/{{.IOS_FRAMEWORK_PATH}} {{.MOBILEPROXY_MODULE}}
+      - PATH={{.ROOT_DIR}}/{{.MOBILEPROXY_BUILD_TOOLS_DIR}}:$PATH gomobile bind -ldflags='-s -w' -target=ios -iosversion={{.IOS_MINIMUM_VERSION}} -o {{.ROOT_DIR}}/{{.IOS_FRAMEWORK_PATH}} {{.MOBILEPROXY_MODULE}}
       - (cd {{.ROOT_DIR}}/{{.MOBILEPROXY_ARTIFACT_DIR}} && zip -qr {{.IOS_ZIP_NAME}} {{.IOS_FRAMEWORK_NAME}})
     sources:
       - mobileproxy/**/*.go
@@ -45,7 +45,7 @@ tasks:
     desc: Builds mobileproxy.aar for Android.
     deps: [setup:mobileproxy]
     cmds:
-      - PATH={{.ROOT_DIR}}/{{.MOBILEPROXY_BUILD_TOOLS_DIR}}:$PATH gomobile bind -ldflags='-s -w' -tags=psiphon -target=android -androidapi={{.ANDROID_MIN_SDK_VERSION}} -o {{.ROOT_DIR}}/{{.ANDROID_AAR_PATH}} {{.MOBILEPROXY_MODULE}}
+      - PATH={{.ROOT_DIR}}/{{.MOBILEPROXY_BUILD_TOOLS_DIR}}:$PATH gomobile bind -ldflags='-s -w' -target=android -androidapi={{.ANDROID_MIN_SDK_VERSION}} -o {{.ROOT_DIR}}/{{.ANDROID_AAR_PATH}} {{.MOBILEPROXY_MODULE}}
     sources:
       - mobileproxy/**/*.go
       - go.mod
