@@ -12,11 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// The Psiphon library is broken after Go 1.24:
-// https://github.com/Jigsaw-Code/outline-sdk/issues/513
-// TODO(fortuna): Remove tag once the issue is fixed
-//go:build psiphon && !go1.24
-
 package psiphon
 
 import (
