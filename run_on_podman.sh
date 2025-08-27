@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -eu
+
 function main() {
   declare -r bin="$1"
   # Remove the binary name from the args
