@@ -119,11 +119,11 @@ jobs:
         with:
           api-level: ${{ matrix.api-level }}
           force-avd-creation: false
-          arch: arm64-v8a
+          arch: x86_64
           profile: Nexus 6
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
-            export CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android${{ matrix.api-level }}-clang"
-            export GOOS=android GOARCH=arm64 CGO_ENABLED=1
+            export CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang"
+            export GOOS=android GOARCH=amd64 CGO_ENABLED=1
             go test -tags nettest -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
             go test -C x -tags nettest,psiphon -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
