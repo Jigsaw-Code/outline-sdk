@@ -10,13 +10,22 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/psiphon"
 )
 
 func getUserCacheDir(finder *StrategyFinder, ctx context.Context) (string, error) {
-	cacheBaseDir, err := os.UserCacheDir()
+
+	var err error
+	var cacheBaseDir string
+	if runtime.GOOS == "android" {
+		cacheBaseDir, err = PrivateCacheDirNoContext()
+	} else {
+		// For every other system os.UserCacheDir works okay
+		cacheBaseDir, err = os.UserCacheDir()
+	}
 	if err != nil {
 		return "", fmt.Errorf("Failed to get the user cache directory: %w", err)
 	}
