@@ -15,19 +15,29 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/x/psiphon"
 )
 
+func getUserCacheDir(finder *StrategyFinder, ctx context.Context) (string, error) {
+	cacheBaseDir, err := os.UserCacheDir()
+	if err != nil {
+		return "", fmt.Errorf("Failed to get the user cache directory: %w", err)
+	}
+
+	userCacheDir := path.Join(cacheBaseDir, "psiphon")
+	if err := os.MkdirAll(cacheBaseDir, 0700); err != nil {
+		return "", fmt.Errorf("Failed to create storage directory: %w", err)
+	}
+	finder.logCtx(ctx, "Using data store in %v\n", userCacheDir)
+
+	return userCacheDir, nil
+}
+
 func newPsiphonDialer(finder *StrategyFinder, ctx context.Context, psiphonJSON []byte) (transport.StreamDialer, error) {
 	config := &psiphon.DialerConfig{ProviderConfig: psiphonJSON}
 
-	cacheBaseDir, err := os.UserCacheDir()
+	userCacheDir, err := getUserCacheDir(finder, ctx)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get the user cache directory: %w", err)
+		return nil, err
 	}
-
-	config.DataRootDirectory = path.Join(cacheBaseDir, "psiphon")
-	if err := os.MkdirAll(config.DataRootDirectory, 0700); err != nil {
-		return nil, fmt.Errorf("Failed to create storage directory: %w", err)
-	}
-	finder.logCtx(ctx, "Using data store in %v\n", config.DataRootDirectory)
+	config.DataRootDirectory = userCacheDir
 
 	dialer := psiphon.GetSingletonDialer()
 	if err := dialer.Start(ctx, config); err != nil {
