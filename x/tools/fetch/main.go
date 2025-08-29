@@ -17,6 +17,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/base64"
 	"flag"
@@ -26,12 +27,14 @@ import (
 	"net"
 	"net/http"
 	"net/textproto"
+	"net/url"
 	"os"
 	"path"
 	"strings"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
+	"github.com/Jigsaw-Code/outline-sdk/x/ech"
 	"github.com/lmittmann/tint"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
@@ -107,10 +110,14 @@ func main() {
 		}
 	}
 
-	url := flag.Arg(0)
-	if url == "" {
+	if flag.Arg(0) == "" {
 		slog.Error("Need to pass the URL to fetch in the command-line")
 		flag.Usage()
+		os.Exit(1)
+	}
+	reqURL, err := url.Parse(flag.Arg(0))
+	if err != nil {
+		slog.Error("Invalid URL", "error", err)
 		os.Exit(1)
 	}
 
@@ -124,13 +131,23 @@ func main() {
 
 	var tlsConfig tls.Config
 	if *echConfigFlag != "" {
-		// TODO(fortuna): Add support for GREASE and automatic fetching of the HTTPS RR.
-		echConfigBytes, err := base64.StdEncoding.DecodeString(*echConfigFlag)
-		if err != nil {
-			slog.Error("Failed to decode base64 ECH config", "error", err)
-			os.Exit(1)
+		switch *echConfigFlag {
+		case "grease":
+			echConfigBytes, err := ech.GenerateGreaseECHConfigList(rand.Reader, reqURL.Hostname())
+			if err != nil {
+				slog.Error("Failed to decode base64 ECH config", "error", err)
+				os.Exit(1)
+			}
+			tlsConfig.EncryptedClientHelloConfigList = echConfigBytes
+		default:
+			// TODO(fortuna): Add support for fetching the ECH config in the HTTPS RR.
+			echConfigBytes, err := base64.StdEncoding.DecodeString(*echConfigFlag)
+			if err != nil {
+				slog.Error("Failed to decode base64 ECH config", "error", err)
+				os.Exit(1)
+			}
+			tlsConfig.EncryptedClientHelloConfigList = echConfigBytes
 		}
-		tlsConfig.EncryptedClientHelloConfigList = echConfigBytes
 	}
 	if *tlsKeyLogFlag != "" {
 		f, err := os.Create(*tlsKeyLogFlag)
@@ -210,7 +227,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	req, err := http.NewRequest(*methodFlag, url, nil)
+	req, err := http.NewRequest(*methodFlag, reqURL.String(), nil)
 	if err != nil {
 		slog.Error("Failed to create request", "error", err)
 		os.Exit(1)
