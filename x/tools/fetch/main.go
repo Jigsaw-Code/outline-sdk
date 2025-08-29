@@ -18,6 +18,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"io"
@@ -71,10 +72,14 @@ func overrideAddress(original string, newHost string, newPort string) (string, e
 
 func main() {
 	verboseFlag := flag.Bool("v", false, "Enable debug output")
+
 	tlsKeyLogFlag := flag.String("tls-key-log", "", "Filename to write the TLS key log to allow for decryption on Wireshark")
-	protoFlag := flag.String("proto", "h1", "HTTP version to use (h1, h2, h3)")
-	transportFlag := flag.String("transport", "", "Transport config")
+	echConfigFlag := flag.String("ech-config", "", "Base64-encoded ECH config")
+
 	addressFlag := flag.String("address", "", "Address to connect to. If empty, use the URL authority")
+	transportFlag := flag.String("transport", "", "Transport config")
+
+	protoFlag := flag.String("proto", "h1", "HTTP version to use (h1, h2, h3)")
 	methodFlag := flag.String("method", "GET", "The HTTP method to use")
 	var headersFlag stringArrayFlagValue
 	flag.Var(&headersFlag, "H", "Raw HTTP Header line to add. It must not end in \\r\\n")
@@ -118,6 +123,15 @@ func main() {
 	defer httpClient.CloseIdleConnections()
 
 	var tlsConfig tls.Config
+	if *echConfigFlag != "" {
+		// TODO(fortuna): Add support for GREASE and automatic fetching of the HTTPS RR.
+		echConfigBytes, err := base64.StdEncoding.DecodeString(*echConfigFlag)
+		if err != nil {
+			slog.Error("Failed to decode base64 ECH config", "error", err)
+			os.Exit(1)
+		}
+		tlsConfig.EncryptedClientHelloConfigList = echConfigBytes
+	}
 	if *tlsKeyLogFlag != "" {
 		f, err := os.Create(*tlsKeyLogFlag)
 		if err != nil {
@@ -144,13 +158,14 @@ func main() {
 			}
 			return dialer.DialStream(ctx, addressToDial)
 		}
-		if *protoFlag == "h1" {
+		switch *protoFlag {
+		case "h1":
 			tlsConfig.NextProtos = []string{"http/1.1"}
 			httpClient.Transport = &http.Transport{
 				DialContext:     dialContext,
 				TLSClientConfig: &tlsConfig,
 			}
-		} else if *protoFlag == "h2" {
+		case "h2":
 			tlsConfig.NextProtos = []string{"h2"}
 			httpClient.Transport = &http.Transport{
 				DialContext:       dialContext,
