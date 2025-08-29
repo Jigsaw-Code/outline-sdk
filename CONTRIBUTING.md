@@ -291,12 +291,40 @@ For tests:
 GOOS=windows go test -exec "wine64"  ./...
 ```
 
-## Tests with external network dependencies
+## Testing
 
-Some tests are implemented talking to external services. That's undesirable, but convenient.
-We started tagging them with the `nettest` tag, so they don't run by default. To run them, you need to specify `-tags nettest`, as done in our CI.
+All new code must be accompanied by tests. Tests should be placed in `_test.go` files alongside the code they are testing.
+
+### Running Tests
+
+To run all tests in the repository, run the following commands from the root of the repository:
+
+```sh
+go test -race ./...
+go test -C x -race ./...
+```
+
+This will run all tests except those that have external network dependencies.
+
+### Network Dependant Tests
+
+Some tests have external network dependencies. These tests are tagged with the `nettest` build tag and are not run by default. To run these tests, you must include the `-tags nettest` flag. Our CI runs these tests.
+
 For example:
 
 ```sh
-go test -v -race -bench '.' ./... -benchtime=100ms -tags nettest
+go test -v -race -tags nettest
 ```
+
+### Benchmarks
+
+To run benchmarks:
+
+```sh
+go test -race -bench '.' ./... -benchtime=100ms
+go -C x test -race -bench '.' ./... -benchtime=100ms
+```
+
+### Continuous Integration (CI)
+
+All pull requests are tested on our CI system. The CI runs all tests, including `nettest`s, on Linux, macOS, and Windows. It also runs tests on an Android emulator. You can see the CI configuration in [`.github/workflows/test.yml`](.github/workflows/test.yml).
