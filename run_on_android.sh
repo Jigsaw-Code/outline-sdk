@@ -18,14 +18,20 @@ set -eu
 
 function main() {
   declare -r host_bin="$1"
-  declare -r android_bin="/data/local/tmp/test/$(basename "${host_bin}")"
+  declare -r android_run_dir="/data/local/tmp/run/$(basename "${host_bin}")"
+  # Set up cleanup to run whenever the script exits. `adb push` creates the directory.
+  trap "adb shell rm -r '${android_run_dir}'" EXIT
+  declare -r android_bin="${android_run_dir}/bin"
   adb push "${host_bin}" "${android_bin}"
+
+  declare -r testdata_dir="$(pwd)/testdata"
+  if [[ "${host_bin##*.}" = "test" && -d "${testdata_dir}" ]]; then
+    adb push "${testdata_dir}" "${android_run_dir}/testdata"
+  fi
 
   # Remove the binary name from the args
   shift 1
-  adb shell "${android_bin}" "$@"
-
-  adb shell rm "${android_bin}"
+  adb shell cd "${android_run_dir}"";" ./bin "$@"
 }
 
 main "$@"
