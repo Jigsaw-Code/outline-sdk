@@ -133,6 +133,8 @@ func main() {
 	if *echConfigFlag != "" {
 		switch *echConfigFlag {
 		case "grease":
+			// TODO: investigate ECH rejection and cert verification.
+			// Can we make it work with a fake domain that validates the right domain?
 			echConfigBytes, err := ech.GenerateGreaseECHConfigList(rand.Reader, reqURL.Hostname())
 			if err != nil {
 				slog.Error("Failed to decode base64 ECH config", "error", err)
