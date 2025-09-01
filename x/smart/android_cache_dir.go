@@ -11,25 +11,33 @@ import (
 	"strings"
 )
 
-// PrivateCacheDirNoContext returns the app-private cache dir path
-// (e.g., /data/data/<pkg>/cache), without using any Android Context.
-// It validates the directory exists (or creates it).
-func PrivateCacheDirNoContext() (string, error) {
+func GetAndroidPackageName() (string, error) {
 	f, err := os.Open("/proc/self/cmdline")
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
 
-	// /proc/self/cmdline is NUL-terminated; read up to the first NUL.
+	// /proc/self/cmdline is NULL-terminated; read up to the first NULL.
 	r := bufio.NewReader(f)
 	line, err := r.ReadString('\x00')
 	if err != nil && !errors.Is(err, bufio.ErrBufferFull) {
-		// On success the NUL will be included; trim regardless.
+		// On success the NULL will be included; trim regardless.
 	}
 	pkg := strings.Trim(line, "\x00\r\n\t ")
 	if pkg == "" {
 		return "", errors.New("could not determine package name from /proc/self/cmdline")
+	}
+	return pkg, nil
+}
+
+// AndroidPrivateCacheDirNoContext returns the app-private cache dir path
+// (e.g., /data/data/<pkg>/cache), without using any Android Context.
+// It validates the directory exists (or creates it).
+func AndroidPrivateCacheDirNoContext() (string, error) {
+	pkg, err := GetAndroidPackageName()
+	if err != nil {
+		return "", err
 	}
 
 	// Prefer legacy symlink location; it resolves to /data/user/<id>/<pkg>.
