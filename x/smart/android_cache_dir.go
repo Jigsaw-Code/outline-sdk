@@ -47,7 +47,7 @@ func AndroidPrivateCacheDirNoContext() (string, error) {
 	if st, err := os.Stat(p); err == nil && st.IsDir() {
 		return p, nil
 	}
-	if err := os.MkdirAll(p, 0o700); err != nil {
+	if err := os.MkdirAll(p, 0700); err != nil {
 		return "", err
 	}
 	return p, nil
