@@ -17,7 +17,6 @@ import (
 )
 
 func getUserCacheDir(finder *StrategyFinder, ctx context.Context) (string, error) {
-
 	var err error
 	var cacheBaseDir string
 	if runtime.GOOS == "android" {
