@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-func GetAndroidPackageName() (string, error) {
+func getAndroidPackageName() (string, error) {
 	f, err := os.Open("/proc/self/cmdline")
 	if err != nil {
 		return "", err
@@ -31,12 +31,11 @@ func GetAndroidPackageName() (string, error) {
 	return pkg, nil
 }
 
-// AndroidPrivateCacheDirNoContext returns the app-private cache dir path
+// AndroidPrivateCacheDir returns the app-private cache dir path
 // (e.g., /data/data/<pkg>/cache), without using any Android Context.
 // It validates the directory exists (or creates it).
-func AndroidPrivateCacheDirNoContext() (string, error) {
-	pkg, err := GetAndroidPackageName()
-	if err != nil {
+func AndroidPrivateCacheDir() (string, error) {
+	pkg, err := getAndroidPackageName(); err != nil {
 		return "", err
 	}
 

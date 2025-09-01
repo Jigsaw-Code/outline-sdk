@@ -20,7 +20,7 @@ func getUserCacheDir(finder *StrategyFinder, ctx context.Context) (string, error
 	var err error
 	var cacheBaseDir string
 	if runtime.GOOS == "android" {
-		cacheBaseDir, err = PrivateCacheDirNoContext()
+		cacheBaseDir, err = AndroidPrivateCacheDir()
 	} else {
 		// For every other system os.UserCacheDir works okay
 		cacheBaseDir, err = os.UserCacheDir()
