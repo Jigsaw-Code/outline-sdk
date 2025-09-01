@@ -6,6 +6,8 @@ package smart
 import (
 	"bufio"
 	"errors"
+	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +30,13 @@ func getAndroidPackageName() (string, error) {
 	if pkg == "" {
 		return "", errors.New("could not determine package name from /proc/self/cmdline")
 	}
+
+	if pkg == "./bin" {
+		return "", fmt.Errorf("process is running as a binary in a test env, not a packaged app: %q", pkg)
+	}
+
+	log.Printf("pkg: %v , %x", pkg, pkg)
+
 	return pkg, nil
 }
 
@@ -35,7 +44,8 @@ func getAndroidPackageName() (string, error) {
 // (e.g., /data/data/<pkg>/cache), without using any Android Context.
 // It validates the directory exists (or creates it).
 func AndroidPrivateCacheDir() (string, error) {
-	pkg, err := getAndroidPackageName(); err != nil {
+	pkg, err := getAndroidPackageName()
+	if err != nil {
 		return "", err
 	}
 

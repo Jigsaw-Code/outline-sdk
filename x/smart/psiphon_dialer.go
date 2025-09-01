@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strings"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/psiphon"
@@ -20,7 +21,15 @@ func getUserCacheDir(finder *StrategyFinder, ctx context.Context) (string, error
 	var err error
 	var cacheBaseDir string
 	if runtime.GOOS == "android" {
+		// AndroidPrivateCacheDir works when running as part of an APK.
 		cacheBaseDir, err = AndroidPrivateCacheDir()
+		if err != nil {
+			// Fallback for command-line tools and other environments where
+			// the process name is not the package name.
+			if strings.Contains(err.Error(), "process is running as a binary in a test env, not a packaged app") {
+				cacheBaseDir, err = os.UserCacheDir()
+			}
+		}
 	} else {
 		// For every other system os.UserCacheDir works okay
 		cacheBaseDir, err = os.UserCacheDir()
