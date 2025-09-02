@@ -26,7 +26,8 @@ Active Processor Count: 10
 This seems to properly build for iOS:
 
 ```console
-$ CC="$(pwd)/x/examples/objc/clangwrap.sh" GOOS=ios GOARCH=arm64 CGO_ENABLED=1 go -C x build  -v ./examples/objc
+% CC="$(xcrun --sdk iphoneos --find cc) -isysroot \"$(xcrun --sdk iphoneos --show-sdk-path)\"" GOOS=ios GOARCH=arm64 CGO_ENABLED=1 go -C x build  -v ./examples/objc
+
 github.com/Jigsaw-Code/outline-sdk/x/examples/objc
 # github.com/Jigsaw-Code/outline-sdk/x/examples/objc
 examples/objc/process_info.go:74:47: error: 'userName' is unavailable: not available on iOS
@@ -46,8 +47,9 @@ examples/objc/process_info.go:75:51: error: 'fullUserName' is unavailable: not a
 2 errors generated.
 ```
 
-Alternatively:
 
-```
-CC="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot \"$(xcrun --sdk "iphoneos" --show-sdk-path)\"" GOOS=ios GOARCH=arm64 CGO_ENABLED=1 go -C x build  -v ./examples/objc
+For the simulator:
+
+```console
+% CC="$(xcrun --sdk iphonesimulator --find cc) -isysroot \"$(xcrun --sdk iphonesimulator --show-sdk-path)\"" GOOS=ios GOARCH=arm64 CGO_ENABLED=1 go -C x build  -v ./examples/objc
 ```
