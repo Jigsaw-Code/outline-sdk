@@ -79,6 +79,10 @@ go tool pkgsite -dev
 
 Then open http://localhost:8080 on your browser. The `-dev` flag is optional and enables developer mode, reloading content on changes.
 
+## Style
+
+We use the standard Go style. Use `gofmt -w <path>` tool to make sure the style is correct.
+
 ## Cross-platform Development
 
 ### Building
