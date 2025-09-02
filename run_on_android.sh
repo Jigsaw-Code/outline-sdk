@@ -31,7 +31,7 @@ function main() {
 
   # Remove the binary name from the args
   shift 1
-  adb shell cd "${android_run_dir}"";" ./bin "$@"
+  adb root; adb shell cd "${android_run_dir}"";" ./bin "$@"
 }
 
 main "$@"
