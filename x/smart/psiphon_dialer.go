@@ -8,8 +8,6 @@ package smart
 import (
 	"context"
 	"fmt"
-	"os"
-	"path"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/psiphon"
@@ -18,16 +16,12 @@ import (
 func newPsiphonDialer(finder *StrategyFinder, ctx context.Context, psiphonJSON []byte) (transport.StreamDialer, error) {
 	config := &psiphon.DialerConfig{ProviderConfig: psiphonJSON}
 
-	cacheBaseDir, err := os.UserCacheDir()
+	userCacheDir, err := getUserCacheDir()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get the user cache directory: %w", err)
+		return nil, err
 	}
-
-	config.DataRootDirectory = path.Join(cacheBaseDir, "psiphon")
-	if err := os.MkdirAll(config.DataRootDirectory, 0700); err != nil {
-		return nil, fmt.Errorf("Failed to create storage directory: %w", err)
-	}
-	finder.logCtx(ctx, "Using data store in %v\n", config.DataRootDirectory)
+	finder.logCtx(ctx, "Using data store in %v\n", userCacheDir)
+	config.DataRootDirectory = userCacheDir
 
 	dialer := psiphon.GetSingletonDialer()
 	if err := dialer.Start(ctx, config); err != nil {
