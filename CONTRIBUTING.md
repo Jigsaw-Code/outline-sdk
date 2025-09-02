@@ -49,7 +49,7 @@ one of the tools in `x/tools/` to demonstrate your feature.
 
 Only low-level libraries that have been validated should move to the root module.
 
-You cannot make atomic changes across module boundaries. If you need to cahnge both the root and `x` modules
+You cannot make atomic changes across module boundaries. If you need to change both the root and `x` modules
 You need to first change root, merge, then you can refer to it in `x`.
 Module `x` has a pinned version of the root module in its [`go.mod`](./x/go.mod) file.
 
