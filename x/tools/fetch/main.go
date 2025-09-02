@@ -20,6 +20,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -247,7 +248,12 @@ func main() {
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		slog.Error("HTTP request failed", "error", err)
+		args := []any{"error", err}
+		echErr := new(tls.ECHRejectionError)
+		if errors.As(err, &echErr) {
+			args = append(args, "ech_retry_config", base64.StdEncoding.EncodeToString(echErr.RetryConfigList))
+		}
+		slog.Error("HTTP request failed", args...)
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
