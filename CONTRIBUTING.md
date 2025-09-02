@@ -2,7 +2,26 @@
 
 We'd love to accept your patches and contributions to this project.
 
-## Before you begin
+Please review [Google's Open Source Community Guidelines](https://opensource.google/conduct/).
+
+## Contribution process
+
+If you don't know what to contribute, a good start is to go over the [issue tracker](https://github.com/Jigsaw-Code/outline-sdk/issues).
+
+For new features, it's best to share your idea first before going too deep into the implementation,
+so we can align on the design.
+
+* If there's a feature request open, share your proposal there.
+* Otherwise, start with a discussion on [API Proposals](https://github.com/Jigsaw-Code/outline-sdk/discussions/categories/api-proposals).
+
+For bug fixes, you can send a PR directly.
+
+### Code reviews
+
+All submissions, including submissions by project members, require review. We
+use GitHub pull requests for this purpose. Consult
+[GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
+information on using pull requests.
 
 ### Sign our Contributor License Agreement
 
@@ -18,34 +37,51 @@ was for a different project), you probably don't need to do it again.
 Visit <https://cla.developers.google.com/> to see your current agreements or to
 sign a new one.
 
-### Review our community guidelines
+## Repository structure
 
-This project follows
-[Google's Open Source Community Guidelines](https://opensource.google/conduct/).
+The repository has two Go modules:
 
-## Contribution process
+* The root (`/`) module, where all the basic definitions and stable libraries live
+* The `/x` module, where higher-level code, extensions and experimental libraries live.
 
-### Code reviews
+New libraries should start in the `x/` module. We encourage you to create an example in `x/examples` or extend
+one of the tools in `x/tools/` to demonstrate your feature.
 
-All submissions, including submissions by project members, require review. We
-use GitHub pull requests for this purpose. Consult
-[GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
-information on using pull requests.
+Only low-level libraries that have been validated should move to the root module.
 
-# Go Documentation
+You cannot make atomic changes across module boundaries. If you need to change both the root and `x` modules
+You need to first change root, merge, then you can refer to it in `x`.
+Module `x` has a pinned version of the root module in its [`go.mod`](./x/go.mod) file.
+
+To build and run code in the `x` module, you have to enter the `x` folder, or use `go -C x` flag from the repository root.
+For example:
+
+```sh
+go run -C x ./tools/fetch https://ipinfo.io
+```
+
+Or
+
+```sh
+go -C x mod tidy
+```
+
+## Write Go Documentation
+
+Writing and improving existing documentation is a good way to start with contributions.
 
 The best way to ensure you got the Go doc formatting right is to visualize it.
 To visualize the Go documentation you wrote, run:
 
 ```sh
-go run golang.org/x/pkgsite/cmd/pkgsite@latest
+go tool pkgsite -dev
 ```
 
-Then open http://localhost:8080 on your browser.
+Then open http://localhost:8080 on your browser. The `-dev` flag is optional and enables developer mode, reloading content on changes.
 
-# Cross-platform Development
+## Cross-platform Development
 
-## Building
+### Building
 
 In Go you can compile for other target operating system and architecture by specifying the `GOOS` and `GOARCH` environment variables and using the [`go build` command](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies). That only works if you are not using [Cgo](https://pkg.go.dev/cmd/cgo) to call C code.
 
@@ -78,7 +114,7 @@ Windows example:
 
 </details>
 
-## Running Android binaries
+### Running Android binaries
 
 To run Android binaries, you must have an Android simulator running or a physical device plugged in.
 
@@ -122,11 +158,11 @@ The script will:
 
 </details>
 
-## Running Linux binaries
+### Running Linux binaries
 
 To run Linux binaries you can use a Linux container via [Podman](https://podman.io/).
 
-### Set up podman
+#### Set up podman
 <details>
   <summary>Instructions</summary>
 
@@ -164,7 +200,7 @@ podman machine stop
 
 </details>
 
-### Run
+#### Run
 
 The easiest way is to run a binary is to use the [`go run` command](https://pkg.go.dev/cmd/go#hdr-Compile_and_run_Go_program) directly with the `-exec` flag and our convenience tool `run_on_podman.sh`:
 
@@ -204,18 +240,20 @@ Usage of /outline/test-connectivity:
 ```
 
 Flags explanation:
-- `--rm`: Remove container (and pod if created) after exit
-- `-i` (interactive): Keep STDIN open even if not attached
-- `-t` (tty): Allocate a pseudo-TTY for container
-- `-v` (volume): Bind mount a volume into the container. Volume source will be on the server machine, not the client
+
+* `--rm`: Remove container (and pod if created) after exit
+* `-i` (interactive): Keep STDIN open even if not attached
+* `-t` (tty): Allocate a pseudo-TTY for container
+* `-v` (volume): Bind mount a volume into the container. Volume source will be on the server machine, not the client
+
 </details>
 
-## Running Windows binaries
+### Running Windows binaries
 
 To run Windows binaries you can use [Wine](https://en.wikipedia.org/wiki/Wine_(software)) to emulate a Windows environment.
 This is not the same as a real Windows environment, so make sure you test on actual Windows machines.
 
-### Install Wine
+#### Install Wine
 
 <details>
   <summary>Instructions</summary>
@@ -237,7 +275,7 @@ wine64 --version
 
 </details>
 
-### Run
+#### Run
 
 You can pass `wine64` as the `-exec` parameter in the `go` calls.
 
@@ -253,12 +291,40 @@ For tests:
 GOOS=windows go test -exec "wine64"  ./...
 ```
 
-# Tests with external network dependencies
+## Testing
 
-Some tests are implemented talking to external services. That's undesirable, but convenient.
-We started tagging them with the `nettest` tag, so they don't run by default. To run them, you need to specify `-tags nettest`, as done in our CI.
+All new code must be accompanied by tests. Tests should be placed in `_test.go` files alongside the code they are testing.
+
+### Running Tests
+
+To run all tests in the repository, run the following commands from the root of the repository:
+
+```sh
+go test -race ./...
+go test -C x -race ./...
+```
+
+This will run all tests except those that have external network dependencies.
+
+### Network Dependant Tests
+
+Some tests have external network dependencies. These tests are tagged with the `nettest` build tag and are not run by default. To run these tests, you must include the `-tags nettest` flag. Our CI runs these tests.
+
 For example:
 
 ```sh
-go test -v -race -bench '.' ./... -benchtime=100ms -tags nettest
+go test -v -race -tags nettest
 ```
+
+### Benchmarks
+
+To run benchmarks:
+
+```sh
+go test -race -bench '.' ./... -benchtime=100ms
+go -C x test -race -bench '.' ./... -benchtime=100ms
+```
+
+### Continuous Integration (CI)
+
+All pull requests are tested on our CI system. The CI runs all tests, including `nettest`s, on Linux, macOS, and Windows. It also runs tests on an Android emulator. You can see the CI configuration in [`.github/workflows/test.yml`](.github/workflows/test.yml).
