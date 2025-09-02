@@ -64,7 +64,7 @@ func addECHConfigContents(b *cryptobyte.Builder, rand io.Reader, publicName stri
 	}
 
 	// uint8 maximum_name_length
-	b.AddUint8(uint8(42))
+	b.AddUint8(uint8(0))
 
 	// opaque public_name<1..255>
 	publicNameBytes := []byte(publicName)
