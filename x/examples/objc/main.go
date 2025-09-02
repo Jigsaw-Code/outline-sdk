@@ -74,8 +74,17 @@ static ProcessInfo_t* get_all_process_info() {
         p_info->globallyUniqueString = safe_strdup([[info globallyUniqueString] UTF8String]);
         p_info->operatingSystemVersionString = safe_strdup([[info operatingSystemVersionString] UTF8String]);
         p_info->hostName = safe_strdup([[info hostName] UTF8String]);
-        // p_info->userName = safe_strdup([[info userName] UTF8String]);
-        // p_info->fullUserName = safe_strdup([[info fullUserName] UTF8String]);
+
+        #if TARGET_OS_OSX
+        // NSUserName and NSFullUserName are only available on macOS.
+        // We use the modern, non-deprecated functions here.
+        p_info->userName = safe_strdup([NSUserName() UTF8String]);
+        p_info->fullUserName = safe_strdup([NSFullUserName() UTF8String]);
+        #else
+        // On other platforms (like iOS), provide empty strings to avoid crashes.
+        p_info->userName = safe_strdup(NULL);
+        p_info->fullUserName = safe_strdup(NULL);
+        #endif
 
         // Populate numeric fields directly.
         p_info->processIdentifier = [info processIdentifier];
