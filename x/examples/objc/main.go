@@ -120,7 +120,11 @@ import "C"
 import (
 	"fmt"
 	"log"
+	"log/slog"
+	"os"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 // A Go struct that mirrors the C struct, providing an idiomatic way
@@ -186,6 +190,18 @@ func getProcessInfo() (*ProcessInfo, error) {
 	return goInfo, nil
 }
 
+// CstrToString converts a null-terminated []int8 byte slice to a string.
+func CstrToString(arr []byte) string {
+	buf := make([]byte, 0, len(arr))
+	for _, v := range arr {
+		if v == 0x00 {
+			break
+		}
+		buf = append(buf, byte(v))
+	}
+	return string(buf)
+}
+
 func main() {
 	fmt.Println("Attempting to get iOS process info using Cgo...")
 
@@ -195,15 +211,27 @@ func main() {
 		log.Fatalf("Error: %v", err)
 	}
 
+	osHostname, err := os.Hostname()
+	if err != nil {
+		osHostname = err.Error()
+	}
+
+	uts := new(unix.Utsname)
+	err = unix.Uname(uts)
+	if err != nil {
+		slog.Error("uname failed", "error", err)
+	}
 	// Print all the retrieved information in a formatted way.
 	fmt.Printf("\n--- Successfully Retrieved Process Info ---\n")
 	fmt.Printf("Process Name:           %s\n", info.ProcessName)
 	fmt.Printf("Process ID (PID):       %d\n", info.ProcessIdentifier)
+	fmt.Printf("os.Getpid():            %d\n", os.Getpid())
 	fmt.Printf("User Name:              %s\n", info.UserName)
 	fmt.Printf("Full User Name:         %s\n", info.FullUserName)
 	fmt.Printf("Globally Unique ID:     %s\n", info.GloballyUniqueString)
 	fmt.Printf("OS Version:             %s\n", info.OperatingSystemVersionString)
 	fmt.Printf("Hostname:               %s\n", info.HostName)
+	fmt.Printf("os.Hostname():          %s\n", osHostname)
 	fmt.Printf("Is Mac Catalyst App:    %t\n", info.IsMacCatalystApp)
 	fmt.Printf("Is iOS App on Mac:      %t\n", info.IsIOSAppOnMac)
 	fmt.Printf("Is iOS:                 %t\n", info.IsIOS)
@@ -211,5 +239,11 @@ func main() {
 	fmt.Printf("System Uptime (s):      %.2f\n", info.SystemUptimeSeconds)
 	fmt.Printf("Processor Count:        %d\n", info.ProcessorCount)
 	fmt.Printf("Active Processor Count: %d\n", info.ActiveProcessorCount)
+	fmt.Printf("uname:\n")
+	fmt.Printf("  Sysname:    %s\n", CstrToString(uts.Sysname[:]))
+	fmt.Printf("  Nodename:   %s\n", CstrToString(uts.Nodename[:]))
+	fmt.Printf("  Release:    %s\n", CstrToString(uts.Release[:]))
+	fmt.Printf("  Version:    %s\n", CstrToString(uts.Version[:]))
+	fmt.Printf("  Machine:    %s\n", CstrToString(uts.Machine[:]))
 	fmt.Println("-------------------------------------------")
 }
