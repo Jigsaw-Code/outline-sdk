@@ -6,8 +6,11 @@ package smart
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"os"
+	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -52,4 +55,25 @@ func AndroidPrivateCacheDir() (string, error) {
 		return "", err
 	}
 	return p, nil
+}
+
+func getUserCacheDir() (string, error) {
+	var err error
+	var cacheBaseDir string
+	if runtime.GOOS == "android" {
+		cacheBaseDir, err = AndroidPrivateCacheDir()
+	} else {
+		// For every other system os.UserCacheDir works okay
+		cacheBaseDir, err = os.UserCacheDir()
+	}
+	if err != nil {
+		return "", fmt.Errorf("Failed to get the user cache directory: %w", err)
+	}
+
+	userCacheDir := path.Join(cacheBaseDir, "psiphon")
+	if err := os.MkdirAll(userCacheDir, 0700); err != nil {
+		return "", fmt.Errorf("Failed to create storage directory: %w", err)
+	}
+
+	return userCacheDir, nil
 }
