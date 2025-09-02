@@ -26,7 +26,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version-file: "${{ github.workspace }}/x/go.mod"
+          go-version-file: "${{ github.workspace }}/go.mod"
 
       - name: Build SDK
         run: go build -v ./...
@@ -41,12 +41,12 @@ jobs:
       - name: Build Mobileproxy (Android)
         if: matrix.os == 'ubuntu-latest'
         working-directory: ${{ github.workspace }}/x
-        run: PATH="${{ env.OUTPUT_DIR }}:$PATH" gomobile bind -ldflags='-s -w' -v -target=android -androidapi=21 -o "${{ env.OUTPUT_DIR }}/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+        run: PATH="${{ env.OUTPUT_DIR }}:$PATH" gomobile bind -ldflags='-s -w' -v -tags=psiphon -target=android -androidapi=21 -o "${{ env.OUTPUT_DIR }}/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
 
       - name: Build Mobileproxy (iOS)
         if: matrix.os == 'macos-latest'
         working-directory: ${{ github.workspace }}/x
-        run: PATH="${{ env.OUTPUT_DIR }}:$PATH" gomobile bind -ldflags='-s -w' -v -target=ios -iosversion=11.0 -o "${{ env.OUTPUT_DIR }}/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+        run: PATH="${{ env.OUTPUT_DIR }}:$PATH" gomobile bind -ldflags='-s -w' -v -tags=psiphon -target=ios -iosversion=11.0 -o "${{ env.OUTPUT_DIR }}/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
 
       - name: Check SDK licenses
         # We allow only "notice" type of licenses.
@@ -63,3 +63,72 @@ jobs:
       - name: Test x
         # Enable nettests, which executes external network requests.
         run: go test -C x -tags nettest,psiphon -race -bench '.' ./... -benchtime=100ms
+
+  android-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        api-level: [34]
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: "${{ github.workspace }}/go.mod"
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: "zulu"
+          java-version: "17"
+
+      # Android recipe from https://github.com/ReactiveCircus/android-emulator-runner/blob/v2/README.md#usage--examples
+      # KVM makes the emulator faster.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: AVD cache
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd
+            ~/.android/adb*
+          key: avd-${{ matrix.api-level }}
+
+      - name: create AVD and generate snapshot for caching
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          arch: x86_64
+          target: aosp_atd
+          api-level: ${{ matrix.api-level }}
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: |
+            echo "Generated AVD snapshot for caching."
+            ls ~/.android/avd
+            ls ~/.android/
+      
+      - name: Run Android unit tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          arch: x86_64
+          # Using Automated Test Device because they are leaner. See
+          # https://developer.android.com/studio/test/gradle-managed-devices#gmd-atd
+          target: aosp_atd
+          api-level: ${{ matrix.api-level }}
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            # We can't set environment variables in this script, nor refer to $ANDROID_NDK_HOME in the job.step.env block, so
+            # we set it explicitly here. (#pain)
+            CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang" GOOS=android GOARCH=amd64 CGO_ENABLED=1 go test -tags nettest -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
+            # TODO(fortuna): Fix psiphon and support testdata.
+            CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android${{ matrix.api-level }}-clang" GOOS=android GOARCH=amd64 CGO_ENABLED=1 go test -C x -tags nettest,psiphon -exec "${{ github.workspace }}/run_on_android.sh" -v ./...
