@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"log"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +31,11 @@ import (
 )
 
 func Test_Integration_NewDialer_BrokenConfig(t *testing.T) {
+	if runtime.GOOS == "android" {
+		// See https://github.com/Jigsaw-Code/outline-sdk/issues/504
+		t.Skip("Skip Smart Dialer integration test on Android until storage is made compatible with android emulator testing")
+	}
+
 	configBytes := []byte(`
 dns:
     # We get censored DNS responses when we send queries to an IP in China.
