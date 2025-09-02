@@ -39,6 +39,7 @@ typedef struct {
     // New fields from your request
     int isMacCatalystApp;
     int isiOSAppOnMac;
+	int isIOS;
     char* userName;
     char* fullUserName;
 } ProcessInfo_t;
@@ -90,6 +91,12 @@ static ProcessInfo_t* get_all_process_info() {
             p_info->isMacCatalystApp = 0; // Default to false on older systems.
         }
 
+        #if TARGET_OS_IOS
+			p_info->isIOS = 1;
+		#else
+			p_info->isIOS = 0;
+		#endif
+
         if (@available(macOS 11.0, iOS 14.0, *)) {
             p_info->isiOSAppOnMac = [info isiOSAppOnMac] ? 1 : 0;
         } else {
@@ -121,6 +128,7 @@ type ProcessInfo struct {
 	ActiveProcessorCount         int
 	IsMacCatalystApp             bool
 	IsIOSAppOnMac                bool
+	IsIOS                        bool
 	UserName                     string
 	FullUserName                 string
 }
@@ -161,6 +169,7 @@ func getProcessInfo() (*ProcessInfo, error) {
 		ActiveProcessorCount:         int(cInfo.activeProcessorCount),
 		IsMacCatalystApp:             cInfo.isMacCatalystApp != 0,
 		IsIOSAppOnMac:                cInfo.isiOSAppOnMac != 0,
+		IsIOS:                        cInfo.isIOS != 0,
 		UserName:                     C.GoString(cInfo.userName),
 		FullUserName:                 C.GoString(cInfo.fullUserName),
 	}
@@ -188,6 +197,7 @@ func main() {
 	fmt.Printf("Hostname:               %s\n", info.HostName)
 	fmt.Printf("Is Mac Catalyst App:    %t\n", info.IsMacCatalystApp)
 	fmt.Printf("Is iOS App on Mac:      %t\n", info.IsIOSAppOnMac)
+	fmt.Printf("Is iOS:                 %t\n", info.IsIOS)
 	fmt.Printf("Physical Memory (B):    %d\n", info.PhysicalMemoryBytes)
 	fmt.Printf("System Uptime (s):      %.2f\n", info.SystemUptimeSeconds)
 	fmt.Printf("Processor Count:        %d\n", info.ProcessorCount)
