@@ -54,7 +54,7 @@ For the simulator:
 % CC="$(xcrun --sdk iphonesimulator --find cc) -isysroot \"$(xcrun --sdk iphonesimulator --show-sdk-path)\"" GOOS=ios GOARCH=arm64 CGO_ENABLED=1 go -C x build  -v ./examples/objc
 ```
 
-Building the app:
+If you build it for the iOS Simulator, you can run on the iOS simulator. It correctly returns the iOS version on the simulator (18.4), though notice that "Is iOS App on Mac" is false, because it's not "on Mac". 
 
 ```
 % CC="$(xcrun --sdk iphonesimulator --find cc) -isysroot \"$(xcrun --sdk iphonesimulator --show-sdk-path)\"" GOOS=ios GOARCH=arm64 CGO_ENABLED=1 go -C x build  -v -o examples/objc/ProcessInfo.app ./examples/objc
@@ -64,4 +64,22 @@ Building the app:
 % xcrun simctl install booted ./x/examples/objc/ProcessInfo.app
 
 % xcrun simctl launch --console booted org.getoutline.test
+org.getoutline.test: 41369
+Attempting to get iOS process info using Cgo...
+
+--- Successfully Retrieved Process Info ---
+Process Name:           objc
+Process ID (PID):       41369
+User Name:              
+Full User Name:         
+Globally Unique ID:     8BA56801-5364-4D9C-A4F6-17F9681C1FF2-41369-00000900466BD6C9
+OS Version:             Version 18.4 (Build 22E238)
+Hostname:               fortuna-macbookpro2.roam.internal
+Is Mac Catalyst App:    false
+Is iOS App on Mac:      false
+Physical Memory (B):    17179869184
+System Uptime (s):      412366.44
+Processor Count:        10
+Active Processor Count: 10
+-------------------------------------------
 ```
