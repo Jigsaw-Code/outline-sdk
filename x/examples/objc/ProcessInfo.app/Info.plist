@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>objc</string>
+    <string>main</string>
     
     <key>CFBundleIdentifier</key>
     <string>org.getoutline.test</string>
