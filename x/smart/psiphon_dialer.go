@@ -30,7 +30,7 @@ func getUserCacheDir(finder *StrategyFinder, ctx context.Context) (string, error
 	}
 
 	userCacheDir := path.Join(cacheBaseDir, "psiphon")
-	if err := os.MkdirAll(cacheBaseDir, 0700); err != nil {
+	if err := os.MkdirAll(userCacheDir, 0700); err != nil {
 		return "", fmt.Errorf("Failed to create storage directory: %w", err)
 	}
 	finder.logCtx(ctx, "Using data store in %v\n", userCacheDir)
