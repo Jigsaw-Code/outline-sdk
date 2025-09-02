@@ -53,3 +53,15 @@ For the simulator:
 ```console
 % CC="$(xcrun --sdk iphonesimulator --find cc) -isysroot \"$(xcrun --sdk iphonesimulator --show-sdk-path)\"" GOOS=ios GOARCH=arm64 CGO_ENABLED=1 go -C x build  -v ./examples/objc
 ```
+
+Building the app:
+
+```
+% CC="$(xcrun --sdk iphonesimulator --find cc) -isysroot \"$(xcrun --sdk iphonesimulator --show-sdk-path)\"" GOOS=ios GOARCH=arm64 CGO_ENABLED=1 go -C x build  -v -o examples/objc/ProcessInfo.app ./examples/objc
+
+% xcrun simctl boot 529EC4D4-FFC6-4249-A829-0D8181639E9D
+
+% xcrun simctl install booted ./x/examples/objc/ProcessInfo.app
+
+% xcrun simctl launch --console booted org.getoutline.test
+```
