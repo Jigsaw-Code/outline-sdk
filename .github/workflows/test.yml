@@ -41,12 +41,12 @@ jobs:
       - name: Build Mobileproxy (Android)
         if: matrix.os == 'ubuntu-latest'
         working-directory: ${{ github.workspace }}/x
-        run: PATH="${{ env.OUTPUT_DIR }}:$PATH" gomobile bind -ldflags='-s -w' -v -target=android -androidapi=21 -o "${{ env.OUTPUT_DIR }}/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+        run: PATH="${{ env.OUTPUT_DIR }}:$PATH" gomobile bind -ldflags='-s -w' -v -tags=psiphon -target=android -androidapi=21 -o "${{ env.OUTPUT_DIR }}/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
 
       - name: Build Mobileproxy (iOS)
         if: matrix.os == 'macos-latest'
         working-directory: ${{ github.workspace }}/x
-        run: PATH="${{ env.OUTPUT_DIR }}:$PATH" gomobile bind -ldflags='-s -w' -v -target=ios -iosversion=11.0 -o "${{ env.OUTPUT_DIR }}/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+        run: PATH="${{ env.OUTPUT_DIR }}:$PATH" gomobile bind -ldflags='-s -w' -v -tags=psiphon -target=ios -iosversion=11.0 -o "${{ env.OUTPUT_DIR }}/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
 
       - name: Check SDK licenses
         # We allow only "notice" type of licenses.
