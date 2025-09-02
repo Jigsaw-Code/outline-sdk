@@ -31,8 +31,9 @@ func getAndroidPackageName() (string, error) {
 	return pkg, nil
 }
 
-// AndroidPrivateCacheDir returns the app-private cache dir path
-// (e.g., /data/data/<pkg>/cache), without using any Android Context.
+// On Android, each app has a private data directory /data/user/<user-id>/<package>/ (something like /data/user/0/com.example.app/)
+// Older devices, before multi user, used /data/data/<packageName>/. For backwards-compatibility, the OS still maintains symlinks so /data/data/... resolves to /data/user/<user-id>/ for the current user.
+// This uses the directory /data/data/<packageName>/cache/
 // It validates the directory exists (or creates it).
 func AndroidPrivateCacheDir() (string, error) {
 	pkg, err := getAndroidPackageName()
