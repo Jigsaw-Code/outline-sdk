@@ -88,8 +88,6 @@ func TestDialer_StopOnStart(t *testing.T) {
 
 // Test that there's no race condition if you call start while start is running
 func TestDialer_StartOnStart(t *testing.T) {
-	//failedToStartError := errors.New("failed to start")
-
 	dialer := GetSingletonDialer()
 	dialer.Start(context.Background(), nil)
 
