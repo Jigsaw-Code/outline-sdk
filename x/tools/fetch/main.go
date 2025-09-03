@@ -132,17 +132,27 @@ func main() {
 
 	var tlsConfig tls.Config
 	if *echConfigFlag != "" {
-		switch *echConfigFlag {
-		case "grease":
-			// TODO: investigate ECH rejection and cert verification.
+		if strings.HasPrefix(*echConfigFlag, "grease") {
+			publicName := reqURL.Hostname()
+			if len(*echConfigFlag) > 7 {
+				if (*echConfigFlag)[6] != ':' {
+					slog.Error("Invalid GREASE ECH config")
+					os.Exit(1)
+				}
+				publicName = (*echConfigFlag)[7:]
+			}
 			// Can we make it work with a fake domain that validates the right domain?
-			echConfigBytes, err := ech.GenerateGreaseECHConfigList(rand.Reader, reqURL.Hostname())
+			echConfigBytes, err := ech.GenerateGreaseECHConfigList(rand.Reader, publicName)
 			if err != nil {
 				slog.Error("Failed to decode base64 ECH config", "error", err)
 				os.Exit(1)
 			}
 			tlsConfig.EncryptedClientHelloConfigList = echConfigBytes
-		default:
+			// TODO: verify the certificate based on reqURL.Hostname() instead of the public_name.
+			// tlsConfig.EncryptedClientHelloRejectionVerify = func(cs tls.ConnectionState) error {
+			// 	return nil
+			// }
+		} else {
 			// TODO(fortuna): Add support for fetching the ECH config in the HTTPS RR.
 			echConfigBytes, err := base64.StdEncoding.DecodeString(*echConfigFlag)
 			if err != nil {
