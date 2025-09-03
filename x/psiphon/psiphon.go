@@ -199,6 +199,18 @@ func (d *Dialer) Stop() error {
 	return nil
 }
 
+// If the dialer has not yet started, starts it.
+// If the dialer is already started, stop it and restart with the new config
+// TODO: if the dialer is already started and config is identical, just return nil
+func (d *Dialer) StartOrRestart(startCtx context.Context, config *DialerConfig) error {
+	err := d.Start(startCtx, config)
+	if err == errAlreadyStarted {
+		err = d.Stop()
+		err = d.Start(startCtx, config)
+	}
+	return err
+}
+
 // GetSingletonDialer returns the single Psiphon dialer instance.
 func GetSingletonDialer() *Dialer {
 	return &singletonDialer

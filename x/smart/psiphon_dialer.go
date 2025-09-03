@@ -24,7 +24,7 @@ func newPsiphonDialer(finder *StrategyFinder, ctx context.Context, psiphonJSON [
 	config.DataRootDirectory = userCacheDir
 
 	dialer := psiphon.GetSingletonDialer()
-	if err := dialer.Start(ctx, config); err != nil {
+	if err := dialer.StartOrRestart(ctx, config); err != nil {
 		return nil, fmt.Errorf("failed to start psiphon dialer: %w", err)
 	}
 

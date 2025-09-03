@@ -142,6 +142,29 @@ func TestDialer_Start_Timeout(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 }
 
+func TestDialer_StartOrRestart_Successful(t *testing.T) {
+	dialer := GetSingletonDialer()
+	startTunnel = func(ctx context.Context, config *DialerConfig) (psiphonTunnel, error) {
+		return &clientlib.PsiphonTunnel{}, nil
+	}
+	defer func() {
+		startTunnel = psiphonStartTunnel
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	require.NoError(t, dialer.StartOrRestart(ctx, nil))
+	require.NoError(t, dialer.StartOrRestart(ctx, nil))
+	require.NoError(t, dialer.Stop())
+
+	// StartOrRestart after Start
+	require.NoError(t, dialer.Start(ctx, nil))
+	require.NoError(t, dialer.StartOrRestart(ctx, nil))
+	require.NoError(t, dialer.Stop())
+
+}
+
 type errorTunnel struct {
 	err     error
 	stopped bool
