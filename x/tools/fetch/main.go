@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"flag"
@@ -130,9 +131,13 @@ func main() {
 	}
 	defer httpClient.CloseIdleConnections()
 
-	var tlsConfig tls.Config
+	tlsConfig := tls.Config{
+		ServerName: reqURL.Hostname(),
+	}
+	greaseEnabled := false
 	if *echConfigFlag != "" {
 		if strings.HasPrefix(*echConfigFlag, "grease") {
+			greaseEnabled = true
 			publicName := reqURL.Hostname()
 			if len(*echConfigFlag) > 7 {
 				if (*echConfigFlag)[6] != ':' {
@@ -148,10 +153,11 @@ func main() {
 				os.Exit(1)
 			}
 			tlsConfig.EncryptedClientHelloConfigList = echConfigBytes
-			// TODO: verify the certificate based on reqURL.Hostname() instead of the public_name.
-			// tlsConfig.EncryptedClientHelloRejectionVerify = func(cs tls.ConnectionState) error {
-			// 	return nil
-			// }
+			tlsConfig.EncryptedClientHelloRejectionVerify = func(cs tls.ConnectionState) error {
+				// Ignore validation. There's no way to validate here. We will do it later in the handshake.
+				slog.Debug("EncryptedClientHelloRejectionVerify", "ConnectionState", cs)
+				return nil
+			}
 		} else {
 			// TODO(fortuna): Add support for fetching the ECH config in the HTTPS RR.
 			echConfigBytes, err := base64.StdEncoding.DecodeString(*echConfigFlag)
@@ -188,17 +194,43 @@ func main() {
 			}
 			return dialer.DialStream(ctx, addressToDial)
 		}
+		dialTLSContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+			conn, err := dialContext(ctx, network, addr)
+			if err != nil {
+				return nil, err
+			}
+			tlsConn := tls.Client(conn, &tlsConfig)
+			err = tlsConn.HandshakeContext(ctx)
+			slog.Debug("tls.Conn.Handshake", "error", err, "ConnectionState", tlsConn.ConnectionState())
+			if len(tlsConn.ConnectionState().PeerCertificates) >= 1 {
+				opts := x509.VerifyOptions{
+					DNSName:       reqURL.Hostname(),
+					Intermediates: x509.NewCertPool(),
+				}
+				for _, cert := range tlsConn.ConnectionState().PeerCertificates[1:] {
+					opts.Intermediates.AddCert(cert)
+				}
+				_, validationErr := tlsConn.ConnectionState().PeerCertificates[0].Verify(opts)
+				slog.Debug("tls.Conn.VerifyHostname", "status", validationErr)
+				if validationErr != nil {
+					return nil, validationErr
+				}
+			}
+			return tlsConn, err
+		}
 		switch *protoFlag {
 		case "h1":
 			tlsConfig.NextProtos = []string{"http/1.1"}
 			httpClient.Transport = &http.Transport{
 				DialContext:     dialContext,
+				DialTLSContext:  dialTLSContext,
 				TLSClientConfig: &tlsConfig,
 			}
 		case "h2":
 			tlsConfig.NextProtos = []string{"h2"}
 			httpClient.Transport = &http.Transport{
 				DialContext:       dialContext,
+				DialTLSContext:    dialTLSContext,
 				TLSClientConfig:   &tlsConfig,
 				ForceAttemptHTTP2: true,
 			}
@@ -229,7 +261,11 @@ func main() {
 				if err != nil {
 					return nil, err
 				}
-				return quicTransport.DialEarly(ctx, udpAddr, tlsConf, quicConf)
+				conn, err := quicTransport.DialEarly(ctx, udpAddr, tlsConf, quicConf)
+				if err != nil {
+					slog.Debug("quicTransport.DialEarly", "ConnectionState", conn.ConnectionState().TLS)
+				}
+				return conn, err
 			},
 			Logger: slog.Default(),
 		}
@@ -258,12 +294,13 @@ func main() {
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		args := []any{"error", err}
 		echErr := new(tls.ECHRejectionError)
-		if errors.As(err, &echErr) {
-			args = append(args, "ech_retry_config", base64.StdEncoding.EncodeToString(echErr.RetryConfigList))
+		echRejected := errors.As(err, &echErr)
+		if greaseEnabled && echRejected {
+			slog.Info("Ignoring ECH rejection error in ECH GREASE mode", "ech_retry_config", base64.StdEncoding.EncodeToString(echErr.RetryConfigList))
+		} else {
+			slog.Error("HTTP request failed", "error", err)
 		}
-		slog.Error("HTTP request failed", args...)
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
