@@ -120,9 +120,10 @@ func psiphonStartTunnel(tunnelCtx context.Context, config *DialerConfig) (psipho
 	return clientlib.StartTunnel(tunnelCtx, config.ProviderConfig, "", params, nil, nil)
 }
 
+// Helper function for Start which encapsulates the mutex call.
 // Starts running the Dialer. It returns when the tunnel is ready.
 // If the dialer is already started returns errAlreadyStarted
-func (d *Dialer) startDialer(startCtx context.Context, config *DialerConfig) error {
+func (d *Dialer) startHelper(startCtx context.Context, config *DialerConfig) error {
 	resultCh := make(chan error)
 	go func() {
 		d.mu.Lock()
@@ -202,14 +203,14 @@ func (d *Dialer) Stop() error {
 
 // Start configures and runs the Dialer. It must be called before you can use the Dialer. It returns when the tunnel is ready.
 func (d *Dialer) Start(startCtx context.Context, config *DialerConfig) error {
-	err := d.startDialer(startCtx, config)
+	err := d.startHelper(startCtx, config)
 	if err == errAlreadyStarted {
 		// If the dialer is already started, stop it and restart with the new config
 		err = d.Stop()
 		if err != nil {
 			return err
 		}
-		err = d.startDialer(startCtx, config)
+		err = d.startHelper(startCtx, config)
 		// TODO: if the dialer is already started and config is identical, just return nil
 	}
 	return err
