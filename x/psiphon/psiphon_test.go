@@ -54,7 +54,8 @@ func TestDialer_Start_Successful(t *testing.T) {
 	defer cancel()
 	require.NoError(t, dialer.Start(ctx, nil))
 	require.NotNil(t, dialer.tunnel)
-	require.ErrorIs(t, dialer.Start(ctx, nil), errAlreadyStarted)
+	// we can restart an already-started dialer with no error
+	require.NoError(t, dialer.Start(ctx, nil))
 	require.NoError(t, dialer.Stop())
 	require.Nil(t, dialer.tunnel)
 	require.ErrorIs(t, dialer.Stop(), errNotStartedStop)
@@ -85,9 +86,13 @@ func TestDialer_StopOnStart(t *testing.T) {
 	require.Error(t, <-resultCh)
 }
 
+// Test that there's no race condition if you call start while start is running
 func TestDialer_StartOnStart(t *testing.T) {
 	dialer := GetSingletonDialer()
+	dialer.Start(context.Background(), nil)
+
 	startCalled := make(chan struct{})
+	// Long running startTunnel
 	startTunnel = func(ctx context.Context, config *DialerConfig) (psiphonTunnel, error) {
 		startCalled <- struct{}{}
 		select {
@@ -104,10 +109,16 @@ func TestDialer_StartOnStart(t *testing.T) {
 		resultCh <- dialer.Start(context.Background(), nil)
 	}()
 	<-startCalled
+
+	// Normal startTunnel
 	startTunnel = func(ctx context.Context, config *DialerConfig) (psiphonTunnel, error) {
-		return nil, errors.New("failed to start")
+		return &clientlib.PsiphonTunnel{}, nil
 	}
-	require.ErrorIs(t, dialer.Start(context.Background(), nil), errAlreadyStarted)
+	defer func() {
+		startTunnel = psiphonStartTunnel
+	}()
+
+	require.NoError(t, dialer.Start(context.Background(), nil))
 	require.NoError(t, dialer.Stop())
 	require.Error(t, <-resultCh)
 }
