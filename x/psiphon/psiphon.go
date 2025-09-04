@@ -208,7 +208,7 @@ func (d *Dialer) Start(startCtx context.Context, config *DialerConfig) error {
 		// If the dialer is already started, stop it and restart with the new config
 		err = d.Stop()
 		if err != nil {
-			return err
+			return errors.Join(errAlreadyStarted, err)
 		}
 		err = d.startHelper(startCtx, config)
 		// TODO: if the dialer is already started and config is identical, just return nil
