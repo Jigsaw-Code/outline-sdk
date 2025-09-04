@@ -100,9 +100,6 @@ func TestDialer_StartOnStart(t *testing.T) {
 			return nil, context.Cause(ctx)
 		}
 	}
-	defer func() {
-		startTunnel = psiphonStartTunnel
-	}()
 
 	resultCh := make(chan error)
 	go func() {

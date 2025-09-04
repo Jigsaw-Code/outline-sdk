@@ -120,17 +120,22 @@ func psiphonStartTunnel(tunnelCtx context.Context, config *DialerConfig) (psipho
 	return clientlib.StartTunnel(tunnelCtx, config.ProviderConfig, "", params, nil, nil)
 }
 
-// Starts running the Dialer. It returns when the tunnel is ready.
-// If the dialer is already started returns errAlreadyStarted
-func (d *Dialer) startDialer(startCtx context.Context, config *DialerConfig) error {
+// Start configures and runs the Dialer.
+// It must be called before you can use the Dialer.
+// If the dialer has already started it attempts to stop and restart
+// It returns when the tunnel is ready.
+func (d *Dialer) Start(startCtx context.Context, config *DialerConfig) error {
 	resultCh := make(chan error)
 	go func() {
 		d.mu.Lock()
 		defer d.mu.Unlock()
 
 		if d.stop != nil {
-			resultCh <- errAlreadyStarted
-			return
+			// If the dialer is already started, attempt to stop it before restarting
+			err := d.Stop()
+			if err != nil {
+				resultCh <- errors.Join(errAlreadyStarted, err)
+			}
 		}
 
 		// startCtx is intended for the lifetime of the startup.
@@ -186,7 +191,8 @@ func (d *Dialer) startDialer(startCtx context.Context, config *DialerConfig) err
 	return <-resultCh
 }
 
-// Stop stops the Dialer background processes, releasing resources and allowing it to be reconfigured.
+// Stop stops the Dialer background processes,
+// releasing resources and allowing it to be reconfigured.
 // It returns when the Dialer is completely stopped.
 func (d *Dialer) Stop() error {
 	d.mu.Lock()
@@ -198,21 +204,6 @@ func (d *Dialer) Stop() error {
 	}
 	stop()
 	return nil
-}
-
-// Start configures and runs the Dialer. It must be called before you can use the Dialer. It returns when the tunnel is ready.
-func (d *Dialer) Start(startCtx context.Context, config *DialerConfig) error {
-	err := d.startDialer(startCtx, config)
-	if err == errAlreadyStarted {
-		// If the dialer is already started, stop it and restart with the new config
-		err = d.Stop()
-		if err != nil {
-			return err
-		}
-		err = d.startDialer(startCtx, config)
-		// TODO: if the dialer is already started and config is identical, just return nil
-	}
-	return err
 }
 
 // GetSingletonDialer returns the single Psiphon dialer instance.
