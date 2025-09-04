@@ -97,6 +97,9 @@ fallback:
 
 	_, err = finder.NewDialer(context.Background(), testDomains, configBytes)
 
+	// rerun again immediatly to test psiphon singleton
+	_, err = finder.NewDialer(context.Background(), testDomains, configBytes)
+
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "could not find a working fallback: all tests failed")
 
