@@ -63,16 +63,12 @@ You should see this on Wireshark:
 Pass the `-ech-config` flag with the base64-encoded ECH Config in binary format (as per the standard proposal).
 
 ```console
-$ go -C x run ./tools/fetch https://test.defo.ie | grep SSL_ECH 
-    <p>SSL_ECH_OUTER_SNI: NONE <br />
-SSL_ECH_INNER_SNI: NONE <br />
-SSL_ECH_STATUS: not attempted <img src="redx-small.png" alt="bummer" /> <br/>
+$ go run github.com/Jigsaw-Code/outline-sdk/x/tools/fetch@latest 'https://test.defo.ie/echstat.php?format=json'
+{"SSL_ECH_OUTER_SNI": "NONE","SSL_ECH_INNER_SNI": "NONE","SSL_ECH_STATUS": "not attempted","date": "2025-09-05T14:26:43+00:00","config": "min-ng.test.defo.ie"}
 
 $ dig +short test.defo.ie HTTPS
 1 . ech=AEb+DQBCqQAgACBlm7cfDx/gKuUAwRTe+Y9MExbIyuLpLcgTORIdi69uewAEAAEAAQATcHVibGljLnRlc3QuZGVmby5pZQAA
 
-$ go -C x run ./tools/fetch --ech-config=AEb+DQBCqQAgACBlm7cfDx/gKuUAwRTe+Y9MExbIyuLpLcgTORIdi69uewAEAAEAAQATcHVibGljLnRlc3QuZGVmby5pZQAA https://test.defo.ie | grep SSL_ECH
-    <p>SSL_ECH_OUTER_SNI: public.test.defo.ie <br />
-SSL_ECH_INNER_SNI: test.defo.ie <br />
-SSL_ECH_STATUS: success <img src="greentick-small.png" alt="good" /> <br/>
+$ go run github.com/Jigsaw-Code/outline-sdk/x/tools/fetch@latest --ech-config=AEb+DQBCqQAgACBlm7cfDx/gKuUAwRTe+Y9MExbIyuLpLcgTORIdi69uewAEAAEAAQATcHVibGljLnRlc3QuZGVmby5pZQAA 'https://test.defo.ie/echstat.php?format=json'
+{"SSL_ECH_OUTER_SNI": "public.test.defo.ie","SSL_ECH_INNER_SNI": "test.defo.ie","SSL_ECH_STATUS": "success", "date": "2025-09-05T14:22:52+00:00","config": "min-ng.test.defo.ie"}
 ```
