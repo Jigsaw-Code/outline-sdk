@@ -94,11 +94,11 @@ func addECHConfig(b *cryptobyte.Builder, rand io.Reader, publicName string) {
 	})
 }
 
-// GenerateGreaseECHConfigList creates a serialized ECHConfigList containing one
+// GenerateFakeECHConfigList creates a serialized ECHConfigList containing one
 // GREASE ECHConfig.
 // Client behavior: https://www.ietf.org/archive/id/draft-ietf-tls-esni-25.html#name-grease-ech
 // ECHConfigList format https://www.ietf.org/archive/id/draft-ietf-tls-esni-25.html#name-encrypted-clienthello-confi
-func GenerateGreaseECHConfigList(rand io.Reader, publicName string) ([]byte, error) {
+func GenerateFakeECHConfigList(rand io.Reader, publicName string) ([]byte, error) {
 	var b cryptobyte.Builder
 	// ECHConfig ECHConfigList<4..2^16-1>
 	b.AddUint16LengthPrefixed(func(child *cryptobyte.Builder) {

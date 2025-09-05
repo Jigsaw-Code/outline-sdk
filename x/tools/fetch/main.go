@@ -134,20 +134,20 @@ func main() {
 	tlsConfig := tls.Config{
 		ServerName: reqURL.Hostname(),
 	}
-	greaseEnabled := false
+	fakeECHConfig := false
 	if *echConfigFlag != "" {
-		if strings.HasPrefix(*echConfigFlag, "grease") {
-			greaseEnabled = true
+		if strings.HasPrefix(*echConfigFlag, "fake") {
+			fakeECHConfig = true
 			publicName := reqURL.Hostname()
 			if len(*echConfigFlag) > 7 {
 				if (*echConfigFlag)[6] != ':' {
-					slog.Error("Invalid GREASE ECH config")
+					slog.Error("Invalid fake ECH config")
 					os.Exit(1)
 				}
 				publicName = (*echConfigFlag)[7:]
 			}
 			// Can we make it work with a fake domain that validates the right domain?
-			echConfigBytes, err := ech.GenerateGreaseECHConfigList(rand.Reader, publicName)
+			echConfigBytes, err := ech.GenerateFakeECHConfigList(rand.Reader, publicName)
 			if err != nil {
 				slog.Error("Failed to decode base64 ECH config", "error", err)
 				os.Exit(1)
@@ -296,8 +296,8 @@ func main() {
 	if err != nil {
 		echErr := new(tls.ECHRejectionError)
 		echRejected := errors.As(err, &echErr)
-		if greaseEnabled && echRejected {
-			slog.Info("Ignoring ECH rejection error in ECH GREASE mode", "ech_retry_config", base64.StdEncoding.EncodeToString(echErr.RetryConfigList))
+		if fakeECHConfig && echRejected {
+			slog.Info("Got expected ECH rejection error for fake ECH config", "ech_retry_config", base64.StdEncoding.EncodeToString(echErr.RetryConfigList))
 		} else {
 			slog.Error("HTTP request failed", "error", err)
 		}
