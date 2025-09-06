@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -98,6 +97,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						spinner:   s,
 					}
 					m.requests = append(m.requests, request)
+					if len(m.requests) > 10 {
+						m.requests = m.requests[1:]
+					}
 					fetchCmds = append(fetchCmds, doFetch(request))
 				}
 			}
@@ -136,24 +138,29 @@ func (m model) View() string {
 	b.WriteString("\n\n")
 
 	if len(m.requests) > 0 {
-		columns := []table.Column{
-			{Title: "URL", Width: 30},
-			{Title: "Transport", Width: 20},
-			{Title: "Status", Width: 50},
-		}
-		s := table.DefaultStyles()
-		s.Header = s.Header.BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("240")).BorderBottom(true)
-		// By default, the first row is highlighted. Since we are not using the table
-		// for interaction, we can disable the highlight by overriding the style.
-		s.Selected = lipgloss.NewStyle()
-		t := table.New(
+		headerStyle := lipgloss.NewStyle().
+			Bold(true).
+			Padding(0, 1).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color("240")).
+			BorderBottom(true)
 
-			table.WithColumns(columns),
-			table.WithHeight(10),
-			table.WithStyles(s),
-		)
+		cellStyle := lipgloss.NewStyle().Padding(0, 1)
 
-		var rows []table.Row
+		urlWidth := 30
+		transportWidth := 20
+		statusWidth := 50
+
+		// Header
+		urlHeader := headerStyle.Copy().Width(urlWidth).Render("URL")
+		transportHeader := headerStyle.Copy().Width(transportWidth).Render("Transport")
+		statusHeader := headerStyle.Copy().Width(statusWidth).Render("Status")
+		headerRow := lipgloss.JoinHorizontal(lipgloss.Top, urlHeader, transportHeader, statusHeader)
+		b.WriteString(headerRow)
+		b.WriteString("\n")
+
+		// Rows
+		var tableRows []string
 		for i := len(m.requests) - 1; i >= 0; i-- {
 			req := m.requests[i]
 			transportStr := req.transport
@@ -164,10 +171,13 @@ func (m model) View() string {
 			if req.IsPending() {
 				status = "fetching " + req.spinner.View()
 			}
-			rows = append(rows, table.Row{req.url, transportStr, status})
+			urlCell := cellStyle.Copy().Width(urlWidth).Render(req.url)
+			transportCell := cellStyle.Copy().Width(transportWidth).Render(transportStr)
+			statusCell := cellStyle.Copy().Width(statusWidth).Render(status)
+			row := lipgloss.JoinHorizontal(lipgloss.Top, urlCell, transportCell, statusCell)
+			tableRows = append(tableRows, row)
 		}
-		t.SetRows(rows)
-		b.WriteString(t.View())
+		b.WriteString(lipgloss.JoinVertical(lipgloss.Left, tableRows...))
 	}
 
 	b.WriteString("\n\n(press ctrl+c to quit, ctrl+l to clear)\n")

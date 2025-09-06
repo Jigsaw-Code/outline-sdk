@@ -29,7 +29,7 @@ func doFetch(req *request) tea.Cmd {
 
 		resp, err := client.Get(req.url)
 		if err != nil {
-			return fetchResultMsg{req: req, status: fmt.Sprintf("failed to fetch %s with %s: %v", req.url, req.transport, err)}
+			return fetchResultMsg{req: req, status: err.Error()}
 		}
 		defer resp.Body.Close()
 
