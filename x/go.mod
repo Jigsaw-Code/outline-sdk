@@ -10,6 +10,9 @@ require (
 	// Use github.com/Psiphon-Labs/psiphon-tunnel-core@staging-client as per
 	// https://github.com/Psiphon-Labs/psiphon-tunnel-core/?tab=readme-ov-file#using-psiphon-with-go-modules
 	github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20250319154633-ceb78316d06e
+	github.com/charmbracelet/bubbles v0.21.0
+	github.com/charmbracelet/bubbletea v1.3.7
+	github.com/cloudflare/circl v1.5.0
 	github.com/goccy/go-yaml v1.17.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/lmittmann/tint v1.0.7
@@ -18,9 +21,10 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/things-go/go-socks5 v0.0.5
 	github.com/vishvananda/netlink v1.2.1-beta.2
+	golang.org/x/crypto v0.35.0
 	golang.org/x/mobile v0.0.0-20240520174638-fa72addaaa1b
 	golang.org/x/net v0.36.0
-	golang.org/x/sys v0.30.0
+	golang.org/x/sys v0.34.0
 	golang.org/x/term v0.29.0
 )
 
@@ -38,12 +42,18 @@ require (
 	github.com/alexbrainman/sspi v0.0.0-20231016080023-1a75b4708caa // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/armon/go-proxyproto v0.0.0-20180202201750-5b7edb60ff5f // indirect
+	github.com/atotto/clipboard v0.1.4 // indirect
+	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bifurcation/mint v0.0.0-20180306135233-198357931e61 // indirect
-	github.com/bits-and-blooms/bitset v1.10.0 // indirect
+	github.com/bits-and-blooms/bitset v1.22.0 // indirect
 	github.com/bits-and-blooms/bloom/v3 v3.6.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
+	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
+	github.com/charmbracelet/lipgloss v1.1.0 // indirect
+	github.com/charmbracelet/x/ansi v0.10.1 // indirect
+	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect
+	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/cheekybits/genny v0.0.0-20170328200008-9127e812e1e9 // indirect
-	github.com/cloudflare/circl v1.5.0 // indirect
 	github.com/cognusion/go-cache-lru v0.0.0-20170419142635-f73e2280ecea // indirect
 	github.com/coreos/go-iptables v0.7.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -51,6 +61,7 @@ require (
 	github.com/dchest/siphash v1.2.3 // indirect
 	github.com/dgraph-io/badger v1.5.4-0.20180815194500-3a87f6d9c273 // indirect
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
+	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/eycorsican/go-tun2socks v1.16.11 // indirect
 	github.com/flynn/noise v1.0.1-0.20220214164934-d803f5c4b0f4 // indirect
 	github.com/fxamacker/cbor/v2 v2.5.0 // indirect
@@ -68,11 +79,18 @@ require (
 	github.com/jsimonetti/rtnetlink v1.3.5 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/libp2p/go-reuseport v0.4.0 // indirect
+	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/marusama/semaphore v0.0.0-20171214154724-565ffd8e868a // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mattn/go-localereader v0.0.1 // indirect
+	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mdlayher/netlink v1.7.2 // indirect
 	github.com/mdlayher/socket v0.5.0 // indirect
 	github.com/miekg/dns v1.1.56 // indirect
 	github.com/mroth/weightedrand v1.0.0 // indirect
+	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
+	github.com/muesli/cancelreader v0.2.2 // indirect
+	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.12.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pion/datachannel v1.5.5 // indirect
@@ -99,6 +117,7 @@ require (
 	github.com/refraction-networking/gotapdance v1.7.10 // indirect
 	github.com/refraction-networking/obfs4 v0.1.2 // indirect
 	github.com/refraction-networking/utls v1.3.3 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sergeyfrolov/bsbuffer v0.0.0-20180903213811-94e85abb8507 // indirect
 	github.com/shadowsocks/go-shadowsocks2 v0.1.5 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
@@ -109,11 +128,11 @@ require (
 	github.com/wader/filtertransport v0.0.0-20200316221534-bdd9e61eee78 // indirect
 	github.com/wlynxg/anet v0.0.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
+	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/goptlib v1.5.0 // indirect
 	go.uber.org/mock v0.4.0 // indirect
 	go4.org/mem v0.0.0-20220726221520-4f986261bf13 // indirect
 	go4.org/netipx v0.0.0-20230824141953-6213f710f925 // indirect
-	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
