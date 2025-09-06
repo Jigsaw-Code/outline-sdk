@@ -38,6 +38,9 @@ func initialModel() model {
 	ti2.CharLimit = 0 // no limit
 	ti2.Width = 80
 
+	ti1.CursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	ti2.CursorStyle = ti1.CursorStyle
+
 	return model{
 		urlsInput:       ti1,
 		transportsInput: ti2,
@@ -131,9 +134,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	var b strings.Builder
 
-	b.WriteString("Enter URLs (comma-separated):\n")
+	focusedInputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	inputStyle := lipgloss.NewStyle()
+	if m.urlsInput.Focused() {
+		inputStyle = focusedInputStyle
+	}
+	b.WriteString(inputStyle.Render("Enter URLs (comma-separated):"))
+
+	b.WriteString("\n")
 	b.WriteString(m.urlsInput.View())
-	b.WriteString("\nEnter Transports (comma-separated):\n")
+
+	b.WriteString("\n")
+	inputStyle = lipgloss.NewStyle()
+	if m.transportsInput.Focused() {
+		inputStyle = focusedInputStyle
+	}
+	b.WriteString(inputStyle.Render("Enter Transports (comma-separated):"))
+
+	b.WriteString("\n")
 	b.WriteString(m.transportsInput.View())
 	b.WriteString("\n\n")
 
