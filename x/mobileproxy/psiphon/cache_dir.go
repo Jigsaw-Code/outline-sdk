@@ -1,7 +1,4 @@
-//go:build psiphon
-// +build psiphon
-
-package smart
+package psiphon
 
 import (
 	"bufio"
@@ -67,12 +64,12 @@ func getUserCacheDir() (string, error) {
 		cacheBaseDir, err = os.UserCacheDir()
 	}
 	if err != nil {
-		return "", fmt.Errorf("Failed to get the user cache directory: %w", err)
+		return "", fmt.Errorf("failed to get the user cache directory: %w", err)
 	}
 
 	userCacheDir := path.Join(cacheBaseDir, "psiphon")
 	if err := os.MkdirAll(userCacheDir, 0700); err != nil {
-		return "", fmt.Errorf("Failed to create storage directory: %w", err)
+		return "", fmt.Errorf("failed to create storage directory: %w", err)
 	}
 
 	return userCacheDir, nil

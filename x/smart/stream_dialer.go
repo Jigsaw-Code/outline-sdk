@@ -38,13 +38,35 @@ import (
 // To test one strategy:
 // go run -C ./x/examples/smart-proxy/ . -v -localAddr=localhost:1080 --transport="" --domain www.rferl.org  --config=<(echo '{"dns": [{"https": {"name": "doh.sb"}}]}')
 
+// YAMLNode represents a parsed YAML node.
+type YAMLNode any
+
+// FallbackParser goes from a YAML node to a [transport.StreamDialer] and strategy key. In case of error,
+// the dialer is nil, and the configSignature is empty.
+type FallbackParser func(context.Context, YAMLNode) (dialer transport.StreamDialer, configSignature string, err error)
+
 type StrategyFinder struct {
-	TestTimeout  time.Duration
-	LogWriter    io.Writer
-	StreamDialer transport.StreamDialer
-	PacketDialer transport.PacketDialer
-	Cache        StrategyResultCache
-	logMu        sync.Mutex
+	TestTimeout     time.Duration
+	LogWriter       io.Writer
+	StreamDialer    transport.StreamDialer
+	PacketDialer    transport.PacketDialer
+	Cache           StrategyResultCache
+	fallbackParsers map[string]FallbackParser
+	logMu           sync.Mutex
+}
+
+// RegisterFallbackParser register a fallback parser with the given name.
+// It overwrites an existing parser if it exists with the same name.
+func (f *StrategyFinder) RegisterFallbackParser(name string, parser FallbackParser) {
+
+	f.ensureFallbackParsers()[name] = parser
+}
+
+func (f *StrategyFinder) ensureFallbackParsers() map[string]FallbackParser {
+	if f.fallbackParsers == nil {
+		f.fallbackParsers = make(map[string]FallbackParser)
+	}
+	return f.fallbackParsers
 }
 
 func (f *StrategyFinder) log(format string, a ...any) {
@@ -97,11 +119,6 @@ type dnsEntryConfig struct {
 	TLS    *tlsEntryConfig   `yaml:"tls,omitempty"`
 	UDP    *udpEntryConfig   `yaml:"udp,omitempty"`
 	TCP    *tcpEntryConfig   `yaml:"tcp,omitempty"`
-}
-
-type fallbackEntryStructConfig struct {
-	Psiphon any `yaml:"psiphon,omitempty"`
-	// As we allow more fallback types beyond psiphon they will be added here
 }
 
 // This contains either a configURL string or a fallbackEntryStructConfig
@@ -194,27 +211,6 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryConfig) (dns.Reso
 	} else {
 		return nil, false, errors.New("invalid DNS entry")
 	}
-}
-
-// Takes a (potentially very long) psiphon config and outputs
-// a short signature string for logging identification purposes
-// with only the PropagationChannelId and SponsorId (required fields)
-// ex: {PropagationChannelId: FFFFFFFFFFFFFFFF, SponsorId: FFFFFFFFFFFFFFFF, [...]}
-// If the config does not contains these fields
-// output the whole config as a string
-func (f *StrategyFinder) getPsiphonConfigSignature(psiphonJSON []byte) string {
-	var psiphonConfig map[string]any
-	if err := json.Unmarshal(psiphonJSON, &psiphonConfig); err != nil {
-		return string(psiphonJSON)
-	}
-
-	propagationChannelId, ok1 := psiphonConfig["PropagationChannelId"].(string)
-	sponsorId, ok2 := psiphonConfig["SponsorId"].(string)
-
-	if ok1 && ok2 {
-		return fmt.Sprintf("Psiphon: {PropagationChannelId: %v, SponsorId: %v, [...]}", propagationChannelId, sponsorId)
-	}
-	return string(psiphonJSON)
 }
 
 type smartResolver struct {
@@ -402,7 +398,7 @@ type SearchResult struct {
 // Make a fallback dialer (either from a configurl or a Psiphon config)
 // Returns a stream dialer, config signature, error
 // In case of an error the stream dialer can be nil, but the string is always set.
-func (f *StrategyFinder) makeDialerFromConfig(ctx context.Context, configModule *configurl.ProviderContainer, fallbackConfig fallbackEntryConfig) (transport.StreamDialer, string, error) {
+func (f *StrategyFinder) makeDialerFromConfig(ctx context.Context, configModule *configurl.ConfigRegistry, fallbackConfig fallbackEntryConfig) (transport.StreamDialer, string, error) {
 	switch v := fallbackConfig.(type) {
 	case string:
 		configUrl := v
@@ -412,27 +408,23 @@ func (f *StrategyFinder) makeDialerFromConfig(ctx context.Context, configModule 
 		}
 		return dialer, v, nil
 
-	case fallbackEntryStructConfig:
-		if v.Psiphon != nil {
-			psiphonCfg := v.Psiphon
-
-			psiphonJSON, err := json.Marshal(psiphonCfg)
-			if err != nil {
-				f.logCtx(ctx, "Error marshaling to JSON: %v, %v\n", psiphonCfg, err)
-			}
-
-			psiphonSignature := f.getPsiphonConfigSignature(psiphonJSON)
-			dialer, err := newPsiphonDialer(f, ctx, psiphonJSON)
-			if err != nil {
-				return nil, psiphonSignature, fmt.Errorf("newPsiphonDialer failed: %w", err)
-			}
-			return dialer, psiphonSignature, nil
-		} else {
-			return nil, fmt.Sprintf("Unknown Config: %v", fallbackConfig), fmt.Errorf("unknown fallback type: %v", fallbackConfig)
+	case map[string]any:
+		if len(v) != 1 {
+			return nil, fmt.Sprint(fallbackConfig), fmt.Errorf("fallback config has too many keys")
 		}
-	default:
-		return nil, fmt.Sprintf("Unknown Config: %v", fallbackConfig), fmt.Errorf("unknown fallback type: %v", fallbackConfig)
+		// There should be only one entry.
+		for key, config := range v {
+			parser, ok := f.ensureFallbackParsers()[key]
+			if !ok {
+				return nil, fmt.Sprintf("Unknown Config: %v", fallbackConfig), fmt.Errorf("%.0wunsupported fallback type: %v", errors.ErrUnsupported, key)
+			}
+			dialer, signature, err := parser(ctx, config)
+			// TODO: only output signature on successes.
+			fullSignature := fmt.Sprintf("%s:%s", key, signature)
+			return dialer, fullSignature, err
+		}
 	}
+	return nil, fmt.Sprintf("Invalid Config: %v", fallbackConfig), fmt.Errorf("invalid config of type %T: %v", fallbackConfig, fallbackConfig)
 }
 
 // Return the fastest fallback dialer that is able to access all the testDomans
@@ -452,7 +444,13 @@ func (f *StrategyFinder) findFallback(
 	fallback, err := raceTests(raceCtx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
 		dialer, configSignature, err := f.makeDialerFromConfig(raceCtx, configModule, fallbackConfig)
 		if err != nil {
-			f.logCtx(raceCtx, "❌ Failed to start dialer: %v %v\n", configSignature, err)
+			sigBytes, marshalErr := json.Marshal(fallbackConfig)
+			if marshalErr != nil {
+				configSignature = fmt.Sprint(fallbackConfig)
+			} else {
+				configSignature = string(sigBytes)
+			}
+			f.logCtx(raceCtx, "❌ Failed to create dialer: %v %v\n", configSignature, err)
 			return nil, err
 		}
 
@@ -521,7 +519,7 @@ func (f *StrategyFinder) parseConfig(configBytes []byte) (configConfig, error) {
 		case string:
 			parsedConfig.Fallback[i] = v
 		case map[string]any:
-			var fallbackEntry fallbackEntryStructConfig
+			var fallbackEntry fallbackEntryConfig
 			err := mapToAny(v, &fallbackEntry)
 			if err != nil {
 				return configConfig{}, fmt.Errorf("failed to parse fallback config: %w", err)

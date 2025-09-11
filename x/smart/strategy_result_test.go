@@ -96,8 +96,8 @@ func TestWinningStrategy_MarshalFallback(t *testing.T) {
 		yaml: `{fallback: ["ss://Y2hhY2hh@1.2.3.4:9999/?outline=1"]}`,
 	}, {
 		name: "StructPsiphon",
-		conf: fallbackEntryStructConfig{
-			Psiphon: map[string]any{
+		conf: map[string]any{
+			"psiphon": map[string]any{
 				"PropagationChannelId": "42",
 				"SponsorId":            "TBD",
 			},
@@ -194,7 +194,7 @@ func TestWinningStrategy_GetFallbackIfExclusive(t *testing.T) {
 	var (
 		shadowsocksFb  = "ss://Y2hhY2hh@11.22.33.44:19999/?outline=1"
 		shadowsocksFb2 = "ssconf://Here-is-the-dynamic-key.com"
-		psiphonFb      = fallbackEntryStructConfig{Psiphon: map[string]any{
+		psiphonFb      = map[string]any{"psiphon": map[string]any{
 			"PropagationChannelId": "19980904",
 			"SponsorId":            "G00gle",
 		}}

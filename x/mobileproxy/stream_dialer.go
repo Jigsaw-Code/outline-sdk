@@ -32,12 +32,12 @@ type StreamDialer struct {
 	transport.StreamDialer
 }
 
-var configModule = configurl.NewDefaultProviders()
+var configRegistry = configurl.NewDefaultProviders()
 
 // NewStreamDialerFromConfig creates a [StreamDialer] based on the given config.
 // The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format.
 func NewStreamDialerFromConfig(transportConfig string) (*StreamDialer, error) {
-	dialer, err := configModule.NewStreamDialer(context.Background(), transportConfig)
+	dialer, err := configRegistry.NewStreamDialer(context.Background(), transportConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -47,12 +47,16 @@ func NewStreamDialerFromConfig(transportConfig string) (*StreamDialer, error) {
 // SmartDialerOptions specifies the options for creating a "Smart Dialer".
 // A "Smart Dialer" automatically selects the best DNS/TLS strategy to connect to the internet.
 type SmartDialerOptions struct {
+	registry *configurl.ConfigRegistry
+
 	testDomains []string
 	config      []byte
 	testTimeout time.Duration
 
 	baseSD transport.StreamDialer
 	basePD transport.PacketDialer
+
+	fallbackParsers map[string]smart.FallbackParser
 
 	logWriter io.Writer
 	cache     *strategyCacheAdapter
@@ -71,6 +75,17 @@ func NewSmartDialerOptions(testDomains *StringList, config string) *SmartDialerO
 		baseSD:      &transport.TCPDialer{},
 		basePD:      &transport.UDPDialer{},
 	}
+}
+
+func (opt *SmartDialerOptions) ensureFallbackParsers() map[string]smart.FallbackParser {
+	if opt.fallbackParsers == nil {
+		opt.fallbackParsers = make(map[string]smart.FallbackParser)
+	}
+	return opt.fallbackParsers
+}
+
+func (opt *SmartDialerOptions) SetConfigRegistry(registry *ConfigRegistry) {
+	opt.registry = registry.GoRegistry
 }
 
 // SetLogWriter configures an optional LogWriter for logging the strategy selection process.
@@ -92,6 +107,10 @@ func (opt *SmartDialerOptions) SetStrategyCache(cache StrategyCache) {
 	}
 }
 
+func (opt *SmartDialerOptions) RegisterFallbackParser(name string, parser smart.FallbackParser) {
+	opt.ensureFallbackParsers()[name] = parser
+}
+
 // NewStreamDialer creates a new "Smart" StreamDialer using the configured options.
 // It finds the best-performing DNS/TLS strategy and returns a StreamDialer that uses this strategy.
 func (opt *SmartDialerOptions) NewStreamDialer() (*StreamDialer, error) {
@@ -101,6 +120,9 @@ func (opt *SmartDialerOptions) NewStreamDialer() (*StreamDialer, error) {
 		TestTimeout:  opt.testTimeout,
 		StreamDialer: opt.baseSD,
 		PacketDialer: opt.basePD,
+	}
+	for name, parser := range opt.ensureFallbackParsers() {
+		finder.RegisterFallbackParser(name, parser)
 	}
 	// When assigning a nil concrete value to an interface, the interface is not nil
 	// but contains a nil value. The `if` check is necessary to avoid a panic.
