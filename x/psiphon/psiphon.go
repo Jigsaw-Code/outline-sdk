@@ -128,8 +128,10 @@ func (d *Dialer) Start(startCtx context.Context, config *DialerConfig) error {
 		defer d.mu.Unlock()
 
 		if d.stop != nil {
-			resultCh <- errAlreadyStarted
-			return
+			// If we are already started stop first
+			// We can't check for errors here since d.stop() doesn't return errors
+			d.stop()
+			d.stop = nil
 		}
 
 		// startCtx is intended for the lifetime of the startup.
