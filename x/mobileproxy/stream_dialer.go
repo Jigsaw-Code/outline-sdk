@@ -47,8 +47,6 @@ func NewStreamDialerFromConfig(transportConfig string) (*StreamDialer, error) {
 // SmartDialerOptions specifies the options for creating a "Smart Dialer".
 // A "Smart Dialer" automatically selects the best DNS/TLS strategy to connect to the internet.
 type SmartDialerOptions struct {
-	registry *configurl.ProviderContainer
-
 	testDomains []string
 	config      []byte
 	testTimeout time.Duration
@@ -82,10 +80,6 @@ func (opt *SmartDialerOptions) ensureFallbackParsers() map[string]smart.Fallback
 		opt.fallbackParsers = make(map[string]smart.FallbackParser)
 	}
 	return opt.fallbackParsers
-}
-
-func (opt *SmartDialerOptions) SetConfigRegistry(registry *ConfigRegistry) {
-	opt.registry = registry.GoRegistry
 }
 
 // SetLogWriter configures an optional LogWriter for logging the strategy selection process.
