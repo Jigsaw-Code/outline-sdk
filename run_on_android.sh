@@ -18,7 +18,8 @@ set -eu
 
 function main() {
   declare -r host_bin="$1"
-  declare -r android_run_dir="/data/local/tmp/run/$(basename "${host_bin}")"
+  declare -r android_run_dir="$(adb shell mktemp -d)"
+  adb shell mkdir -p "${android_run_dir}"
   # Set up cleanup to run whenever the script exits. `adb push` creates the directory.
   trap "adb shell rm -r '${android_run_dir}'" EXIT
   declare -r android_bin="${android_run_dir}/bin"
