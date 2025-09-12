@@ -19,13 +19,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -419,7 +419,6 @@ func (f *StrategyFinder) makeDialerFromConfig(ctx context.Context, configModule 
 				return nil, fmt.Sprintf("Unknown Config: %v", fallbackConfig), fmt.Errorf("%.0wunsupported fallback type: %v", errors.ErrUnsupported, key)
 			}
 			dialer, signature, err := parser(ctx, config)
-			// TODO: only output signature on successes.
 			fullSignature := fmt.Sprintf("%s:%s", key, signature)
 			return dialer, fullSignature, err
 		}
@@ -444,13 +443,18 @@ func (f *StrategyFinder) findFallback(
 	fallback, err := raceTests(raceCtx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
 		dialer, configSignature, err := f.makeDialerFromConfig(raceCtx, configModule, fallbackConfig)
 		if err != nil {
-			sigBytes, marshalErr := json.Marshal(fallbackConfig)
+			// Make up a config signature in case of failure.
+			sigBytes, marshalErr := yaml.MarshalContext(raceCtx, fallbackConfig, yaml.Flow(true))
 			if marshalErr != nil {
 				configSignature = fmt.Sprint(fallbackConfig)
 			} else {
 				configSignature = string(sigBytes)
 			}
-			f.logCtx(raceCtx, "❌ Failed to create dialer: %v %v\n", configSignature, err)
+			configSignature = strings.TrimSpace(configSignature)
+			if len(configSignature) > 80 {
+				configSignature = configSignature[:79] + "…"
+			}
+			f.logCtx(raceCtx, "❌ Failed to create dialer: [%v]: %v\n", configSignature, err)
 			return nil, err
 		}
 

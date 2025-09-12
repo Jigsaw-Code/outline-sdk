@@ -107,7 +107,7 @@ fallback:
 		"request for A query failed: dial DNS resolver failed:",
 		`request for A query failed: receive DNS message failed: failed to get HTTP response: Post "https://mitm-software.badssl.com:443/dns-query": tls:`,
 		"🏃 running test: 'ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1'",
-		"❌ Failed to start dialer: Psiphon: {PropagationChannelId: ID1, SponsorId: ID2, [...]} newPsiphonDialer failed: failed to start psiphon dialer:",
+		"❌ Failed to create dialer: [{psiphon: {DisableLocalHTTPProxy: true, DisableLocalSocksProxy: true, Establish…]: unsupported fallback type: psiphon",
 		"🏃 running test: 'socks5://192.168.1.10:1080' (domain: www.example.com.)",
 	}
 	logContent := logBuffer.String()
