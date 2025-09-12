@@ -398,7 +398,7 @@ type SearchResult struct {
 // Make a fallback dialer (either from a configurl or a Psiphon config)
 // Returns a stream dialer, config signature, error
 // In case of an error the stream dialer can be nil, but the string is always set.
-func (f *StrategyFinder) makeDialerFromConfig(ctx context.Context, configModule *configurl.ConfigRegistry, fallbackConfig fallbackEntryConfig) (transport.StreamDialer, string, error) {
+func (f *StrategyFinder) makeDialerFromConfig(ctx context.Context, configModule *configurl.ProviderContainer, fallbackConfig fallbackEntryConfig) (transport.StreamDialer, string, error) {
 	switch v := fallbackConfig.(type) {
 	case string:
 		configUrl := v

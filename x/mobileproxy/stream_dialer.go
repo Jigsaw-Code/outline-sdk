@@ -47,7 +47,7 @@ func NewStreamDialerFromConfig(transportConfig string) (*StreamDialer, error) {
 // SmartDialerOptions specifies the options for creating a "Smart Dialer".
 // A "Smart Dialer" automatically selects the best DNS/TLS strategy to connect to the internet.
 type SmartDialerOptions struct {
-	registry *configurl.ConfigRegistry
+	registry *configurl.ProviderContainer
 
 	testDomains []string
 	config      []byte
