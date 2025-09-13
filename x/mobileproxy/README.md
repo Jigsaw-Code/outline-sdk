@@ -49,11 +49,80 @@ PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=1
 PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=android -androidapi=21 -o "$(pwd)/out/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
 ```
 
-To include psiphon support please also include the `-tags=psiphon` flag.
+To include Psiphon support please also include the `-tags=psiphon` flag and the psiphon library.
 
 ```bash
-PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -tags=psiphon -o "$(pwd)/out/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
-PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=android -androidapi=21 -tags=psiphon -o "$(pwd)/out/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -tags=psiphon -o "$(pwd)/out/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy github.com/Jigsaw-Code/outline-sdk/x/mobileproxy/psiphon
+PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=android -androidapi=21 -tags=psiphon -o "$(pwd)/out/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy github.com/Jigsaw-Code/outline-sdk/x/mobileproxy/psiphon
+```
+
+Then, in your native code, register Psiphon with your Smart Dialer options.
+
+Android:
+
+```kotlin
+import mobileproxy.Mobileproxy
+import psiphon.Psiphon
+
+// ...
+
+val testDomains = Mobileproxy.newListFromLines("www.google.com\ni.ytimg.com")
+// You can get a Psiphon config from the Psiphon team at sponsor@psiphon.ca.
+val psiphonConfig = "<YOUR_PSIPHON_CONFIG_JSON_HERE>"
+val config = """
+dns:
+  - {system: {}}
+tls:
+  - ""
+fallback:
+  - {"psiphon": \(psiphonConfig)}
+"""
+
+val options = Mobileproxy.newSmartDialerOptions(testDomains, config)
+// Register Psiphon
+Psiphon.registerConfig(options, "psiphon")
+
+try {
+    // Create the dialer
+    val dialer = options.newStreamDialer()
+    // ... use the dialer
+} catch (e: Exception) {
+    // Handle error
+}
+```
+
+iOS:
+
+```swift
+import Mobileproxy
+import Psiphon
+
+// ...
+
+let testDomains = MobileproxyNewListFromLines("www.google.com\ni.ytimg.com")
+// You can get a Psiphon config from the Psiphon team at sponsor@psiphon.ca.
+let psiphonConfig = "<YOUR_PSIPHON_CONFIG_JSON_HERE>"
+let config = """
+dns:
+  - {system: {}}
+tls:
+  - ""
+fallback:
+  - {"psiphon": \(psiphonConfig)}
+"""
+
+let options = MobileproxyNewSmartDialerOptions(testDomains, config)
+
+// Register Psiphon
+PsiphonRegisterConfig(options, "psiphon")
+
+do {
+    // Create the dialer
+    let dialer = try options.newStreamDialer()
+    // ... use the dialer
+} catch {
+    // Handle error
+}
 ```
 
 Note: Gomobile expects gobind to be in the PATH, that's why we need to prebuild it, and set up the PATH accordingly.
@@ -261,7 +330,7 @@ public final class StreamDialer implements Seq.Proxy {
 	
 	/**
 	 * NewStreamDialerFromConfig creates a [StreamDialer] based on the given config.
-	The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format.
+The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format.
 	 */
 	public StreamDialer(String transportConfig) {
 		this.refnum = __NewStreamDialerFromConfig(transportConfig);
@@ -346,8 +415,8 @@ public abstract class Mobileproxy {
 	 * NewSmartStreamDialer automatically selects a DNS and TLS strategy to use, and return a [StreamDialer]
 	that will use the selected strategy.
 	It uses testDomain to find a strategy that works when accessing those domains.
-	The strategies to search are given in the searchConfig. An example can be found in
-	https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.json
+The strategies to search are given in the searchConfig. An example can be found in
+https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.json
 	 */
 	public static native StreamDialer newSmartStreamDialer(StringList testDomains, String searchConfig, LogWriter logWriter) throws Exception;
 	/**
@@ -356,7 +425,7 @@ public abstract class Mobileproxy {
 	public static native LogWriter newStderrLogWriter();
 	/**
 	 * NewStreamDialerFromConfig creates a [StreamDialer] based on the given config.
-	The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format.
+The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format.
 	 */
 	public static native StreamDialer newStreamDialerFromConfig(String transportConfig) throws Exception;
 	/**
@@ -412,7 +481,7 @@ public final class Proxy implements Seq.Proxy {
 	public native long port();
 	/**
 	 * Stop gracefully stops the proxy service, waiting for at most timeout seconds before forcefully closing it.
-	The function takes a timeoutSeconds number instead of a [time.Duration] so it&#39;s compatible with Go Mobile.
+The function takes a timeoutSeconds number instead of a [time.Duration] so it's compatible with Go Mobile.
 	 */
 	public native void stop(long timeoutSeconds);
 	@Override public boolean equals(Object o) {
@@ -448,7 +517,7 @@ package mobileproxy;
 import go.Seq;
 
 /**
- * StringList allows us to pass a list of strings to the Go Mobile functions, since Go Mobiule doesn&#39;t
+ * StringList allows us to pass a list of strings to the Go Mobile functions, since Go Mobiule doesn't
 support slices as parameters.
  */
 public final class StringList implements Seq.Proxy {
@@ -529,7 +598,7 @@ On Android, the Kotlin code would look like this:
 ```kotlin
 // Use port zero to let the system pick an open port for you.
 val testDomains = Mobileproxy.newListFromLines("www.youtube.com\ni.ytimg.com")
-val strategiesConfig = "..."  // Config YAML.
+val strategiesConfig = "..."  // Config YAML. 
 val dialer = Mobileproxy.newSmartStreamDialer(testDomains, strategiesConfig, Mobileproxy.newStderrLogWriter())
 
 val proxy = Mobileproxy.runProxy("localhost:0", dialer)
@@ -593,8 +662,8 @@ ProxyController.getInstance()
 				ProxyConfig.Builder()
 						.addProxyRule(this.proxy!!.address())
 						.build(),
-				{}, // execution context for the following callback - do anything needed here once the proxy is applied, like refreshing web views 
-				{} // callback to be called once the ProxyConfig is applied
+						{},
+						{} // callback to be called once the ProxyConfig is applied
 		)
 ```
 
@@ -607,17 +676,16 @@ let configuration = WKWebViewConfiguration()
 
 let endpoint = NWEndpoint.hostPort(
 		host: NWEndpoint.Host(proxyHost),
-		port: NWEndpoint.Port(proxyPort)!
-)
+		port: NWEndpoint.Port(proxyPort)!)
 let proxyConfig = ProxyConfiguration.init(httpCONNECTProxy: endpoint)
 
 let websiteDataStore = WKWebsiteDataStore.default()
 websiteDataStore.proxyConfigurations = [proxyConfig]
 
-// Other webview configuration options... see https://developer.apple.com/documentation/webkit/wkwebviewconfiguration
+// Other webview configuration options... see https://developer.go.org/documentation/webkit/wkwebviewconfiguration
 
 let webview = WKWebView(
-	configuration: configuration,
+		configuration: configuration,
 )
 
 // use this webview as you would normally!
@@ -628,3 +696,10 @@ let webview = WKWebView(
 ```bash
 rm -rf ./out/
 ```
+
+## TODO
+
+* Move Psiphon to separate registration function. Need to make the Smart Dialer config extensible
+* Need to be able to extend the config URL format too. But two mechanisms is confusing. 
+  * Could consider `StrategyFinder.RegisterURLParser(scheme, parser)` and `StrategyFinder.RegisterYAMLParser(fieldName, parser)`
+* Merge URL and YAML formats, so we have a single way to parse and extend the config.
