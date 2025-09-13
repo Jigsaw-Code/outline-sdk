@@ -35,7 +35,7 @@ func getAndroidPackageName() (string, error) {
 // Older devices, before multi user, used /data/data/<packageName>/. For backwards-compatibility, the OS still maintains symlinks so /data/data/... resolves to /data/user/<user-id>/ for the current user.
 // This uses the directory /data/data/<packageName>/cache/
 // It validates the directory exists (or creates it).
-func AndroidPrivateCacheDir() (string, error) {
+func androidPrivateCacheDir() (string, error) {
 	pkg, err := getAndroidPackageName()
 	if err != nil {
 		return "", err
@@ -58,7 +58,7 @@ func getUserCacheDir() (string, error) {
 	var err error
 	var cacheBaseDir string
 	if runtime.GOOS == "android" {
-		cacheBaseDir, err = AndroidPrivateCacheDir()
+		cacheBaseDir, err = androidPrivateCacheDir()
 	} else {
 		// For every other system os.UserCacheDir works okay
 		cacheBaseDir, err = os.UserCacheDir()
