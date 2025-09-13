@@ -51,7 +51,7 @@ func getPsiphonConfigSignature(yamlNode smart.YAMLNode) string {
 
 func RegisterConfig(opt *mobileproxy.SmartDialerOptions, name string) {
 	opt.RegisterFallbackParser(name, func(ctx context.Context, yamlNode smart.YAMLNode) (transport.StreamDialer, string, error) {
-		dialer, err := parsePsiphon(context.Background(), yamlNode)
+		dialer, err := parsePsiphon(ctx, yamlNode)
 		if err != nil {
 			return nil, "", err
 		}
