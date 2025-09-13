@@ -79,6 +79,7 @@ fallback:
 """
 
 val options = Mobileproxy.newSmartDialerOptions(testDomains, config)
+
 // Register Psiphon
 Psiphon.registerConfig(options, "psiphon")
 
