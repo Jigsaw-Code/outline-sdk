@@ -331,7 +331,7 @@ public final class StreamDialer implements Seq.Proxy {
 	
 	/**
 	 * NewStreamDialerFromConfig creates a [StreamDialer] based on the given config.
-The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format.
+	The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format.
 	 */
 	public StreamDialer(String transportConfig) {
 		this.refnum = __NewStreamDialerFromConfig(transportConfig);
@@ -416,8 +416,8 @@ public abstract class Mobileproxy {
 	 * NewSmartStreamDialer automatically selects a DNS and TLS strategy to use, and return a [StreamDialer]
 	that will use the selected strategy.
 	It uses testDomain to find a strategy that works when accessing those domains.
-The strategies to search are given in the searchConfig. An example can be found in
-https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.json
+	The strategies to search are given in the searchConfig. An example can be found in
+	https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.json
 	 */
 	public static native StreamDialer newSmartStreamDialer(StringList testDomains, String searchConfig, LogWriter logWriter) throws Exception;
 	/**
@@ -426,7 +426,7 @@ https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.json
 	public static native LogWriter newStderrLogWriter();
 	/**
 	 * NewStreamDialerFromConfig creates a [StreamDialer] based on the given config.
-The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format.
+	The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format.
 	 */
 	public static native StreamDialer newStreamDialerFromConfig(String transportConfig) throws Exception;
 	/**
@@ -482,7 +482,7 @@ public final class Proxy implements Seq.Proxy {
 	public native long port();
 	/**
 	 * Stop gracefully stops the proxy service, waiting for at most timeout seconds before forcefully closing it.
-The function takes a timeoutSeconds number instead of a [time.Duration] so it's compatible with Go Mobile.
+	The function takes a timeoutSeconds number instead of a [time.Duration] so it&#39;s compatible with Go Mobile.
 	 */
 	public native void stop(long timeoutSeconds);
 	@Override public boolean equals(Object o) {
@@ -518,7 +518,7 @@ package mobileproxy;
 import go.Seq;
 
 /**
- * StringList allows us to pass a list of strings to the Go Mobile functions, since Go Mobiule doesn't
+ * StringList allows us to pass a list of strings to the Go Mobile functions, since Go Mobiule doesn&#39;t
 support slices as parameters.
  */
 public final class StringList implements Seq.Proxy {
@@ -599,7 +599,7 @@ On Android, the Kotlin code would look like this:
 ```kotlin
 // Use port zero to let the system pick an open port for you.
 val testDomains = Mobileproxy.newListFromLines("www.youtube.com\ni.ytimg.com")
-val strategiesConfig = "..."  // Config YAML. 
+val strategiesConfig = "..."  // Config YAML.
 val dialer = Mobileproxy.newSmartStreamDialer(testDomains, strategiesConfig, Mobileproxy.newStderrLogWriter())
 
 val proxy = Mobileproxy.runProxy("localhost:0", dialer)
@@ -663,8 +663,8 @@ ProxyController.getInstance()
 				ProxyConfig.Builder()
 						.addProxyRule(this.proxy!!.address())
 						.build(),
-						{},
-						{} // callback to be called once the ProxyConfig is applied
+				{}, // execution context for the following callback - do anything needed here once the proxy is applied, like refreshing web views 
+				{} // callback to be called once the ProxyConfig is applied
 		)
 ```
 
@@ -677,16 +677,17 @@ let configuration = WKWebViewConfiguration()
 
 let endpoint = NWEndpoint.hostPort(
 		host: NWEndpoint.Host(proxyHost),
-		port: NWEndpoint.Port(proxyPort)!)
+		port: NWEndpoint.Port(proxyPort)!
+)
 let proxyConfig = ProxyConfiguration.init(httpCONNECTProxy: endpoint)
 
 let websiteDataStore = WKWebsiteDataStore.default()
 websiteDataStore.proxyConfigurations = [proxyConfig]
 
-// Other webview configuration options... see https://developer.go.org/documentation/webkit/wkwebviewconfiguration
+// Other webview configuration options... see https://developer.apple.com/documentation/webkit/wkwebviewconfiguration
 
 let webview = WKWebView(
-		configuration: configuration,
+	configuration: configuration,
 )
 
 // use this webview as you would normally!
@@ -697,10 +698,3 @@ let webview = WKWebView(
 ```bash
 rm -rf ./out/
 ```
-
-## TODO
-
-* Move Psiphon to separate registration function. Need to make the Smart Dialer config extensible
-* Need to be able to extend the config URL format too. But two mechanisms is confusing. 
-  * Could consider `StrategyFinder.RegisterURLParser(scheme, parser)` and `StrategyFinder.RegisterYAMLParser(fieldName, parser)`
-* Merge URL and YAML formats, so we have a single way to parse and extend the config.
