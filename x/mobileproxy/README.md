@@ -41,7 +41,7 @@ To include Psiphon support please also include the `-tags=psiphon` flag and the 
 
 ```bash
 PATH="$(dirname $(go tool -n gobind)):${PATH}" go tool gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -tags=psiphon -o "$(pwd)/out/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy github.com/Jigsaw-Code/outline-sdk/x/mobileproxy/psiphon
-PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=android -androidapi=21 -tags=psiphon -o "$(pwd)/out/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy github.com/Jigsaw-Code/outline-sdk/x/mobileproxy/psiphon
+PATH="$(dirname $(go tool -n gobind)):${PATH}" go tool gomobile bind -ldflags='-s -w' -target=android -androidapi=21 -tags=psiphon -o "$(pwd)/out/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy github.com/Jigsaw-Code/outline-sdk/x/mobileproxy/psiphon
 ```
 
 Then, in your native code, register Psiphon with your Smart Dialer options.
