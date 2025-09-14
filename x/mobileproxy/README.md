@@ -26,33 +26,21 @@ If you are looking into converting a web site or web app into a censorship-resis
 ## Add the MobileProxy dependency
 ### Build the MobileProxy libraries for Android and iOS
 
-First, Build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
-
-From the `x/` directory:
+Build the iOS and Android libraries with [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile#hdr-Build_a_library_for_Android_and_iOS)
 
 ```bash
-go build -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
+PATH="$(dirname $(go tool -n gobind)):${PATH}" go tool gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -o "$(pwd)/out/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
+PATH="$(dirname $(go tool -n gobind)):${PATH}" go tool gomobile bind -ldflags='-s -w' -target=android -androidapi=21 -o "$(pwd)/out/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
 ```
 
 > [!WARNING]
 > The Psiphon library is not included in the build by default because the Psiphon codebase uses GPL. To support Psiphon configuration in the Mobile Proxy please build using the [`psiphon` build tag](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/psiphon).
 > When integrating Psiphon into your application please work with the Psiphon team at sponsor@psiphon.ca
 
-```bash
-go build -tags psiphon -o "$(pwd)/out/" golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
-```
-
-Then build the iOS and Android libraries with [`gomobile bind`](https://pkg.go.dev/golang.org/x/mobile/cmd/gomobile#hdr-Build_a_library_for_Android_and_iOS)
-
-```bash
-PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -o "$(pwd)/out/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
-PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=android -androidapi=21 -o "$(pwd)/out/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy
-```
-
 To include Psiphon support please also include the `-tags=psiphon` flag and the psiphon library.
 
 ```bash
-PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -tags=psiphon -o "$(pwd)/out/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy github.com/Jigsaw-Code/outline-sdk/x/mobileproxy/psiphon
+PATH="$(dirname $(go tool -n gobind)):${PATH}" go tool gomobile bind -ldflags='-s -w' -target=ios -iosversion=11.0 -tags=psiphon -o "$(pwd)/out/mobileproxy.xcframework" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy github.com/Jigsaw-Code/outline-sdk/x/mobileproxy/psiphon
 PATH="$(pwd)/out:$PATH" gomobile bind -ldflags='-s -w' -target=android -androidapi=21 -tags=psiphon -o "$(pwd)/out/mobileproxy.aar" github.com/Jigsaw-Code/outline-sdk/x/mobileproxy github.com/Jigsaw-Code/outline-sdk/x/mobileproxy/psiphon
 ```
 
