@@ -21,7 +21,7 @@ To integrate the MobileProxy into a Flutter app, follow this excellent tutorial 
 
 ### Web Apps (Experimental)
 
-If you are looking into converting a web site or web app into a censorship-resistant mobile app, look at the [Outline App Maker](https://github.com/Jigsaw-Code/Jigsaw-Code/outline-app-maker) that we are working on. 
+If you are looking into converting a web site or web app into a censorship-resistant mobile app, look at the [Outline App Maker](https://github.com/Jigsaw-Code/Jigsaw-Code/outline-app-maker). 
 
 ## Add the MobileProxy dependency
 
