@@ -31,7 +31,7 @@ We build and release the Mobileproxy library separately. To learn how to use the
 
 ### Build the MobileProxy libraries for Android and iOS
 
-Should you want or need to build Mobileproxy yorself, first build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
+Should you want or need to build Mobileproxy yourself, first build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
 
 From the `x/` directory:
 
