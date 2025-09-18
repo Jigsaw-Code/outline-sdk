@@ -27,7 +27,7 @@ If you are looking into converting a web site or web app into a censorship-resis
 
 ### Import natively built libraries
 
-We build and release the Mobileproxy library separately. To learn how to use the pre-compiled version, see the [Mobileproxy SDK Repository](https://github.com/Jigsaw-Code/outline-sdk-mobileproxy)
+We build and release the Mobileproxy library separately. To learn how to use the pre-compiled version, see the [Mobileproxy SDK Repository](https://github.com/Jigsaw-Code/outline-sdk-mobileproxy#integration)
 
 ### Build the MobileProxy libraries for Android and iOS
 
