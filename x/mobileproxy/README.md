@@ -21,12 +21,17 @@ To integrate the MobileProxy into a Flutter app, follow this excellent tutorial 
 
 ### Web Apps (Experimental)
 
-If you are looking into converting a web site or web app into a censorship-resistant mobile app, look at the [Web App Wrapper](https://github.com/Jigsaw-Code/outline-sdk/tree/main/x/examples/web-wrapper) that we are working on. 
+If you are looking into converting a web site or web app into a censorship-resistant mobile app, look at the [Outline App Maker](https://github.com/Jigsaw-Code/Jigsaw-Code/outline-app-maker). 
 
 ## Add the MobileProxy dependency
+
+### Import natively built libraries
+
+We build and release the Mobileproxy library separately. To learn how to use the pre-compiled version, see the [Mobileproxy SDK Repository](https://github.com/Jigsaw-Code/outline-sdk-mobileproxy#integration)
+
 ### Build the MobileProxy libraries for Android and iOS
 
-First, Build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
+Should you want or need to build Mobileproxy yourself, first build the Go Mobile binaries with [`go build`](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies)
 
 From the `x/` directory:
 
