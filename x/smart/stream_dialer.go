@@ -303,7 +303,7 @@ func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsC
 	ctx, searchDone := context.WithCancel(ctx)
 	defer searchDone()
 	raceStart := time.Now()
-	resolver, err := raceTests(ctx, 250*time.Millisecond, resolvers, func(resolver *smartResolver) (*smartResolver, error) {
+	resolver, err := raceTests(ctx, 250*time.Millisecond, resolvers, func(_ int, resolver *smartResolver) (*smartResolver, error) {
 		for _, testDomain := range testDomains {
 			select {
 			case <-ctx.Done():
@@ -352,10 +352,10 @@ func (f *StrategyFinder) findTLS(
 		Dialer transport.StreamDialer
 		Config string
 	}
-	result, err := raceTests(searchCtx, 250*time.Millisecond, tlsConfig, func(transportCfg string) (*SearchResult, error) {
+	result, err := raceTests(searchCtx, 250*time.Millisecond, tlsConfig, func(index int, transportCfg string) (*SearchResult, error) {
 		tlsDialer, err := configModule.NewStreamDialer(searchCtx, transportCfg)
 		if err != nil {
-			f.logCtx(searchCtx, "❌ dialer creation failed: %v, error=%v\n", transportCfg, err)
+			f.logCtx(searchCtx, "❌ Failed to create tls[%d]: %v, error=%v\n", index, transportCfg, err)
 			return nil, fmt.Errorf("NewStreamDialer failed: %w", err)
 		}
 
@@ -425,6 +425,21 @@ func (f *StrategyFinder) makeDialerFromConfig(ctx context.Context, configModule 
 	return nil, fmt.Sprintf("Invalid Config: %v", fallbackConfig), fmt.Errorf("invalid config of type %T: %v", fallbackConfig, fallbackConfig)
 }
 
+func makeConfigErrorSignature(ctx context.Context, config fallbackEntryConfig) string {
+	var configSignature string
+	sigBytes, marshalErr := yaml.MarshalContext(ctx, config, yaml.Flow(true))
+	if marshalErr != nil {
+		configSignature = fmt.Sprint(config)
+	} else {
+		configSignature = string(sigBytes)
+	}
+	configSignature = strings.TrimSpace(configSignature)
+	if len(configSignature) > 80 {
+		configSignature = configSignature[:79] + "…"
+	}
+	return configSignature
+}
+
 // Return the fastest fallback dialer that is able to access all the testDomans
 func (f *StrategyFinder) findFallback(
 	ctx context.Context, testDomains []string, fallbackConfigs []fallbackEntryConfig,
@@ -439,21 +454,12 @@ func (f *StrategyFinder) findFallback(
 
 	configModule := configurl.NewDefaultProviders()
 
-	fallback, err := raceTests(raceCtx, 250*time.Millisecond, fallbackConfigs, func(fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
+	fallback, err := raceTests(raceCtx, 250*time.Millisecond, fallbackConfigs, func(index int, fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
 		dialer, configSignature, err := f.makeDialerFromConfig(raceCtx, configModule, fallbackConfig)
 		if err != nil {
 			// Make up a config signature in case of failure.
-			sigBytes, marshalErr := yaml.MarshalContext(raceCtx, fallbackConfig, yaml.Flow(true))
-			if marshalErr != nil {
-				configSignature = fmt.Sprint(fallbackConfig)
-			} else {
-				configSignature = string(sigBytes)
-			}
-			configSignature = strings.TrimSpace(configSignature)
-			if len(configSignature) > 80 {
-				configSignature = configSignature[:79] + "…"
-			}
-			f.logCtx(raceCtx, "❌ Failed to create dialer: [%v]: %v\n", configSignature, err)
+			configSignature := makeConfigErrorSignature(raceCtx, fallbackConfig)
+			f.logCtx(raceCtx, "❌ Failed to create fallback[%d]: [%v]: %v\n", index, configSignature, err)
 			return nil, err
 		}
 

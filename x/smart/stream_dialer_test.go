@@ -1,6 +1,7 @@
 package smart
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -100,4 +101,30 @@ fallback:
 	}
 
 	require.Equal(t, expectedConfig, parsedConfig)
+}
+
+func TestMakeConfigErrorSignature(t *testing.T) {
+	t.Run("Simple string", func(t *testing.T) {
+		config := "ss://simple"
+		signature := makeConfigErrorSignature(context.Background(), config)
+		require.Equal(t, `ss://simple`, signature)
+	})
+
+	t.Run("Simple map", func(t *testing.T) {
+		config := map[string]any{"psiphon": map[string]any{"SponsorId": "sponsor"}}
+		signature := makeConfigErrorSignature(context.Background(), config)
+		require.Equal(t, `{psiphon: {SponsorId: sponsor}}`, signature)
+	})
+
+	t.Run("Long string", func(t *testing.T) {
+		config := "ss://longlonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglong"
+		signature := makeConfigErrorSignature(context.Background(), config)
+		require.Equal(t, `ss://longlonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglo…`, signature)
+	})
+
+	t.Run("Long map", func(t *testing.T) {
+		config := map[string]any{"psiphon": map[string]any{"SponsorId": "longlonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglong"}}
+		signature := makeConfigErrorSignature(context.Background(), config)
+		require.Equal(t, `{psiphon: {SponsorId: longlonglonglonglonglonglonglonglonglonglonglonglonglongl…`, signature)
+	})
 }
