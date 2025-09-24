@@ -58,7 +58,6 @@ type StrategyFinder struct {
 // RegisterFallbackParser register a fallback parser with the given name.
 // It overwrites an existing parser if it exists with the same name.
 func (f *StrategyFinder) RegisterFallbackParser(name string, parser FallbackParser) {
-
 	f.ensureFallbackParsers()[name] = parser
 }
 
