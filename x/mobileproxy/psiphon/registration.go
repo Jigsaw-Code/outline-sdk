@@ -22,7 +22,6 @@ import (
 	"fmt"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
 	"github.com/Jigsaw-Code/outline-sdk/x/smart"
 )
 
@@ -49,13 +48,12 @@ func getPsiphonConfigSignature(yamlNode smart.YAMLNode) string {
 	return string(jsonBytes)
 }
 
-func RegisterConfig(opt *mobileproxy.SmartDialerOptions, name string) {
-	opt.RegisterFallbackParser(name, func(ctx context.Context, yamlNode smart.YAMLNode) (transport.StreamDialer, string, error) {
-		dialer, err := parsePsiphon(ctx, yamlNode)
-		if err != nil {
-			return nil, "", err
-		}
-		configSignature := getPsiphonConfigSignature(yamlNode)
-		return dialer, configSignature, err
-	})
+// ParseConfig creates the Psiphon StreamDialer from a config.
+func ParseConfig(ctx context.Context, yamlNode smart.YAMLNode) (transport.StreamDialer, string, error) {
+	dialer, err := parsePsiphon(ctx, yamlNode)
+	if err != nil {
+		return nil, "", err
+	}
+	configSignature := getPsiphonConfigSignature(yamlNode)
+	return dialer, configSignature, err
 }

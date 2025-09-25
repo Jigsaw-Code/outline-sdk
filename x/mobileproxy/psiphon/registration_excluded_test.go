@@ -26,7 +26,7 @@ import (
 func Test_RegisterPsiphon(t *testing.T) {
 	opts := mobileproxy.NewSmartDialerOptions(mobileproxy.NewListFromLines("example.com"),
 		`fallback: [{psiphon: {}}]`)
-	RegisterConfig(opts, "psiphon")
+	opts.RegisterFallbackParser("psiphon", ParseConfig)
 	dialer, err := opts.NewStreamDialer()
 	require.Nil(t, dialer)
 	require.Error(t, err)

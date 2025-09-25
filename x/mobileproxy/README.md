@@ -86,7 +86,7 @@ fallback:
 val options = Mobileproxy.newSmartDialerOptions(testDomains, config)
 
 // Register Psiphon
-Psiphon.registerConfig(options, "psiphon")
+options.registerFallbackParser("psiphon", Psiphon.Parse)
 
 try {
     // Create the dialer
@@ -120,7 +120,7 @@ fallback:
 let options = MobileproxyNewSmartDialerOptions(testDomains, config)
 
 // Register Psiphon
-PsiphonRegisterConfig(options, "psiphon")
+options.registerFallbackParser("psiphon", PsiphonParse)
 
 do {
     // Create the dialer

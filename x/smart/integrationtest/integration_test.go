@@ -15,7 +15,7 @@
 //go:build nettest
 // +build nettest
 
-package smart
+package integrationtest
 
 import (
 	"bytes"
@@ -27,6 +27,8 @@ import (
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
+	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy/psiphon"
+	"github.com/Jigsaw-Code/outline-sdk/x/smart"
 	"github.com/stretchr/testify/require"
 )
 
@@ -88,12 +90,13 @@ fallback:
 		require.NoError(t, err)
 	}
 
-	finder := StrategyFinder{
+	finder := smart.StrategyFinder{
 		LogWriter:    logger.Writer(),
 		TestTimeout:  5 * time.Second,
 		StreamDialer: streamDialer,
 		PacketDialer: packetDialer,
 	}
+	finder.RegisterFallbackParser("psiphon", psiphon.ParseConfig)
 
 	_, err = finder.NewDialer(context.Background(), testDomains, configBytes)
 
@@ -107,7 +110,7 @@ fallback:
 		"request for A query failed: dial DNS resolver failed:",
 		`request for A query failed: receive DNS message failed: failed to get HTTP response: Post "https://mitm-software.badssl.com:443/dns-query": tls:`,
 		"🏃 running test: 'ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1'",
-		"❌ Failed to create fallback[1]: [{psiphon: {DisableLocalHTTPProxy: true, DisableLocalSocksProxy: true, Establish…]: unsupported fallback type: psiphon",
+		"❌ Failed to create fallback[1]: [{psiphon: {DisableLocalHTTPProxy: true, DisableLocalSocksProxy: true, Establish…]: failed to start psiphon dialer: clientlib: tunnel establishment timeout",
 		"🏃 running test: 'socks5://192.168.1.10:1080' (domain: www.example.com.)",
 	}
 	logContent := logBuffer.String()
