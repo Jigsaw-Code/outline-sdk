@@ -161,3 +161,39 @@ if err != nil {
 ```
 
 Please note that this is a basic example and may need to be adapted for your specific use case.
+
+## Adding a new fallback strategy
+
+Fallback strategies are used when none of the proxyless strategies are successful. They are typically proxies that are expected to be more reliable.
+
+To add a new fallback strategy:
+
+1. Create a `FallbackParser` function. This function takes a `YAMLNode` and returns a `transport.StreamDialer` and a config signature.
+2. Register the `FallbackParser` with the `mobileproxy.SmartDialerOptions.RegisterFallbackParser` method.
+
+For example, this is how you can register a fallback that is configured with `{error: "my error message"}` that
+always returns an error on dial:
+
+```go
+func RegisterErrorConfig(opt *mobileproxy.SmartDialerOptions, name string) {
+	opt.RegisterFallbackParser(name, func(ctx context.Context, yamlNode smart.YAMLNode) (transport.StreamDialer, string, error) {
+		switch typed := yamlNode.(type) {
+		case string:
+			dialer := transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+				return nil, errors.New(typed)
+			})
+			return dialer, typed, nil
+		default:
+			return nil, "", fmt.Errorf("invalid error dialer config")
+		}
+	})
+}
+
+func main() {
+	// ...
+  opts := mobileproxy.NewSmartDialerOptions(mobileproxy.NewListFromLines(*testDomainsFlag), *configFlag)
+	opts.SetLogWriter(mobileproxy.NewStderrLogWriter())
+	RegisterErrorConfig(opts, "error")
+  //...
+}
+```

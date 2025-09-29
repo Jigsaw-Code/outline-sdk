@@ -31,7 +31,7 @@ func newClosedChanel() <-chan struct{} {
 // That entry is returned. A test is only started after the previous test finished or maxWait is done, whichever
 // happens first. That way you bound the wait for a test, and they may overlap.
 // The test function should make use of the context to stop doing work when the race is done and it is no longer needed.
-func raceTests[E any, R any](ctx context.Context, maxWait time.Duration, entries []E, test func(entry E) (R, error)) (R, error) {
+func raceTests[E any, R any](ctx context.Context, maxWait time.Duration, entries []E, test func(index int, entry E) (R, error)) (R, error) {
 	type testResult struct {
 		Result R
 		Err    error
@@ -50,7 +50,8 @@ func raceTests[E any, R any](ctx context.Context, maxWait time.Duration, entries
 
 		// Ready to start testing another resolver.
 		case <-waitCh:
-			entry := entries[next]
+			index := next
+			entry := entries[index]
 			next++
 
 			waitCtx, waitDone := context.WithTimeout(ctx, maxWait)
@@ -63,7 +64,7 @@ func raceTests[E any, R any](ctx context.Context, maxWait time.Duration, entries
 
 			go func(entry E, testDone context.CancelFunc) {
 				defer testDone()
-				result, err := test(entry)
+				result, err := test(index, entry)
 				resultChan <- testResult{Result: result, Err: err}
 			}(entry, waitDone)
 

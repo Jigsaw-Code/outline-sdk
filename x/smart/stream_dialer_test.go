@@ -1,6 +1,7 @@
 package smart
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -63,8 +64,8 @@ fallback:
 		TLS: []string{"", "split:1", "split:2", "split:5", "tlsfrag:1"},
 		Fallback: []fallbackEntryConfig{
 			"ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTprSzdEdHQ0MkJLOE9hRjBKYjdpWGFK@1.2.3.4:9999/?outline=1",
-			fallbackEntryStructConfig{
-				Psiphon: map[string]any{
+			map[string]any{
+				"psiphon": map[string]any{
 					"PropagationChannelId": "FFFFFFFFFFFFFFFF",
 					"SponsorId":            "FFFFFFFFFFFFFFFF",
 				},
@@ -90,8 +91,8 @@ fallback:
 
 	expectedConfig := configConfig{
 		Fallback: []fallbackEntryConfig{
-			fallbackEntryStructConfig{
-				Psiphon: map[string]any{
+			map[string]any{
+				"psiphon": map[string]any{
 					"PropagationChannelId": "FFFFFFFFFFFFFFFF",
 					"SponsorId":            "FFFFFFFFFFFFFFFF",
 				},
@@ -102,34 +103,28 @@ fallback:
 	require.Equal(t, expectedConfig, parsedConfig)
 }
 
-func Test_getPsiphonConfigSignature_ValidFields(t *testing.T) {
-	finder := &StrategyFinder{}
-	config := []byte(`{
-		"PropagationChannelId": "FFFFFFFFFFFFFFFF",
-		"SponsorId": "FFFFFFFFFFFFFFFF",
-		"ClientPlatform": "outline",
-		"ClientVersion": "1"
-	}`)
-	expected := "Psiphon: {PropagationChannelId: FFFFFFFFFFFFFFFF, SponsorId: FFFFFFFFFFFFFFFF, [...]}"
-	actual := finder.getPsiphonConfigSignature(config)
-	require.Equal(t, expected, actual)
-}
+func TestMakeConfigErrorSignature(t *testing.T) {
+	t.Run("Simple string", func(t *testing.T) {
+		config := "ss://simple"
+		signature := makeConfigErrorSignature(context.Background(), config)
+		require.Equal(t, `ss://simple`, signature)
+	})
 
-func Test_getPsiphonConfigSignature_InvalidFields(t *testing.T) {
-	// If we don't understand the psiphon config we received for any reason
-	// then just output it as an opaque string
+	t.Run("Simple map", func(t *testing.T) {
+		config := map[string]any{"psiphon": map[string]any{"SponsorId": "sponsor"}}
+		signature := makeConfigErrorSignature(context.Background(), config)
+		require.Equal(t, `{psiphon: {SponsorId: sponsor}}`, signature)
+	})
 
-	finder := &StrategyFinder{}
-	config := []byte(`{"ClientPlatform": "outline", "ClientVersion": "1"}`)
-	expected := `{"ClientPlatform": "outline", "ClientVersion": "1"}`
-	actual := finder.getPsiphonConfigSignature(config)
-	require.Equal(t, expected, actual)
-}
+	t.Run("Long string", func(t *testing.T) {
+		config := "ss://longlonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglong"
+		signature := makeConfigErrorSignature(context.Background(), config)
+		require.Equal(t, `ss://longlonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglo…`, signature)
+	})
 
-func Test_getPsiphonConfigSignature_InvalidJson(t *testing.T) {
-	finder := &StrategyFinder{}
-	config := []byte(`invalid json`)
-	expected := `invalid json`
-	actual := finder.getPsiphonConfigSignature(config)
-	require.Equal(t, expected, actual)
+	t.Run("Long map", func(t *testing.T) {
+		config := map[string]any{"psiphon": map[string]any{"SponsorId": "longlonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglong"}}
+		signature := makeConfigErrorSignature(context.Background(), config)
+		require.Equal(t, `{psiphon: {SponsorId: longlonglonglonglonglonglonglonglonglonglonglonglonglongl…`, signature)
+	})
 }

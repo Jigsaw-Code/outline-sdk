@@ -15,21 +15,49 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 
+	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
+	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy/psiphon"
+	"github.com/Jigsaw-Code/outline-sdk/x/smart"
 )
 
+// RegisterErrorConfig registers a config that creates a dialer that always outputs an error.
+// The config looks like "error: my error message".
+func RegisterErrorConfig(opt *mobileproxy.SmartDialerOptions, name string) {
+	opt.RegisterFallbackParser(name, func(ctx context.Context, yamlNode smart.YAMLNode) (transport.StreamDialer, string, error) {
+		switch typed := yamlNode.(type) {
+		case string:
+			dialer := transport.FuncStreamDialer(func(ctx context.Context, addr string) (transport.StreamConn, error) {
+				return nil, errors.New(typed)
+			})
+			return dialer, typed, nil
+		default:
+			return nil, "", fmt.Errorf("invalid error dialer config")
+		}
+	})
+}
+
 func main() {
-	transportFlag := flag.String("transport", "", "Transport config")
+	configFlag := flag.String("config", "", "Smart Dialer config")
+	testDomainsFlag := flag.String("domains", "", "The test domains to find strategies.")
 	addrFlag := flag.String("localAddr", "localhost:8080", "Local proxy address")
 	urlProxyPrefixFlag := flag.String("proxyPath", "/proxy", "Path where to run the URL proxy. Set to empty (\"\") to disable it.")
 	flag.Parse()
 
-	dialer, err := mobileproxy.NewStreamDialerFromConfig(*transportFlag)
+	// TODO(fortuna): add strategy cache.
+	opts := mobileproxy.NewSmartDialerOptions(mobileproxy.NewListFromLines(*testDomainsFlag), *configFlag)
+	opts.SetLogWriter(mobileproxy.NewStderrLogWriter())
+	opts.RegisterFallbackParser("psiphon", psiphon.ParseConfig)
+	RegisterErrorConfig(opts, "error")
+	dialer, err := opts.NewStreamDialer()
 	if err != nil {
 		log.Fatalf("NewStreamDialerFromConfig failed: %v", err)
 	}
