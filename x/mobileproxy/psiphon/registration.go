@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
 	"github.com/Jigsaw-Code/outline-sdk/x/smart"
 )
 
@@ -56,4 +57,8 @@ func ParseConfig(ctx context.Context, yamlNode smart.YAMLNode) (transport.Stream
 	}
 	configSignature := getPsiphonConfigSignature(yamlNode)
 	return dialer, configSignature, err
+}
+
+func RegisterFallbackParser(opts *mobileproxy.SmartDialerOptions, name string) {
+	opts.RegisterFallbackParser(name, ParseConfig)
 }
