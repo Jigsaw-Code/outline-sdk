@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
 	"github.com/Jigsaw-Code/outline-sdk/x/smart"
 )
 
@@ -56,4 +57,14 @@ func ParseConfig(ctx context.Context, yamlNode smart.YAMLNode) (transport.Stream
 	}
 	configSignature := getPsiphonConfigSignature(yamlNode)
 	return dialer, configSignature, err
+}
+
+// RegisterFallbackParser registers the Psiphon config parser as a fallback parser for the given name (usually "psiphon").
+// This function is a convenience wrapper around opts.RegisterFallbackParser that is compatible with Go Mobile.
+//
+// Parameters:
+// * opts - the SmartDialerOptions to register the parser with
+// * name - the name under which to register the fallback parser
+func RegisterFallbackParser(opts *mobileproxy.SmartDialerOptions, name string) {
+	opts.RegisterFallbackParser(name, ParseConfig)
 }

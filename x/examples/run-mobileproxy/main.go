@@ -55,7 +55,7 @@ func main() {
 	// TODO(fortuna): add strategy cache.
 	opts := mobileproxy.NewSmartDialerOptions(mobileproxy.NewListFromLines(*testDomainsFlag), *configFlag)
 	opts.SetLogWriter(mobileproxy.NewStderrLogWriter())
-	opts.RegisterFallbackParser("psiphon", psiphon.ParseConfig)
+	psiphon.RegisterFallbackParser(opts, "psiphon")
 	RegisterErrorConfig(opts, "error")
 	dialer, err := opts.NewStreamDialer()
 	if err != nil {
