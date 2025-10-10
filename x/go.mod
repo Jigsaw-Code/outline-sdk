@@ -13,7 +13,7 @@ require (
 	github.com/goccy/go-yaml v1.17.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/lmittmann/tint v1.0.7
-	github.com/quic-go/quic-go v0.48.1
+	github.com/quic-go/quic-go v0.49.1
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/stretchr/testify v1.9.0
 	github.com/things-go/go-socks5 v0.0.5
@@ -110,7 +110,7 @@ require (
 	github.com/wlynxg/anet v0.0.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/goptlib v1.5.0 // indirect
-	go.uber.org/mock v0.4.0 // indirect
+	go.uber.org/mock v0.5.0 // indirect
 	go4.org/mem v0.0.0-20220726221520-4f986261bf13 // indirect
 	go4.org/netipx v0.0.0-20230824141953-6213f710f925 // indirect
 	golang.org/x/crypto v0.42.0 // indirect
