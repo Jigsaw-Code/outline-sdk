@@ -262,6 +262,7 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 			testConn, err := dialer.DialStream(testTimeoutCtx, testAddr)
 			if err != nil {
 				f.logCtx(testCtx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+				cancelAll()
 				errCh <- err
 				return
 			}
@@ -272,6 +273,7 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 			err = tlsConn.HandshakeContext(testTimeoutCtx)
 			if err != nil {
 				f.logCtx(testCtx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+				cancelAll()
 				errCh <- err
 				return
 			}
@@ -279,12 +281,14 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 			// HTTPS Get
 			req, err := http.NewRequestWithContext(testTimeoutCtx, http.MethodHead, "https://"+testDomain, nil)
 			if err != nil {
+				cancelAll()
 				errCh <- fmt.Errorf("failed to create HTTP request: %w", err)
 				return
 			}
 
 			if err := req.Write(tlsConn); err != nil {
 				f.logCtx(testCtx, "🏁 failed to write HTTP request: '%v' (domain: %v), duration=%v, error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+				cancelAll()
 				errCh <- err
 				return
 			}
@@ -292,6 +296,7 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 			resp, err := http.ReadResponse(bufio.NewReader(tlsConn), req)
 			if err != nil {
 				f.logCtx(testCtx, "🏁 failed to read HTTP response: '%v' (domain: %v), duration=%v, error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+				cancelAll()
 				errCh <- err
 				return
 			}
@@ -301,10 +306,14 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 			f.logCtx(testCtx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
 		}(testDomain)
 	}
-	wg.Wait()
-	close(errCh)
 
-	// Return the first error we received, if any.
+	go func() {
+		wg.Wait()
+		close(errCh)
+	}()
+
+	// Return the first error we received, if any. If all tests succeed,
+	// the channel will be closed and this will return nil.
 	return <-errCh
 }
 
