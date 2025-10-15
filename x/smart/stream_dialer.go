@@ -241,57 +241,61 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryConfig) ([]*sma
 
 // Test that a dialer is able to access all the given test domains. Returns nil if all tests succeed
 func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.StreamDialer, testDomains []string, transportCfg string) error {
-	for _, testDomain := range testDomains {
-		startTime := time.Now()
+	_, err := raceTests(ctx, 0, testDomains, func(testDomain string) (struct{}, error) {
+		var empty struct{}
+		{
+			startTime := time.Now()
 
-		testAddr := net.JoinHostPort(testDomain, "443")
-		f.logCtx(ctx, "🏃 running test: '%v' (domain: %v)\n", transportCfg, testDomain)
+			testAddr := net.JoinHostPort(testDomain, "443")
+			f.logCtx(ctx, "🏃 running test: '%v' (domain: %v)\n", transportCfg, testDomain)
 
-		testCtx, cancel := context.WithTimeout(ctx, f.TestTimeout)
-		defer cancel()
+			testCtx, cancel := context.WithTimeout(ctx, f.TestTimeout)
+			defer cancel()
 
-		// Dial
+			// Dial
 
-		testConn, err := dialer.DialStream(testCtx, testAddr)
-		if err != nil {
-			f.logCtx(ctx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-			return err
+			testConn, err := dialer.DialStream(testCtx, testAddr)
+			if err != nil {
+				f.logCtx(ctx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+				return empty, err
+			}
+
+			// TLS Connection
+
+			tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
+			defer tlsConn.Close()
+			err = tlsConn.HandshakeContext(testCtx)
+			if err != nil {
+				f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+				return empty, err
+			}
+
+			// HTTPS Get
+
+			req, err := http.NewRequestWithContext(testCtx, http.MethodHead, "https://"+testDomain, nil)
+			if err != nil {
+				return empty, fmt.Errorf("failed to create HTTP request: %w", err)
+			}
+
+			if err := req.Write(tlsConn); err != nil {
+				f.logCtx(ctx, "🏁 failed to write HTTP request: '%v' (domain: %v), duration=%v, error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+				return empty, err
+			}
+
+			resp, err := http.ReadResponse(bufio.NewReader(tlsConn), req)
+			if err != nil {
+				f.logCtx(ctx, "🏁 failed to read HTTP response: '%v' (domain: %v), duration=%v, error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+				return empty, err
+			}
+			defer resp.Body.Close()
+
+			// Many bare domains return i.e. 301 redirects, so we don't validate anything about the response here, just that the request succeeded.
+
+			f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
 		}
-
-		// TLS Connection
-
-		tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
-		defer tlsConn.Close()
-		err = tlsConn.HandshakeContext(testCtx)
-		if err != nil {
-			f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-			return err
-		}
-
-		// HTTPS Get
-
-		req, err := http.NewRequestWithContext(testCtx, http.MethodHead, "https://"+testDomain, nil)
-		if err != nil {
-			return fmt.Errorf("failed to create HTTP request: %w", err)
-		}
-
-		if err := req.Write(tlsConn); err != nil {
-			f.logCtx(ctx, "🏁 failed to write HTTP request: '%v' (domain: %v), duration=%v, error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-			return err
-		}
-
-		resp, err := http.ReadResponse(bufio.NewReader(tlsConn), req)
-		if err != nil {
-			f.logCtx(ctx, "🏁 failed to read HTTP response: '%v' (domain: %v), duration=%v, error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-			return err
-		}
-		defer resp.Body.Close()
-
-		// Many bare domains return i.e. 301 redirects, so we don't validate anything about the response here, just that the request succeeded.
-
-		f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
-	}
-	return nil
+		return empty, nil
+	})
+	return err
 }
 
 func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsConfig []dnsEntryConfig) (dns.Resolver, *dnsEntryConfig, error) {
