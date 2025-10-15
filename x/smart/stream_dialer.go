@@ -239,6 +239,56 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryConfig) ([]*sma
 	return rts, nil
 }
 
+// testDialerSingleDomain tests that a dialer is able to access a single test domain.
+func (f *StrategyFinder) testDialerSingleDomain(ctx context.Context, dialer transport.StreamDialer, testDomain, transportCfg string) error {
+	startTime := time.Now()
+
+	testAddr := net.JoinHostPort(testDomain, "443")
+	f.logCtx(ctx, "🏃 running test: '%v' (domain: %v)\n", transportCfg, testDomain)
+
+	testTimeoutCtx, cancelTest := context.WithTimeout(ctx, f.TestTimeout)
+	defer cancelTest()
+
+	// Dial
+	testConn, err := dialer.DialStream(testTimeoutCtx, testAddr)
+	if err != nil {
+		f.logCtx(ctx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+		return err
+	}
+	defer testConn.Close()
+
+	// TLS Connection
+	tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
+	err = tlsConn.HandshakeContext(testTimeoutCtx)
+	if err != nil {
+		f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+		return err
+	}
+
+	// HTTPS Get
+	req, err := http.NewRequestWithContext(testTimeoutCtx, http.MethodHead, "https://"+testDomain, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	if err := req.Write(tlsConn); err != nil {
+		f.logCtx(ctx, "🏁 failed to write HTTP request: '%v' (domain: %v), duration=%v, error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+		return err
+	}
+
+	resp, err := http.ReadResponse(bufio.NewReader(tlsConn), req)
+	if err != nil {
+		f.logCtx(ctx, "🏁 failed to read HTTP response: '%v' (domain: %v), duration=%v, error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+		return err
+	}
+	resp.Body.Close()
+
+	// Many bare domains return i.e. 301 redirects, so we don't validate anything about the response here, just that the request succeeded.
+	f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
+
+	return nil
+}
+
 // Test that a dialer is able to access all the given test domains. Returns nil if all tests succeed
 func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.StreamDialer, testDomains []string, transportCfg string) error {
 	var wg sync.WaitGroup
@@ -250,60 +300,11 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 	for _, testDomain := range testDomains {
 		go func(testDomain string) {
 			defer wg.Done()
-			startTime := time.Now()
-
-			testAddr := net.JoinHostPort(testDomain, "443")
-			f.logCtx(testCtx, "🏃 running test: '%v' (domain: %v)\n", transportCfg, testDomain)
-
-			testTimeoutCtx, cancelTest := context.WithTimeout(testCtx, f.TestTimeout)
-			defer cancelTest()
-
-			// Dial
-			testConn, err := dialer.DialStream(testTimeoutCtx, testAddr)
-			if err != nil {
-				f.logCtx(testCtx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-				cancelAll()
-				errCh <- err
-				return
-			}
-			defer testConn.Close()
-
-			// TLS Connection
-			tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
-			err = tlsConn.HandshakeContext(testTimeoutCtx)
-			if err != nil {
-				f.logCtx(testCtx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-				cancelAll()
-				errCh <- err
-				return
-			}
-
-			// HTTPS Get
-			req, err := http.NewRequestWithContext(testTimeoutCtx, http.MethodHead, "https://"+testDomain, nil)
+			err := f.testDialerSingleDomain(testCtx, dialer, testDomain, transportCfg)
 			if err != nil {
 				cancelAll()
-				errCh <- fmt.Errorf("failed to create HTTP request: %w", err)
-				return
-			}
-
-			if err := req.Write(tlsConn); err != nil {
-				f.logCtx(testCtx, "🏁 failed to write HTTP request: '%v' (domain: %v), duration=%v, error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-				cancelAll()
 				errCh <- err
-				return
 			}
-
-			resp, err := http.ReadResponse(bufio.NewReader(tlsConn), req)
-			if err != nil {
-				f.logCtx(testCtx, "🏁 failed to read HTTP response: '%v' (domain: %v), duration=%v, error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
-				cancelAll()
-				errCh <- err
-				return
-			}
-			resp.Body.Close()
-
-			// Many bare domains return i.e. 301 redirects, so we don't validate anything about the response here, just that the request succeeded.
-			f.logCtx(testCtx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
 		}(testDomain)
 	}
 
