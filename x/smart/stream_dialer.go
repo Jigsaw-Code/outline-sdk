@@ -246,27 +246,30 @@ func (f *StrategyFinder) testDialerSingleDomain(ctx context.Context, dialer tran
 	testAddr := net.JoinHostPort(testDomain, "443")
 	f.logCtx(ctx, "🏃 running test: '%v' (domain: %v)\n", transportCfg, testDomain)
 
-	testTimeoutCtx, cancelTest := context.WithTimeout(ctx, f.TestTimeout)
-	defer cancelTest()
+	testCtx, cancel := context.WithTimeout(ctx, f.TestTimeout)
+	defer cancel()
 
 	// Dial
-	testConn, err := dialer.DialStream(testTimeoutCtx, testAddr)
+
+	testConn, err := dialer.DialStream(testCtx, testAddr)
 	if err != nil {
 		f.logCtx(ctx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 		return err
 	}
-	defer testConn.Close()
 
 	// TLS Connection
+
 	tlsConn := tls.Client(testConn, &tls.Config{ServerName: testDomain})
-	err = tlsConn.HandshakeContext(testTimeoutCtx)
+	defer tlsConn.Close()
+	err = tlsConn.HandshakeContext(testCtx)
 	if err != nil {
 		f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 		return err
 	}
 
 	// HTTPS Get
-	req, err := http.NewRequestWithContext(testTimeoutCtx, http.MethodHead, "https://"+testDomain, nil)
+
+	req, err := http.NewRequestWithContext(testCtx, http.MethodHead, "https://"+testDomain, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP request: %w", err)
 	}
@@ -281,16 +284,17 @@ func (f *StrategyFinder) testDialerSingleDomain(ctx context.Context, dialer tran
 		f.logCtx(ctx, "🏁 failed to read HTTP response: '%v' (domain: %v), duration=%v, error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 		return err
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
 
 	// Many bare domains return i.e. 301 redirects, so we don't validate anything about the response here, just that the request succeeded.
-	f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
 
+	f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
 	return nil
 }
 
 // Test that a dialer is able to access all the given test domains. Returns nil if all tests succeed
 func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.StreamDialer, testDomains []string, transportCfg string) error {
+	// Run tests for all the testDomains in parallel
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(testDomains))
 	testCtx, cancelAll := context.WithCancel(ctx)
