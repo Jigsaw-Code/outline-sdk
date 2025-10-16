@@ -1,10 +1,26 @@
-# ECH Analisys Tool
+# ECH Analysis Tool
 
-## Running the DNS analysis
+This goal of this project is to better understand the impact of deploying the HTTPS Resource Record (RR) and
+Encrypted ClientHello (ECH) in order to inform various tradeoffs.
 
-This tool performs DNS queries for the top domains from the Tranco list to check for A, AAAA, and HTTPS records.
+Some research questions:
 
-To run the tool, use the `go run` command from the `x/` directory:
+* **DNS Latency** - How long does it take to receive the HTTPS RR, and how does that compare to the A and AAAA records?
+* **Service Support** - Do services implement the TLS standard correctly, or do they fail with the ECH GREASE extension?
+  Do the services supporting ECH correctly implement it? What HTTPS RR features do services support?
+* **Network Support** - Do networks block or interfere with ECH?
+
+This project contains two main tools to help answer these questions:
+1.  A Go program to perform large-scale DNS analysis.
+2.  A custom `curl` build with ECH support for targeted testing.
+
+---
+
+## DNS Analysis Tool
+
+This tool performs DNS queries (A, AAAA, HTTPS) for a large number of domains from the Tranco list.
+
+To run the tool, use the `go run` command:
 
 ```sh
 go run github.com/Jigsaw-Code/outline-sdk/x/tools/ech-test --topN 100
@@ -16,22 +32,48 @@ This will:
 3. Query the top 100 domains for A, AAAA, and HTTPS records using the `8.8.8.8:53` resolver.
 4. Save the results to `workspace/results-top100.csv`.
 
-### Parameters
+#### Parameters
 
 * `-workspace <path>`: Directory to store intermediate files. Defaults to `./workspace`.
 * `-trancoID <id>`: The ID of the Tranco list to use. Defaults to `7NZ4X`.
 * `-topN <number>`: The number of top domains to analyze. Defaults to 100.
 
-## Domain List
+### Output Format
 
-We are using the [Tranco list](https://tranco-list.eu/) of top 1 million domains.
+The tool generates a CSV file (`workspace/results-top<N>.csv`) with the following columns:
 
-We use the October 2, 2025 version with subdomains ([reference](https://tranco-list.eu/list/7NZ4X/1000000)).
-You can find the zip file at https://tranco-list.eu/download/daily/tranco_7NZ4X-1m.csv.zip
+*   `timestamp`: When the query was performed (RFC3339Nano).
+*   `duration_ms`: How long the query took in milliseconds.
+*   `domain`: The domain that was queried.
+*   `query_type`: The type of DNS query (A, AAAA, HTTPS).
+*   `error`: Any error that occurred during the query.
+*   `rcode`: The DNS response code (e.g., NoError, NXDomain).
+*   `answers`: The resource records in the answer section, formatted as a JSON array.
+*   `additionals`: The resource records in the additional section, formatted as a JSON array.
 
-## Building `curl`
+**Example:**
+```csv
+timestamp,duration_ms,domain,query_type,error,rcode,answers,additionals
+2025-10-16T12:00:00.123456789Z,50,example.com,A,,NoError,"["93.184.216.34"]","[]"
+2025-10-16T12:00:00.234567890Z,75,example.com,AAAA,,NoError,"["2606:2800:220:1:248:1893:25c8:1946"]","[]"
+2025-10-16T12:00:00.456789012Z,150,example.com,HTTPS,,NoError,"[{"priority":1,"target":"example.com.","params":{"alpn":["h2","http/1.1"]}}]","[]"
+```
 
-If you don't have automake:
+---
+
+## ECH-enabled `curl`
+
+This is a custom build of `curl` with ECH support from the [DEfO project](https://github.com/defo-project). It is useful for manually testing ECH functionality against specific web servers.
+
+### Prerequisites (for building on macOS)
+
+*   Homebrew
+*   `automake`
+*   `libtool`
+
+### Building
+
+If you don't have `automake`:
 
 ```sh
 brew install automake libtool
@@ -79,7 +121,9 @@ configure: WARNING: ECH is enabled but marked EXPERIMENTAL. Use with caution!
 configure: WANING: HTTPSRR is enabled but marked EXPERIMENTAL. Use with caution!
 ```
 
-To test:
+### Verifying the build
+
+To test that your custom `curl` build is working correctly, run it against the DEfO test server:
 
 ```console
 % "${WORKSPACE_DIR}/output/bin/curl" --ech=true --doh-url https://1.1.1.1/dns-query 'https://test.defo.ie/echstat.php?format=json' | jq
@@ -91,3 +135,6 @@ To test:
   "config": "min-ng.test.defo.ie"
 }
 ```
+
+---
+*The domain list used for the DNS analysis is the [Tranco list](https://tranco-list.eu/).*
