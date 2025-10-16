@@ -1,5 +1,27 @@
 # ECH Analisys Tool
 
+## Running the DNS analysis
+
+This tool performs DNS queries for the top domains from the Tranco list to check for A, AAAA, and HTTPS records.
+
+To run the tool, use the `go run` command from the `x/` directory:
+
+```sh
+go run github.com/Jigsaw-Code/outline-sdk/x/tools/ech-test --topN 100
+```
+
+This will:
+1. Create a `workspace` directory if it doesn't exist.
+2. Download the Tranco top 1 million domains list (if not already present).
+3. Query the top 100 domains for A, AAAA, and HTTPS records using the `8.8.8.8:53` resolver.
+4. Save the results to `workspace/results-top100.csv`.
+
+### Parameters
+
+* `-workspace <path>`: Directory to store intermediate files. Defaults to `./workspace`.
+* `-trancoID <id>`: The ID of the Tranco list to use. Defaults to `7NZ4X`.
+* `-topN <number>`: The number of top domains to analyze. Defaults to 100.
+
 ## Domain List
 
 We are using the [Tranco list](https://tranco-list.eu/) of top 1 million domains.
