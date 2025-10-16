@@ -19,9 +19,9 @@ require (
 	github.com/things-go/go-socks5 v0.0.5
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	golang.org/x/mobile v0.0.0-20240520174638-fa72addaaa1b
-	golang.org/x/net v0.44.0
-	golang.org/x/sys v0.36.0
-	golang.org/x/term v0.35.0
+	golang.org/x/net v0.46.1-0.20251015210336-ef82ae896f6c
+	golang.org/x/sys v0.37.0
+	golang.org/x/term v0.36.0
 )
 
 require (
@@ -113,11 +113,11 @@ require (
 	go.uber.org/mock v0.4.0 // indirect
 	go4.org/mem v0.0.0-20220726221520-4f986261bf13 // indirect
 	go4.org/netipx v0.0.0-20230824141953-6213f710f925 // indirect
-	golang.org/x/crypto v0.42.0 // indirect
+	golang.org/x/crypto v0.43.0 // indirect
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
 	golang.org/x/mod v0.28.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
-	golang.org/x/text v0.29.0 // indirect
+	golang.org/x/text v0.30.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.37.0 // indirect
 	golang.org/x/tools/go/packages/packagestest v0.1.1-deprecated // indirect
