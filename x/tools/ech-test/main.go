@@ -35,6 +35,7 @@ import (
 	"github.com/Jigsaw-Code/outline-sdk/dns"
 	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"golang.org/x/net/dns/dnsmessage"
+	"golang.org/x/sync/semaphore"
 )
 
 // downloadFile downloads the file from fileURL and saves it as localFilename.
@@ -260,6 +261,7 @@ func main() {
 	workspaceFlag := flag.String("workspace", "./workspace", "Directory to store intermediate files")
 	trancoIDFlag := flag.String("trancoID", "7NZ4X", "Tranco list ID to use")
 	topNFlag := flag.Int("topN", 100, "Number of top domains to analyze")
+	parallelismFlag := flag.Int("parallelism", 100, "Maximum number of parallel requests")
 	flag.Parse()
 
 	// Set up workspace directory.
@@ -335,15 +337,31 @@ func main() {
 		}
 	}()
 
+	sem := semaphore.NewWeighted(int64(*parallelismFlag))
 	var resolveWg sync.WaitGroup
+	resolveWg.Add(len(domains) * 3)
 	for _, domain := range domains {
-		resolveWg.Add(1)
 		go func(d string) {
-			defer resolveWg.Done()
+			if err := sem.Acquire(context.Background(), 3); err != nil {
+				slog.Error("Failed to acquire semaphore", "error", err)
+				return
+			}
 			slog.Info("Analyzing", "domain", d)
-			resultsCh <- resolve(resolver, d, dnsmessage.TypeA)
-			resultsCh <- resolve(resolver, d, dnsmessage.TypeAAAA)
-			resultsCh <- resolve(resolver, d, dnsmessage.TypeHTTPS)
+			go func() {
+				resultsCh <- resolve(resolver, d, dnsmessage.TypeA)
+				sem.Release(1)
+				resolveWg.Done()
+			}()
+			go func() {
+				resultsCh <- resolve(resolver, d, dnsmessage.TypeAAAA)
+				sem.Release(1)
+				resolveWg.Done()
+			}()
+			go func() {
+				resultsCh <- resolve(resolver, d, dnsmessage.TypeHTTPS)
+				sem.Release(1)
+				resolveWg.Done()
+			}()
 		}(domain)
 	}
 	resolveWg.Wait()

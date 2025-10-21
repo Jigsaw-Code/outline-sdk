@@ -39,6 +39,7 @@ This will:
 * `-workspace <path>`: Directory to store intermediate files. Defaults to `./workspace`.
 * `-trancoID <id>`: The ID of the Tranco list to use. Defaults to `7NZ4X`.
 * `-topN <number>`: The number of top domains to analyze. Defaults to 100.
+* `-parallelism <number>`: Maximum number of parallel requests. Defaults to 100.
 
 ### Output Format
 
@@ -50,16 +51,17 @@ The tool generates a CSV file (`workspace/results-top<N>.csv`) with the followin
 * `query_type`: The type of DNS query (A, AAAA, HTTPS).
 * `error`: Any error that occurred during the query.
 * `rcode`: The DNS response code (e.g., NoError, NXDomain).
-* `answers`: The resource records in the answer section, formatted as a JSON array.
+* `cnames`: The CNAME records in the answer section, formatted as a JSON array.
+* `answers`: The resource records in the answer section (excluding CNAMEs), formatted as a JSON array.
 * `additionals`: The resource records in the additional section, formatted as a JSON array.
 
 **Example:**
 
 ```csv
-timestamp,duration_ms,domain,query_type,error,rcode,answers,additionals
-2025-10-16T12:00:00.123456789Z,50,example.com,A,,NoError,"["93.184.216.34"]","[]"
-2025-10-16T12:00:00.234567890Z,75,example.com,AAAA,,NoError,"["2606:2800:220:1:248:1893:25c8:1946"]","[]"
-2025-10-16T12:00:00.456789012Z,150,example.com,HTTPS,,NoError,"[{"priority":1,"target":"example.com.","params":{"alpn":["h2","http/1.1"]}}]","[]"
+timestamp,duration_ms,domain,query_type,error,rcode,cnames,answers,additionals
+2025-10-16T12:00:00.123456789Z,50,example.com,A,,NoError,[],"["93.184.216.34"]","[]"
+2025-10-16T12:00:00.234567890Z,75,example.com,AAAA,,NoError,[],"["2606:2800:220:1:248:1893:25c8:1946"]","[]"
+2025-10-16T12:00:00.456789012Z,150,example.com,HTTPS,,NoError,[],"[{"priority":1,"target":"example.com.","params":{"alpn":["h2","http/1.1"]}}]","[]"
 ```
 
 ---
