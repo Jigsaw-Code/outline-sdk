@@ -11,8 +11,9 @@ Some research questions:
 * **Network Support** - Do networks block or interfere with ECH?
 
 This project contains two main tools to help answer these questions:
-1.  A Go program to perform large-scale DNS analysis.
-2.  A custom `curl` build with ECH support for targeted testing.
+
+1. A Go program to perform large-scale DNS analysis.
+2. A custom `curl` build with ECH support for targeted testing.
 
 ---
 
@@ -27,12 +28,13 @@ go run github.com/Jigsaw-Code/outline-sdk/x/tools/ech-test --topN 100
 ```
 
 This will:
-1. Create a `workspace` directory if it doesn't exist.
+
+1. Create a `./workspace` directory if it doesn't exist.
 2. Download the Tranco top 1 million domains list (if not already present).
 3. Query the top 100 domains for A, AAAA, and HTTPS records using the `8.8.8.8:53` resolver.
-4. Save the results to `workspace/results-top100.csv`.
+4. Save the results to `./workspace/results-top100.csv`.
 
-#### Parameters
+### Parameters
 
 * `-workspace <path>`: Directory to store intermediate files. Defaults to `./workspace`.
 * `-trancoID <id>`: The ID of the Tranco list to use. Defaults to `7NZ4X`.
@@ -42,16 +44,17 @@ This will:
 
 The tool generates a CSV file (`workspace/results-top<N>.csv`) with the following columns:
 
-*   `timestamp`: When the query was performed (RFC3339Nano).
-*   `duration_ms`: How long the query took in milliseconds.
-*   `domain`: The domain that was queried.
-*   `query_type`: The type of DNS query (A, AAAA, HTTPS).
-*   `error`: Any error that occurred during the query.
-*   `rcode`: The DNS response code (e.g., NoError, NXDomain).
-*   `answers`: The resource records in the answer section, formatted as a JSON array.
-*   `additionals`: The resource records in the additional section, formatted as a JSON array.
+* `timestamp`: When the query was performed (RFC3339Nano).
+* `duration_ms`: How long the query took in milliseconds.
+* `domain`: The domain that was queried.
+* `query_type`: The type of DNS query (A, AAAA, HTTPS).
+* `error`: Any error that occurred during the query.
+* `rcode`: The DNS response code (e.g., NoError, NXDomain).
+* `answers`: The resource records in the answer section, formatted as a JSON array.
+* `additionals`: The resource records in the additional section, formatted as a JSON array.
 
 **Example:**
+
 ```csv
 timestamp,duration_ms,domain,query_type,error,rcode,answers,additionals
 2025-10-16T12:00:00.123456789Z,50,example.com,A,,NoError,"["93.184.216.34"]","[]"
@@ -67,9 +70,9 @@ This is a custom build of `curl` with ECH support from the [DEfO project](https:
 
 ### Prerequisites (for building on macOS)
 
-*   Homebrew
-*   `automake`
-*   `libtool`
+* Homebrew
+* `automake`
+* `libtool`
 
 ### Building
 
