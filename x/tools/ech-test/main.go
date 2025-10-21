@@ -215,6 +215,34 @@ func ensureTrancoList(workspaceDir, trancoID string) string {
 	return trancoZipFilename
 }
 
+func readDomainsFromTrancoCSV(trancoZipFilename string, topN int) ([]string, error) {
+	zipReader, err := zip.OpenReader(trancoZipFilename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open Tranco ZIP file: %w", err)
+	}
+	defer zipReader.Close()
+
+	csvFile, err := zipReader.Open("top-1m.csv")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open CSV file inside ZIP: %w", err)
+	}
+	defer csvFile.Close()
+	csvReader := csv.NewReader(csvFile)
+	var domains []string
+	for i := 0; i < topN; i++ {
+		record, err := csvReader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to read from Tranco CSV: %w", err)
+		}
+		// Format is <index>,<domain>
+		domains = append(domains, record[1])
+	}
+	return domains, nil
+}
+
 func extractCNAMEs(resources []dnsmessage.Resource) ([]dnsmessage.Resource, []dnsmessage.Resource) {
 	var cnames []dnsmessage.Resource
 	var cleanAnswers []dnsmessage.Resource
@@ -240,34 +268,14 @@ func main() {
 	// Ensure Tranco list is present.
 	trancoZipFilename := ensureTrancoList(workspaceDir, *trancoIDFlag)
 
-	zipReader, err := zip.OpenReader(trancoZipFilename)
+	// Read top N domains from Tranco CSV.
+	domains, err := readDomainsFromTrancoCSV(trancoZipFilename, *topNFlag)
 	if err != nil {
-		slog.Error("Failed to open Tranco ZIP file", "path", trancoZipFilename, "error", err)
+		slog.Error("Failed to read domains from Tranco CSV", "error", err)
 		os.Exit(1)
 	}
-	defer zipReader.Close()
 
-	csvFile, err := zipReader.Open("top-1m.csv")
-	if err != nil {
-		slog.Error("Failed to open CSV file inside ZIP", "error", err)
-		os.Exit(1)
-	}
-	defer csvFile.Close()
-	csvReader := csv.NewReader(csvFile)
-	var domains []string
-	for i := 0; i < *topNFlag; i++ {
-		record, err := csvReader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			slog.Error("Failed to read from Tranco CSV", "error", err)
-			os.Exit(1)
-		}
-		// Format is <index>,<domain>
-		domains = append(domains, record[1])
-	}
-
+	// Create new output CSV file.
 	outputFilename := filepath.Join(workspaceDir, fmt.Sprintf("results-top%d.csv", *topNFlag))
 	outputFile, err := os.Create(outputFilename)
 	if err != nil {
