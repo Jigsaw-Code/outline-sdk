@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -30,6 +31,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/dns"
@@ -77,8 +79,6 @@ type QueryResult struct {
 
 func resolve(resolver dns.Resolver, domain string, qtype dnsmessage.Type) QueryResult {
 	startTime := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	result := QueryResult{
 		Timestamp: startTime,
@@ -93,10 +93,13 @@ func resolve(resolver dns.Resolver, domain string, qtype dnsmessage.Type) QueryR
 		return result
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	resp, err := resolver.Query(ctx, *q)
 	result.Duration = time.Since(startTime)
 	if err != nil {
-		result.Error = fmt.Sprintf("query failed: %v", err)
+		slog.Debug("Query failed", "domain", domain, "type", qtype.String(), "error", err)
+		result.Error = fmt.Sprintf("query failed: %v", formatError(err))
 		return result
 	}
 
@@ -257,12 +260,34 @@ func extractCNAMEs(resources []dnsmessage.Resource) ([]dnsmessage.Resource, []dn
 	return cnames, cleanAnswers
 }
 
+func isTimeout(err error) bool {
+	var timeErr interface{ Timeout() bool }
+	return errors.As(err, &timeErr) && timeErr.Timeout()
+}
+
+func formatError(err error) string {
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		return errno.Error()
+	} else if isTimeout(err) {
+		return "ETIMEDOUT"
+	}
+	return err.Error()
+}
+
 func main() {
 	workspaceFlag := flag.String("workspace", "./workspace", "Directory to store intermediate files")
 	trancoIDFlag := flag.String("trancoID", "7NZ4X", "Tranco list ID to use")
 	topNFlag := flag.Int("topN", 100, "Number of top domains to analyze")
 	parallelismFlag := flag.Int("parallelism", 100, "Maximum number of parallel requests")
+	verboseFlag := flag.Bool("verbose", false, "Enable verbose logging")
 	flag.Parse()
+
+	if *verboseFlag {
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	} else {
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	}
 
 	// Set up workspace directory.
 	workspaceDir := ensureWorkspace(*workspaceFlag)
