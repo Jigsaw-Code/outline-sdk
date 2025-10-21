@@ -69,6 +69,7 @@ type QueryResult struct {
 	QueryType   string
 	Error       string
 	RCode       string
+	CNAMEs      []string
 	Answers     []dnsmessage.Resource
 	Additionals []dnsmessage.Resource
 }
@@ -214,6 +215,19 @@ func ensureTrancoList(workspaceDir, trancoID string) string {
 	return trancoZipFilename
 }
 
+func extractCNAMEs(resources []dnsmessage.Resource) ([]dnsmessage.Resource, []dnsmessage.Resource) {
+	var cnames []dnsmessage.Resource
+	var cleanAnswers []dnsmessage.Resource
+	for _, r := range resources {
+		if r.Header.Type == dnsmessage.TypeCNAME {
+			cnames = append(cnames, r)
+		} else {
+			cleanAnswers = append(cleanAnswers, r)
+		}
+	}
+	return cnames, cleanAnswers
+}
+
 func main() {
 	workspaceFlag := flag.String("workspace", "./workspace", "Directory to store intermediate files")
 	trancoIDFlag := flag.String("trancoID", "7NZ4X", "Tranco list ID to use")
@@ -265,7 +279,7 @@ func main() {
 	csvWriter := csv.NewWriter(outputFile)
 	defer csvWriter.Flush()
 
-	header := []string{"timestamp", "duration_ms", "domain", "query_type", "error", "rcode", "answers", "additionals"}
+	header := []string{"timestamp", "duration_ms", "domain", "query_type", "error", "rcode", "cnames", "answers", "additionals"}
 	if err := csvWriter.Write(header); err != nil {
 		slog.Error("Failed to write CSV header", "error", err)
 		os.Exit(1)
@@ -280,7 +294,13 @@ func main() {
 	go func() {
 		defer csvWg.Done()
 		for result := range resultsCh {
-			answersJSON, err := formatResources(result.Answers)
+			cnames, cleanAnswers := extractCNAMEs(result.Answers)
+			cnamesJSON, err := formatResources(cnames)
+			if err != nil {
+				slog.Error("Failed to format cnames", "error", err)
+				cnamesJSON = "[]"
+			}
+			answersJSON, err := formatResources(cleanAnswers)
 			if err != nil {
 				slog.Error("Failed to format answers", "error", err)
 				answersJSON = "[]"
@@ -297,6 +317,7 @@ func main() {
 				result.QueryType,
 				result.Error,
 				result.RCode,
+				cnamesJSON,
 				answersJSON,
 				additionalsJSON,
 			}
