@@ -65,45 +65,51 @@ func downloadFile(fileURL, localFilename string) error {
 	return nil
 }
 
+type Domain struct {
+	Name        string
+	Rank        int
+	Nameservers []string
+}
+
 type QueryResult struct {
+	Domain      Domain
+	QueryType   dnsmessage.Type
 	Timestamp   time.Time
 	Duration    time.Duration
-	Domain      string
-	QueryType   string
-	Error       string
-	RCode       string
+	Error       error
+	RCode       dnsmessage.RCode
 	CNAMEs      []string
 	Answers     []dnsmessage.Resource
 	Additionals []dnsmessage.Resource
 }
 
-func resolve(resolver dns.Resolver, domain string, qtype dnsmessage.Type) QueryResult {
+func resolve(resolver dns.Resolver, domain Domain, qtype dnsmessage.Type) QueryResult {
 	startTime := time.Now()
 
 	result := QueryResult{
 		Timestamp: startTime,
 		Domain:    domain,
-		QueryType: qtype.String(),
+		QueryType: qtype,
 	}
 
-	q, err := dns.NewQuestion(domain, qtype)
+	q, err := dns.NewQuestion(domain.Name, qtype)
 	if err != nil {
-		result.Error = fmt.Sprintf("failed to create question: %v", err)
+		result.Error = fmt.Errorf("failed to create question: %w", err)
 		result.Duration = time.Since(startTime)
 		return result
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	queryCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	resp, err := resolver.Query(ctx, *q)
+	resp, err := resolver.Query(queryCtx, *q)
 	result.Duration = time.Since(startTime)
 	if err != nil {
-		slog.Debug("Query failed", "domain", domain, "type", qtype.String(), "error", err)
-		result.Error = fmt.Sprintf("query failed: %v", formatError(err))
+		slog.Debug("Query failed", "domain", domain.Name, "type", qtype.String(), "error", err)
+		result.Error = fmt.Errorf("query failed: %v", formatError(err))
 		return result
 	}
 
-	result.RCode = strings.TrimPrefix(resp.RCode.String(), "RCode")
+	result.RCode = resp.RCode
 	result.Answers = resp.Answers
 	result.Additionals = resp.Additionals
 	return result
@@ -219,7 +225,7 @@ func ensureTrancoList(workspaceDir, trancoID string) string {
 	return trancoZipFilename
 }
 
-func readDomainsFromTrancoCSV(trancoZipFilename string, topN int) ([]string, error) {
+func readDomainsFromTrancoCSV(trancoZipFilename string, topN int) ([]Domain, error) {
 	zipReader, err := zip.OpenReader(trancoZipFilename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open Tranco ZIP file: %w", err)
@@ -232,7 +238,7 @@ func readDomainsFromTrancoCSV(trancoZipFilename string, topN int) ([]string, err
 	}
 	defer csvFile.Close()
 	csvReader := csv.NewReader(csvFile)
-	var domains []string
+	var domains []Domain
 	for i := 0; i < topN; i++ {
 		record, err := csvReader.Read()
 		if err == io.EOF {
@@ -241,8 +247,12 @@ func readDomainsFromTrancoCSV(trancoZipFilename string, topN int) ([]string, err
 		if err != nil {
 			return nil, fmt.Errorf("failed to read from Tranco CSV: %w", err)
 		}
-		// Format is <index>,<domain>
-		domains = append(domains, record[1])
+		// Format is <rank>,<domain>
+		rank, err := strconv.Atoi(record[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse rank: %w", err)
+		}
+		domains = append(domains, Domain{Name: record[1], Rank: rank})
 	}
 	return domains, nil
 }
@@ -279,7 +289,7 @@ func main() {
 	workspaceFlag := flag.String("workspace", "./workspace", "Directory to store intermediate files")
 	trancoIDFlag := flag.String("trancoID", "7NZ4X", "Tranco list ID to use")
 	topNFlag := flag.Int("topN", 100, "Number of top domains to analyze")
-	parallelismFlag := flag.Int("parallelism", 100, "Maximum number of parallel requests")
+	parallelismFlag := flag.Int("parallelism", 10, "Maximum number of parallel requests")
 	verboseFlag := flag.Bool("verbose", false, "Enable verbose logging")
 	flag.Parse()
 
@@ -314,13 +324,11 @@ func main() {
 	csvWriter := csv.NewWriter(outputFile)
 	defer csvWriter.Flush()
 
-	header := []string{"timestamp", "duration_ms", "domain", "query_type", "error", "rcode", "cnames", "answers", "additionals"}
+	header := []string{"domain", "rank", "query_type", "timestamp", "duration_ms", "error", "rcode", "cnames", "answers", "additionals"}
 	if err := csvWriter.Write(header); err != nil {
 		slog.Error("Failed to write CSV header", "error", err)
 		os.Exit(1)
 	}
-
-	resolver := dns.NewUDPResolver(&transport.UDPDialer{}, "8.8.8.8:53")
 
 	resultsCh := make(chan QueryResult, 3*(*topNFlag))
 
@@ -345,13 +353,18 @@ func main() {
 				slog.Error("Failed to format additionals", "error", err)
 				additionalsJSON = "[]"
 			}
+			errorText := ""
+			if result.Error != nil {
+				errorText = result.Error.Error()
+			}
 			record := []string{
+				result.Domain.Name,
+				strconv.Itoa(result.Domain.Rank),
+				strings.TrimPrefix(result.QueryType.String(), "Type"),
 				result.Timestamp.Format(time.RFC3339Nano),
 				strconv.FormatInt(result.Duration.Milliseconds(), 10),
-				result.Domain,
-				result.QueryType,
-				result.Error,
-				result.RCode,
+				errorText,
+				strings.TrimPrefix(result.RCode.String(), "RCode"),
 				cnamesJSON,
 				answersJSON,
 				additionalsJSON,
@@ -364,14 +377,18 @@ func main() {
 
 	sem := semaphore.NewWeighted(int64(*parallelismFlag))
 	var resolveWg sync.WaitGroup
-	resolveWg.Add(len(domains) * 3)
+	resolveWg.Add(len(domains))
 	for _, domain := range domains {
-		go func(d string) {
+		go func(d Domain) {
+			defer resolveWg.Done()
+			slog.Info("Analyzing", "domain", d.Name)
+			resolver := dns.NewUDPResolver(&transport.UDPDialer{}, "8.8.8.8:53")
+
 			if err := sem.Acquire(context.Background(), 3); err != nil {
-				slog.Error("Failed to acquire semaphore", "error", err)
+				slog.Error("Failed to acquire semaphore", "domain", d.Name, "error", err)
 				return
 			}
-			slog.Info("Analyzing", "domain", d)
+			resolveWg.Add(3)
 			go func() {
 				resultsCh <- resolve(resolver, d, dnsmessage.TypeA)
 				sem.Release(1)
