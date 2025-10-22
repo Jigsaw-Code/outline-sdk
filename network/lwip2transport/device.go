@@ -19,9 +19,9 @@ import (
 	"io"
 	"sync"
 
-	"github.com/Jigsaw-Code/outline-sdk/network"
-	"github.com/Jigsaw-Code/outline-sdk/transport"
 	lwip "github.com/eycorsican/go-tun2socks/core"
+	"golangpoc.getoutline.org/sdk/network"
+	"golangpoc.getoutline.org/sdk/transport"
 )
 
 const packetMTU = 1500

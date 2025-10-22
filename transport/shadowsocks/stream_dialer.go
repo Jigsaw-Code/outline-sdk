@@ -19,8 +19,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
+	"golangpoc.getoutline.org/sdk/transport"
 )
 
 // NewStreamDialer creates a client that routes connections to a Shadowsocks proxy listening at

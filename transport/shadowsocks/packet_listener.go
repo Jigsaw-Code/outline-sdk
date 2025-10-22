@@ -21,9 +21,9 @@ import (
 	"io"
 	"net"
 
-	"github.com/Jigsaw-Code/outline-sdk/internal/slicepool"
-	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
+	"golangpoc.getoutline.org/sdk/internal/slicepool"
+	"golangpoc.getoutline.org/sdk/transport"
 )
 
 // clientUDPBufferSize is the maximum supported UDP packet size in bytes.

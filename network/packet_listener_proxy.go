@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/internal/slicepool"
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golangpoc.getoutline.org/sdk/internal/slicepool"
+	"golangpoc.getoutline.org/sdk/transport"
 )
 
 // this was the buffer size used before, we may consider update it in the future

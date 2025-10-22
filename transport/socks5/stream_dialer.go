@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golangpoc.getoutline.org/sdk/transport"
 )
 
 // https://datatracker.ietf.org/doc/html/rfc1929

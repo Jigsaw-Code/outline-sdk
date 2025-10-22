@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"net/netip"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
 	"golang.org/x/net/dns/dnsmessage"
+	"golangpoc.getoutline.org/sdk/transport"
 )
 
 func resolveIP(ctx context.Context, resolver Resolver, rrType dnsmessage.Type, hostname string) ([]netip.Addr, error) {

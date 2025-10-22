@@ -23,7 +23,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golangpoc.getoutline.org/sdk/transport"
 )
 
 // StreamDialer is a [transport.StreamDialer] that uses TLS to wrap the inner StreamDialer.
