@@ -25,6 +25,11 @@ require (
 )
 
 require (
+	github.com/miekg/dns v1.1.56
+	golang.org/x/sync v0.17.0
+)
+
+require (
 	filippo.io/bigmod v0.0.1 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	filippo.io/keygen v0.0.0-20230306160926-5201437acf8e // indirect
@@ -71,7 +76,6 @@ require (
 	github.com/marusama/semaphore v0.0.0-20171214154724-565ffd8e868a // indirect
 	github.com/mdlayher/netlink v1.7.2 // indirect
 	github.com/mdlayher/socket v0.5.0 // indirect
-	github.com/miekg/dns v1.1.56 // indirect
 	github.com/mroth/weightedrand v1.0.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.12.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
@@ -116,7 +120,6 @@ require (
 	golang.org/x/crypto v0.43.0 // indirect
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
 	golang.org/x/mod v0.28.0 // indirect
-	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.37.0 // indirect
