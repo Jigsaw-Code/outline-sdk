@@ -19,8 +19,9 @@ This project contains two main tools to help answer these questions:
 
 ## TODO
 
-* Re-imlpement resolution to bypass MBox issue.
+* Group results by domain
 * Pre-warm the cache.
+* Get numbers per domain: Diff from A.
 * Save TTLs
   
 A number of cases have arbitrary time outs. That's because the mailbox in the SOA record is failing to parse due to a bug in Go: <https://github.com/golang/net/pull/154#issuecomment-3429439404>. We need to fix that to get accurate numbers. The correct behavior is to successfully parse the email address.
@@ -155,3 +156,64 @@ To test that your custom `curl` build is working correctly, run it against the D
 
 ---
 *The domain list used for the DNS analysis is the [Tranco list](https://tranco-list.eu/).*
+
+---
+
+## Plotting Results
+
+Python scripts are available to generate various plots from the CSV results.
+
+### Prerequisites
+
+- Python 3
+- `venv` (usually included with Python)
+
+### Setup
+
+1.  Create a virtual environment:
+    ```sh
+    python3 -m venv .venv
+    ```
+
+2.  Activate the virtual environment:
+    ```sh
+    source .venv/bin/activate
+    ```
+
+3.  Install the required packages:
+    ```sh
+    pip install pandas seaborn matplotlib
+    ```
+
+### Usage
+
+Run the `plot_durations.py` script with the input CSV file and the desired output image file:
+
+```sh
+python report/plot_durations.py <input_csv_file> <output_png_file>
+```
+
+**Example:**
+
+```sh
+python report/plot_durations.py report/results-top1000.csv report/duration_distribution.png
+```
+
+Run the `generate_charts.py` script with the input CSV file and the desired output directory:
+
+```sh
+python report/generate_charts.py <input_csv_file> <output_directory>
+```
+
+**Example:**
+
+```sh
+python report/generate_charts.py report/results-top1000-v1.csv report/
+```
+
+Run the `unique_domain_analysis.py` script to analyze HTTPS RR feature usage:
+
+```sh
+python report/unique_domain_analysis.py
+
+
