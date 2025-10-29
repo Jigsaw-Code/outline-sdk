@@ -17,6 +17,18 @@ This project contains two main tools to help answer these questions:
 
 ---
 
+## TODO
+
+* Re-imlpement resolution to bypass MBox issue.
+* Pre-warm the cache.
+* Save TTLs
+  
+A number of cases have arbitrary time outs. That's because the mailbox in the SOA record is failing to parse due to a bug in Go: <https://github.com/golang/net/pull/154#issuecomment-3429439404>. We need to fix that to get accurate numbers. The correct behavior is to successfully parse the email address.
+  * Parse rejection: https://cs.opensource.google/go/x/net/+/master:dns/dnsmessage/message.go;l=2084;drc=6e243da531559f8c99439dabc7647dec07191f9b
+  * Combined with bad packet rejection: https://github.com/Jigsaw-Code/outline-sdk/blob/f48a75c191ff7babfdd36253cc6ec3c1790b9f5d/dns/resolver.go#L194C1-L195C1
+
+---
+
 ## DNS Analysis Tool
 
 This tool performs DNS queries (A, AAAA, HTTPS) for a large number of domains from the Tranco list.

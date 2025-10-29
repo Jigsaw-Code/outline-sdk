@@ -24,19 +24,15 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/dns"
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"golang.org/x/net/dns/dnsmessage"
+	"github.com/miekg/dns"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -73,17 +69,17 @@ type Domain struct {
 
 type QueryResult struct {
 	Domain      Domain
-	QueryType   dnsmessage.Type
+	QueryType   uint16
 	Timestamp   time.Time
 	Duration    time.Duration
 	Error       error
-	RCode       dnsmessage.RCode
+	RCode       int
 	CNAMEs      []string
-	Answers     []dnsmessage.Resource
-	Additionals []dnsmessage.Resource
+	Answers     []dns.RR
+	Additionals []dns.RR
 }
 
-func resolve(resolver dns.Resolver, domain Domain, qtype dnsmessage.Type) QueryResult {
+func resolve(client *dns.Client, resolverAddress string, domain Domain, qtype uint16) QueryResult {
 	startTime := time.Now()
 
 	result := QueryResult{
@@ -92,91 +88,81 @@ func resolve(resolver dns.Resolver, domain Domain, qtype dnsmessage.Type) QueryR
 		QueryType: qtype,
 	}
 
-	q, err := dns.NewQuestion(domain.Name, qtype)
-	if err != nil {
-		result.Error = fmt.Errorf("failed to create question: %w", err)
-		result.Duration = time.Since(startTime)
-		return result
-	}
+	msg := new(dns.Msg)
+	msg.SetQuestion(dns.Fqdn(domain.Name), qtype)
+	msg.RecursionDesired = true
 
-	queryCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	resp, err := resolver.Query(queryCtx, *q)
+	r, _, err := client.Exchange(msg, resolverAddress)
 	result.Duration = time.Since(startTime)
 	if err != nil {
-		slog.Debug("Query failed", "domain", domain.Name, "type", qtype.String(), "error", err)
+		slog.Debug("Query failed", "domain", domain.Name, "type", dns.TypeToString[qtype], "error", err)
 		result.Error = fmt.Errorf("query failed: %v", formatError(err))
 		return result
 	}
+	if r == nil {
+		slog.Debug("Query failed", "domain", domain.Name, "type", dns.TypeToString[qtype], "error", "nil response")
+		result.Error = fmt.Errorf("query failed: nil response")
+		return result
+	}
 
-	result.RCode = resp.RCode
-	result.Answers = resp.Answers
-	result.Additionals = resp.Additionals
+	result.RCode = r.Rcode
+	result.Answers = r.Answer
+	result.Additionals = r.Extra
 	return result
 }
 
-func formatResourceBody(body dnsmessage.ResourceBody) (interface{}, error) {
-	switch b := body.(type) {
-	case *dnsmessage.AResource:
-		return net.IP(b.A[:]).String(), nil
-	case *dnsmessage.AAAAResource:
-		return net.IP(b.AAAA[:]).String(), nil
-	case *dnsmessage.HTTPSResource:
+func formatResourceBody(rr dns.RR) (interface{}, error) {
+	switch r := rr.(type) {
+	case *dns.A:
+		return r.A.String(), nil
+	case *dns.AAAA:
+		return r.AAAA.String(), nil
+	case *dns.HTTPS:
 		params := make(map[string]interface{})
-		for _, p := range b.Params {
+		for _, p := range r.Value {
 			var value interface{}
-			switch p.Key {
-			case dnsmessage.SVCParamALPN:
-				var alpnValues []string
-				alpnBytes := p.Value
-				for len(alpnBytes) > 0 {
-					strLen := int(alpnBytes[0])
-					if len(alpnBytes) < 1+strLen {
-						value = fmt.Sprintf("malformed_alpn: %x", p.Value)
-						break
-					}
-					alpnValues = append(alpnValues, string(alpnBytes[1:1+strLen]))
-					alpnBytes = alpnBytes[1+strLen:]
-				}
-				if value == nil {
-					value = alpnValues
-				}
-			case dnsmessage.SVCParamIPv4Hint:
+			switch p.Key() {
+			case dns.SVCB_ALPN:
+				alpn := p.(*dns.SVCBAlpn)
+				value = alpn.Alpn
+			case dns.SVCB_IPV4HINT:
+				v4hint := p.(*dns.SVCBIPv4Hint)
 				var ips []string
-				for i := 0; i < len(p.Value); i += net.IPv4len {
-					ips = append(ips, net.IP(p.Value[i:i+net.IPv4len]).String())
+				for _, ip := range v4hint.Hint {
+					ips = append(ips, ip.String())
 				}
 				value = ips
-			case dnsmessage.SVCParamIPv6Hint:
+			case dns.SVCB_IPV6HINT:
+				v6hint := p.(*dns.SVCBIPv6Hint)
 				var ips []string
-				for i := 0; i < len(p.Value); i += net.IPv6len {
-					ips = append(ips, net.IP(p.Value[i:i+net.IPv6len]).String())
+				for _, ip := range v6hint.Hint {
+					ips = append(ips, ip.String())
 				}
 				value = ips
 			default:
-				value = fmt.Sprintf("%x", p.Value)
+				value = p.String()
 			}
-			params[p.Key.String()] = value
+			params[p.Key().String()] = value
 		}
 		return map[string]interface{}{
-			"priority": b.Priority,
-			"target":   b.Target.String(),
+			"priority": r.Priority,
+			"target":   r.Target,
 			"params":   params,
 		}, nil
-	case *dnsmessage.CNAMEResource:
-		return b.CNAME.String(), nil
+	case *dns.CNAME:
+		return r.Target, nil
 	default:
-		return body.GoString(), nil
+		return r.String(), nil
 	}
 }
 
-func formatResources(resources []dnsmessage.Resource) (string, error) {
+func formatResources(resources []dns.RR) (string, error) {
 	var out []interface{}
 	for _, r := range resources {
-		if r.Header.Type == dnsmessage.TypeOPT {
+		if r.Header().Rrtype == dns.TypeOPT {
 			continue
 		}
-		body, err := formatResourceBody(r.Body)
+		body, err := formatResourceBody(r)
 		if err != nil {
 			return "", err
 		}
@@ -257,11 +243,11 @@ func readDomainsFromTrancoCSV(trancoZipFilename string, topN int) ([]Domain, err
 	return domains, nil
 }
 
-func extractCNAMEs(resources []dnsmessage.Resource) ([]dnsmessage.Resource, []dnsmessage.Resource) {
-	var cnames []dnsmessage.Resource
-	var cleanAnswers []dnsmessage.Resource
+func extractCNAMEs(resources []dns.RR) ([]dns.RR, []dns.RR) {
+	var cnames []dns.RR
+	var cleanAnswers []dns.RR
 	for _, r := range resources {
-		if r.Header.Type == dnsmessage.TypeCNAME {
+		if r.Header().Rrtype == dns.TypeCNAME {
 			cnames = append(cnames, r)
 		} else {
 			cleanAnswers = append(cleanAnswers, r)
@@ -360,11 +346,11 @@ func main() {
 			record := []string{
 				result.Domain.Name,
 				strconv.Itoa(result.Domain.Rank),
-				strings.TrimPrefix(result.QueryType.String(), "Type"),
+				dns.TypeToString[result.QueryType],
 				result.Timestamp.Format(time.RFC3339Nano),
 				strconv.FormatInt(result.Duration.Milliseconds(), 10),
 				errorText,
-				strings.TrimPrefix(result.RCode.String(), "RCode"),
+				dns.RcodeToString[result.RCode],
 				cnamesJSON,
 				answersJSON,
 				additionalsJSON,
@@ -378,29 +364,33 @@ func main() {
 	sem := semaphore.NewWeighted(int64(*parallelismFlag))
 	var resolveWg sync.WaitGroup
 	resolveWg.Add(len(domains))
+	client := new(dns.Client)
+	client.ReadTimeout = 5 * time.Second
+	client.WriteTimeout = 5 * time.Second
+	resolverAddress := "8.8.8.8:53"
+
 	for _, domain := range domains {
+		if err := sem.Acquire(context.Background(), 3); err != nil {
+			slog.Error("Failed to acquire semaphore", "domain", domain.Name, "error", err)
+			return
+		}
 		go func(d Domain) {
 			defer resolveWg.Done()
 			slog.Info("Analyzing", "domain", d.Name)
-			resolver := dns.NewUDPResolver(&transport.UDPDialer{}, "8.8.8.8:53")
 
-			if err := sem.Acquire(context.Background(), 3); err != nil {
-				slog.Error("Failed to acquire semaphore", "domain", d.Name, "error", err)
-				return
-			}
 			resolveWg.Add(3)
 			go func() {
-				resultsCh <- resolve(resolver, d, dnsmessage.TypeA)
+				resultsCh <- resolve(client, resolverAddress, d, dns.TypeA)
 				sem.Release(1)
 				resolveWg.Done()
 			}()
 			go func() {
-				resultsCh <- resolve(resolver, d, dnsmessage.TypeAAAA)
+				resultsCh <- resolve(client, resolverAddress, d, dns.TypeAAAA)
 				sem.Release(1)
 				resolveWg.Done()
 			}()
 			go func() {
-				resultsCh <- resolve(resolver, d, dnsmessage.TypeHTTPS)
+				resultsCh <- resolve(client, resolverAddress, d, dns.TypeHTTPS)
 				sem.Release(1)
 				resolveWg.Done()
 			}()
