@@ -31,11 +31,17 @@ This report analyzes the performance of HTTPS RR queries based on a dataset of t
 
 ### 3.1. Overall Latency Comparison
 
-The following chart shows a quantile plot of the DNS query durations for A, AAAA, and HTTPS records. This chart illustrates the cumulative distribution of query latencies based on the combined data from three runs.
+The following chart shows a quantile plot of the DNS query durations for A, AAAA, and HTTPS records. This chart illustrates the cumulative distribution of query latencies based on the combined raw data from five runs.
 
-![Quantile Plot of DNS Query Durations by Type (5 runs)](./quantile_plot.png)
+![Quantile Plot of DNS Query Durations by Type (Raw Data, 5 runs)](./quantile_plot.png)
 
-As we can see, for the vast majority of queries (up to the ~0.85 quantile), the latency of HTTPS queries is very close to that of A and AAAA queries. However, beyond this point, the latency of HTTPS queries starts to increase significantly, forming a long tail of slow queries.
+To further investigate the latency characteristics, especially considering potential caching effects, we also generated quantile plots based on the minimum and median durations observed for each domain across the five runs.
+
+![Quantile Plot of DNS Query Durations by Type (Min per Domain, 5 runs)](./min_duration_quantile_plot.png)
+
+![Quantile Plot of DNS Query Durations by Type (Median per Domain, 5 runs)](./median_duration_quantile_plot.png)
+
+As we can see, for the vast majority of queries (up to the ~0.85 quantile), the latency of HTTPS queries is very close to that of A and AAAA queries. However, beyond this point, the latency of HTTPS queries starts to increase significantly, forming a long tail of slow queries. The plots based on minimum and median durations per domain provide a clearer view of the inherent performance characteristics, minimizing the impact of individual slow queries within a domain's multiple runs.
 
 ### 3.2. HTTPS Query Performance Deep Dive
 
@@ -118,38 +124,38 @@ The HTTPS resource record is a critical component for the future of a more priva
 
 ## 6. Appendix: Slowest Domains by HTTPS/A Ratio (5 runs, median, diff > 50ms)
 
-| Domain | Median A Duration (ms) | Median HTTPS Duration (ms) | Median Ratio (HTTPS/A) |
-|:---|:---|:---|:---|
-| pubmed.ncbi.nlm.nih.gov | 8 | 3019 | 377.38 |
-| nih.gov | 14 | 5000 | 357.14 |
-| samsungapps.com | 13 | 214 | 16.46 |
-| chinamobile.com | 16 | 255 | 15.94 |
-| jomodns.com | 15 | 225 | 15.00 |
-| beian.miit.gov.cn | 19 | 247 | 13.00 |
-| shifen.com | 19 | 243 | 12.79 |
-| ksyuncdn.com | 20 | 243 | 12.15 |
-| ks-cdn.com | 20 | 235 | 11.75 |
-| yahoo.co.jp | 15 | 167 | 11.13 |
-| uol.com.br | 13 | 137 | 10.54 |
-| kaspi.kz | 19 | 183 | 9.63 |
-| mikrotik.com | 14 | 127 | 9.07 |
-| rakuten.co.jp | 19 | 163 | 8.58 |
-| wbbasket.ru | 16 | 130 | 8.12 |
-| consultant.ru | 17 | 133 | 7.82 |
-| reg.ru | 17 | 132 | 7.76 |
-| 2gis.com | 19 | 138 | 7.26 |
-| wp.pl | 17 | 123 | 7.24 |
-| rbc.ru | 19 | 129 | 6.79 |
-| rambler.ru | 20 | 135 | 6.75 |
-| cdnvideo.ru | 20 | 130 | 6.50 |
-| t-online.de | 19 | 123 | 6.47 |
-| myfritz.net | 19 | 120 | 6.32 |
-| vkuser.net | 21 | 124 | 5.90 |
-| pool.ntp.org | 16 | 92 | 5.75 |
-| nease.net | 18 | 103 | 5.72 |
-| taobao.com | 20 | 108 | 5.40 |
-| intel.com | 16 | 85 | 5.31 |
-| gandi.net | 19 | 100 | 5.26 |
-| betweendigital.com | 18 | 94 | 5.22 |
-| mediatek.com | 18 | 88 | 4.89 |
-| netease.com | 24 | 104 | 4.33 |
+| Domain | Median A (ms) | Min HTTPS (ms) | Median HTTPS (ms) | Max HTTPS (ms) | Ratio (HTTPS/A) |
+|:---|:---|:---|:---|:---|:---|
+| pubmed.ncbi.nlm.nih.gov | 8 | 3016 | 3019 | 5000 | 377.38 |
+| nih.gov | 14 | 3024 | 5000 | 5000 | 357.14 |
+| samsungapps.com | 13 | 13 | 214 | 218 | 16.46 |
+| chinamobile.com | 16 | 14 | 255 | 261 | 15.94 |
+| jomodns.com | 15 | 16 | 225 | 307 | 15.00 |
+| beian.miit.gov.cn | 19 | 232 | 247 | 297 | 13.00 |
+| shifen.com | 19 | 16 | 243 | 268 | 12.79 |
+| ksyuncdn.com | 20 | 13 | 243 | 457 | 12.15 |
+| ks-cdn.com | 20 | 19 | 235 | 492 | 11.75 |
+| yahoo.co.jp | 15 | 163 | 167 | 168 | 11.13 |
+| uol.com.br | 13 | 13 | 137 | 143 | 10.54 |
+| kaspi.kz | 19 | 19 | 183 | 194 | 9.63 |
+| mikrotik.com | 14 | 16 | 127 | 141 | 9.07 |
+| rakuten.co.jp | 19 | 18 | 163 | 186 | 8.58 |
+| wbbasket.ru | 16 | 20 | 130 | 132 | 8.12 |
+| consultant.ru | 17 | 131 | 133 | 139 | 7.82 |
+| reg.ru | 17 | 16 | 132 | 288 | 7.76 |
+| 2gis.com | 19 | 107 | 138 | 203 | 7.26 |
+| wp.pl | 17 | 17 | 123 | 131 | 7.24 |
+| rbc.ru | 19 | 18 | 129 | 131 | 6.79 |
+| rambler.ru | 20 | 19 | 135 | 144 | 6.75 |
+| cdnvideo.ru | 20 | 19 | 130 | 135 | 6.50 |
+| t-online.de | 19 | 116 | 123 | 125 | 6.47 |
+| myfritz.net | 19 | 117 | 120 | 125 | 6.32 |
+| vkuser.net | 21 | 19 | 124 | 135 | 5.90 |
+| pool.ntp.org | 16 | 24 | 92 | 109 | 5.75 |
+| nease.net | 18 | 76 | 103 | 264 | 5.72 |
+| taobao.com | 20 | 19 | 108 | 136 | 5.40 |
+| intel.com | 16 | 19 | 85 | 87 | 5.31 |
+| gandi.net | 19 | 15 | 100 | 109 | 5.26 |
+| betweendigital.com | 18 | 17 | 94 | 118 | 5.22 |
+| mediatek.com | 18 | 13 | 88 | 195 | 4.89 |
+| netease.com | 24 | 17 | 104 | 236 | 4.33 |

@@ -26,7 +26,7 @@ def main():
         print(f"Error: File not found at {args.input_file}")
         exit()
 
-    # Chart 1: Quantile Plot of DNS Query Durations by Type
+    # Chart 1: Quantile Plot of DNS Query Durations by Type (Raw Data)
     plt.figure(figsize=(12, 7))
     quantiles = np.linspace(0, 1, 101)
     for query_type in sorted(df['query_type'].unique()):
@@ -34,7 +34,7 @@ def main():
         if not durations.empty:
             quantile_values = durations.quantile(quantiles)
             sns.lineplot(x=quantiles, y=quantile_values, label=query_type)
-    plt.title('Quantile Plot of DNS Query Durations by Type')
+    plt.title('Quantile Plot of DNS Query Durations by Type (Raw Data)')
     plt.xlabel('Cumulative Probability')
     plt.ylabel('Duration (ms)')
     plt.ylim(0, 300)
@@ -44,6 +44,48 @@ def main():
     output_path = os.path.join(args.output_dir, 'quantile_plot.png')
     plt.savefig(output_path)
     print(f"Chart 1 saved to {output_path}")
+    plt.close()
+
+    # Prepare data for min/median duration plots
+    min_durations_per_domain = df.groupby(['domain', 'query_type'])['duration_ms'].min().reset_index()
+    median_durations_per_domain = df.groupby(['domain', 'query_type'])['duration_ms'].median().reset_index()
+
+    # Chart 1.1: Quantile Plot of DNS Query Durations by Type (Min per Domain)
+    plt.figure(figsize=(12, 7))
+    for query_type in sorted(min_durations_per_domain['query_type'].unique()):
+        durations = min_durations_per_domain[min_durations_per_domain['query_type'] == query_type]['duration_ms']
+        if not durations.empty:
+            quantile_values = durations.quantile(quantiles)
+            sns.lineplot(x=quantiles, y=quantile_values, label=query_type)
+    plt.title('Quantile Plot of DNS Query Durations by Type (Min per Domain)')
+    plt.xlabel('Cumulative Probability')
+    plt.ylabel('Duration (ms)')
+    plt.ylim(0, 300)
+    plt.xticks(np.arange(0, 1.1, 0.1))
+    plt.grid(True)
+    plt.legend(title='Query Type')
+    output_path = os.path.join(args.output_dir, 'min_duration_quantile_plot.png')
+    plt.savefig(output_path)
+    print(f"Chart 1.1 saved to {output_path}")
+    plt.close()
+
+    # Chart 1.2: Quantile Plot of DNS Query Durations by Type (Median per Domain)
+    plt.figure(figsize=(12, 7))
+    for query_type in sorted(median_durations_per_domain['query_type'].unique()):
+        durations = median_durations_per_domain[median_durations_per_domain['query_type'] == query_type]['duration_ms']
+        if not durations.empty:
+            quantile_values = durations.quantile(quantiles)
+            sns.lineplot(x=quantiles, y=quantile_values, label=query_type)
+    plt.title('Quantile Plot of DNS Query Durations by Type (Median per Domain)')
+    plt.xlabel('Cumulative Probability')
+    plt.ylabel('Duration (ms)')
+    plt.ylim(0, 300)
+    plt.xticks(np.arange(0, 1.1, 0.1))
+    plt.grid(True)
+    plt.legend(title='Query Type')
+    output_path = os.path.join(args.output_dir, 'median_duration_quantile_plot.png')
+    plt.savefig(output_path)
+    print(f"Chart 1.2 saved to {output_path}")
     plt.close()
 
     # Prepare data for the next charts

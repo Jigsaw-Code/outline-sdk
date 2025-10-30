@@ -38,19 +38,19 @@ def main():
 
     filtered_df['has_answer'] = filtered_df.apply(has_valid_answer, axis=1)
 
-    # Calculate median durations for A and HTTPS queries for each domain
-    median_durations = filtered_df.groupby(['domain', 'query_type'])['duration_ms'].median().unstack()
+    # Calculate median, min, and max durations for A and HTTPS queries for each domain
+    grouped_durations = filtered_df.groupby(['domain', 'query_type'])['duration_ms']
+    median_durations = grouped_durations.median().unstack()
+    min_durations = grouped_durations.min().unstack()
+    max_durations = grouped_durations.max().unstack()
 
-    # Merge A and HTTPS durations
-    merged_durations = pd.merge(
-        median_durations['A'],
-        median_durations['HTTPS'],
-        on='domain',
-        suffixes=('_A', '_HTTPS')
-    ).reset_index()
-
-    # Rename columns for clarity
-    merged_durations.rename(columns={'A': 'median_A_duration_ms', 'HTTPS': 'median_HTTPS_duration_ms'}, inplace=True)
+    # Merge A and HTTPS durations (median, min, max)
+    merged_durations = pd.DataFrame({
+        'median_A_duration_ms': median_durations['A'],
+        'median_HTTPS_duration_ms': median_durations['HTTPS'],
+        'min_HTTPS_duration_ms': min_durations['HTTPS'],
+        'max_HTTPS_duration_ms': max_durations['HTTPS'],
+    }).reset_index()
 
     # Calculate duration difference and ratio
     merged_durations['duration_diff'] = merged_durations['median_HTTPS_duration_ms'] - merged_durations['median_A_duration_ms']
@@ -63,11 +63,11 @@ def main():
     filtered_domains.sort_values(by='ratio', ascending=False, inplace=True)
 
     # Generate Markdown table
-    markdown_table = "| Domain | Median A Duration (ms) | Median HTTPS Duration (ms) | Median Ratio (HTTPS/A) |\n"
-    markdown_table += "|:---|:---|:---|:---|"
+    markdown_table = "| Domain | Median A (ms) | Min HTTPS (ms) | Median HTTPS (ms) | Max HTTPS (ms) | Ratio (HTTPS/A) |\n"
+    markdown_table += "|:---|:---|:---|:---|:---|:---|"
 
     for index, row in filtered_domains.iterrows():
-        markdown_table += f"\n| {row['domain']} | {row['median_A_duration_ms']:.0f} | {row['median_HTTPS_duration_ms']:.0f} | {row['ratio']:.2f} |"
+        markdown_table += f"\n| {row['domain']} | {row['median_A_duration_ms']:.0f} | {row['min_HTTPS_duration_ms']:.0f} | {row['median_HTTPS_duration_ms']:.0f} | {row['max_HTTPS_duration_ms']:.0f} | {row['ratio']:.2f} |"
 
     print(markdown_table)
 
