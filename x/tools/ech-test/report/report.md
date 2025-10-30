@@ -55,10 +55,9 @@ This chart reveals a few interesting patterns. While the "other" category, conta
 
 A closer look at the slowest HTTPS queries reveals that the high latency is often not due to the size or complexity of the HTTPS record itself, but rather to server-side issues. The most common causes for extreme latency are:
 
-*   **Timeouts:** The DNS query simply times out after several seconds.
-*   **`SERVFAIL` errors:** The authoritative DNS server is unable to process the query and returns a `SERVFAIL` error, but only after a long delay.
-
-These issues point to a lack of proper support for the HTTPS RR on some authoritative DNS servers, rather than a fundamental performance problem with the HTTPS RR itself.
+*   **Two `nih.gov` domains consistently time out:** This indicates a clear lack of support for HTTPS RRs on these domains.
+*   **Seven other domains had a minimum HTTPS duration > 50ms:** This suggests inherently poor performance for HTTPS queries on these domains, even in the best-case scenario.
+*   **Twenty-four domains had a minimum HTTPS duration <= 24ms but a median HTTPS duration 50ms+ more than the median A duration:** This pattern strongly suggests caching issues, where initial queries are slow but subsequent queries benefit from caching.
 
 ### 3.4. Latency vs. Answer Presence
 
@@ -116,38 +115,38 @@ The HTTPS resource record is a critical component for the future of a more priva
 
 ## 6. Appendix: Slowest Domains by Min HTTPS Duration (5 runs, diff > 50ms)
 
-| Domain | Median A (ms) | Min HTTPS (ms) | Median HTTPS (ms) | Max HTTPS (ms) | Ratio (HTTPS/A) |
-|:---|:---|:---|:---|:---|:---|
-| nih.gov | 14 | 3024 | 5000 | 5000 | 357.14 |
-| pubmed.ncbi.nlm.nih.gov | 8 | 3016 | 3019 | 5000 | 377.38 |
-| beian.miit.gov.cn | 19 | 232 | 247 | 297 | 13.00 |
-| yahoo.co.jp | 15 | 163 | 167 | 168 | 11.13 |
-| consultant.ru | 17 | 131 | 133 | 139 | 7.82 |
-| myfritz.net | 19 | 117 | 120 | 125 | 6.32 |
-| t-online.de | 19 | 116 | 123 | 125 | 6.47 |
-| 2gis.com | 19 | 107 | 138 | 203 | 7.26 |
-| nease.net | 18 | 76 | 103 | 264 | 5.72 |
-| pool.ntp.org | 16 | 24 | 92 | 109 | 5.75 |
-| wbbasket.ru | 16 | 20 | 130 | 132 | 8.12 |
-| ks-cdn.com | 20 | 19 | 235 | 492 | 11.75 |
-| vkuser.net | 21 | 19 | 124 | 135 | 5.90 |
-| intel.com | 16 | 19 | 85 | 87 | 5.31 |
-| taobao.com | 20 | 19 | 108 | 136 | 5.40 |
-| cdnvideo.ru | 20 | 19 | 130 | 135 | 6.50 |
-| kaspi.kz | 19 | 19 | 183 | 194 | 9.63 |
-| rambler.ru | 20 | 19 | 135 | 144 | 6.75 |
-| rakuten.co.jp | 19 | 18 | 163 | 186 | 8.58 |
-| rbc.ru | 19 | 18 | 129 | 131 | 6.79 |
-| wp.pl | 17 | 17 | 123 | 131 | 7.24 |
-| betweendigital.com | 18 | 17 | 94 | 118 | 5.22 |
-| netease.com | 24 | 17 | 104 | 236 | 4.33 |
-| reg.ru | 17 | 16 | 132 | 288 | 7.76 |
-| shifen.com | 19 | 16 | 243 | 268 | 12.79 |
-| mikrotik.com | 14 | 16 | 127 | 141 | 9.07 |
-| jomodns.com | 15 | 16 | 225 | 307 | 15.00 |
-| gandi.net | 19 | 15 | 100 | 109 | 5.26 |
-| chinamobile.com | 16 | 14 | 255 | 261 | 15.94 |
-| samsungapps.com | 13 | 13 | 214 | 218 | 16.46 |
-| uol.com.br | 13 | 13 | 137 | 143 | 10.54 |
-| mediatek.com | 18 | 13 | 88 | 195 | 4.89 |
-| ksyuncdn.com | 20 | 13 | 243 | 457 | 12.15 |
+| Domain | Rank | Median A (ms) | Min HTTPS (ms) | Median HTTPS (ms) | Max HTTPS (ms) | Ratio (HTTPS/A) |
+|:---|:---|:---|:---|:---|:---|:---|
+| nih.gov | 193 | 14 | 3024 | 5000 | 5000 | 357.14 |
+| pubmed.ncbi.nlm.nih.gov | 500 | 8 | 3016 | 3019 | 5000 | 377.38 |
+| beian.miit.gov.cn | 214 | 19 | 232 | 247 | 297 | 13.00 |
+| yahoo.co.jp | 536 | 15 | 163 | 167 | 168 | 11.13 |
+| consultant.ru | 442 | 17 | 131 | 133 | 139 | 7.82 |
+| myfritz.net | 254 | 19 | 117 | 120 | 125 | 6.32 |
+| t-online.de | 657 | 19 | 116 | 123 | 125 | 6.47 |
+| 2gis.com | 617 | 19 | 107 | 138 | 203 | 7.26 |
+| nease.net | 376 | 18 | 76 | 103 | 264 | 5.72 |
+| pool.ntp.org | 902 | 16 | 24 | 92 | 109 | 5.75 |
+| wbbasket.ru | 615 | 16 | 20 | 130 | 132 | 8.12 |
+| ks-cdn.com | 869 | 20 | 19 | 235 | 492 | 11.75 |
+| vkuser.net | 427 | 21 | 19 | 124 | 135 | 5.90 |
+| intel.com | 677 | 16 | 19 | 85 | 87 | 5.31 |
+| taobao.com | 546 | 20 | 19 | 108 | 136 | 5.40 |
+| cdnvideo.ru | 641 | 20 | 19 | 130 | 135 | 6.50 |
+| kaspi.kz | 1000 | 19 | 19 | 183 | 194 | 9.63 |
+| rambler.ru | 559 | 20 | 19 | 135 | 144 | 6.75 |
+| rakuten.co.jp | 703 | 19 | 18 | 163 | 186 | 8.58 |
+| rbc.ru | 883 | 19 | 18 | 129 | 131 | 6.79 |
+| wp.pl | 837 | 17 | 17 | 123 | 131 | 7.24 |
+| betweendigital.com | 986 | 18 | 17 | 94 | 118 | 5.22 |
+| netease.com | 620 | 24 | 17 | 104 | 236 | 4.33 |
+| reg.ru | 209 | 17 | 16 | 132 | 288 | 7.76 |
+| shifen.com | 238 | 19 | 16 | 243 | 268 | 12.79 |
+| mikrotik.com | 299 | 14 | 16 | 127 | 141 | 9.07 |
+| jomodns.com | 271 | 15 | 16 | 225 | 307 | 15.00 |
+| gandi.net | 86 | 19 | 15 | 100 | 109 | 5.26 |
+| chinamobile.com | 777 | 16 | 14 | 255 | 261 | 15.94 |
+| samsungapps.com | 781 | 13 | 13 | 214 | 218 | 16.46 |
+| uol.com.br | 576 | 13 | 13 | 137 | 143 | 10.54 |
+| mediatek.com | 494 | 18 | 13 | 88 | 195 | 4.89 |
+| ksyuncdn.com | 284 | 20 | 13 | 243 | 457 | 12.15 |

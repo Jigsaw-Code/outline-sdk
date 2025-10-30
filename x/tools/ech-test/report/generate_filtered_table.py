@@ -15,6 +15,9 @@ def main():
     # Filter out rows where query_type is not A or HTTPS
     filtered_df = df[df['query_type'].isin(['A', 'HTTPS'])].copy()
 
+    # Extract rank for each domain
+    domain_ranks = df[['domain', 'rank']].drop_duplicates().set_index('domain')
+
     # Convert 'answers' column from string to list/json object
     # This is necessary to correctly identify successful queries
     def parse_answers(answers_str):
@@ -52,6 +55,9 @@ def main():
         'max_HTTPS_duration_ms': max_durations['HTTPS'],
     }).reset_index()
 
+    # Add rank to merged_durations
+    merged_durations = merged_durations.set_index('domain').join(domain_ranks).reset_index()
+
     # Calculate duration difference and ratio
     merged_durations['duration_diff'] = merged_durations['median_HTTPS_duration_ms'] - merged_durations['median_A_duration_ms']
     merged_durations['ratio'] = merged_durations['median_HTTPS_duration_ms'] / merged_durations['median_A_duration_ms']
@@ -63,11 +69,11 @@ def main():
     filtered_domains.sort_values(by='min_HTTPS_duration_ms', ascending=False, inplace=True)
 
     # Generate Markdown table
-    markdown_table = "| Domain | Median A (ms) | Min HTTPS (ms) | Median HTTPS (ms) | Max HTTPS (ms) | Ratio (HTTPS/A) |\n"
-    markdown_table += "|:---|:---|:---|:---|:---|:---|"
+    markdown_table = "| Domain | Rank | Median A (ms) | Min HTTPS (ms) | Median HTTPS (ms) | Max HTTPS (ms) | Ratio (HTTPS/A) |\n"
+    markdown_table += "|:---|:---|:---|:---|:---|:---|:---|"
 
     for index, row in filtered_domains.iterrows():
-        markdown_table += f"\n| {row['domain']} | {row['median_A_duration_ms']:.0f} | {row['min_HTTPS_duration_ms']:.0f} | {row['median_HTTPS_duration_ms']:.0f} | {row['max_HTTPS_duration_ms']:.0f} | {row['ratio']:.2f} |"
+        markdown_table += f"\n| {row['domain']} | {row['rank']:.0f} | {row['median_A_duration_ms']:.0f} | {row['min_HTTPS_duration_ms']:.0f} | {row['median_HTTPS_duration_ms']:.0f} | {row['max_HTTPS_duration_ms']:.0f} | {row['ratio']:.2f} |"
 
     print(markdown_table)
 
