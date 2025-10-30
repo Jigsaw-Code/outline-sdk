@@ -59,8 +59,8 @@ def main():
     # Filter domains where duration_diff > 50ms
     filtered_domains = merged_durations[merged_durations['duration_diff'] > 50].copy()
 
-    # Sort by ratio in descending order
-    filtered_domains.sort_values(by='ratio', ascending=False, inplace=True)
+    # Sort by min_HTTPS_duration_ms in descending order
+    filtered_domains.sort_values(by='min_HTTPS_duration_ms', ascending=False, inplace=True)
 
     # Generate Markdown table
     markdown_table = "| Domain | Median A (ms) | Min HTTPS (ms) | Median HTTPS (ms) | Max HTTPS (ms) | Ratio (HTTPS/A) |\n"

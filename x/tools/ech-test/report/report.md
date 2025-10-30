@@ -122,40 +122,40 @@ This approach has several advantages:
 
 The HTTPS resource record is a critical component for the future of a more private and secure internet with ECH. While our analysis shows that there is a long tail of slow HTTPS queries, these are caused by a minority of misconfigured or slow servers. By implementing a hybrid approach that races the HTTPS query with a short timeout, the client can reap the benefits of ECH without compromising on user experience.
 
-## 6. Appendix: Slowest Domains by HTTPS/A Ratio (5 runs, median, diff > 50ms)
+## 6. Appendix: Slowest Domains by Min HTTPS Duration (5 runs, diff > 50ms)
 
 | Domain | Median A (ms) | Min HTTPS (ms) | Median HTTPS (ms) | Max HTTPS (ms) | Ratio (HTTPS/A) |
 |:---|:---|:---|:---|:---|:---|
-| pubmed.ncbi.nlm.nih.gov | 8 | 3016 | 3019 | 5000 | 377.38 |
 | nih.gov | 14 | 3024 | 5000 | 5000 | 357.14 |
-| samsungapps.com | 13 | 13 | 214 | 218 | 16.46 |
-| chinamobile.com | 16 | 14 | 255 | 261 | 15.94 |
-| jomodns.com | 15 | 16 | 225 | 307 | 15.00 |
+| pubmed.ncbi.nlm.nih.gov | 8 | 3016 | 3019 | 5000 | 377.38 |
 | beian.miit.gov.cn | 19 | 232 | 247 | 297 | 13.00 |
-| shifen.com | 19 | 16 | 243 | 268 | 12.79 |
-| ksyuncdn.com | 20 | 13 | 243 | 457 | 12.15 |
-| ks-cdn.com | 20 | 19 | 235 | 492 | 11.75 |
 | yahoo.co.jp | 15 | 163 | 167 | 168 | 11.13 |
-| uol.com.br | 13 | 13 | 137 | 143 | 10.54 |
-| kaspi.kz | 19 | 19 | 183 | 194 | 9.63 |
-| mikrotik.com | 14 | 16 | 127 | 141 | 9.07 |
-| rakuten.co.jp | 19 | 18 | 163 | 186 | 8.58 |
-| wbbasket.ru | 16 | 20 | 130 | 132 | 8.12 |
 | consultant.ru | 17 | 131 | 133 | 139 | 7.82 |
-| reg.ru | 17 | 16 | 132 | 288 | 7.76 |
-| 2gis.com | 19 | 107 | 138 | 203 | 7.26 |
-| wp.pl | 17 | 17 | 123 | 131 | 7.24 |
-| rbc.ru | 19 | 18 | 129 | 131 | 6.79 |
-| rambler.ru | 20 | 19 | 135 | 144 | 6.75 |
-| cdnvideo.ru | 20 | 19 | 130 | 135 | 6.50 |
-| t-online.de | 19 | 116 | 123 | 125 | 6.47 |
 | myfritz.net | 19 | 117 | 120 | 125 | 6.32 |
-| vkuser.net | 21 | 19 | 124 | 135 | 5.90 |
-| pool.ntp.org | 16 | 24 | 92 | 109 | 5.75 |
+| t-online.de | 19 | 116 | 123 | 125 | 6.47 |
+| 2gis.com | 19 | 107 | 138 | 203 | 7.26 |
 | nease.net | 18 | 76 | 103 | 264 | 5.72 |
-| taobao.com | 20 | 19 | 108 | 136 | 5.40 |
+| pool.ntp.org | 16 | 24 | 92 | 109 | 5.75 |
+| wbbasket.ru | 16 | 20 | 130 | 132 | 8.12 |
+| ks-cdn.com | 20 | 19 | 235 | 492 | 11.75 |
+| vkuser.net | 21 | 19 | 124 | 135 | 5.90 |
 | intel.com | 16 | 19 | 85 | 87 | 5.31 |
-| gandi.net | 19 | 15 | 100 | 109 | 5.26 |
+| taobao.com | 20 | 19 | 108 | 136 | 5.40 |
+| cdnvideo.ru | 20 | 19 | 130 | 135 | 6.50 |
+| kaspi.kz | 19 | 19 | 183 | 194 | 9.63 |
+| rambler.ru | 20 | 19 | 135 | 144 | 6.75 |
+| rakuten.co.jp | 19 | 18 | 163 | 186 | 8.58 |
+| rbc.ru | 19 | 18 | 129 | 131 | 6.79 |
+| wp.pl | 17 | 17 | 123 | 131 | 7.24 |
 | betweendigital.com | 18 | 17 | 94 | 118 | 5.22 |
-| mediatek.com | 18 | 13 | 88 | 195 | 4.89 |
 | netease.com | 24 | 17 | 104 | 236 | 4.33 |
+| reg.ru | 17 | 16 | 132 | 288 | 7.76 |
+| shifen.com | 19 | 16 | 243 | 268 | 12.79 |
+| mikrotik.com | 14 | 16 | 127 | 141 | 9.07 |
+| jomodns.com | 15 | 16 | 225 | 307 | 15.00 |
+| gandi.net | 19 | 15 | 100 | 109 | 5.26 |
+| chinamobile.com | 16 | 14 | 255 | 261 | 15.94 |
+| samsungapps.com | 13 | 13 | 214 | 218 | 16.46 |
+| uol.com.br | 13 | 13 | 137 | 143 | 10.54 |
+| mediatek.com | 18 | 13 | 88 | 195 | 4.89 |
+| ksyuncdn.com | 20 | 13 | 243 | 457 | 12.15 |
