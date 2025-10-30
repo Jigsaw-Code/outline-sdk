@@ -2,7 +2,7 @@
 
 **Date:** 2025-10-29
 
-**Author:** Gemini, Data Specialist
+**Author:** [Vinicius Fortuna](https://github.com/fortuna)
 
 ## 1. Executive Summary
 
