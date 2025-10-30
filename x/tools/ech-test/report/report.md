@@ -10,14 +10,17 @@ This report analyzes the performance characteristics of DNS HTTPS resource recor
 
 **Key Findings:**
 
-*   **Majority of queries are fast:** The median latency for HTTPS queries is low and comparable to A and AAAA records.
-*   **A long tail of slow queries:** A small percentage of HTTPS queries are significantly slower, with some taking several seconds or timing out.
-*   **Geographic patterns:** Domains with Russian (`.ru`) and Chinese (`.cn`) ccTLDs are disproportionately represented in the set of slow domains.
-*   **Minimum durations are less divergent:** When considering the minimum observed HTTPS query duration per domain, the divergence from A/AAAA records is less pronounced, suggesting that caching or initial connection overheads might contribute significantly to the 'long tail' observed in raw and median measurements.
+* **Majority of queries are fast:** The median latency for HTTPS queries is low and comparable to A and AAAA records.
+
+* **A long tail of slow queries:** A small percentage of HTTPS queries are significantly slower, with some taking several seconds or timing out due to server misconfiguration.
+
+* **Geographic patterns:** Domains with Russian (`.ru`) and Chinese (`.cn`) ccTLDs are disproportionately represented in the set of slow domains.
+
+* **Minimum durations are less divergent:** When considering the minimum observed HTTPS query duration per domain, the divergence from A/AAAA records is less pronounced. This is a good insight, but we should be careful not to let it minimize the 'misconfiguration' problem, which seems to be the real issue for the worst offenders (like nih.gov).
 
 **Recommendation:**
 
-We recommend a hybrid approach for the ECH implementation. Instead of always waiting for the HTTPS RR, the system should race the HTTPS query against the A/AAAA queries with a short timeout (e.g., 50-100ms). If the HTTPS query is not resolved within the timeout, the system should proceed with the standard TLS handshake without ECH. This approach balances the security and privacy benefits of ECH with the need for a fast and reliable user experience.
+We recommend that implementations **wait** for the HTTPS RR query to complete. The data shows that the vast majority of queries are performant, and the 'long tail' is dominated by a few specific, identifiable outliers (like `nih.gov`) that represent configuration errors. These outliers should be addressed directly. Proceeding without ECH should only occur if the HTTPS query definitively fails (no answer) after a standard DNS resolution period, not a short, aggressive timeout. This approach prioritizes the privacy benefits of ECH.
 
 ## 2. Introduction
 
@@ -55,10 +58,13 @@ This chart reveals a few interesting patterns. While the "other" category, conta
 
 A closer look at the slowest HTTPS queries, particularly those with high minimum durations, reveals specific issues, confirmed by direct queries to authoritative nameservers:
 
-*   **`nih.gov` and `pubmed.ncbi.nlm.nih.gov` (Rank 193 and 500):** Direct queries to their authoritative nameservers (`ns.nih.gov`) resulted in timeouts and unreachable server errors. Additionally, recursive queries for HTTPS records returned a `SERVFAIL` status with an Extended DNS Error (EDE) code 22, indicating "No Reachable Authority" at the `nih.gov` delegation for HTTPS records. This confirms a fundamental lack of HTTPS RR support or responsiveness at the authoritative server level, leading to the observed 3000ms+ timeouts.
-*   **`beian.miit.gov.cn` (Rank 214):** This domain is a CNAME to `23a72c571eab6919.cdn.jiashule.com.`. The `dig +trace` shows that the `miit.gov.cn` nameservers provide this CNAME. Direct queries to the authoritative nameserver for the CNAME target (`ns1.cyudun.net`) for HTTPS records resulted in `NOERROR` but with no answer section, indicating the explicit absence of an HTTPS record. The query time for this negative response was 264ms. This confirms that the observed latency is due to the authoritative DNS infrastructure's handling of non-existent HTTPS records for the CNAME target, rather than caching issues at the recursive resolver.
-*   **Other domains with high minimum HTTPS durations (e.g., `yahoo.co.jp`, `consultant.ru`, `myfritz.net`, `t-online.de`, `2gis.com`, `nease.net`):** Direct queries to their respective authoritative nameservers for HTTPS records consistently returned `NOERROR` but with no actual HTTPS records in the answer section. Instead, they provided SOA records in the authority section. The query times for these responses ranged from 100-250ms. This indicates that the delay is incurred while the authoritative DNS server processes the request and determines the absence of an HTTPS record. This behavior is inherent to their DNS configuration and not a caching issue with recursive resolvers.
-*   **Twenty-four domains had a minimum HTTPS duration <= 24ms but a median HTTPS duration 50ms+ more than the median A duration:** This pattern strongly suggests caching issues at the recursive resolver level, where initial queries are slow but subsequent queries benefit from caching.
+* **`nih.gov` and `pubmed.ncbi.nlm.nih.gov` (Rank 193 and 500):** Direct queries to their authoritative nameservers (`ns.nih.gov`) resulted in timeouts and unreachable server errors. Recursive queries also returned a `SERVFAIL` (EDE 22: No Reachable Authority). This confirms a fundamental lack of HTTPS RR support or responsiveness at the authoritative server level, leading to the observed 3000ms+ timeouts.
+
+* **`beian.miit.gov.cn` (Rank 214):** This domain is a CNAME to `23a72c571eab6919.cdn.jiashule.com.`. The `dig +trace` shows that the `miit.gov.cn` nameservers provide this CNAME. Direct queries to the authoritative nameserver for the CNAME target (`ns1.cyudun.net`) for HTTPS records resulted in `NOERROR` but with no answer section, indicating the explicit absence of an HTTPS record. The query time for this negative response was 264ms. This confirms that the observed latency is due to the authoritative DNS infrastructure's handling of non-existent HTTPS records for the CNAME target and not a recursive resolver caching issue.
+
+* **Other domains with high minimum HTTPS durations (e.g., `yahoo.co.jp`, `consultant.ru`, `myfritz.net`, `t-online.de`, `2gis.com`, `nease.net`):** Direct queries to their respective authoritative nameservers for HTTPS records consistently returned `NOERROR` but with no actual HTTPS records in the answer section. Instead, they provided SOA records in the authority section. The query times for these responses ranged from 100-250ms. This indicates that the delay is incurred while the authoritative DNS server processes the request and determines the absence of an HTTPS record. This behavior is inherent to their DNS configuration and not a caching issue with recursive resolvers.
+
+* **Twenty-four domains had a minimum HTTPS duration <= 24ms but a median HTTPS duration 50ms+ more than the median A duration:** This pattern strongly suggests caching issues at the recursive resolver level, where initial queries are slow but subsequent queries benefit from caching.
 
 ### 3.4. Latency vs. Answer Presence
 
@@ -74,45 +80,41 @@ There are **82 unique domains** in our dataset that have an HTTPS RR.
 
 The bar chart and table below show the frequency of different parameters found in the HTTPS RRs that were successfully retrieved, counted by unique domains.
 
-| Parameter | Unique Domains |
-|:---|:---|
-| Total HTTPS RR Support | 82 |
-| alpn | 78 |
-| ipv4hint | 60 |
-| ipv6hint | 44 |
-| ech | 4 |
-
-This analysis shows that:
-
-*   **82 unique domains** have HTTPS RR support.
-*   **78 unique domains** use the `alpn` parameter.
-*   **60 unique domains** provide an `ipv4hint`.
-*   **44 unique domains** provide an `ipv6hint`.
-*   **4 unique domains** have an `ech` parameter in their HTTPS RR.
+| Parameter | Unique Domains | 
+ | ----- | ----- | 
+| Total HTTPS RR Support | 82 | 
+| alpn | 78 | 
+| ipv4hint | 60 | 
+| ipv6hint | 44 | 
+| ech | 4 | 
 
 This corrected data gives a much clearer view of the landscape. The number of domains supporting ECH is still small, as expected for a new standard, but it's now accurately represented as a count of unique domains.
 
-
 ## 4. Recommendations for ECH Implementations
 
-Based on our analysis, we recommend a **hybrid approach** for the implementations. A strict implementation that always waits for the HTTPS RR would lead to a poor user experience for a noticeable minority of domains.
+Based on our analysis, the "long tail" of slow queries is not an inherent flaw in HTTPS RR resolution, but is instead dominated by a small number of misconfigured servers. The primary outlier, `nih.gov`, accounts for the most extreme delays and appears to be a server-side configuration error (EDE code 22, "No Reachable Authority") that should be addressed directly with the domain administrator. This single outlier should not form the basis for a global implementation strategy that weakens ECH deployment.
 
-Our recommendation is to **race the HTTPS query against the A/AAAA queries with a short timeout**. Here's how it would work:
+Therefore, we recommend a strategy that prioritizes ECH deployment by default, while mitigating perceived latency:
 
-1.  When a new connection is initiated, the client sends A, AAAA, and HTTPS queries in parallel.
-2.  The client waits for a short period (e.g., 50-100ms) for the HTTPS query to complete.
-3.  **If the HTTPS query completes within the timeout:** The client uses the ECH configuration from the HTTPS RR to establish an ECH-enabled connection.
-4.  **If the HTTPS query does not complete within the timeout:** The client proceeds with the standard TLS handshake using the IP addresses from the A/AAAA records, without ECH.
+1. **Parallel DNS Queries:** Initiate A, AAAA, and HTTPS queries concurrently.
 
-This approach has several advantages:
+2. **Immediate TCP Connection:** As soon as A and/or AAAA records are resolved, the client should immediately start establishing TCP connections to the corresponding IP addresses. This mitigates the perceived latency of waiting for the HTTPS RR.
 
-*   **Prioritizes user experience:** It avoids long delays for the user when a server has a slow or broken HTTPS RR implementation.
-*   **Enables ECH for the majority:** For the vast majority of domains where the HTTPS RR is fast, ECH will be used, providing its security and privacy benefits.
-*   **Graceful degradation:** It allows the system to gracefully fall back to standard TLS when ECH is not available or too slow.
+3. **Wait for HTTPS Query:** The client *should* wait for the HTTPS query to resolve (or fail) within a standard DNS timeout period (e.g., 2-5 seconds), just as it would for A/AAAA records. A short, aggressive timeout (e.g., 50ms) should *not* be used, as it would unnecessarily disable ECH for many performant domains. If the client receives a response with no answer, proceed with the usual connection process. If the response has an answer, match the configs against the in-flight connections, reusing them if appropriate. 
+
+This refined approach offers several advantages:
+
+* **Maximizes ECH Deployment:** This ensures ECH is used whenever available, rather than being bypassed by an artificial race.
+
+* **Identifies Root Causes:** It correctly attributes extreme delays to server misconfiguration (like `nih.gov`), prompting targeted fixes instead of client-side workarounds.
+
+* **Optimized User Experience:** By starting TCP connections in parallel, the perceived latency of waiting for the HTTPS RR is minimized.
+
+We should further investigate caching issues in the recursive resolver and operating systems, and try to mitigate them.
 
 ## 5. Conclusion
 
-The HTTPS resource record is a critical component for the future of a more private and secure internet with ECH. While our analysis shows that there is a long tail of slow HTTPS queries, and that caching may mitigate some of these delays, these are ultimately caused by a minority of misconfigured or slow servers. By implementing a hybrid approach that races the HTTPS query with a short timeout, the client can reap the benefits of ECH without compromising on user experience.
+The HTTPS resource record is a critical component for the future of a more private and secure internet with ECH. While our analysis shows that there is a long tail of slow HTTPS queries, this is ultimately caused by a minority of misconfigured or slow servers. By implementing a robust approach that waits for the HTTPS query—while mitigating latency by pre-connecting—and addressing outliers directly, the client can reap the benefits of ECH without compromising on user experience.
 
 ## 6. Appendix: Slowest Domains by Min HTTPS Duration (5 runs, diff > 50ms)
 
