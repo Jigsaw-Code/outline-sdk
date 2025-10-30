@@ -6,14 +6,14 @@
 
 ## 1. Executive Summary
 
-This report analyzes the performance characteristics of DNS HTTPS resource records (RRs) to inform the implementation strategy for Encrypted ClientHello (ECH) on various libraries and platforms. Our analysis of the top 1,000 domains from the Tranco list, based on five separate runs to ensure robustness, reveals that while the majority of HTTPS queries are performant, a significant minority of domains exhibit high latency, which could negatively impact user experience if the system strictly waits for the HTTPS RR.
+This report analyzes the performance characteristics of DNS HTTPS resource records (RRs) to inform the implementation strategy for Encrypted ClientHello (ECH) on various libraries and platforms. Our analysis of the top 1,000 domains from the Tranco list, based on five separate runs to ensure robustness, reveals that while the majority of HTTPS queries are performant, a significant minority of domains exhibit high latency. Further analysis of minimum and median durations per domain suggests that caching plays a role in mitigating some of the observed latency, but a long tail of slow queries persists, which could negatively impact user experience if the system strictly waits for the HTTPS RR.
 
 **Key Findings:**
 
 *   **Majority of queries are fast:** The median latency for HTTPS queries is low and comparable to A and AAAA records.
 *   **A long tail of slow queries:** A small percentage of HTTPS queries are significantly slower, with some taking several seconds or timing out.
 *   **Geographic patterns:** Domains with Russian (`.ru`) and Chinese (`.cn`) ccTLDs are disproportionately represented in the set of slow domains.
-*   **Root causes of slowness:** The primary causes for the high latency are server-side issues, including timeouts and `SERVFAIL` errors, rather than the inherent size or complexity of HTTPS RRs.
+*   **Minimum durations are less divergent:** When considering the minimum observed HTTPS query duration per domain, the divergence from A/AAAA records is less pronounced, suggesting that caching or initial connection overheads might contribute significantly to the 'long tail' observed in raw and median measurements.
 
 **Recommendation:**
 
@@ -120,7 +120,7 @@ This approach has several advantages:
 
 ## 5. Conclusion
 
-The HTTPS resource record is a critical component for the future of a more private and secure internet with ECH. While our analysis shows that there is a long tail of slow HTTPS queries, these are caused by a minority of misconfigured or slow servers. By implementing a hybrid approach that races the HTTPS query with a short timeout, the client can reap the benefits of ECH without compromising on user experience.
+The HTTPS resource record is a critical component for the future of a more private and secure internet with ECH. While our analysis shows that there is a long tail of slow HTTPS queries, and that caching may mitigate some of these delays, these are ultimately caused by a minority of misconfigured or slow servers. By implementing a hybrid approach that races the HTTPS query with a short timeout, the client can reap the benefits of ECH without compromising on user experience.
 
 ## 6. Appendix: Slowest Domains by Min HTTPS Duration (5 runs, diff > 50ms)
 
