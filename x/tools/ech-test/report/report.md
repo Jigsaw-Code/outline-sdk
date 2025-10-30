@@ -43,15 +43,7 @@ To further investigate the latency characteristics, especially considering poten
 
 As we can see, for the vast majority of queries (up to the ~0.85 quantile), the latency of HTTPS queries is very close to that of A and AAAA queries. However, beyond this point, the latency of HTTPS queries starts to increase significantly, forming a long tail of slow queries. The plots based on minimum and median durations per domain provide a clearer view of the inherent performance characteristics, minimizing the impact of individual slow queries within a domain's multiple runs.
 
-### 3.2. HTTPS Query Performance Deep Dive
-
-To better understand the performance of HTTPS queries, let's look at the distribution of their durations.
-
-![Distribution of HTTPS Query Durations (5 runs)](./https_duration_histogram.png)
-
-The histogram shows that the vast majority of HTTPS queries are resolved in under 200ms, with a large concentration in the 0-100ms range. This confirms that in the common case, HTTPS queries are fast. The long tail of the distribution, however, confirms the presence of a significant number of slow queries.
-
-### 3.3. Impact of Geographic Location
+### 3.2. Impact of Geographic Location
 
 We analyzed the difference in duration between HTTPS and A queries, broken down by country-code top-level domain (ccTLD). TLDs that are not country-specific are grouped as "other".
 
@@ -59,7 +51,7 @@ We analyzed the difference in duration between HTTPS and A queries, broken down 
 
 This chart reveals a few interesting patterns. While the "other" category, containing gTLDs, has the widest distribution due to major outliers, some ccTLDs also show significant variation. Notably, the `.kz` (Kazakhstan) and `.nz` (New Zealand) ccTLDs show a significantly higher median duration difference compared to other ccTLDs. The `.jp` (Japan) and `.su` (Soviet Union) also have a higher median. While `.ru` (Russia) and `.cn` (China) have a wide distribution of duration differences, their median values are closer to the bulk of other ccTLDs, suggesting that while there are slow domains in those regions, the typical performance is not as poor as the outliers might suggest.
 
-### 3.4. Analysis of Slow Queries
+### 3.3. Analysis of Slow Queries
 
 A closer look at the slowest HTTPS queries reveals that the high latency is often not due to the size or complexity of the HTTPS record itself, but rather to server-side issues. The most common causes for extreme latency are:
 
@@ -68,13 +60,13 @@ A closer look at the slowest HTTPS queries reveals that the high latency is ofte
 
 These issues point to a lack of proper support for the HTTPS RR on some authoritative DNS servers, rather than a fundamental performance problem with the HTTPS RR itself.
 
-### 3.5. Latency vs. Answer Presence
+### 3.4. Latency vs. Answer Presence
 
 ![Latency vs. Answer Presence](./latency_vs_answer.png)
 
 The box plot above compares the duration of HTTPS queries that received an answer against those that did not. Interestingly, the median latency for queries *with* an answer is slightly higher than for those without. However, the distribution for queries with an answer is much tighter, with fewer extreme outliers. This suggests that while there's a small, consistent cost to retrieving the HTTPS record, the major latency issues are more strongly associated with servers that fail to respond correctly to HTTPS queries (i.e., those that don't return an answer).
 
-### 3.6. HTTPS RR Feature Usage
+### 3.5. HTTPS RR Feature Usage
 
 There are **82 unique domains** in our dataset that have an HTTPS RR.
 
