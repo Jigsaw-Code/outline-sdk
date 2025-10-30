@@ -276,6 +276,7 @@ func main() {
 	trancoIDFlag := flag.String("trancoID", "7NZ4X", "Tranco list ID to use")
 	topNFlag := flag.Int("topN", 100, "Number of top domains to analyze")
 	parallelismFlag := flag.Int("parallelism", 10, "Maximum number of parallel requests")
+	numQueriesFlag := flag.Int("numQueries", 1, "Number of times to query each domain")
 	verboseFlag := flag.Bool("verbose", false, "Enable verbose logging")
 	flag.Parse()
 
@@ -299,7 +300,7 @@ func main() {
 	}
 
 	// Create new output CSV file.
-	outputFilename := filepath.Join(workspaceDir, fmt.Sprintf("results-top%d.csv", *topNFlag))
+	outputFilename := filepath.Join(workspaceDir, fmt.Sprintf("results-top%d-n%d.csv", *topNFlag, *numQueriesFlag))
 	outputFile, err := os.Create(outputFilename)
 	if err != nil {
 		slog.Error("Failed to create output CSV file", "path", outputFilename, "error", err)
@@ -316,7 +317,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	resultsCh := make(chan QueryResult, 3*(*topNFlag))
+	resultsCh := make(chan QueryResult, 3*(*topNFlag)*(*numQueriesFlag))
 
 	var csvWg sync.WaitGroup
 	csvWg.Add(1)
@@ -363,38 +364,40 @@ func main() {
 
 	sem := semaphore.NewWeighted(int64(*parallelismFlag))
 	var resolveWg sync.WaitGroup
-	resolveWg.Add(len(domains))
+	resolveWg.Add(len(domains) * (*numQueriesFlag))
 	client := new(dns.Client)
 	client.ReadTimeout = 5 * time.Second
 	client.WriteTimeout = 5 * time.Second
 	resolverAddress := "8.8.8.8:53"
 
-	for _, domain := range domains {
-		if err := sem.Acquire(context.Background(), 3); err != nil {
-			slog.Error("Failed to acquire semaphore", "domain", domain.Name, "error", err)
-			return
-		}
-		go func(d Domain) {
-			defer resolveWg.Done()
-			slog.Info("Analyzing", "domain", d.Name)
+	for i := 0; i < *numQueriesFlag; i++ {
+		for _, domain := range domains {
+			if err := sem.Acquire(context.Background(), 3); err != nil {
+				slog.Error("Failed to acquire semaphore", "domain", domain.Name, "error", err)
+				return
+			}
+			go func(d Domain) {
+				defer resolveWg.Done()
+				slog.Info("Analyzing", "domain", d.Name)
 
-			resolveWg.Add(3)
-			go func() {
-				resultsCh <- resolve(client, resolverAddress, d, dns.TypeA)
-				sem.Release(1)
-				resolveWg.Done()
-			}()
-			go func() {
-				resultsCh <- resolve(client, resolverAddress, d, dns.TypeAAAA)
-				sem.Release(1)
-				resolveWg.Done()
-			}()
-			go func() {
-				resultsCh <- resolve(client, resolverAddress, d, dns.TypeHTTPS)
-				sem.Release(1)
-				resolveWg.Done()
-			}()
-		}(domain)
+				resolveWg.Add(3)
+				go func() {
+					resultsCh <- resolve(client, resolverAddress, d, dns.TypeA)
+					sem.Release(1)
+					resolveWg.Done()
+				}()
+				go func() {
+					resultsCh <- resolve(client, resolverAddress, d, dns.TypeAAAA)
+					sem.Release(1)
+					resolveWg.Done()
+				}()
+				go func() {
+					resultsCh <- resolve(client, resolverAddress, d, dns.TypeHTTPS)
+					sem.Release(1)
+					resolveWg.Done()
+				}()
+			}(domain)
+		}
 	}
 	resolveWg.Wait()
 	close(resultsCh)
