@@ -10,10 +10,10 @@ go run ./greasetest --topN 100
 
 This will:
 
-1. Create a `./greasetest/workspace` directory if it doesn't exist.
+1. Create a `./workspace` directory if it doesn't exist.
 2. Download the Tranco top 1 million domains list (if not already present).
 3. Issue HEAD requests to the top 100 domains, once with ECH GREASE and once without.
-4. Save the results to `./greasetest/workspace/grease-results-top100.csv`.
+4. Save the results to `./workspace/grease-results-top100.csv`.
 
 ### Parameters
 
@@ -47,14 +47,16 @@ This is a custom build of `curl` with ECH support from the [DEfO project](https:
 
 * Homebrew
 * `automake`
-* `libtool`
+* `libtool` (installed as `glibtoolize`)
+* `pkg-config`
+* `libpsl`
 
 ### Building
 
-If you don't have `automake`:
+If you don't have `automake`, `libtool`, `pkg-config`, or `libpsl`:
 
 ```sh
-brew install automake libtool
+brew install automake libtool pkg-config libpsl
 ```
 
 We will put everything under a `$WORKSPACE_DIR` folder with this structure:
@@ -67,14 +69,14 @@ We will put everything under a `$WORKSPACE_DIR` folder with this structure:
 Let's create an env var for our workspace folder:
 
 ```sh
-export WORKSPACE_DIR="$(pwd)"
+export WORKSPACE_DIR="$(pwd)/workspace"
 ```
 
 Clone and build OpenSSL with ECH:
 
 ```sh
-git clone --filter=blob:none https://github.com/defo-project/openssl
-cd openssl
+git clone --filter=blob:none https://github.com/defo-project/openssl "${WORKSPACE_DIR}/openssl"
+cd "${WORKSPACE_DIR}/openssl"
 ./config --libdir=lib --prefix="${WORKSPACE_DIR}/output"
 make -j8
 make install_sw
@@ -83,9 +85,7 @@ make install_sw
 Clone and build curl with ECH:
 
 ```sh
-cd "${WORKSPACE_DIR}"
-git clone --filter=blob:none https://github.com/defo-project/curl
-cd curl
+cd "${WORKSPACE_DIR}/curl"
 autoreconf -fi
 ./configure --with-openssl="${WORKSPACE_DIR}/output" --prefix="${WORKSPACE_DIR}/output" --enable-ech
 make
@@ -103,13 +103,17 @@ configure: WANING: HTTPSRR is enabled but marked EXPERIMENTAL. Use with caution!
 
 To test that your custom `curl` build is working correctly, run it against the DEfO test server:
 
-```console
-% "${WORKSPACE_DIR}/output/bin/curl" --ech=true --doh-url https://1.1.1.1/dns-query 'https://test.defo.ie/echstat.php?format=json' | jq
+```sh
+"$(pwd)/workspace/output/bin/curl" --ech=true --doh-url https://1.1.1.1/dns-query 'https://test.defo.ie/echstat.php?format=json' | jq
+```
+
+Example output:
+```json
 {
   "SSL_ECH_OUTER_SNI": "public.test.defo.ie",
   "SSL_ECH_INNER_SNI": "test.defo.ie",
   "SSL_ECH_STATUS": "success",
-  "date": "2025-10-07T20:19:18+00:00",
+  "date": "2025-11-06T19:36:47+00:00",
   "config": "min-ng.test.defo.ie"
 }
 ```

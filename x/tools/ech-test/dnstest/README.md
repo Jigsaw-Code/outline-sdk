@@ -10,10 +10,10 @@ go run ./dnstest --topN 100
 
 This will:
 
-1. Create a `./dnstest/workspace` directory if it doesn't exist.
+1. Create a `./workspace` directory if it doesn't exist.
 2. Download the Tranco top 1 million domains list (if not already present).
 3. Query the top 100 domains for A, AAAA, and HTTPS records using the `8.8.8.8:53` resolver.
-4. Save the results to `./dnstest/workspace/results-top100-n1.csv`.
+4. Save the results to `./workspace/results-top100-n1.csv`.
 
 ### Parameters
 
