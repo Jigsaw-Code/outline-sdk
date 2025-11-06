@@ -134,3 +134,8 @@ After running the `greasetest` tool, a `report` subdirectory is created within t
 *   `analyze.py`: The Python script used for the analysis.
 *   `grease-results-top<N>.csv`: The raw data from the test run.
 
+
+### TODO
+
+* Investigate which outer SNI ECH GREASE should use.
+* Investigate which outer SNI is being used, and whether it makes a difference.
