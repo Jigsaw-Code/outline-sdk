@@ -59,11 +59,12 @@ If you don't have `automake`, `libtool`, `pkg-config`, or `libpsl`:
 brew install automake libtool pkg-config libpsl
 ```
 
-We will put everything under a `$WORKSPACE_DIR` folder with this structure:
+We will use the `workspace` directory at the root of this project. Inside it, the structure will be:
 
 * `openssl/`: the DEfO OpenSSL repository clone
 * `curl/`: the DEfO curl repository clone
 * `output/`: where we will put all the built output
+  * `bin/`: there the executables are stored in the output
   * `lib/`: there the libraries are stored in the output
 
 Let's create an env var for our workspace folder:
