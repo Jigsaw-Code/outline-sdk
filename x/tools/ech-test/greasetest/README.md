@@ -86,6 +86,7 @@ make install_sw
 Clone and build curl with ECH:
 
 ```sh
+git clone --filter=blob:none https://github.com/defo-project/curl "${WORKSPACE_DIR}/curl"
 cd "${WORKSPACE_DIR}/curl"
 autoreconf -fi
 ./configure --with-openssl="${WORKSPACE_DIR}/output" --prefix="${WORKSPACE_DIR}/output" --enable-ech
