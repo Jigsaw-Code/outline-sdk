@@ -20,7 +20,7 @@ This report analyzes the performance characteristics of DNS HTTPS resource recor
 
 **Recommendation:**
 
-We recommend that implementations **wait** for the HTTPS RR query to complete. The data shows that the vast majority of queries are performant, and the 'long tail' is dominated by a few specific, identifiable outliers (like `nih.gov`) that represent configuration errors. These outliers should be addressed directly. Proceeding without ECH should only occur if the HTTPS query definitively fails (no answer) after a standard DNS resolution period, not a short, aggressive timeout. This approach prioritizes the privacy benefits of ECH.
+We recommend that ECH-enabled implementations start TCP connections as prescribed in [Happy Eyeballs v3](https://datatracker.ietf.org/doc/draft-ietf-happy-happyeyeballs-v3/), waiting for the HTTPS RR query to complete before advancing the TLS connection. This gives the HTTPS RR an extra round-trip of time to arrive. The data shows that the vast majority of queries are performant, and the 'long tail' is dominated by a few specific, identifiable outliers (like `nih.gov`) that represent configuration errors. These outliers should be addressed directly. Proceeding without ECH should only occur if the HTTPS query definitively fails (no answer) after a standard DNS resolution period, not a short, aggressive timeout. This approach prioritizes the privacy benefits of ECH.
 
 ## 2. Introduction
 
