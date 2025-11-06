@@ -47,7 +47,7 @@ This is a custom build of `curl` with ECH support from the [DEfO project](https:
 
 * Homebrew
 * `automake`
-* `libtool` (installed as `glibtoolize`)
+* `libtool`
 * `pkg-config`
 * `libpsl`
 
