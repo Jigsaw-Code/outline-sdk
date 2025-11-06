@@ -1,4 +1,3 @@
-
 // Copyright 2025 The Outline Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,18 +16,19 @@ package main
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/csv"
 	"flag"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
-	"net/http/httptrace"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -78,7 +78,7 @@ type TestResult struct {
 	HTTPStatus     int
 }
 
-func runTest(client *http.Client, domain Domain, echGrease bool) TestResult {
+func runTest(curlPath string, domain Domain, echGrease bool) TestResult {
 	result := TestResult{
 		Domain:    domain.Name,
 		Rank:      domain.Rank,
@@ -86,47 +86,64 @@ func runTest(client *http.Client, domain Domain, echGrease bool) TestResult {
 	}
 
 	url := "https://" + domain.Name
-	req, err := http.NewRequest("HEAD", url, nil)
+
+	// curl -w "dnslookup:%{time_namelookup},tcpconnect:%{time_connect},tlsconnect:%{time_appconnect},servertime:%{time_starttransfer},total:%{time_total},httpstatus:%{http_code}" --head -s --ech true https://example.com
+	args := []string{
+		"-w",
+		"dnslookup:%{time_namelookup},tcpconnect:%{time_connect},tlsconnect:%{time_appconnect},servertime:%{time_starttransfer},total:%{time_total},httpstatus:%{http_code}",
+		"--head",
+		"-s", // silent
+	}
+	if echGrease {
+		args = append(args, "--ech", "true")
+	}
+	args = append(args, url)
+
+	slog.Debug("running curl", "path", curlPath, "args", args)
+	cmd := exec.Command(curlPath, args...)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
 	if err != nil {
-		result.Error = fmt.Sprintf("failed to create request: %v", err)
+		result.Error = fmt.Sprintf("failed to run curl: %v, stderr: %s", err, stderr.String())
 		return result
 	}
 
-	var dnsStart, dnsDone, connStart, connDone, tlsStart, tlsDone, gotFirstResponseByte time.Time
-	trace := &httptrace.ClientTrace{
-		DNSStart: func(_ httptrace.DNSStartInfo) { dnsStart = time.Now() },
-		DNSDone:  func(_ httptrace.DNSDoneInfo) { dnsDone = time.Now() },
-		ConnectStart: func(_, _ string) { connStart = time.Now() },
-		ConnectDone:  func(_, _, err error) { connDone = time.Now() },
-		TLSHandshakeStart: func() { tlsStart = time.Now() },
-		TLSHandshakeDone:  func(_ tls.ConnectionState, _ error) { tlsDone = time.Now() },
-		GotFirstResponseByte: func() { gotFirstResponseByte = time.Now() },
-	}
-	req = req.WithContext(httptrace.WithClientTrace(context.Background(), trace))
+	// parse the output
+	// dnslookup:0.001,tcpconnect:0.002,tlsconnect:0.003,servertime:0.004,total:0.005,httpstatus:200
+	parts := strings.Split(out.String(), ",")
+	for _, part := range parts {
+		kv := strings.Split(part, ":")
+		if len(kv) != 2 {
+			continue
+		}
+		key := kv[0]
+		value := kv[1]
 
-	start := time.Now()
-	resp, err := client.Do(req)
-	result.TotalTime = time.Since(start)
-
-	if dnsStart.IsZero() {
-		// From cache
-		result.DNSLookup = 0
-	} else {
-		result.DNSLookup = dnsDone.Sub(dnsStart)
+		switch key {
+		case "dnslookup":
+			f, _ := strconv.ParseFloat(value, 64)
+			result.DNSLookup = time.Duration(f * float64(time.Second))
+		case "tcpconnect":
+			f, _ := strconv.ParseFloat(value, 64)
+			result.TCPConnection = time.Duration(f * float64(time.Second))
+		case "tlsconnect":
+			f, _ := strconv.ParseFloat(value, 64)
+			result.TLSHandshake = time.Duration(f * float64(time.Second))
+		case "servertime":
+			f, _ := strconv.ParseFloat(value, 64)
+			result.ServerTime = time.Duration(f * float64(time.Second))
+		case "total":
+			f, _ := strconv.ParseFloat(value, 64)
+			result.TotalTime = time.Duration(f * float64(time.Second))
+		case "httpstatus":
+			i, _ := strconv.Atoi(value)
+			result.HTTPStatus = i
+		}
 	}
-	result.TCPConnection = connDone.Sub(connStart)
-	result.TLSHandshake = tlsDone.Sub(tlsStart)
-	if !gotFirstResponseByte.IsZero() {
-		result.ServerTime = gotFirstResponseByte.Sub(tlsDone)
-	}
-
-
-	if err != nil {
-		result.Error = err.Error()
-		return result
-	}
-	defer resp.Body.Close()
-	result.HTTPStatus = resp.StatusCode
 
 	return result
 }
@@ -202,6 +219,7 @@ func main() {
 	topNFlag := flag.Int("topN", 100, "Number of top domains to analyze")
 	parallelismFlag := flag.Int("parallelism", 10, "Maximum number of parallel requests")
 	verboseFlag := flag.Bool("verbose", false, "Enable verbose logging")
+	curlPathFlag := flag.String("curl", "", "Path to the ECH-enabled curl binary")
 	flag.Parse()
 
 	if *verboseFlag {
@@ -212,6 +230,12 @@ func main() {
 
 	// Set up workspace directory.
 	workspaceDir := ensureWorkspace(*workspaceFlag)
+
+	// Determine curl binary path.
+	curlPath := *curlPathFlag
+	if curlPath == "" {
+		curlPath = filepath.Join(workspaceDir, "output", "bin", "curl")
+	}
 
 	// Ensure Tranco list is present.
 	trancoZipFilename := ensureTrancoList(workspaceDir, *trancoIDFlag)
@@ -260,7 +284,7 @@ func main() {
 				strconv.FormatInt(result.TotalTime.Milliseconds(), 10),
 				strconv.Itoa(result.HTTPStatus),
 			}
-if err := csvWriter.Write(record); err != nil {
+			if err := csvWriter.Write(record); err != nil {
 				slog.Error("Failed to write record to CSV", "error", err)
 			}
 		}
@@ -268,35 +292,6 @@ if err := csvWriter.Write(record); err != nil {
 
 	sem := semaphore.NewWeighted(int64(*parallelismFlag))
 	var wg sync.WaitGroup
-	
-	// TODO: Use a transport that supports ECH GREASE.
-	// The standard library http.Client does not support ECH.
-	// A custom transport will be needed.
-	// For now, we use two separate clients to simulate the different TLS configs.
-	
-	// Client for control (ECH disabled)
-	controlClient := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-
-	// Client for ECH GREASE
-	// This needs a custom transport that enables ECH GREASE.
-	// For example:
-	// greaseTransport := &http.Transport{
-	// 	 TLSClientConfig: &tls.Config{
-	// 		 // ECH GREASE configuration would go here.
-	// 		 // This is not supported in the standard library.
-	// 	},
-	// }
-	// greaseClient := &http.Client{
-	// 	Transport: greaseTransport,
-	// 	Timeout: 10 * time.Second,
-	// }
-	// Since we don't have the ECH library, we will use the same client for now.
-	greaseClient := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-
 
 	for _, domain := range domains {
 		wg.Add(2)
@@ -308,7 +303,7 @@ if err := csvWriter.Write(record); err != nil {
 			defer sem.Release(1)
 			defer wg.Done()
 			slog.Info("Testing domain", "domain", d.Name, "ech_grease", false)
-			resultsCh <- runTest(controlClient, d, false)
+			resultsCh <- runTest(curlPath, d, false)
 		}(domain)
 
 		if err := sem.Acquire(context.Background(), 1); err != nil {
@@ -319,7 +314,7 @@ if err := csvWriter.Write(record); err != nil {
 			defer sem.Release(1)
 			defer wg.Done()
 			slog.Info("Testing domain", "domain", d.Name, "ech_grease", true)
-			resultsCh <- runTest(greaseClient, d, true)
+			resultsCh <- runTest(curlPath, d, true)
 		}(domain)
 	}
 
