@@ -1,6 +1,6 @@
 ## `greasetest`
 
-This tool, located in the `greasetest/` directory, issues HEAD requests to a list of domains with and without ECH GREASE to test for compatibility.
+This tool, located in the `greasetest/` directory, issues HEAD requests to a list of domains with and without ECH GREASE to test for compatibility. It uses a custom-built ECH-enabled `curl` binary for these requests.
 
 To run the tool, use the `go run` command from the `ech-test` directory:
 
@@ -21,6 +21,8 @@ This will:
 * `-trancoID <id>`: The ID of the Tranco list to use. Defaults to `7NZ4X`.
 * `-topN <number>`: The number of top domains to analyze. Defaults to 100.
 * `-parallelism <number>`: Maximum number of parallel requests. Defaults to 10.
+* `-curl <path>`: Path to the ECH-enabled curl binary. Defaults to `./workspace/output/bin/curl`.
+* `-maxTime <duration>`: Maximum time per curl request. Defaults to `10s`.
 
 ### Output Format
 
@@ -30,6 +32,8 @@ The tool generates a CSV file (`workspace/grease-results-top<N>.csv`) with the f
 * `rank`: The rank of the domain in the Tranco list.
 * `ech_grease`: `true` if ECH GREASE was enabled for the request, `false` otherwise.
 * `error`: Any error that occurred during the request.
+* `curl_exit_code`: The exit code returned by the `curl` command.
+* `curl_error_name`: The human-readable name corresponding to the `curl` exit code.
 * `dns_lookup_ms`: The duration of the DNS lookup.
 * `tcp_connection_ms`: The duration of the TCP connection.
 * `tls_handshake_ms`: The duration of the TLS handshake.
@@ -122,7 +126,11 @@ Example output:
 }
 ```
 
-### TODO
+### Report
 
-* Investigate which outer SNI ECH GREASE should use.
-* Investigate which outer SNI is being used, and whether it makes a difference.
+After running the `greasetest` tool, a `report` subdirectory is created within the `greasetest` directory. This directory contains:
+
+*   `report.md`: A summary of the ECH GREASE connectivity analysis.
+*   `analyze.py`: The Python script used for the analysis.
+*   `grease-results-top<N>.csv`: The raw data from the test run.
+
