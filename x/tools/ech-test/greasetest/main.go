@@ -184,7 +184,7 @@ func runTest(curlPath string, domain Domain, echGrease bool) TestResult {
 		"-s", // silent
 	}
 	if echGrease {
-		args = append(args, "--ech", "true")
+		args = append(args, "--ech", "grease")
 	}
 	args = append(args, url)
 

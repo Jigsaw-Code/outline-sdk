@@ -101,6 +101,8 @@ configure: WARNING: ECH is enabled but marked EXPERIMENTAL. Use with caution!
 configure: WANING: HTTPSRR is enabled but marked EXPERIMENTAL. Use with caution!
 ```
 
+For more details on how to use `curl` with ECH, see the [official documentation](https://github.com/defo-project/curl/blob/master/docs/ECH.md).
+
 ### Verifying the build
 
 To test that your custom `curl` build is working correctly, run it against the DEfO test server:
