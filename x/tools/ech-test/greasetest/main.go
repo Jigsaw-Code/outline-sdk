@@ -167,7 +167,7 @@ var curlExitCodeNames = map[int]string{
 	96: "CURLE_QUIC_CONNECT_ERROR",
 }
 
-func runTest(curlPath string, domain Domain, echGrease bool) TestResult {
+func runTest(curlPath string, domain Domain, echGrease bool, maxTime time.Duration) TestResult {
 	result := TestResult{
 		Domain:    domain.Name,
 		Rank:      domain.Rank,
@@ -176,12 +176,14 @@ func runTest(curlPath string, domain Domain, echGrease bool) TestResult {
 
 	url := "https://" + domain.Name
 
-	// curl -w "dnslookup:%{time_namelookup},tcpconnect:%{time_connect},tlsconnect:%{time_appconnect},servertime:%{time_starttransfer},total:%{time_total},httpstatus:%{http_code}" --head -s --ech true https://example.com
+	// curl -w "dnslookup:%{time_namelookup},tcpconnect:%{time_connect},tlsconnect:%{time_appconnect},servertime:%{time_starttransfer},total:%{time_total},httpstatus:%{http_code}" --head -s --ech grease https://example.com
 	args := []string{
 		"-w",
 		"dnslookup:%{time_namelookup},tcpconnect:%{time_connect},tlsconnect:%{time_appconnect},servertime:%{time_starttransfer},total:%{time_total},httpstatus:%{http_code}",
 		"--head",
 		"-s", // silent
+		"--max-time",
+		strconv.FormatFloat(maxTime.Seconds(), 'f', -1, 64),
 	}
 	if echGrease {
 		args = append(args, "--ech", "grease")
@@ -312,6 +314,7 @@ func main() {
 	topNFlag := flag.Int("topN", 100, "Number of top domains to analyze")
 	parallelismFlag := flag.Int("parallelism", 10, "Maximum number of parallel requests")
 	verboseFlag := flag.Bool("verbose", false, "Enable verbose logging")
+	maxTimeFlag := flag.Duration("maxTime", 10*time.Second, "Maximum time per curl request")
 	curlPathFlag := flag.String("curl", "", "Path to the ECH-enabled curl binary")
 	flag.Parse()
 
@@ -398,7 +401,7 @@ func main() {
 			defer sem.Release(1)
 			defer wg.Done()
 			slog.Info("Testing domain", "domain", d.Name, "ech_grease", false)
-			resultsCh <- runTest(curlPath, d, false)
+			resultsCh <- runTest(curlPath, d, false, *maxTimeFlag)
 		}(domain)
 
 		if err := sem.Acquire(context.Background(), 1); err != nil {
@@ -409,7 +412,7 @@ func main() {
 			defer sem.Release(1)
 			defer wg.Done()
 			slog.Info("Testing domain", "domain", d.Name, "ech_grease", true)
-			resultsCh <- runTest(curlPath, d, true)
+			resultsCh <- runTest(curlPath, d, true, *maxTimeFlag)
 		}(domain)
 	}
 
