@@ -121,3 +121,8 @@ Example output:
   "config": "min-ng.test.defo.ie"
 }
 ```
+
+### TODO
+
+* Investigate which outer SNI ECH GREASE should use.
+* Investigate which outer SNI is being used, and whether it makes a difference.
