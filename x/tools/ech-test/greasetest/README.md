@@ -57,53 +57,21 @@ This is a custom build of `curl` with ECH support from the [DEfO project](https:
 
 ### Building
 
-If you don't have `automake`, `libtool`, `pkg-config`, or `libpsl`:
+A helper script, `build-curl.sh`, is provided to automate the build process for `curl` and its dependency, `openssl`.
+
+To build the ECH-enabled `curl`, run the script from the `greasetest` directory and provide an output path:
 
 ```sh
-brew install automake libtool pkg-config libpsl
+./build-curl.sh <output_directory>
 ```
 
-We will use the `workspace` directory at the root of this project. Inside it, the structure will be:
-
-* `openssl/`: the DEfO OpenSSL repository clone
-* `curl/`: the DEfO curl repository clone
-* `output/`: where we will put all the built output
-  * `bin/`: there the executables are stored in the output
-  * `lib/`: there the libraries are stored in the output
-
-Let's create an env var for our workspace folder:
+For example, to build `curl` and place the output in the `workspace` directory:
 
 ```sh
-export WORKSPACE_DIR="$(pwd)/workspace"
+./build-curl.sh ../workspace
 ```
 
-Clone and build OpenSSL with ECH:
-
-```sh
-git clone --filter=blob:none https://github.com/defo-project/openssl "${WORKSPACE_DIR}/openssl"
-cd "${WORKSPACE_DIR}/openssl"
-./config --libdir=lib --prefix="${WORKSPACE_DIR}/output"
-make -j8
-make install_sw
-```
-
-Clone and build curl with ECH:
-
-```sh
-git clone --filter=blob:none https://github.com/defo-project/curl "${WORKSPACE_DIR}/curl"
-cd "${WORKSPACE_DIR}/curl"
-autoreconf -fi
-./configure --with-openssl="${WORKSPACE_DIR}/output" --prefix="${WORKSPACE_DIR}/output" --enable-ech
-make
-make install
-```
-
-Note: you should see the warning below after the `configure` call. If you don't, something went wrong.
-
-```text
-configure: WARNING: ECH is enabled but marked EXPERIMENTAL. Use with caution!
-configure: WANING: HTTPSRR is enabled but marked EXPERIMENTAL. Use with caution!
-```
+The script will download the source code for `openssl` and `curl`, build them, and install the final binaries in the specified output directory.
 
 For more details on how to use `curl` with ECH, see the [official documentation](https://github.com/defo-project/curl/blob/master/docs/ECH.md).
 

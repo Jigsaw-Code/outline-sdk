@@ -17,7 +17,11 @@ We then analyzed the results to identify any differences in HTTP status, `curl` 
 
 Our analysis focused on identifying domains where the control and grease runs had different outcomes. We considered a difference to be a change in the HTTP status, the `curl` error name, or a significant (>100ms) deviation in the TLS handshake time.
 
-Out of the 1000 domains tested, we found **3 domains** with different success/failure outcomes:
+Out of 1000 domains tested, we found **28 domains** with differences between the control and grease runs. These can be broken down into two categories:
+
+### Failure Differences
+
+We found **3 domains** with different success/failure outcomes:
 
 1.  **`events.data.microsoft.com`**: The control run resulted in an HTTP 404, while the grease run failed with a certificate validation error (`CURLE_SSL_CACERT`).
 2.  **`w3schools.com`**: The control run timed out (`CURLE_OPERATION_TIMEDOUT`), while the grease run failed with an SSL connection error (`CURLE_SSL_CONNECT_ERROR`).
@@ -25,8 +29,15 @@ Out of the 1000 domains tested, we found **3 domains** with different success/fa
 
 Further manual debugging of these three domains revealed that the discrepancies were likely caused by transient network errors or pre-existing server-side issues, not by ECH GREASE itself.
 
-When considering performance, we found **59 domains** with a significant (>100ms) difference in TLS handshake time between the control and grease runs. However, these are performance variations, not connectivity failures.
+### Performance Differences
+
+We found **25 domains** with a significant (>100ms) difference in TLS handshake time between the control and grease runs.
+
+*   **Improved Performance**: For **24 domains**, the TLS handshake was faster when ECH GREASE was enabled. The improvements ranged from 104ms to 1273ms.
+*   **Degraded Performance**: For **1 domain** (`th.bing.com`), the TLS handshake was significantly slower (3598ms) with ECH GREASE.
 
 ## Conclusion
 
-Based on our analysis of the top 1000 domains, there is **no evidence to suggest that ECH GREASE breaks connectivity**. The few observed failures were attributable to other factors. While ECH GREASE can influence the performance of the TLS handshake, it does not appear to cause widespread connection failures.
+Based on our analysis of the top 1000 domains, there is **no evidence to suggest that ECH GREASE breaks connectivity**. The few observed failures were attributable to other factors.
+
+While ECH GREASE can influence the performance of the TLS handshake, our findings show that it is more likely to improve performance than to degrade it. In our test, 24 domains saw a significant performance improvement, while only one saw a degradation. This suggests that enabling ECH GREASE may offer performance benefits for some servers.
