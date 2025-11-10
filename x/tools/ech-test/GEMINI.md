@@ -6,8 +6,8 @@ This project provides a suite of tools for analyzing the deployment and impact o
 
 The project is composed of two main Go-based command-line tools:
 
-1.  **`dnstest`**: Performs large-scale DNS analysis by querying a list of top domains (from the Tranco list) for A, AAAA, and HTTPS records. See `dnstest/README.md` for more details.
-2.  **`greasetest`**: Tests ECH GREASE compatibility by issuing HEAD requests to top domains with and without ECH GREASE enabled, using a custom ECH-enabled `curl` binary. It also generates a report summarizing the findings. See `greasetest/README.md` for more details.
+1.  **`dnsreport`**: Performs large-scale DNS analysis by querying a list of top domains (from the Tranco list) for A, AAAA, and HTTPS records. See `dnsreport/README.md` for more details.
+2.  **`greasereport`**: Tests ECH GREASE compatibility by issuing HEAD requests to top domains with and without ECH GREASE enabled, using a custom ECH-enabled `curl` binary. It also generates a report summarizing the findings. See `greasereport/README.md` for more details.
 
 ## Workspace
 

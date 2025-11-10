@@ -1,11 +1,11 @@
-## `dnstest`
+## `dnsreport`
 
-This tool, located in the `dnstest/` directory, performs DNS queries (A, AAAA, HTTPS) for a large number of domains from the Tranco list.
+This tool, located in the `dnsreport/` directory, performs DNS queries (A, AAAA, HTTPS) for a large number of domains from the Tranco list.
 
 To run the tool, use the `go run` command from the `ech-test` directory:
 
 ```sh
-go run ./dnstest --topN 100
+go run ./dnsreport --topN 100
 ```
 
 This will:
@@ -68,7 +68,7 @@ Python scripts are available in the `dnstest/report/` directory to generate vari
 
 ### Usage
 
-Run the plotting scripts from the `dnstest/` directory.
+Run the plotting scripts from the `dnsreport/` directory.
 
 **Example:**
 

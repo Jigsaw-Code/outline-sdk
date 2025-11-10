@@ -1,11 +1,11 @@
-## `greasetest`
+## `greasereport`
 
-This tool, located in the `greasetest/` directory, issues HEAD requests to a list of domains with and without ECH GREASE to test for compatibility. It uses a custom-built ECH-enabled `curl` binary for these requests.
+This tool, located in the `greasereport/` directory, issues HEAD requests to a list of domains with and without ECH GREASE to test for compatibility. It uses a custom-built ECH-enabled `curl` binary for these requests.
 
 To run the tool, use the `go run` command from the `ech-test` directory:
 
 ```sh
-go run ./greasetest --topN 100
+go run ./greasereport --topN 100
 ```
 
 This will:
@@ -59,7 +59,7 @@ This is a custom build of `curl` with ECH support from the [DEfO project](https:
 
 A helper script, `build-curl.sh`, is provided to automate the build process for `curl` and its dependency, `openssl`.
 
-To build the ECH-enabled `curl`, run the script from the `greasetest` directory and provide an output path:
+To build the ECH-enabled `curl`, run the script from the `greasereport` directory and provide an output path:
 
 ```sh
 ./build-curl.sh <output_directory>
@@ -96,7 +96,7 @@ Example output:
 
 ### Report
 
-After running the `greasetest` tool, a `report` subdirectory is created within the `greasetest` directory. This directory contains:
+After running the `greasereport` tool, a `report` subdirectory is created within the `greasereport` directory. This directory contains:
 
 *   `report.md`: A summary of the ECH GREASE connectivity analysis.
 *   `analyze.py`: The Python script used for the analysis.
