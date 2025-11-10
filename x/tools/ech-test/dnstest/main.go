@@ -15,16 +15,13 @@
 package main
 
 import (
-	"archive/zip"
 	"context"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -32,43 +29,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Jigsaw-Code/outline-sdk/x/tools/ech-test/internal/workspace"
 	"github.com/miekg/dns"
 	"golang.org/x/sync/semaphore"
 )
 
-// downloadFile downloads the file from fileURL and saves it as localFilename.
-func downloadFile(fileURL, localFilename string) error {
-	resp, err := http.Get(fileURL)
-	if err != nil {
-		return fmt.Errorf("failed to download file: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("bad status: %s", resp.Status)
-	}
-
-	localFile, err := os.Create(localFilename)
-	if err != nil {
-		return fmt.Errorf("failed to create file: %w", err)
-	}
-	defer localFile.Close()
-
-	if _, err := io.Copy(localFile, resp.Body); err != nil {
-		return fmt.Errorf("failed to save file: %w", err)
-	}
-
-	return nil
-}
-
-type Domain struct {
-	Name        string
-	Rank        int
-	Nameservers []string
-}
-
 type QueryResult struct {
-	Domain      Domain
+	Domain      workspace.Domain
 	QueryType   uint16
 	Timestamp   time.Time
 	Duration    time.Duration
@@ -79,7 +46,7 @@ type QueryResult struct {
 	Additionals []dns.RR
 }
 
-func resolve(client *dns.Client, resolverAddress string, domain Domain, qtype uint16) QueryResult {
+func resolve(client *dns.Client, resolverAddress string, domain workspace.Domain, qtype uint16) QueryResult {
 	startTime := time.Now()
 
 	result := QueryResult{
@@ -178,71 +145,6 @@ func formatResources(resources []dns.RR) (string, error) {
 	return string(jsonBytes), nil
 }
 
-// ensureWorkspace ensures the workspace directory exists, creating it if needed.
-func ensureWorkspace(workspaceDir string) string {
-	workspaceAbsDir, err := filepath.Abs(workspaceDir)
-	if err != nil {
-		slog.Error("Failed to resolve workspace path", "error", err)
-		os.Exit(1)
-	}
-	if _, err := os.Stat(workspaceAbsDir); os.IsNotExist(err) {
-		slog.Info("Creating workspace directory", "path", workspaceAbsDir)
-		if err := os.MkdirAll(workspaceAbsDir, 0755); err != nil {
-			slog.Error("Failed to create workspace directory", "error", err)
-			os.Exit(1)
-		}
-	}
-	return workspaceAbsDir
-}
-
-// ensureTrancoList ensures the Tranco list is in the workspace directory, downloading it if needed.
-func ensureTrancoList(workspaceDir, trancoID string) string {
-	trancoZipFilename := filepath.Join(workspaceDir, fmt.Sprintf("tranco_%s-1m.csv.zip", trancoID))
-	if _, err := os.Stat(trancoZipFilename); os.IsNotExist(err) {
-		trancoZipURL := fmt.Sprintf("https://tranco-list.eu/download/daily/tranco_%s-1m.csv.zip", trancoID)
-		slog.Info("Downloading Tranco list", "url", trancoZipURL, "to", trancoZipFilename)
-		if err := downloadFile(trancoZipURL, trancoZipFilename); err != nil {
-			slog.Error("Failed to get Tranco list", "error", err)
-			os.Exit(1)
-		}
-	} else {
-		slog.Info("Found Tranco list", "path", trancoZipFilename)
-	}
-	return trancoZipFilename
-}
-
-func readDomainsFromTrancoCSV(trancoZipFilename string, topN int) ([]Domain, error) {
-	zipReader, err := zip.OpenReader(trancoZipFilename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open Tranco ZIP file: %w", err)
-	}
-	defer zipReader.Close()
-
-	csvFile, err := zipReader.Open("top-1m.csv")
-	if err != nil {
-		return nil, fmt.Errorf("failed to open CSV file inside ZIP: %w", err)
-	}
-	defer csvFile.Close()
-	csvReader := csv.NewReader(csvFile)
-	var domains []Domain
-	for i := 0; i < topN; i++ {
-		record, err := csvReader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to read from Tranco CSV: %w", err)
-		}
-		// Format is <rank>,<domain>
-		rank, err := strconv.Atoi(record[0])
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse rank: %w", err)
-		}
-		domains = append(domains, Domain{Name: record[1], Rank: rank})
-	}
-	return domains, nil
-}
-
 func extractCNAMEs(resources []dns.RR) ([]dns.RR, []dns.RR) {
 	var cnames []dns.RR
 	var cleanAnswers []dns.RR
@@ -287,13 +189,13 @@ func main() {
 	}
 
 	// Set up workspace directory.
-	workspaceDir := ensureWorkspace(*workspaceFlag)
+	workspaceDir := workspace.EnsureWorkspace(*workspaceFlag)
 
 	// Ensure Tranco list is present.
-	trancoZipFilename := ensureTrancoList(workspaceDir, *trancoIDFlag)
+	trancoZipFilename := workspace.EnsureTrancoList(workspaceDir, *trancoIDFlag)
 
 	// Read top N domains from Tranco CSV.
-	domains, err := readDomainsFromTrancoCSV(trancoZipFilename, *topNFlag)
+	domains, err := workspace.ReadDomainsFromTrancoCSV(trancoZipFilename, *topNFlag)
 	if err != nil {
 		slog.Error("Failed to read domains from Tranco CSV", "error", err)
 		os.Exit(1)
@@ -376,7 +278,7 @@ func main() {
 				slog.Error("Failed to acquire semaphore", "domain", domain.Name, "error", err)
 				return
 			}
-			go func(d Domain) {
+			go func(d workspace.Domain) {
 				defer resolveWg.Done()
 				slog.Info("Analyzing", "domain", d.Name)
 
