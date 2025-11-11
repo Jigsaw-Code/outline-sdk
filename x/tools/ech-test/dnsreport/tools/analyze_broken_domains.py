@@ -3,44 +3,53 @@ import sys
 import subprocess
 
 def run_dig_command(command):
+    full_command_str = ' '.join(command) # Store the full command string
     try:
-        # Add timeout and tries options to the dig command
-        command_with_options = [command[0]] + ['+timeout=5', '+tries=1'] + command[1:]
-        result = subprocess.run(command_with_options, capture_output=True, text=True, check=True)
-        return result.stdout.strip()
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+        return full_command_str + "\n" + result.stdout.strip()
     except subprocess.CalledProcessError as e:
-        return f"Error executing command: {e}\n{e.stderr.strip()}"
+        return full_command_str + f"\nError executing command: {e}\n{e.stderr.strip()}"
     except FileNotFoundError:
-        return "Error: 'dig' command not found. Please ensure 'dig' is installed and in your PATH."
+        return full_command_str + "\nError: 'dig' command not found. Please ensure 'dig' is installed and in your PATH."
 
 def analyze_broken_domains_python(input_file):
     try:
-        df = pd.read_csv(input_file)
+        print(f"Reading {input_file}...", file=sys.stderr)
+        df = pd.read_csv(input_file, dtype={6: str})
     except FileNotFoundError:
-        print(f"Error: File not found at {input_file}")
+        print(f"Error: File not found at {input_file}", file=sys.stderr)
         sys.exit(1)
 
     https_df = df[df['query_type'] == 'HTTPS']
 
     broken_domains_info = {}
-    for domain, group in https_df.groupby('domain'):
+    
+    # Get all domains that are potentially broken
+    all_https_domains = https_df['domain'].unique()
+    
+    for i, domain in enumerate(all_https_domains):
+        group = https_df[https_df['domain'] == domain]
         if (group['duration_ms'] > 2000).all():
+            print(f"({i+1}/{len(all_https_domains)}) Analyzing broken domain: {domain}", file=sys.stderr)
             errors = group['error'].dropna().unique().tolist()
             rcodes = group['rcode'].dropna().unique().tolist()
             broken_domains_info[domain] = {'errors': errors, 'rcodes': rcodes, 'dig_analysis': {}}
 
             # Get authoritative nameservers
-            ns_output = run_dig_command(['dig', '+short', 'NS', domain])
+            print(f"  - Getting NS records for {domain}", file=sys.stderr)
+            ns_output = run_dig_command(['dig', '+timeout=5', '+tries=1', '+short', 'NS', domain])
             broken_domains_info[domain]['dig_analysis']['ns_servers_raw'] = ns_output
             
-            ns_servers = [ns.strip() for ns in ns_output.split('\n') if ns.strip()]
+            ns_servers = [ns.strip() for ns in ns_output.split('\n') if ns.strip() and not ns.startswith('Error')]
 
             if ns_servers:
                 broken_domains_info[domain]['dig_analysis']['authoritative_queries'] = {}
                 for ns in ns_servers:
-                    https_query_output = run_dig_command(['dig', f'@{ns}', domain, 'HTTPS'])
+                    print(f"    - Querying {ns} for HTTPS record...", file=sys.stderr)
+                    https_query_output = run_dig_command(['dig', '+timeout=5', '+tries=1', f'@{ns}', domain, 'HTTPS'])
                     broken_domains_info[domain]['dig_analysis']['authoritative_queries'][ns] = https_query_output
             else:
+                print(f"  - No authoritative nameservers found for {domain}", file=sys.stderr)
                 broken_domains_info[domain]['dig_analysis']['authoritative_queries'] = "No authoritative nameservers found."
 
     return broken_domains_info
@@ -63,7 +72,6 @@ def generate_markdown_report(broken_domains_analysis, output_file):
             f.write("### Authoritative DNS Investigation\n\n")
             f.write("#### Authoritative Nameservers (dig +short NS)\n")
             f.write("```bash\n")
-            f.write(f"dig +short NS {domain}\n")
             f.write(info['dig_analysis']['ns_servers_raw'] + "\n")
             f.write("```\n\n")
 
@@ -71,19 +79,18 @@ def generate_markdown_report(broken_domains_analysis, output_file):
                 for ns, query_output in info['dig_analysis']['authoritative_queries'].items():
                     f.write(f"#### Querying {ns} for HTTPS record\n")
                     f.write("```bash\n")
-                    f.write(f"dig @{ns} {domain} HTTPS\n")
                     f.write(query_output + "\n")
                     f.write("```\n\n")
             else:
                 f.write(f"**{info['dig_analysis']['authoritative_queries']}**\n\n")
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print("Usage: python analyze_broken_domains.py <input_csv_file>")
+    if len(sys.argv) < 3:
+        print("Usage: python analyze_broken_domains.py <input_csv_file> <output_report_file>")
         sys.exit(1)
 
     input_file = sys.argv[1]
-    output_report_file = "broken_domains_report.md"
+    output_report_file = sys.argv[2]
 
     print(f"Analyzing broken domains from {input_file}...")
     broken_domains_analysis = analyze_broken_domains_python(input_file)

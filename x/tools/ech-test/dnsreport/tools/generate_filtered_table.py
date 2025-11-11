@@ -3,11 +3,12 @@ import json
 import sys
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python generate_filtered_table.py <input_csv_file>")
+    if len(sys.argv) < 3:
+        print("Usage: python generate_filtered_table.py <input_csv_file> <output_md_file>")
         sys.exit(1)
 
     input_file = sys.argv[1]
+    output_file = sys.argv[2]
 
     try:
         df = pd.read_csv(input_file)
@@ -74,7 +75,8 @@ def main():
             else:
                 markdown_table += " - |"
     
-    print(markdown_table)
+    with open(output_file, 'w') as f:
+        f.write(markdown_table)
 
 if __name__ == '__main__':
     main()

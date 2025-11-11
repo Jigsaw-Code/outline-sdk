@@ -9,75 +9,72 @@ from collections import Counter
 import sys
 
 def main():
-    parser = argparse.ArgumentParser(description='Analyze unique domain usage of HTTPS RR parameters.')
-    parser.add_argument('input_file', help='Path to the input CSV file.')
-    parser.add_argument('output_dir', help='Path to the output directory for plots.')
-    args = parser.parse_args()
-
-    # Load the dataset
-    try:
-        df = pd.read_csv(args.input_file)
-    except FileNotFoundError:
-        print(f"Error: File not found at {args.input_file}")
+    if len(sys.argv) < 3:
+        print("Usage: python unique_domain_analysis.py <input_csv_file> <output_md_file>")
         sys.exit(1)
 
-    https_df = df[df['query_type'] == 'HTTPS'].copy()
-    https_df.loc[:, 'has_answer'] = https_df['answers'].apply(lambda x: x != '[]')
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
 
-    # Calculate total unique domains with HTTPS RR
-    total_unique_domains_with_https_rr = https_df[https_df['has_answer']]['domain'].nunique()
+    try:
+        df = pd.read_csv(input_file)
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_file}")
+        sys.exit(1)
 
-    # Analysis 2: HTTPS RR Feature Usage (Unique Domains)
-    param_domains = {} # Use a dict to store sets for dynamic parameters
+    # Filter for successful HTTPS queries
+    https_df = df[(df['query_type'] == 'HTTPS') & (df['error'].isna())].copy()
 
-    for index, row in https_df[https_df['has_answer']].iterrows():
-        try:
-            answers = json.loads(row['answers'])
-            for answer in answers:
-                if 'params' in answer:
-                    for param, value in answer['params'].items():
-                        # Special handling for 'alpn' to extract individual ALPN values
-                        if param == 'alpn' and isinstance(value, list):
-                            for alpn_value in value:
-                                key = f"alpn:{alpn_value}"
-                                if key not in param_domains:
-                                    param_domains[key] = set()
-                                param_domains[key].add(row['domain'])
-                        else: # Handle other parameters
-                            key = f"param:{param}" if param not in ['alpn', 'ipv4hint', 'ipv6hint', 'ech'] else param
-                            if key not in param_domains:
-                                param_domains[key] = set()
-                            param_domains[key].add(row['domain'])
-        except json.JSONDecodeError:
-            continue
+    # Drop duplicates to count each domain only once
+    unique_domains_df = https_df.drop_duplicates(subset=['domain'])
 
-    # Convert sets to counts and include dynamically added parameters
-    final_param_counts = {}
-    for param, domains_set in param_domains.items():
-        final_param_counts[param] = len(domains_set)
+    # --- Feature Usage Analysis ---
+    alias_mode_count = 0
+    alpn_counts = Counter()
+    param_counts = Counter()
 
-    # Add total HTTPS RR support to the counts
-    final_param_counts['Total HTTPS RR Support'] = total_unique_domains_with_https_rr
+    for _, row in unique_domains_df.iterrows():
+        answers = json.loads(row['answers'])
+        for answer in answers:
+            if 'HTTPS' in answer:
+                https_data = answer['HTTPS']
+                
+                # AliasMode
+                if https_data.get('is_alias', False):
+                    alias_mode_count += 1
+                
+                # ALPN
+                if 'alpn' in https_data:
+                    for alpn in https_data['alpn']:
+                        alpn_counts[alpn] += 1
+                
+                # Other Parameters
+                for param, value in https_data.items():
+                    if param not in ['is_alias', 'alpn', 'target_name']:
+                        param_counts[param] += 1
 
-    param_df = pd.DataFrame(final_param_counts.items(), columns=['Parameter', 'Unique Domains']).sort_values(by='Unique Domains', ascending=False)
+    # --- Generate Markdown Table ---
+    total_unique_domains = len(unique_domains_df)
+    
+    markdown_table = "| Feature | Usage Count | Percentage |\n"
+    markdown_table += "|:---|:---|:---|"
+    
+    # AliasMode
+    percentage = (alias_mode_count / total_unique_domains) * 100 if total_unique_domains > 0 else 0
+    markdown_table += f"| AliasMode | {alias_mode_count} | {percentage:.2f}% |\n"
+    
+    # ALPN
+    for alpn, count in alpn_counts.items():
+        percentage = (count / total_unique_domains) * 100 if total_unique_domains > 0 else 0
+        markdown_table += f"| alpn={alpn} | {count} | {percentage:.2f}% |\n"
+        
+    # Other Parameters
+    for param, count in param_counts.items():
+        percentage = (count / total_unique_domains) * 100 if total_unique_domains > 0 else 0
+        markdown_table += f"| {param} | {count} | {percentage:.2f}% |\n"
 
-    plt.figure(figsize=(12, 7))
-    sns.barplot(x='Unique Domains', y='Parameter', data=param_df)
-    plt.title('HTTPS RR Parameter Usage Frequency (Unique Domains)')
-    plt.xlabel('Number of Unique Domains')
-    plt.ylabel('Parameter')
-    plt.tight_layout()
-    output_path = os.path.join(args.output_dir, 'param_usage_unique_domains.png')
-    plt.savefig(output_path)
-    print(f"Parameter usage chart (unique domains) saved to {output_path}")
-    plt.close()
-
-    # Generate markdown table for param usage
-    param_table = "| Parameter | Unique Domains |\n|:---|:---|"
-    for index, row in param_df.iterrows():
-        param_table += f"| {row['Parameter']} | {row['Unique Domains']} |\n"
-    print("\nHTTPS RR Parameter Usage (Unique Domains):\n")
-    print(param_table)
+    with open(output_file, 'w') as f:
+        f.write(markdown_table)
 
 if __name__ == '__main__':
     main()

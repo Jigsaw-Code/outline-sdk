@@ -92,7 +92,7 @@ Now, run the analysis scripts.
 
 2.  **Generate Slow Queries Table:**
     ```sh
-    ./workspace/.venv/bin/python3 dnsreport/tools/generate_filtered_table.py ./workspace/results-top10000-n5-sorted.csv > ./dnsreport/report/slow_https_queries.md
+    ./workspace/.venv/bin/python3 dnsreport/tools/generate_filtered_table.py ./workspace/results-top10000-n5-sorted.csv ./dnsreport/report/slow_https_queries.md
     ```
     **Output:** This creates `slow_https_queries.md` in the `dnsreport/report` directory.
 
@@ -113,7 +113,7 @@ The goal of this step is to determine what features of the HTTPS RR are being us
 
 2.  **Generate Feature Usage Table:**
     ```sh
-    ./workspace/.venv/bin/python3 dnsreport/tools/unique_domain_analysis.py ./workspace/results-top10000-n5-sorted.csv ./dnsreport/report > ./dnsreport/report/feature_usage_table.md
+    ./workspace/.venv/bin/python3 dnsreport/tools/unique_domain_analysis.py ./workspace/results-top10000-n5-sorted.csv ./dnsreport/report/feature_usage_table.md
     ```
     **Output:** This creates `feature_usage_table.md` in the `dnsreport/report` directory.
 
@@ -125,7 +125,7 @@ The goal of this step is to identify domains where HTTPS queries consistently ti
 
 1.  **Run the analysis script:**
     ```sh
-    ./workspace/.venv/bin/python3 dnsreport/tools/analyze_broken_domains.py ./workspace/results-top10000-n5-sorted.csv
+    ./workspace/.venv/bin/python3 dnsreport/tools/analyze_broken_domains.py ./workspace/results-top10000-n5-sorted.csv ./dnsreport/report/broken_domains_report.md
     ```
     **Output:** This generates `broken_domains_report.md` in the `dnsreport/report` directory. The report includes the `dig` commands used for the analysis, which can be easily copied and pasted to reproduce the results.
 
