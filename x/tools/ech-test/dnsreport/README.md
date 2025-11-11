@@ -92,7 +92,7 @@ Now, run the analysis scripts.
 
 2.  **Generate Slow Queries Table:**
     ```sh
-    ./workspace/.venv/bin/python3 dnsreport/tools/generate_filtered_table.py ./workspace/results-top10000-n5-sorted.csv ./dnsreport/report/slow_https_queries.md
+    ./workspace/.venv/bin/python3 dnsreport/tools/generate_slow_queries_table.py ./workspace/results-top10000-n5-sorted.csv ./dnsreport/report/slow_https_queries.md
     ```
     **Output:** This creates `slow_https_queries.md` in the `dnsreport/report` directory.
 

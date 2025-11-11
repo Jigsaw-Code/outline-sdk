@@ -4,7 +4,7 @@ import sys
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python generate_filtered_table.py <input_csv_file> <output_md_file>")
+        print("Usage: python generate_slow_queries_table.py <input_csv_file> <output_md_file>")
         sys.exit(1)
 
     input_file = sys.argv[1]
@@ -68,7 +68,7 @@ def main():
 
             if https_duration is not None and a_duration is not None:
                 diff = https_duration - a_duration
-                cell = f"{https_duration:.0f} ({diff:+.0f})"
+                cell = f"{https_duration:.0f} ({a_duration:.0f}{diff:+.0f})"
                 if diff > 50:
                     cell = f"**{cell}**"
                 markdown_table += f" {cell} |"
