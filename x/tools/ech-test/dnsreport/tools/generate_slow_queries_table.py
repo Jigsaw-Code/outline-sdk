@@ -56,7 +56,7 @@ def main():
         rank = domain_ranks.loc[domain]['rank']
         min_diff = min_durations.loc[domain]['min_diff']
 
-        if is_broken_query and min_diff < 2000:
+        if is_broken_query and min_diff < 1500:
             is_broken_query = False
             markdown_table += "\n\n## Slow queries\n\n" + header_markdown
         
