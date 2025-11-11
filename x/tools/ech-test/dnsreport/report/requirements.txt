@@ -3,4 +3,4 @@ matplotlib
 numpy
 scipy
 markdown
-pdfkit
+seaborn

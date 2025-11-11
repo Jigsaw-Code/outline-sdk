@@ -4,14 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import argparse
 import os
-
-def get_tld_category(domain):
-    parts = domain.split('.')
-    if len(parts) > 1:
-        tld = parts[-1]
-        if len(tld) == 2:
-            return tld
-    return 'other'
+import json # Added import
 
 def main():
     parser = argparse.ArgumentParser(description='Generate performance report charts.')
@@ -41,7 +34,7 @@ def main():
     plt.xticks(np.arange(0, 1.1, 0.1))
     plt.grid(True)
     plt.legend(title='Query Type')
-    output_path = os.path.join(args.output_dir, 'quantile_plot.png')
+    output_path = os.path.join(args.output_dir, 'duration_by_type_quantile_plot.png') # Renamed output file
     plt.savefig(output_path)
     print(f"Chart 1 saved to {output_path}")
     plt.close()
@@ -88,39 +81,32 @@ def main():
     print(f"Chart 1.2 saved to {output_path}")
     plt.close()
 
-    # Prepare data for the next charts
-    a_queries = df[df['query_type'] == 'A'][['domain', 'duration_ms']]
-    https_queries = df[df['query_type'] == 'HTTPS'][['domain', 'duration_ms']]
-    merged_df = pd.merge(a_queries, https_queries, on='domain', suffixes=('_A', '_HTTPS'))
-    merged_df['duration_diff'] = merged_df['duration_ms_HTTPS'] - merged_df['duration_ms_A']
-    merged_df['tld_category'] = merged_df['domain'].apply(get_tld_category)
+    # Chart: Parameter Usage (all occurrences)
+    https_answers = df[df['query_type'] == 'HTTPS']['answers']
+    all_params = []
+    for answer_str in https_answers:
+        try:
+            answers_list = json.loads(answer_str)
+            for answer in answers_list:
+                if isinstance(answer, dict) and 'params' in answer:
+                    for param_key in answer['params'].keys():
+                        all_params.append(param_key)
+        except json.JSONDecodeError:
+            continue # Skip malformed JSON
 
-    # Chart 2: Distribution of Duration Difference (HTTPS - A) by TLD Category
-    plt.figure(figsize=(15, 8))
-    sns.boxplot(x='tld_category', y='duration_diff', data=merged_df, showfliers=False)
-    plt.xticks(rotation=90)
-    plt.title('Distribution of Duration Difference (HTTPS - A) by TLD Category')
-    plt.xlabel('TLD Category')
-    plt.ylabel('Duration Difference (ms)')
-    plt.grid(True)
-    plt.tight_layout()
-    output_path = os.path.join(args.output_dir, 'duration_diff_by_tld.png')
-    plt.savefig(output_path)
-    print(f"Chart 2 saved to {output_path}")
-    plt.close()
-
-    # Chart 3: Histogram of HTTPS Query Durations
-    plt.figure(figsize=(12, 7))
-    sns.histplot(https_queries['duration_ms'], bins=50, kde=True)
-    plt.title('Distribution of HTTPS Query Durations')
-    plt.xlabel('Duration (ms)')
-    plt.ylabel('Frequency')
-    plt.xlim(0, 1000)
-    plt.grid(True)
-    output_path = os.path.join(args.output_dir, 'https_duration_histogram.png')
-    plt.savefig(output_path)
-    print(f"Chart 3 saved to {output_path}")
-    plt.close()
+    if all_params:
+        param_counts = pd.Series(all_params).value_counts()
+        plt.figure(figsize=(12, 7))
+        sns.barplot(x=param_counts.index, y=param_counts.values)
+        plt.title('Parameter Usage (All Occurrences)')
+        plt.xlabel('SVCB Parameter')
+        plt.ylabel('Number of Occurrences')
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+        output_path = os.path.join(args.output_dir, 'param_usage.png')
+        plt.savefig(output_path)
+        print(f"Chart: Parameter Usage (All Occurrences) saved to {output_path}")
+        plt.close()
 
 if __name__ == '__main__':
     main()

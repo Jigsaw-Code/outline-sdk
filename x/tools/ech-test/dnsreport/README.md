@@ -26,21 +26,18 @@ The analysis scripts are written in Python.
     pip install -r ./dnsreport/report/requirements.txt
     ```
 
-4.  **Install PDF generator dependency:**
-    The script to convert the report to PDF uses `wkhtmltopdf`.
-    *   **macOS:** `brew install wkhtmltopdf`
-    *   **Debian/Ubuntu:** `sudo apt-get install wkhtmltopdf`
+
 
 
 ## Step 2: Collect DNS Data
 
-From the `ech-test` folder, run the data collection tool. The following command will query the top 1,000 domains 5 times each, which is a good sample for the report.
+From the `ech-test` folder, run the data collection tool. The following command will query the top 10,000 domains 5 times each, which is a good sample for the report.
 
 ```sh
-go run ./dnsreport -topN 1000 -numQueries 5
+go run ./dnsreport -topN 10000 -numQueries 5
 ```
 
-This will save the results to `./workspace/results-top1000-n5.csv`.
+This will save the results to `./workspace/results-top10000-n5.csv`.
 
 ### Parameters
 
@@ -56,6 +53,7 @@ The tool generates a CSV file (`workspace/results-top<N>-n<M>.csv`) with the fol
 
 * `domain`: The domain that was queried.
 * `rank`: The rank of the domain in the Tranco list.
+* `run`: The run number of the query.
 * `query_type`: The type of DNS query (A, AAAA, HTTPS).
 * `timestamp`: When the query was performed (RFC3339Nano).
 * `duration_ms`: How long the query took in milliseconds.
@@ -76,27 +74,27 @@ The goal of this step is to determine the impact of waiting for the HTTPS RR bef
 
 ### Generating the Latency Analysis
 
-First, navigate to the report directory and sort the data (optional but recommended):
+First, navigate to the report directory and sort the data:
 ```sh
 cd dnsreport/report
-python3 sort_csv_by_rank.py ../../workspace/results-top1000-n5.csv
+../../workspace/.venv/bin/python3 sort_csv_by_rank.py ../../workspace/results-top10000-n5.csv
 ```
+This creates `../../workspace/results-top10000-n5-sorted.csv`.
 
 Now, run the analysis scripts. The input file is the sorted CSV from the previous step.
 
 1.  **Generate Latency Plots:**
     ```sh
-    python3 plot_durations.py ../../workspace/results-top1000-n5-sorted.csv
+    ../../workspace/.venv/bin/python3 generate_charts.py ../../workspace/results-top10000-n5-sorted.csv .
     ```
     **Outputs:** This generates the following plots in the current directory (`dnsreport/report`):
-    *   `quantile_plot.png`: Overall latency distribution.
-    *   `duration_by_type_quantile_plot.png`: Latency broken down by query type.
+    *   `duration_by_type_quantile_plot.png`: Overall latency distribution.
     *   `min_duration_quantile_plot.png`: Best-case (cached) latency distribution.
     *   `median_duration_quantile_plot.png`: Typical latency distribution.
 
 2.  **Generate Slow Queries Table:**
     ```sh
-    python3 generate_filtered_table.py ../../workspace/results-top1000-n5-sorted.csv > slow_https_queries.md
+    ../../workspace/.venv/bin/python3 generate_filtered_table.py ../../workspace/results-top10000-n5-sorted.csv > slow_https_queries.md
     ```
     **Output:** This creates `slow_https_queries.md`, a markdown file containing a table of the slowest domains.
 
@@ -110,7 +108,8 @@ The following scripts analyze the feature usage from the collected data. Ensure 
 
 1.  **Generate Feature Usage Plots:**
     ```sh
-    python3 generate_charts.py ../../workspace/results-top1000-n5-sorted.csv
+    ../../workspace/.venv/bin/python3 generate_charts.py ../../workspace/results-top10000-n5-sorted.csv .
+    ../../workspace/.venv/bin/python3 unique_domain_analysis.py ../../workspace/results-top10000-n5-sorted.csv .
     ```
     **Outputs:** This generates the following plots:
     *   `param_usage.png`: Usage frequency of all HTTPS RR parameters.
@@ -118,7 +117,7 @@ The following scripts analyze the feature usage from the collected data. Ensure 
 
 2.  **Generate Feature Usage Table:**
     ```sh
-    python3 unique_domain_analysis.py ../../workspace/results-top1000-n5-sorted.csv > feature_usage_table.md
+    ../../workspace/.venv/bin/python3 unique_domain_analysis.py ../../workspace/results-top10000-n5-sorted.csv > feature_usage_table.md
     ```
     **Output:** This creates `feature_usage_table.md`, a markdown file with a table showing how many unique domains use each parameter.
 
@@ -127,11 +126,6 @@ The following scripts analyze the feature usage from the collected data. Ensure 
 1.  **Fill in the report:**
     Open `report.md`. The generated charts are already linked. You can copy the contents of `slow_https_queries.md` and `feature_usage_table.md` to replace the example tables in the report. Finally, write a conclusion based on the findings.
 
-2.  **Convert to PDF:**
-    Once the report is complete, you can generate a PDF version:
-    ```sh
-    python3 convert_to_pdf.py
-    ```
-    This will create `report.pdf`.
+
 
 Remember to `cd ../..` to return to the `ech-test` directory when you are done.

@@ -1,0 +1,103 @@
+# .markdownlint.yaml
+#
+# A markdownlint configuration based on the Google Developer Documentation Style Guide
+# (https://google.github.io/styleguide/docguide/style.html)
+#
+# This config is a best-effort translation. Some Google style rules (like
+# sentence case for headings) cannot be enforced by markdownlint.
+
+# --- Default state ---
+# By default, all rules are enabled. We will disable or modify specific
+# rules below to match the Google style guide.
+default: true
+
+# --- Headings ---
+
+# MD003 - Heading style
+# Google style: "ATX-style headings" (e.g., # Heading 1)
+style: atx
+
+# MD025 - Multiple headings with the same content
+# Google style: "Use unique, complete names for headings"
+# This enforces uniqueness at any level.
+level: 1
+
+# MD041 - First line in file should be a top-level heading
+# Google style: "Use one H1 heading as the title of your document."
+level: 1
+
+# MD018 - No space after hash on atx style heading
+# Google style: "Prefer spacing after #"
+# This rule is named confusingly; it *enforces* a space (e.g., `# Heading`).
+style: space
+
+# MD019 - Multiple spaces after hash on atx style heading
+# Disallows multiple spaces (e.g., `#  Heading`).
+no-multiple-space-atx: true
+
+# MD022 - Blanks around headings
+# Google style: "newlines before and after"
+# This is the default, but we're being explicit.
+blanks_around_headings: true
+
+# MD026 - Trailing punctuation in heading
+# The guide doesn't explicitly forbid this, but it's good practice.
+# You can remove this if it's too strict.
+punctuation: ".,;:!?"
+
+# --- Text and Lines ---
+
+# MD013 - Line length
+# Google style: "an 80-character line limit."
+line_length: 100
+# Exceptions: "Links, Tables, Headings, Code blocks"
+headings: false
+code_blocks: false
+tables: false
+# Note: markdownlint does not have an exception for links. Lines
+# containing long URLs may still trigger this rule.
+
+# MD009 - Trailing spaces
+# Google style: "Don't use trailing whitespace."
+no-trailing-spaces: true
+# Also, disallow 2-space line breaks, as Google prefers trailing backslashes.
+br_spaces: 0
+
+# MD047 - Files should end with a single newline character
+single-trailing-newline: true
+
+# --- Lists ---
+
+# MD029 - Ordered list item prefix
+# Google style: "Use lazy numbering for long lists" (e.g., 1. 1. 1.)
+style: "one"
+
+# MD007 - Unordered list indentation
+# Google style: "use a 4-space indent for both numbered and bulleted lists"
+indent: 4
+
+# MD004 - Unordered list style
+# The guide doesn't specify a character (*, -, +). We'll enforce
+# 'asterisk' for consistency, as it's common.
+style: asterisk
+
+# MD005 - Inconsistent indentation for list items at the same level
+no-inconsistent-list-styling: true
+
+# --- Code Blocks ---
+
+# MD046 - Code block style
+# Google style: "Use fenced code blocks instead of indented code blocks"
+style: fenced
+
+# MD040 - Fenced code blocks should have a language specified
+# Google style: "It is best practice to explicitly declare the language"
+fenced-code-language: true
+
+# --- HTML ---
+
+# MD033 - Inline HTML
+# Google style: "Strongly prefer Markdown to HTML"
+no-inline-html: true
+# You may need to add exceptions if you use specific HTML tags (e.g., for tables).
+# allowed_elements: ["table", "tr", "td", "th"]
