@@ -4,7 +4,9 @@ import subprocess
 
 def run_dig_command(command):
     try:
-        result = subprocess.run(command, capture_output=True, text=True, check=True)
+        # Add timeout and tries options to the dig command
+        command_with_options = [command[0]] + ['+timeout=5', '+tries=1'] + command[1:]
+        result = subprocess.run(command_with_options, capture_output=True, text=True, check=True)
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
         return f"Error executing command: {e}\n{e.stderr.strip()}"
@@ -60,14 +62,16 @@ def generate_markdown_report(broken_domains_analysis, output_file):
 
             f.write("### Authoritative DNS Investigation\n\n")
             f.write("#### Authoritative Nameservers (dig +short NS)\n")
-            f.write("```\n")
+            f.write("```bash\n")
+            f.write(f"dig +short NS {domain}\n")
             f.write(info['dig_analysis']['ns_servers_raw'] + "\n")
             f.write("```\n\n")
 
             if isinstance(info['dig_analysis']['authoritative_queries'], dict):
                 for ns, query_output in info['dig_analysis']['authoritative_queries'].items():
                     f.write(f"#### Querying {ns} for HTTPS record\n")
-                    f.write("```\n")
+                    f.write("```bash\n")
+                    f.write(f"dig @{ns} {domain} HTTPS\n")
                     f.write(query_output + "\n")
                     f.write("```\n\n")
             else:

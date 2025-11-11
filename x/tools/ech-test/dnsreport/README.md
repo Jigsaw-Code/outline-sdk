@@ -127,7 +127,7 @@ The goal of this step is to identify domains where HTTPS queries consistently ti
     ```sh
     ./workspace/.venv/bin/python3 dnsreport/tools/analyze_broken_domains.py ./workspace/results-top10000-n5-sorted.csv
     ```
-    **Output:** This generates `broken_domains_report.md` in the `dnsreport/report` directory.
+    **Output:** This generates `broken_domains_report.md` in the `dnsreport/report` directory. The report includes the `dig` commands used for the analysis, which can be easily copied and pasted to reproduce the results.
 
 ## Step 6: Assemble the Report
 
