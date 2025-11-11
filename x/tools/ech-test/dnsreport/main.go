@@ -283,7 +283,7 @@ func main() {
 			}
 			go func(d workspace.Domain, run int) {
 				defer resolveWg.Done()
-				slog.Info("Analyzing", "domain", d.Name, "run", run)
+				slog.Info("Analyzing domain", "rank", d.Rank, "run", run, "name", d.Name)
 
 				resolveWg.Add(3)
 				go func() {
