@@ -45,12 +45,12 @@ def main():
     sorted_slow_domains = sorted(slow_domains_series, key=lambda d: min_https_durations.get(d, 0), reverse=True)
 
     # --- 3. Process each domain ---
-    markdown_table = "| Domain | Rank | Min | 2nd | Median | 4th | Max |\n"
-    markdown_table += "|:---|:---|:---|:---|:---|:---|:---|"
+    markdown_table = "| No. | Domain | Rank | Min | 2nd | Median | 4th | Max |\n"
+    markdown_table += "|:---|:---|:---|:---|:---|:---|:---|:---|"
 
     domain_ranks = df[['domain', 'rank']].drop_duplicates().set_index('domain')
 
-    for domain in sorted_slow_domains: # Use the sorted list of domains
+    for i, domain in enumerate(sorted_slow_domains): # Use the sorted list of domains
         rank = domain_ranks.loc[domain]['rank']
         
         domain_runs = []
@@ -72,10 +72,10 @@ def main():
         # Sort runs by HTTPS duration (already done in previous step, but this is for the cells within the row)
         domain_runs.sort(key=lambda x: x['duration'])
 
-        markdown_table += f"\n| {domain} | {rank:.0f} |"
-        for i in range(5):
-            if i < len(domain_runs):
-                markdown_table += f" {domain_runs[i]['cell']} |"
+        markdown_table += f"\n| {i+1} | {domain} | {rank:.0f} |"
+        for j in range(5):
+            if j < len(domain_runs):
+                markdown_table += f" {domain_runs[j]['cell']} |"
             else:
                 markdown_table += " - |"
     
