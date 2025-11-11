@@ -117,9 +117,21 @@ The goal of this step is to determine what features of the HTTPS RR are being us
     ```
     **Output:** This creates `feature_usage_table.md` in the `dnsreport/report` directory.
 
-## Step 5: Assemble the Report
+## Step 5: Analyze Broken Domains
+
+The goal of this step is to identify domains where HTTPS queries consistently time out (duration > 2s) and investigate the reasons behind these failures by analyzing RCODEs, errors, and querying authoritative nameservers.
+
+### Generating the Broken Domains Analysis
+
+1.  **Run the analysis script:**
+    ```sh
+    ./workspace/.venv/bin/python3 dnsreport/tools/analyze_broken_domains.py ./workspace/results-top10000-n5-sorted.csv
+    ```
+    **Output:** This generates `broken_domains_report.md` in the `dnsreport/report` directory.
+
+## Step 6: Assemble the Report
 
 1.  **Fill in the report:**
-    Open `dnsreport/report/report.md`. The generated charts are already linked. You can copy the contents of `dnsreport/report/slow_https_queries.md` and `dnsreport/report/feature_usage_table.md` to replace the example tables in the report. Finally, write a conclusion based on the findings.
+    Open `dnsreport/report/report.md`. The generated charts are already linked. You can copy the contents of `dnsreport/report/slow_https_queries.md`, `dnsreport/report/feature_usage_table.md`, and `dnsreport/report/broken_domains_report.md` to replace the example tables in the report. Finally, write a conclusion based on the findings.
 
 Remember to `cd ../..` to return to the `ech-test` directory when you are done.
