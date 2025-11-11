@@ -1,26 +1,46 @@
-# DNS Report
+# DNS Report Generation
 
-The DNS report is done in a few steps:
+This document outlines the steps to generate a report on DNS query latency and HTTPS RR feature usage. The process involves collecting data, running analysis scripts, and generating a final report.
 
-1. Collect DNS queries
-2. Analyze DNS query latency
-3. Analyze HTTPS RR feature usage
+The final report is `report/report.md` and can be converted to a PDF.
+
+## Step 1: Setup
+
+The analysis scripts are written in Python.
+
+1.  **Create a Python virtual environment:**
+    From the `ech-test` directory, run:
+    ```sh
+    python3 -m venv ./workspace/.venv
+    ```
+
+2.  **Activate the virtual environment:**
+    ```sh
+    source ./workspace/.venv/bin/activate
+    ```
+    You will need to do this every time you work on the report in a new terminal session.
+
+3.  **Install dependencies:**
+    From the `ech-test` directory, run:
+    ```sh
+    pip install -r ./dnsreport/report/requirements.txt
+    ```
+
+4.  **Install PDF generator dependency:**
+    The script to convert the report to PDF uses `wkhtmltopdf`.
+    *   **macOS:** `brew install wkhtmltopdf`
+    *   **Debian/Ubuntu:** `sudo apt-get install wkhtmltopdf`
 
 
-## Step 1 - Collect DNS Queries.
+## Step 2: Collect DNS Data
 
-From the `ech-test` folder, run:
+From the `ech-test` folder, run the data collection tool. The following command will query the top 1,000 domains 5 times each, which is a good sample for the report.
 
 ```sh
-go run ./dnsreport -topN 10000 -numQueries 5
+go run ./dnsreport -topN 1000 -numQueries 5
 ```
 
-This will:
-
-1. Create a `./workspace` directory if it doesn't exist.
-2. Download the Tranco top 1 million domains list (if not already present).
-3. Query the top 100 domains for A, AAAA, and HTTPS records using the `8.8.8.8:53` resolver.
-4. Save the results to `./workspace/results-top100-n1.csv`.
+This will save the results to `./workspace/results-top1000-n5.csv`.
 
 ### Parameters
 
@@ -46,26 +66,72 @@ The tool generates a CSV file (`workspace/results-top<N>-n<M>.csv`) with the fol
 * `additionals`: The resource records in the additional section, formatted as a JSON array.
 
 
-## Step 2 - Analyze DNS Query Latency
+## Step 3: Analyze DNS Query Latency
 
-The goal of this step is to determine the impact of waiting for the HTTPS RR before proceeding with TCP or TLS connections.
+The goal of this step is to determine the impact of waiting for the HTTPS RR before proceeding with TCP or TLS connections. The analysis is broken down into:
 
-### Duration sitribution Analysis
-We need a cumulative distribution of latencies over all queries, broken down by query type (A/AAAA/HTTPS). X is cummulative probability, Y is duration.
+*   **Duration Distribution:** We create a cumulative distribution of latencies over all queries, broken down by query type (A/AAAA/HTTPS), to visualize the overall performance.
+*   **Impact of Caching:** To consider the effects of caching, we group queries by domain and query type, and analyze the minimum and median durations.
+*   **Slowest Queries:** We identify all domains for which the median HTTPS query is > 50ms slower than the A query and put them in a table for detailed inspection.
 
-### Impact of Caching
-To consider effects of caching, we will group the queries by domain and query type, and take the minimum and median. We will generate the same chart for those metrics.
+### Generating the Latency Analysis
 
-### Analysis of Slowest Queries.
+First, navigate to the report directory and sort the data (optional but recommended):
+```sh
+cd dnsreport/report
+python3 sort_csv_by_rank.py ../../workspace/results-top1000-n5.csv
+```
 
-We should identify all domains for which the median HTTPS query is > 50ms slower than the A query and put them in a table.
-There should be 1 column for each of the 5 runs, sorted from fasted to slower. The leftmost is the min, the middle the median, the last the max. The cells whould have the HTTPS query duration, with the difference to the A query in parenthesis (example: "20 (+2)). Cells where the Difference is > +50ms should be in bold.
+Now, run the analysis scripts. The input file is the sorted CSV from the previous step.
 
+1.  **Generate Latency Plots:**
+    ```sh
+    python3 plot_durations.py ../../workspace/results-top1000-n5-sorted.csv
+    ```
+    **Outputs:** This generates the following plots in the current directory (`dnsreport/report`):
+    *   `quantile_plot.png`: Overall latency distribution.
+    *   `duration_by_type_quantile_plot.png`: Latency broken down by query type.
+    *   `min_duration_quantile_plot.png`: Best-case (cached) latency distribution.
+    *   `median_duration_quantile_plot.png`: Typical latency distribution.
 
-## Step 3 - Determine HTTPS RR feature usage
+2.  **Generate Slow Queries Table:**
+    ```sh
+    python3 generate_filtered_table.py ../../workspace/results-top1000-n5-sorted.csv > slow_https_queries.md
+    ```
+    **Output:** This creates `slow_https_queries.md`, a markdown file containing a table of the slowest domains.
 
-The goal of this step is to determine what features of the HTTPS RR are being used in production to inform
-the priority of implementing support for them.
+## Step 4: Analyze HTTPS RR Feature Usage
 
-The features include the Alias Mode, the various alpn values and the various SVCB parameters (based on their keys).
-For example: ["AliasMode", "alpn:h2", "alpn:h3", "ipv4hint", "ipv6hint", "ech"]
+The goal of this step is to determine what features of the HTTPS RR are being used in production to inform the priority of implementing support for them. The features include the Alias Mode, the various `alpn` values and the various SVCB parameters (e.g., `ipv4hint`, `ipv6hint`, `ech`).
+
+### Generating the Feature Analysis
+
+The following scripts analyze the feature usage from the collected data. Ensure you are in the `dnsreport/report` directory.
+
+1.  **Generate Feature Usage Plots:**
+    ```sh
+    python3 generate_charts.py ../../workspace/results-top1000-n5-sorted.csv
+    ```
+    **Outputs:** This generates the following plots:
+    *   `param_usage.png`: Usage frequency of all HTTPS RR parameters.
+    *   `param_usage_unique_domains.png`: Parameter usage counted only once per domain.
+
+2.  **Generate Feature Usage Table:**
+    ```sh
+    python3 unique_domain_analysis.py ../../workspace/results-top1000-n5-sorted.csv > feature_usage_table.md
+    ```
+    **Output:** This creates `feature_usage_table.md`, a markdown file with a table showing how many unique domains use each parameter.
+
+## Step 5: Assemble and Convert the Report
+
+1.  **Fill in the report:**
+    Open `report.md`. The generated charts are already linked. You can copy the contents of `slow_https_queries.md` and `feature_usage_table.md` to replace the example tables in the report. Finally, write a conclusion based on the findings.
+
+2.  **Convert to PDF:**
+    Once the report is complete, you can generate a PDF version:
+    ```sh
+    python3 convert_to_pdf.py
+    ```
+    This will create `report.pdf`.
+
+Remember to `cd ../..` to return to the `ech-test` directory when you are done.

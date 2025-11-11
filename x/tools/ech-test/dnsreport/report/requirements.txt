@@ -1,0 +1,6 @@
+pandas
+matplotlib
+numpy
+scipy
+markdown
+pdfkit
