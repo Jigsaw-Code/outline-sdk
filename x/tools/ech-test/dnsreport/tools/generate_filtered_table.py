@@ -32,50 +32,45 @@ def main():
     # --- 2. Get all runs for slow domains ---
     slow_df = df[df['domain'].isin(slow_domains_series)]
 
-    # --- New Step: Sort slow_domains by Min HTTPS duration (slowest first) ---
-    min_https_durations = {}
-    for domain in slow_domains_series:
-        https_durations = slow_df[(slow_df['domain'] == domain) & (slow_df['query_type'] == 'HTTPS')]['duration_ms'].tolist()
-        if https_durations:
-            min_https_durations[domain] = min(https_durations)
-        else:
-            min_https_durations[domain] = 0 # Default to 0 if no HTTPS data
+    # --- 3. Calculate fastest HTTPS - fastest A ---
+    min_durations = slow_df.groupby(['domain', 'query_type'])['duration_ms'].min().unstack()
+    min_durations['min_diff'] = min_durations['HTTPS'] - min_durations['A']
+    
+    # Sort domains by the new difference column
+    sorted_slow_domains = min_durations.sort_values(by='min_diff', ascending=False).index
 
-    # Sort domains by their minimum HTTPS duration in descending order
-    sorted_slow_domains = sorted(slow_domains_series, key=lambda d: min_https_durations.get(d, 0), reverse=True)
-
-    # --- 3. Process each domain ---
-    markdown_table = "| No. | Domain | Rank | Min | 2nd | Median | 4th | Max |\n"
-    markdown_table += "|:---|:---|:---|:---|:---|:---|:---|:---|"
+    # --- 4. Generate Markdown Table ---
+    markdown_table = "| No. | Domain | Rank | Min HTTPS - Min A | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 |\n"
+    markdown_table += "|:---|:---|:---|:---|:---|:---|:---|:---|:---|"
 
     domain_ranks = df[['domain', 'rank']].drop_duplicates().set_index('domain')
+    a_durations = slow_df[slow_df['query_type'] == 'A'][['domain', 'run', 'duration_ms']].set_index(['domain', 'run'])
+    https_pivot = slow_df[slow_df['query_type'] == 'HTTPS'].pivot_table(
+        index='domain', columns='run', values='duration_ms'
+    )
 
-    for i, domain in enumerate(sorted_slow_domains): # Use the sorted list of domains
+    for i, domain in enumerate(sorted_slow_domains):
         rank = domain_ranks.loc[domain]['rank']
+        min_diff = min_durations.loc[domain]['min_diff']
         
-        domain_runs = []
+        markdown_table += f"\n| {i+1} | {domain} | {rank:.0f} | {min_diff:.0f} |"
+        
+        row = https_pivot.loc[domain]
         for run in range(1, 6):
-            https_run_df = slow_df[(slow_df['domain'] == domain) & (slow_df['query_type'] == 'HTTPS') & (slow_df['run'] == run)]
-            a_run_df = slow_df[(slow_df['domain'] == domain) & (slow_df['query_type'] == 'A') & (slow_df['run'] == run)]
+            https_duration = row.get(run)
+            
+            a_duration = None
+            try:
+                a_duration = a_durations.loc[(domain, run)]['duration_ms']
+            except KeyError:
+                pass # No matching A query for this run
 
-            if not https_run_df.empty and not a_run_df.empty:
-                https_duration = https_run_df['duration_ms'].iloc[0]
-                a_duration = a_run_df['duration_ms'].iloc[0]
+            if https_duration is not None and a_duration is not None:
                 diff = https_duration - a_duration
-                
                 cell = f"{https_duration:.0f} ({diff:+.0f})"
                 if diff > 50:
                     cell = f"**{cell}**"
-                
-                domain_runs.append({'duration': https_duration, 'cell': cell})
-
-        # Sort runs by HTTPS duration (already done in previous step, but this is for the cells within the row)
-        domain_runs.sort(key=lambda x: x['duration'])
-
-        markdown_table += f"\n| {i+1} | {domain} | {rank:.0f} |"
-        for j in range(5):
-            if j < len(domain_runs):
-                markdown_table += f" {domain_runs[j]['cell']} |"
+                markdown_table += f" {cell} |"
             else:
                 markdown_table += " - |"
     
