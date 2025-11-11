@@ -1,81 +1,80 @@
 import pandas as pd
 import json
-import os
+import sys
 
 def main():
-    report_dir = '/Users/fortuna/firehook/outline-sdk/x/tools/ech-test/report'
-    csv_file = os.path.join(report_dir, 'results-top1000-n5.csv')
+    if len(sys.argv) < 2:
+        print("Usage: python generate_filtered_table.py <input_csv_file>")
+        sys.exit(1)
+
+    input_file = sys.argv[1]
 
     try:
-        df = pd.read_csv(csv_file)
+        df = pd.read_csv(input_file)
     except FileNotFoundError:
-        print(f"Error: File not found at {csv_file}")
-        exit()
+        print(f"Error: File not found at {input_file}")
+        sys.exit(1)
 
-    # Filter out rows where query_type is not A or HTTPS
-    filtered_df = df[df['query_type'].isin(['A', 'HTTPS'])].copy()
+    # --- 1. Find slow domains ---
+    # Calculate median durations for A and HTTPS queries for each domain
+    median_durations = df.groupby(['domain', 'query_type'])['duration_ms'].median().unstack()
+    
+    # Ensure 'A' and 'HTTPS' columns exist
+    if 'A' not in median_durations.columns or 'HTTPS' not in median_durations.columns:
+        print("Data for 'A' or 'HTTPS' queries not found.")
+        return
 
-    # Extract rank for each domain
-    domain_ranks = df[['domain', 'rank']].drop_duplicates().set_index('domain')
+    # Calculate duration difference
+    median_durations['duration_diff'] = median_durations['HTTPS'] - median_durations['A']
 
-    # Convert 'answers' column from string to list/json object
-    # This is necessary to correctly identify successful queries
-    def parse_answers(answers_str):
-        try:
-            parsed = json.loads(answers_str)
-            return parsed if parsed else []
-        except json.JSONDecodeError:
-            return []
+    # Filter for domains where median HTTPS is > 50ms slower than median A
+    slow_domains = median_durations[median_durations['duration_diff'] > 50].index
 
-    filtered_df['parsed_answers'] = filtered_df['answers'].apply(parse_answers)
+    if slow_domains.empty:
+        print("No domains found where median HTTPS query is > 50ms slower than median A query.")
+        return
 
-    # Define a function to check if a query has a valid answer
-    def has_valid_answer(row):
-        if row['query_type'] == 'HTTPS':
-            # For HTTPS, check if there are any answers and if rcode is NOERROR
-            return len(row['parsed_answers']) > 0 and row['rcode'] == 'NOERROR'
-        elif row['query_type'] == 'A':
-            # For A queries, check if there are any answers and if rcode is NOERROR
-            return len(row['parsed_answers']) > 0 and row['rcode'] == 'NOERROR'
-        return False
+    # --- 2. Get all runs for slow domains ---
+    slow_df = df[df['domain'].isin(slow_domains)]
 
-    filtered_df['has_answer'] = filtered_df.apply(has_valid_answer, axis=1)
+    # --- 3. Pivot data to have runs as columns ---
+    # Get A query durations for slow domains
+    a_durations = slow_df[slow_df['query_type'] == 'A'][['domain', 'run', 'duration_ms']].set_index(['domain', 'run'])
+    
+    # Get HTTPS query durations and pivot
+    https_pivot = slow_df[slow_df['query_type'] == 'HTTPS'].pivot_table(
+        index='domain', columns='run', values='duration_ms'
+    )
 
-    # Calculate median, min, and max durations for A and HTTPS queries for each domain
-    grouped_durations = filtered_df.groupby(['domain', 'query_type'])['duration_ms']
-    median_durations = grouped_durations.median().unstack()
-    min_durations = grouped_durations.min().unstack()
-    max_durations = grouped_durations.max().unstack()
-
-    # Merge A and HTTPS durations (median, min, max)
-    merged_durations = pd.DataFrame({
-        'median_A_duration_ms': median_durations['A'],
-        'median_HTTPS_duration_ms': median_durations['HTTPS'],
-        'min_HTTPS_duration_ms': min_durations['HTTPS'],
-        'max_HTTPS_duration_ms': max_durations['HTTPS'],
-    }).reset_index()
-
-    # Add rank to merged_durations
-    merged_durations = merged_durations.set_index('domain').join(domain_ranks).reset_index()
-
-    # Calculate duration difference and ratio
-    merged_durations['duration_diff'] = merged_durations['median_HTTPS_duration_ms'] - merged_durations['median_A_duration_ms']
-    merged_durations['ratio'] = merged_durations['median_HTTPS_duration_ms'] / merged_durations['median_A_duration_ms']
-
-    # Filter domains where duration_diff > 50ms
-    filtered_domains = merged_durations[merged_durations['duration_diff'] > 50].copy()
-
-    # Sort by min_HTTPS_duration_ms in descending order
-    filtered_domains.sort_values(by='min_HTTPS_duration_ms', ascending=False, inplace=True)
-
-    # Generate Markdown table
-    markdown_table = "| Domain | Rank | Median A (ms) | Min HTTPS (ms) | Median HTTPS (ms) | Max HTTPS (ms) | Ratio (HTTPS/A) |\n"
+    # --- 4. Generate Markdown Table ---
+    markdown_table = "| Domain | Rank | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 |\n"
     markdown_table += "|:---|:---|:---|:---|:---|:---|:---|"
 
-    for index, row in filtered_domains.iterrows():
-        markdown_table += f"\n| {row['domain']} | {row['rank']:.0f} | {row['median_A_duration_ms']:.0f} | {row['min_HTTPS_duration_ms']:.0f} | {row['median_HTTPS_duration_ms']:.0f} | {row['max_HTTPS_duration_ms']:.0f} | {row['ratio']:.2f} |"
+    domain_ranks = df[['domain', 'rank']].drop_duplicates().set_index('domain')
 
+    for domain, row in https_pivot.iterrows():
+        rank = domain_ranks.loc[domain]['rank']
+        markdown_table += f"\n| {domain} | {rank:.0f} |"
+        for run in range(1, 6):
+            https_duration = row.get(run)
+            
+            a_duration = None
+            try:
+                a_duration = a_durations.loc[(domain, run)]['duration_ms']
+            except KeyError:
+                pass # No matching A query for this run
+
+            if https_duration is not None and a_duration is not None:
+                diff = https_duration - a_duration
+                cell = f"{https_duration:.0f} ({diff:+.0f})"
+                if diff > 50:
+                    cell = f"**{cell}**"
+                markdown_table += f" {cell} |"
+            else:
+                markdown_table += " - |"
+    
     print(markdown_table)
 
 if __name__ == '__main__':
     main()
+
