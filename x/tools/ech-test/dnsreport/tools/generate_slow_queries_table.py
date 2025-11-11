@@ -41,8 +41,10 @@ def main():
     sorted_slow_domains = min_durations.sort_values(by='min_diff', ascending=False).index
 
     # --- 4. Generate Markdown Table ---
-    markdown_table = "| No. | Domain | Rank | Min HTTPS - Min A | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 |\n"
-    markdown_table += "|:---|:---|:---|:---|:---|:---|:---|:---|:---|"
+    header_markdown = "| No. | Domain | Rank | Min HTTPS - Min A | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 |\n"
+    header_markdown += "|:---|:---|:---|:---|:---|:---|:---|:---|:---|"
+    markdown_table = f"## Broken queries\n\n{header_markdown}"
+    is_broken_query = True
 
     domain_ranks = df[['domain', 'rank']].drop_duplicates().set_index('domain')
     a_durations = slow_df[slow_df['query_type'] == 'A'][['domain', 'run', 'duration_ms']].set_index(['domain', 'run'])
@@ -53,6 +55,10 @@ def main():
     for i, domain in enumerate(sorted_slow_domains):
         rank = domain_ranks.loc[domain]['rank']
         min_diff = min_durations.loc[domain]['min_diff']
+
+        if is_broken_query and min_diff < 2000:
+            is_broken_query = False
+            markdown_table += "\n\n## Slow queries\n\n" + header_markdown
         
         markdown_table += f"\n| {i+1} | `{domain}` | {rank:.0f} | {min_diff:+.0f} |"
         
