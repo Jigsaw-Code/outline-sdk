@@ -23,11 +23,8 @@ The analysis scripts are written in Python.
 3.  **Install dependencies:**
     From the `ech-test` directory, run:
     ```sh
-    pip install -r ./dnsreport/report/requirements.txt
+    pip install -r ./dnsreport/tools/requirements.txt
     ```
-
-
-
 
 ## Step 2: Collect DNS Data
 
@@ -74,29 +71,30 @@ The goal of this step is to determine the impact of waiting for the HTTPS RR bef
 
 ### Generating the Latency Analysis
 
-First, navigate to the report directory and sort the data:
-```sh
-cd dnsreport/report
-../../workspace/.venv/bin/python3 sort_csv_by_rank.py ../../workspace/results-top10000-n5.csv
-```
-This creates `../../workspace/results-top10000-n5-sorted.csv`.
+The analysis scripts are in `dnsreport/tools`. The generated plots and tables will be placed in `dnsreport/report`.
 
-Now, run the analysis scripts. The input file is the sorted CSV from the previous step.
+First, sort the data:
+```sh
+./workspace/.venv/bin/python3 dnsreport/tools/sort_csv_by_rank.py ./workspace/results-top10000-n5.csv
+```
+This creates `./workspace/results-top10000-n5-sorted.csv`.
+
+Now, run the analysis scripts.
 
 1.  **Generate Latency Plots:**
     ```sh
-    ../../workspace/.venv/bin/python3 generate_charts.py ../../workspace/results-top10000-n5-sorted.csv .
+    ./workspace/.venv/bin/python3 dnsreport/tools/generate_charts.py ./workspace/results-top10000-n5-sorted.csv ./dnsreport/report
     ```
-    **Outputs:** This generates the following plots in the current directory (`dnsreport/report`):
+    **Outputs:** This generates the plots in the `dnsreport/report` directory.
     *   `duration_by_type_quantile_plot.png`: Overall latency distribution.
     *   `min_duration_quantile_plot.png`: Best-case (cached) latency distribution.
     *   `median_duration_quantile_plot.png`: Typical latency distribution.
 
 2.  **Generate Slow Queries Table:**
     ```sh
-    ../../workspace/.venv/bin/python3 generate_filtered_table.py ../../workspace/results-top10000-n5-sorted.csv > slow_https_queries.md
+    ./workspace/.venv/bin/python3 dnsreport/tools/generate_filtered_table.py ./workspace/results-top10000-n5-sorted.csv > ./dnsreport/report/slow_https_queries.md
     ```
-    **Output:** This creates `slow_https_queries.md`, a markdown file containing a table of the slowest domains.
+    **Output:** This creates `slow_https_queries.md` in the `dnsreport/report` directory.
 
 ## Step 4: Analyze HTTPS RR Feature Usage
 
@@ -104,28 +102,24 @@ The goal of this step is to determine what features of the HTTPS RR are being us
 
 ### Generating the Feature Analysis
 
-The following scripts analyze the feature usage from the collected data. Ensure you are in the `dnsreport/report` directory.
-
 1.  **Generate Feature Usage Plots:**
     ```sh
-    ../../workspace/.venv/bin/python3 generate_charts.py ../../workspace/results-top10000-n5-sorted.csv .
-    ../../workspace/.venv/bin/python3 unique_domain_analysis.py ../../workspace/results-top10000-n5-sorted.csv .
+    ./workspace/.venv/bin/python3 dnsreport/tools/generate_charts.py ./workspace/results-top10000-n5-sorted.csv ./dnsreport/report
+    ./workspace/.venv/bin/python3 dnsreport/tools/unique_domain_analysis.py ./workspace/results-top10000-n5-sorted.csv ./dnsreport/report
     ```
-    **Outputs:** This generates the following plots:
+    **Outputs:** This generates the plots in the `dnsreport/report` directory.
     *   `param_usage.png`: Usage frequency of all HTTPS RR parameters.
     *   `param_usage_unique_domains.png`: Parameter usage counted only once per domain.
 
 2.  **Generate Feature Usage Table:**
     ```sh
-    ../../workspace/.venv/bin/python3 unique_domain_analysis.py ../../workspace/results-top10000-n5-sorted.csv > feature_usage_table.md
+    ./workspace/.venv/bin/python3 dnsreport/tools/unique_domain_analysis.py ./workspace/results-top10000-n5-sorted.csv ./dnsreport/report > ./dnsreport/report/feature_usage_table.md
     ```
-    **Output:** This creates `feature_usage_table.md`, a markdown file with a table showing how many unique domains use each parameter.
+    **Output:** This creates `feature_usage_table.md` in the `dnsreport/report` directory.
 
-## Step 5: Assemble and Convert the Report
+## Step 5: Assemble the Report
 
 1.  **Fill in the report:**
-    Open `report.md`. The generated charts are already linked. You can copy the contents of `slow_https_queries.md` and `feature_usage_table.md` to replace the example tables in the report. Finally, write a conclusion based on the findings.
-
-
+    Open `dnsreport/report/report.md`. The generated charts are already linked. You can copy the contents of `dnsreport/report/slow_https_queries.md` and `dnsreport/report/feature_usage_table.md` to replace the example tables in the report. Finally, write a conclusion based on the findings.
 
 Remember to `cd ../..` to return to the `ech-test` directory when you are done.
