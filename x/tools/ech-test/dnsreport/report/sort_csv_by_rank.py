@@ -1,22 +1,30 @@
 import pandas as pd
+import sys
 import os
 
 def main():
-    report_dir = '/Users/fortuna/firehook/outline-sdk/x/tools/ech-test/report'
-    csv_file = os.path.join(report_dir, 'results-top1000-n5.csv')
+    if len(sys.argv) < 2:
+        print("Usage: python sort_csv_by_rank.py <input_csv_file>")
+        sys.exit(1)
+
+    input_file = sys.argv[1]
 
     try:
-        df = pd.read_csv(csv_file)
+        df = pd.read_csv(input_file)
     except FileNotFoundError:
-        print(f"Error: File not found at {csv_file}")
-        exit()
+        print(f"Error: File not found at {input_file}")
+        sys.exit(1)
 
-    # Stable sort by 'rank' column
-    df_sorted = df.sort_values(by='rank', kind='mergesort')
+    # Sort by 'rank', 'run', and 'query_type'
+    df_sorted = df.sort_values(by=['rank', 'run', 'query_type'], kind='mergesort')
 
-    # Write the sorted DataFrame back to the CSV file
-    df_sorted.to_csv(csv_file, index=False)
-    print(f"Successfully sorted {csv_file} by domain rank.")
+    # Create the output filename
+    base, ext = os.path.splitext(input_file)
+    output_file = f"{base}-sorted{ext}"
+
+    # Write the sorted DataFrame to the new CSV file
+    df_sorted.to_csv(output_file, index=False)
+    print(f"Successfully sorted {input_file} by rank, run, and query type. Output saved to {output_file}")
 
 if __name__ == '__main__':
     main()
