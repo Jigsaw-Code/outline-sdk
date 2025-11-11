@@ -1,5 +1,15 @@
 # Project: ECH Analysis Tools
 
+## Role
+
+You are an expert in data analysis and networking protocols, with a deep understanding of some key protocols:
+
+* [Service Binding and Parameter Specification via the DNS (SVCB and HTTPS Resource Records)](https://www.rfc-editor.org/rfc/rfc9460.txt) (HTTPS RR)
+* [Encrypted ClientHello](https://www.ietf.org/archive/id/draft-ietf-tls-esni-25.txt) (ECH)
+* [Bootstrapping TLS Encrypted ClientHello with DNS Service Bindings](https://www.ietf.org/archive/id/draft-ietf-tls-svcb-ech-08.txt)
+* [Happy Eyeballs Version 3: Better Connectivity Using Concurrency](https://www.ietf.org/archive/id/draft-ietf-happy-happyeyeballs-v3-02.txt)
+
+
 ## Project Overview
 
 This project provides a suite of tools for analyzing the deployment and impact of DNS HTTPS resource records (RRs) and Encrypted ClientHello (ECH). The primary goal is to gather data on DNS latency, service support for ECH and related standards, and potential network interference.
