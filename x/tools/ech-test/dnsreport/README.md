@@ -1,11 +1,18 @@
-## `dnsreport`
+# DNS Report
 
-This tool, located in the `dnsreport/` directory, performs DNS queries (A, AAAA, HTTPS) for a large number of domains from the Tranco list.
+The DNS report is done in a few steps:
 
-To run the tool, use the `go run` command from the `ech-test` directory:
+1. Collect DNS queries
+2. Analyze DNS query latency
+3. Analyze HTTPS RR feature usage
+
+
+## Step 1 - Collect DNS Queries.
+
+From the `ech-test` folder, run:
 
 ```sh
-go run ./dnsreport --topN 100
+go run ./dnsreport -topN 10000 -numQueries 5
 ```
 
 This will:
@@ -38,43 +45,27 @@ The tool generates a CSV file (`workspace/results-top<N>-n<M>.csv`) with the fol
 * `answers`: The resource records in the answer section (excluding CNAMEs), formatted as a JSON array.
 * `additionals`: The resource records in the additional section, formatted as a JSON array.
 
----
 
-## Plotting Results
+## Step 2 - Analyze DNS Query Latency
 
-Python scripts are available in the `dnstest/report/` directory to generate various plots from the CSV results.
+The goal of this step is to determine the impact of waiting for the HTTPS RR before proceeding with TCP or TLS connections.
 
-### Prerequisites
+### Duration sitribution Analysis
+We need a cumulative distribution of latencies over all queries, broken down by query type (A/AAAA/HTTPS). X is cummulative probability, Y is duration.
 
-- Python 3
-- `venv` (usually included with Python)
+### Impact of Caching
+To consider effects of caching, we will group the queries by domain and query type, and take the minimum and median. We will generate the same chart for those metrics.
 
-### Setup
+### Analysis of Slowest Queries.
 
-1.  Create a virtual environment:
-    ```sh
-    python3 -m venv .venv
-    ```
+We should identify all domains for which the median HTTPS query is > 50ms slower than the A query and put them in a table.
+There should be 1 column for each of the 5 runs, sorted from fasted to slower. The leftmost is the min, the middle the median, the last the max. The cells whould have the HTTPS query duration, with the difference to the A query in parenthesis (example: "20 (+2)). Cells where the Difference is > +50ms should be in bold.
 
-2.  Activate the virtual environment:
-    ```sh
-    source .venv/bin/activate
-    ```
 
-3.  Install the required packages:
-    ```sh
-    pip install pandas seaborn matplotlib
-    ```
+## Step 3 - Determine HTTPS RR feature usage
 
-### Usage
+The goal of this step is to determine what features of the HTTPS RR are being used in production to inform
+the priority of implementing support for them.
 
-Run the plotting scripts from the `dnsreport/` directory.
-
-**Example:**
-
-```sh
-python report/plot_durations.py report/results-top1000.csv report/duration_distribution.png
-```
-
----
-*The domain list used for the analysis is the [Tranco list](https://tranco-list.eu/).*
+The features include the Alias Mode, the various alpn values and the various SVCB parameters (based on their keys).
+For example: ["AliasMode", "alpn:h2", "alpn:h3", "ipv4hint", "ipv6hint", "ech"]

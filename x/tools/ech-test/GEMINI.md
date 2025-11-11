@@ -13,3 +13,6 @@ The project is composed of two main Go-based command-line tools:
 
 * Use `./workspace` as a place to install tools and output binaries and intermediate results.
 * Use `./workspace/.venv` for Python installs. Do not install anything globally.
+
+---
+*The domain list used for the analysis is the [Tranco list](https://tranco-list.eu/).*
