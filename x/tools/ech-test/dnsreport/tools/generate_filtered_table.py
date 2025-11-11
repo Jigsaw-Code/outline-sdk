@@ -23,14 +23,26 @@ def main():
         return
 
     median_durations['duration_diff'] = median_durations['HTTPS'] - median_durations['A']
-    slow_domains = median_durations[median_durations['duration_diff'] > 50].index
+    slow_domains_series = median_durations[median_durations['duration_diff'] > 50].index
 
-    if slow_domains.empty:
+    if slow_domains_series.empty:
         print("No domains found where median HTTPS query is > 50ms slower than median A query.")
         return
 
     # --- 2. Get all runs for slow domains ---
-    slow_df = df[df['domain'].isin(slow_domains)]
+    slow_df = df[df['domain'].isin(slow_domains_series)]
+
+    # --- New Step: Sort slow_domains by Min HTTPS duration (slowest first) ---
+    min_https_durations = {}
+    for domain in slow_domains_series:
+        https_durations = slow_df[(slow_df['domain'] == domain) & (slow_df['query_type'] == 'HTTPS')]['duration_ms'].tolist()
+        if https_durations:
+            min_https_durations[domain] = min(https_durations)
+        else:
+            min_https_durations[domain] = 0 # Default to 0 if no HTTPS data
+
+    # Sort domains by their minimum HTTPS duration in descending order
+    sorted_slow_domains = sorted(slow_domains_series, key=lambda d: min_https_durations.get(d, 0), reverse=True)
 
     # --- 3. Process each domain ---
     markdown_table = "| Domain | Rank | Min | 2nd | Median | 4th | Max |\n"
@@ -38,7 +50,7 @@ def main():
 
     domain_ranks = df[['domain', 'rank']].drop_duplicates().set_index('domain')
 
-    for domain in slow_domains:
+    for domain in sorted_slow_domains: # Use the sorted list of domains
         rank = domain_ranks.loc[domain]['rank']
         
         domain_runs = []
@@ -57,7 +69,7 @@ def main():
                 
                 domain_runs.append({'duration': https_duration, 'cell': cell})
 
-        # Sort runs by HTTPS duration
+        # Sort runs by HTTPS duration (already done in previous step, but this is for the cells within the row)
         domain_runs.sort(key=lambda x: x['duration'])
 
         markdown_table += f"\n| {domain} | {rank:.0f} |"
@@ -71,4 +83,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
