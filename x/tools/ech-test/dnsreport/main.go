@@ -36,6 +36,7 @@ import (
 
 type QueryResult struct {
 	Domain      workspace.Domain
+	RunNumber   int
 	QueryType   uint16
 	Timestamp   time.Time
 	Duration    time.Duration
@@ -46,12 +47,13 @@ type QueryResult struct {
 	Additionals []dns.RR
 }
 
-func resolve(client *dns.Client, resolverAddress string, domain workspace.Domain, qtype uint16) QueryResult {
+func resolve(client *dns.Client, resolverAddress string, domain workspace.Domain, qtype uint16, run int) QueryResult {
 	startTime := time.Now()
 
 	result := QueryResult{
 		Timestamp: startTime,
 		Domain:    domain,
+		RunNumber: run,
 		QueryType: qtype,
 	}
 
@@ -213,7 +215,7 @@ func main() {
 	csvWriter := csv.NewWriter(outputFile)
 	defer csvWriter.Flush()
 
-	header := []string{"domain", "rank", "query_type", "timestamp", "duration_ms", "error", "rcode", "cnames", "answers", "additionals"}
+	header := []string{"domain", "rank", "run", "query_type", "timestamp", "duration_ms", "error", "rcode", "cnames", "answers", "additionals"}
 	if err := csvWriter.Write(header); err != nil {
 		slog.Error("Failed to write CSV header", "error", err)
 		os.Exit(1)
@@ -249,6 +251,7 @@ func main() {
 			record := []string{
 				result.Domain.Name,
 				strconv.Itoa(result.Domain.Rank),
+				strconv.Itoa(result.RunNumber),
 				dns.TypeToString[result.QueryType],
 				result.Timestamp.Format(time.RFC3339Nano),
 				strconv.FormatInt(result.Duration.Milliseconds(), 10),
@@ -278,27 +281,27 @@ func main() {
 				slog.Error("Failed to acquire semaphore", "domain", domain.Name, "error", err)
 				return
 			}
-			go func(d workspace.Domain) {
+			go func(d workspace.Domain, run int) {
 				defer resolveWg.Done()
-				slog.Info("Analyzing", "domain", d.Name)
+				slog.Info("Analyzing", "domain", d.Name, "run", run)
 
 				resolveWg.Add(3)
 				go func() {
-					resultsCh <- resolve(client, resolverAddress, d, dns.TypeA)
+					resultsCh <- resolve(client, resolverAddress, d, dns.TypeA, run)
 					sem.Release(1)
 					resolveWg.Done()
 				}()
 				go func() {
-					resultsCh <- resolve(client, resolverAddress, d, dns.TypeAAAA)
+					resultsCh <- resolve(client, resolverAddress, d, dns.TypeAAAA, run)
 					sem.Release(1)
 					resolveWg.Done()
 				}()
 				go func() {
-					resultsCh <- resolve(client, resolverAddress, d, dns.TypeHTTPS)
+					resultsCh <- resolve(client, resolverAddress, d, dns.TypeHTTPS, run)
 					sem.Release(1)
 					resolveWg.Done()
 				}()
-			}(domain)
+			}(domain, i+1)
 		}
 	}
 	resolveWg.Wait()
