@@ -54,7 +54,7 @@ def main():
         rank = domain_ranks.loc[domain]['rank']
         min_diff = min_durations.loc[domain]['min_diff']
         
-        markdown_table += f"\n| {i+1} | {domain} | {rank:.0f} | {min_diff:+.0f} |"
+        markdown_table += f"\n| {i+1} | `{domain}` | {rank:.0f} | {min_diff:+.0f} |"
         
         row = https_pivot.loc[domain]
         for run in range(1, 6):
