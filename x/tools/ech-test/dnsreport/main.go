@@ -362,35 +362,34 @@ func main() {
 	}()
 
 	var resolveWg sync.WaitGroup
-	resolveWg.Add(len(domains) * (*numQueriesFlag))
+	resolveWg.Add(len(domains) * (*numQueriesFlag) * 3)
 
 	for i := 0; i < *numQueriesFlag; i++ {
 		for _, domain := range domains {
+			d := domain
+			run := i + 1
 			if err := sem.Acquire(context.Background(), 3); err != nil {
-				slog.Error("Failed to acquire semaphore", "domain", domain.Name, "error", err)
-				return
+				slog.Error("Failed to acquire semaphore", "domain", d.Name, "error", err)
+				os.Exit(1)
 			}
-			go func(d Domain, run int) {
-				defer resolveWg.Done()
-				slog.Info("Analyzing domain", "rank", d.Rank, "run", run, "name", d.Name)
 
-				resolveWg.Add(3)
-				go func() {
-					resultsCh <- resolve(client, resolverAddress, d, dns.TypeA, run)
-					sem.Release(1)
-					resolveWg.Done()
-				}()
-				go func() {
-					resultsCh <- resolve(client, resolverAddress, d, dns.TypeAAAA, run)
-					sem.Release(1)
-					resolveWg.Done()
-				}()
-				go func() {
-					resultsCh <- resolve(client, resolverAddress, d, dns.TypeHTTPS, run)
-					sem.Release(1)
-					resolveWg.Done()
-				}()
-			}(domain, i+1)
+			slog.Info("Analyzing domain", "rank", d.Rank, "run", run, "name", d.Name)
+
+			go func() {
+				defer sem.Release(1)
+				defer resolveWg.Done()
+				resultsCh <- resolve(client, resolverAddress, d, dns.TypeA, run)
+			}()
+			go func() {
+				defer sem.Release(1)
+				defer resolveWg.Done()
+				resultsCh <- resolve(client, resolverAddress, d, dns.TypeAAAA, run)
+			}()
+			go func() {
+				defer sem.Release(1)
+				defer resolveWg.Done()
+				resultsCh <- resolve(client, resolverAddress, d, dns.TypeHTTPS, run)
+			}()
 		}
 	}
 	resolveWg.Wait()
