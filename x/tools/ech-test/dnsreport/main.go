@@ -189,134 +189,37 @@ func formatError(err error) string {
 	return err.Error()
 }
 
-func loadDomainsToMap(filename string) (map[string]Domain, error) {
-	file, err := os.Open(filename)
+func annotateDomains(sem *semaphore.Weighted, client *dns.Client, domainsFilename string, trancoDomains []tranco.Domain) ([]Domain, error) {
+	domainMap, err := loadDomainsToMap(domainsFilename)
+	writeHeader := false
 	if err != nil {
-		return nil, err
+		if os.IsNotExist(err) {
+			writeHeader = true
+		} else {
+			slog.Error("Failed to load domains from cache", "error", err)
+			os.Exit(1)
+		}
+	}
+
+	file, err := os.OpenFile(domainsFilename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		slog.Error("Failed to open domains cache file", "path", domainsFilename, "error", err)
+		os.Exit(1)
 	}
 	defer file.Close()
-
-	reader := csv.NewReader(file)
-	records, err := reader.ReadAll()
-	if err != nil {
-		return nil, err
-	}
-
-	if len(records) == 0 {
-		return make(map[string]Domain), nil
-	}
-	// Skip header
-	records = records[1:]
-
-	domains := make(map[string]Domain, len(records))
-	for _, record := range records {
-		rank, err := strconv.Atoi(record[1])
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse rank: %v", err)
-		}
-		var nameservers []string
-		if err := json.Unmarshal([]byte(record[4]), &nameservers); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal nameservers: %v", err)
-		}
-		domain := Domain{
-			Name:             record[0],
-			Rank:             rank,
-			CanonicalName:    record[2],
-			StartOfAuthority: record[3],
-			Nameservers:      nameservers,
-		}
-		domains[domain.Name] = domain
-	}
-	return domains, nil
-}
-
-func saveDomains(filename string, domains []Domain) error {
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
-
-	header := []string{"domain", "rank", "cname", "soa", "nameservers"}
-	if err := writer.Write(header); err != nil {
-		return err
-	}
-
-	for _, d := range domains {
-		nameserversJSON, err := json.Marshal(d.Nameservers)
-		if err != nil {
-			return err
-		}
-		record := []string{
-			d.Name,
-			strconv.Itoa(d.Rank),
-			d.CanonicalName,
-			d.StartOfAuthority,
-			string(nameserversJSON),
-		}
-		if err := writer.Write(record); err != nil {
-			return err
+	if writeHeader {
+		header := []string{"domain", "rank", "cname", "soa", "nameservers"}
+		if err := writer.Write(header); err != nil {
+			return nil, err
 		}
 	}
-	return nil
-}
-
-const (
-	resolverAddress = "8.8.8.8:53"
-)
-
-func main() {
-	workspaceFlag := flag.String("workspace", "./workspace", "Directory to store intermediate files")
-	trancoIDFlag := flag.String("trancoID", "7NZ4X", "Tranco list ID to use")
-	topNFlag := flag.Int("topN", 100, "Number of top domains to analyze")
-	parallelismFlag := flag.Int("parallelism", 10, "Maximum number of parallel requests")
-	numQueriesFlag := flag.Int("numQueries", 1, "Number of times to query each domain")
-	verboseFlag := flag.Bool("verbose", false, "Enable verbose logging")
-	flag.Parse()
-
-	if *verboseFlag {
-		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
-	} else {
-		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
-	}
-
-	// Set up workspace directory.
-	workspaceDir := workspace.EnsureWorkspace(*workspaceFlag)
-
-	// Ensure Tranco list is present.
-	trancoList := tranco.NewTrancoList(workspaceDir, *trancoIDFlag)
-
-	// Read top N domains from Tranco CSV.
-	trancoDomains, err := trancoList.TopDomains(*topNFlag)
-	if err != nil {
-		slog.Error("Failed to read domains from Tranco CSV", "error", err)
-		os.Exit(1)
-	}
-
-	// Set up DNS client.
-	client := new(dns.Client)
-	client.ReadTimeout = 5 * time.Second
-	client.WriteTimeout = 5 * time.Second
-
-	// Set up parallelism semaphore for rate-limiting.
-	sem := semaphore.NewWeighted(int64(*parallelismFlag))
-
-	// Collect extra domain information.
-	domainsFilename := filepath.Join(workspaceDir, fmt.Sprintf("domains-top%d.csv", *topNFlag))
-	domainMap, err := loadDomainsToMap(domainsFilename)
-	if err != nil && !os.IsNotExist(err) {
-		slog.Error("Failed to load domains from cache", "error", err)
-		os.Exit(1)
-	}
+	var writeMu sync.Mutex
 
 	domains := make([]Domain, len(trancoDomains))
 	var domainsWg sync.WaitGroup
-	domainsWg.Add(len(trancoDomains))
-	domainsAdded := false
-
+	domainsWg.Add(len(domains))
 	for di, td := range trancoDomains {
 		if domain, exists := domainMap[td.Name]; exists {
 			domains[di] = domain
@@ -373,17 +276,114 @@ func main() {
 				Nameservers:      nameservers,
 			}
 			domains[di] = domain
-			domainsAdded = true
+			nameserversJSON, err := json.Marshal(domain.Nameservers)
+			if err != nil {
+				slog.Error("Failed to marshal nameservers", "error", err)
+				nameserversJSON = []byte("[]")
+			}
+			record := []string{
+				domain.Name,
+				strconv.Itoa(domain.Rank),
+				domain.CanonicalName,
+				domain.StartOfAuthority,
+				string(nameserversJSON),
+			}
+			writeMu.Lock()
+			writer.Write(record)
+			writeMu.Unlock()
 		}(td)
 	}
 	domainsWg.Wait()
+	return domains, nil
+}
 
-	if domainsAdded {
-		slog.Info("Saving new domains to cache", "count", len(domains))
-		if err := saveDomains(domainsFilename, domains); err != nil {
-			slog.Error("Failed to save domains to cache", "error", err)
-			os.Exit(1)
+func loadDomainsToMap(filename string) (map[string]Domain, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	records, err := reader.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(records) == 0 {
+		return make(map[string]Domain), nil
+	}
+	// Skip header
+	records = records[1:]
+
+	domains := make(map[string]Domain, len(records))
+	for _, record := range records {
+		rank, err := strconv.Atoi(record[1])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse rank: %v", err)
 		}
+		var nameservers []string
+		if err := json.Unmarshal([]byte(record[4]), &nameservers); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal nameservers: %v", err)
+		}
+		domain := Domain{
+			Name:             record[0],
+			Rank:             rank,
+			CanonicalName:    record[2],
+			StartOfAuthority: record[3],
+			Nameservers:      nameservers,
+		}
+		domains[domain.Name] = domain
+	}
+	return domains, nil
+}
+
+const (
+	resolverAddress = "8.8.8.8:53"
+)
+
+func main() {
+	workspaceFlag := flag.String("workspace", "./workspace", "Directory to store intermediate files")
+	trancoIDFlag := flag.String("trancoID", "7NZ4X", "Tranco list ID to use")
+	topNFlag := flag.Int("topN", 100, "Number of top domains to analyze")
+	parallelismFlag := flag.Int("parallelism", 10, "Maximum number of parallel requests")
+	numQueriesFlag := flag.Int("numQueries", 1, "Number of times to query each domain")
+	verboseFlag := flag.Bool("verbose", false, "Enable verbose logging")
+	flag.Parse()
+
+	if *verboseFlag {
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	} else {
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	}
+
+	// Set up workspace directory.
+	workspaceDir := workspace.EnsureWorkspace(*workspaceFlag)
+
+	// Ensure Tranco list is present.
+	trancoList := tranco.NewTrancoList(workspaceDir, *trancoIDFlag)
+
+	// Read top N domains from Tranco CSV.
+	trancoDomains, err := trancoList.TopDomains(*topNFlag)
+	if err != nil {
+		slog.Error("Failed to read domains from Tranco CSV", "error", err)
+		os.Exit(1)
+	}
+
+	// Set up DNS client.
+	client := new(dns.Client)
+	client.ReadTimeout = 5 * time.Second
+	client.WriteTimeout = 5 * time.Second
+
+	// Set up parallelism semaphore for rate-limiting.
+	sem := semaphore.NewWeighted(int64(*parallelismFlag))
+
+	// Collect extra domain information.
+	domainsFilename := filepath.Join(workspaceDir, fmt.Sprintf("domains-top%d.csv", *topNFlag))
+	domains, err := annotateDomains(sem, client, domainsFilename, trancoDomains)
+	if err != nil {
+		slog.Error("Failed to annotate domains", "error", err)
+		os.Exit(1)
 	}
 
 	// Create new output CSV file.
