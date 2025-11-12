@@ -26,8 +26,10 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"sync"
 	"syscall"
@@ -44,6 +46,7 @@ type Domain struct {
 	Rank             int
 	CanonicalName    string
 	StartOfAuthority string
+	Nameservers      []string
 }
 
 type QueryResult struct {
@@ -265,11 +268,22 @@ func main() {
 					}
 				}
 			}
+			nsList, err := net.LookupNS(soa)
+			if err != nil {
+				slog.Error("NS lookup failed", "domain", d.Name, "soa", soa, "error", err)
+				os.Exit(1)
+			}
+			var nameservers []string
+			for _, ns := range nsList {
+				nameservers = append(nameservers, ns.Host)
+			}
+			sort.Strings(nameservers)
 			domains[i] = Domain{
 				Name:             d.Name,
 				Rank:             d.Rank,
 				CanonicalName:    cname,
 				StartOfAuthority: soa,
+				Nameservers:      nameservers,
 			}
 		}(i, d)
 	}
@@ -287,7 +301,7 @@ func main() {
 	csvWriter := csv.NewWriter(outputFile)
 	defer csvWriter.Flush()
 
-	header := []string{"domain", "cname", "soa", "rank", "run", "query_type", "timestamp", "duration_ms", "error", "rcode", "cnames", "answers", "additionals"}
+	header := []string{"domain", "cname", "soa", "nameservers", "rank", "run", "query_type", "timestamp", "duration_ms", "error", "rcode", "cnames", "answers", "additionals"}
 	if err := csvWriter.Write(header); err != nil {
 		slog.Error("Failed to write CSV header", "error", err)
 		os.Exit(1)
@@ -300,6 +314,11 @@ func main() {
 	go func() {
 		defer csvWg.Done()
 		for result := range resultsCh {
+			nameserversJSON, err := json.Marshal(result.Domain.Nameservers)
+			if err != nil {
+				slog.Error("Failed to marshal nameservers", "error", err)
+				nameserversJSON = []byte("[]")
+			}
 			cnames, cleanAnswers := extractCNAMEs(result.Answers)
 			cnamesJSON, err := formatResources(cnames)
 			if err != nil {
@@ -324,6 +343,7 @@ func main() {
 				result.Domain.Name,
 				result.Domain.CanonicalName,
 				result.Domain.StartOfAuthority,
+				string(nameserversJSON),
 				strconv.Itoa(result.Domain.Rank),
 				strconv.Itoa(result.RunNumber),
 				dns.TypeToString[result.QueryType],
