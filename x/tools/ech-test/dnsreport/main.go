@@ -29,13 +29,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Jigsaw-Code/outline-sdk/x/tools/ech-test/internal/tranco"
 	"github.com/Jigsaw-Code/outline-sdk/x/tools/ech-test/internal/workspace"
 	"github.com/miekg/dns"
 	"golang.org/x/sync/semaphore"
 )
 
 type QueryResult struct {
-	Domain      workspace.Domain
+	Domain      tranco.Domain
 	RunNumber   int
 	QueryType   uint16
 	Timestamp   time.Time
@@ -47,7 +48,7 @@ type QueryResult struct {
 	Additionals []dns.RR
 }
 
-func resolve(client *dns.Client, resolverAddress string, domain workspace.Domain, qtype uint16, run int) QueryResult {
+func resolve(client *dns.Client, resolverAddress string, domain tranco.Domain, qtype uint16, run int) QueryResult {
 	startTime := time.Now()
 
 	result := QueryResult{
@@ -194,10 +195,10 @@ func main() {
 	workspaceDir := workspace.EnsureWorkspace(*workspaceFlag)
 
 	// Ensure Tranco list is present.
-	trancoZipFilename := workspace.EnsureTrancoList(workspaceDir, *trancoIDFlag)
+	trancoList := tranco.NewTrancoList(workspaceDir, *trancoIDFlag)
 
 	// Read top N domains from Tranco CSV.
-	domains, err := workspace.ReadDomainsFromTrancoCSV(trancoZipFilename, *topNFlag)
+	domains, err := trancoList.TopDomains(*topNFlag)
 	if err != nil {
 		slog.Error("Failed to read domains from Tranco CSV", "error", err)
 		os.Exit(1)
@@ -281,7 +282,7 @@ func main() {
 				slog.Error("Failed to acquire semaphore", "domain", domain.Name, "error", err)
 				return
 			}
-			go func(d workspace.Domain, run int) {
+			go func(d tranco.Domain, run int) {
 				defer resolveWg.Done()
 				slog.Info("Analyzing domain", "rank", d.Rank, "run", run, "name", d.Name)
 

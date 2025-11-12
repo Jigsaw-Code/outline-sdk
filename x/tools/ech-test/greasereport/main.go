@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Jigsaw-Code/outline-sdk/x/tools/ech-test/internal/tranco"
 	"github.com/Jigsaw-Code/outline-sdk/x/tools/ech-test/internal/workspace"
 	"golang.org/x/sync/semaphore"
 )
@@ -135,7 +136,7 @@ var curlExitCodeNames = map[int]string{
 	96: "CURLE_QUIC_CONNECT_ERROR",
 }
 
-func runTest(curlPath string, domain workspace.Domain, echGrease bool, maxTime time.Duration) TestResult {
+func runTest(curlPath string, domain tranco.Domain, echGrease bool, maxTime time.Duration) TestResult {
 	result := TestResult{
 		Domain:    domain.Name,
 		Rank:      domain.Rank,
@@ -237,10 +238,10 @@ func main() {
 	}
 
 	// Ensure Tranco list is present.
-	trancoZipFilename := workspace.EnsureTrancoList(workspaceDir, *trancoIDFlag)
+	trancoList := tranco.NewTrancoList(workspaceDir, *trancoIDFlag)
 
 	// Read top N domains from Tranco CSV.
-	domains, err := workspace.ReadDomainsFromTrancoCSV(trancoZipFilename, *topNFlag)
+	domains, err := trancoList.TopDomains(*topNFlag)
 	if err != nil {
 		slog.Error("Failed to read domains from Tranco CSV", "error", err)
 		os.Exit(1)
@@ -300,7 +301,7 @@ func main() {
 			slog.Error("Failed to acquire semaphore", "domain", domain.Name, "error", err)
 			continue
 		}
-		go func(d workspace.Domain) {
+		go func(d tranco.Domain) {
 			defer sem.Release(1)
 			defer wg.Done()
 			slog.Info("Testing domain", "domain", d.Name, "ech_grease", false)
@@ -311,7 +312,7 @@ func main() {
 			slog.Error("Failed to acquire semaphore", "domain", domain.Name, "error", err)
 			continue
 		}
-		go func(d workspace.Domain) {
+		go func(d tranco.Domain) {
 			defer sem.Release(1)
 			defer wg.Done()
 			slog.Info("Testing domain", "domain", d.Name, "ech_grease", true)
