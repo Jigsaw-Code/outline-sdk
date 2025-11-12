@@ -13,7 +13,6 @@
 // limitations under the License.
 
 // TODO:
-// * Save augmented domains to file
 // * Introduce Rate-limiting DNS client. But It needs to block the Go routine.
 
 package main
@@ -190,6 +189,81 @@ func formatError(err error) string {
 	return err.Error()
 }
 
+func loadDomainsToMap(filename string) (map[string]Domain, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	records, err := reader.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(records) == 0 {
+		return make(map[string]Domain), nil
+	}
+	// Skip header
+	records = records[1:]
+
+	domains := make(map[string]Domain, len(records))
+	for _, record := range records {
+		rank, err := strconv.Atoi(record[1])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse rank: %v", err)
+		}
+		var nameservers []string
+		if err := json.Unmarshal([]byte(record[4]), &nameservers); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal nameservers: %v", err)
+		}
+		domain := Domain{
+			Name:             record[0],
+			Rank:             rank,
+			CanonicalName:    record[2],
+			StartOfAuthority: record[3],
+			Nameservers:      nameservers,
+		}
+		domains[domain.Name] = domain
+	}
+	return domains, nil
+}
+
+func saveDomains(filename string, domains []Domain) error {
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	header := []string{"domain", "rank", "cname", "soa", "nameservers"}
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+
+	for _, d := range domains {
+		nameserversJSON, err := json.Marshal(d.Nameservers)
+		if err != nil {
+			return err
+		}
+		record := []string{
+			d.Name,
+			strconv.Itoa(d.Rank),
+			d.CanonicalName,
+			d.StartOfAuthority,
+			string(nameserversJSON),
+		}
+		if err := writer.Write(record); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 const (
 	resolverAddress = "8.8.8.8:53"
 )
@@ -231,26 +305,39 @@ func main() {
 	sem := semaphore.NewWeighted(int64(*parallelismFlag))
 
 	// Collect extra domain information.
+	domainsFilename := filepath.Join(workspaceDir, fmt.Sprintf("domains-top%d.csv", *topNFlag))
+	domainMap, err := loadDomainsToMap(domainsFilename)
+	if err != nil && !os.IsNotExist(err) {
+		slog.Error("Failed to load domains from cache", "error", err)
+		os.Exit(1)
+	}
+
 	domains := make([]Domain, len(trancoDomains))
 	var domainsWg sync.WaitGroup
 	domainsWg.Add(len(trancoDomains))
-	for i, d := range trancoDomains {
+	domainsAdded := false
+
+	for di, td := range trancoDomains {
+		if domain, exists := domainMap[td.Name]; exists {
+			domains[di] = domain
+			domainsWg.Done()
+			continue
+		}
 		sem.Acquire(context.Background(), 1)
-		go func(i int, d tranco.Domain) {
+		go func(td tranco.Domain) {
 			defer sem.Release(1)
 			defer domainsWg.Done()
 			msg := new(dns.Msg)
-			msg.SetQuestion(dns.Fqdn(d.Name), dns.TypeSOA)
+			msg.SetQuestion(dns.Fqdn(td.Name), dns.TypeSOA)
 			msg.RecursionDesired = true
 
-			slog.Info("Collecting SOA for domain", "rank", d.Rank, "name", d.Name)
+			slog.Info("Collecting SOA for domain", "rank", td.Rank, "name", td.Name)
 			r, _, err := client.Exchange(msg, resolverAddress)
 			if err != nil {
-				slog.Error("SOA query failed", "domain", d.Name, "type", dns.TypeToString[dns.TypeSOA], "error", err)
-				os.Exit(1)
+				slog.Error("SOA query failed", "domain", td.Name, "type", dns.TypeToString[dns.TypeSOA], "error", err)
+				return
 			}
-			// Collect the canonical name and start of authority.
-			cname := d.Name
+			cname := td.Name
 			soa := ""
 			for _, answer := range r.Answer {
 				if cnameRR, ok := answer.(*dns.CNAME); ok {
@@ -270,24 +357,34 @@ func main() {
 			}
 			nsList, err := net.LookupNS(soa)
 			if err != nil {
-				slog.Error("NS lookup failed", "domain", d.Name, "soa", soa, "error", err)
-				os.Exit(1)
+				slog.Error("NS lookup failed", "domain", td.Name, "soa", soa, "error", err)
+				return
 			}
 			var nameservers []string
 			for _, ns := range nsList {
 				nameservers = append(nameservers, ns.Host)
 			}
 			sort.Strings(nameservers)
-			domains[i] = Domain{
-				Name:             d.Name,
-				Rank:             d.Rank,
+			domain := Domain{
+				Name:             td.Name,
+				Rank:             td.Rank,
 				CanonicalName:    cname,
 				StartOfAuthority: soa,
 				Nameservers:      nameservers,
 			}
-		}(i, d)
+			domains[di] = domain
+			domainsAdded = true
+		}(td)
 	}
 	domainsWg.Wait()
+
+	if domainsAdded {
+		slog.Info("Saving new domains to cache", "count", len(domains))
+		if err := saveDomains(domainsFilename, domains); err != nil {
+			slog.Error("Failed to save domains to cache", "error", err)
+			os.Exit(1)
+		}
+	}
 
 	// Create new output CSV file.
 	outputFilename := filepath.Join(workspaceDir, fmt.Sprintf("results-top%d-n%d.csv", *topNFlag, *numQueriesFlag))
