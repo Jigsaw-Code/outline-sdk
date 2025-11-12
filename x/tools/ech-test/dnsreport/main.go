@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// TODO:
+// * Save augmented domains to file
+// * Introduce Rate-limiting DNS client. But It needs to block the Go routine.
+
 package main
 
 import (
@@ -35,8 +39,15 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+type Domain struct {
+	Name             string
+	Rank             int
+	CanonicalName    string
+	StartOfAuthority string
+}
+
 type QueryResult struct {
-	Domain      tranco.Domain
+	Domain      Domain
 	RunNumber   int
 	QueryType   uint16
 	Timestamp   time.Time
@@ -48,7 +59,7 @@ type QueryResult struct {
 	Additionals []dns.RR
 }
 
-func resolve(client *dns.Client, resolverAddress string, domain tranco.Domain, qtype uint16, run int) QueryResult {
+func resolve(client *dns.Client, resolverAddress string, domain Domain, qtype uint16, run int) QueryResult {
 	startTime := time.Now()
 
 	result := QueryResult{
@@ -176,6 +187,10 @@ func formatError(err error) string {
 	return err.Error()
 }
 
+const (
+	resolverAddress = "8.8.8.8:53"
+)
+
 func main() {
 	workspaceFlag := flag.String("workspace", "./workspace", "Directory to store intermediate files")
 	trancoIDFlag := flag.String("trancoID", "7NZ4X", "Tranco list ID to use")
@@ -198,11 +213,67 @@ func main() {
 	trancoList := tranco.NewTrancoList(workspaceDir, *trancoIDFlag)
 
 	// Read top N domains from Tranco CSV.
-	domains, err := trancoList.TopDomains(*topNFlag)
+	trancoDomains, err := trancoList.TopDomains(*topNFlag)
 	if err != nil {
 		slog.Error("Failed to read domains from Tranco CSV", "error", err)
 		os.Exit(1)
 	}
+
+	// Set up DNS client.
+	client := new(dns.Client)
+	client.ReadTimeout = 5 * time.Second
+	client.WriteTimeout = 5 * time.Second
+
+	// Set up parallelism semaphore for rate-limiting.
+	sem := semaphore.NewWeighted(int64(*parallelismFlag))
+
+	// Collect extra domain information.
+	domains := make([]Domain, len(trancoDomains))
+	var domainsWg sync.WaitGroup
+	domainsWg.Add(len(trancoDomains))
+	for i, d := range trancoDomains {
+		sem.Acquire(context.Background(), 1)
+		go func(i int, d tranco.Domain) {
+			defer sem.Release(1)
+			defer domainsWg.Done()
+			msg := new(dns.Msg)
+			msg.SetQuestion(dns.Fqdn(d.Name), dns.TypeSOA)
+			msg.RecursionDesired = true
+
+			slog.Info("Collecting SOA for domain", "rank", d.Rank, "name", d.Name)
+			r, _, err := client.Exchange(msg, resolverAddress)
+			if err != nil {
+				slog.Error("SOA query failed", "domain", d.Name, "type", dns.TypeToString[dns.TypeSOA], "error", err)
+				os.Exit(1)
+			}
+			// Collect the canonical name and start of authority.
+			cname := d.Name
+			soa := ""
+			for _, answer := range r.Answer {
+				if cnameRR, ok := answer.(*dns.CNAME); ok {
+					cname = cnameRR.Target
+				}
+				if soaRR, ok := answer.(*dns.SOA); ok {
+					soa = soaRR.Hdr.Name
+				}
+			}
+			if soa == "" {
+				for _, ns := range r.Ns {
+					if soaRR, ok := ns.(*dns.SOA); ok {
+						soa = soaRR.Hdr.Name
+						break
+					}
+				}
+			}
+			domains[i] = Domain{
+				Name:             d.Name,
+				Rank:             d.Rank,
+				CanonicalName:    cname,
+				StartOfAuthority: soa,
+			}
+		}(i, d)
+	}
+	domainsWg.Wait()
 
 	// Create new output CSV file.
 	outputFilename := filepath.Join(workspaceDir, fmt.Sprintf("results-top%d-n%d.csv", *topNFlag, *numQueriesFlag))
@@ -216,7 +287,7 @@ func main() {
 	csvWriter := csv.NewWriter(outputFile)
 	defer csvWriter.Flush()
 
-	header := []string{"domain", "rank", "run", "query_type", "timestamp", "duration_ms", "error", "rcode", "cnames", "answers", "additionals"}
+	header := []string{"domain", "cname", "soa", "rank", "run", "query_type", "timestamp", "duration_ms", "error", "rcode", "cnames", "answers", "additionals"}
 	if err := csvWriter.Write(header); err != nil {
 		slog.Error("Failed to write CSV header", "error", err)
 		os.Exit(1)
@@ -251,6 +322,8 @@ func main() {
 			}
 			record := []string{
 				result.Domain.Name,
+				result.Domain.CanonicalName,
+				result.Domain.StartOfAuthority,
 				strconv.Itoa(result.Domain.Rank),
 				strconv.Itoa(result.RunNumber),
 				dns.TypeToString[result.QueryType],
@@ -268,13 +341,8 @@ func main() {
 		}
 	}()
 
-	sem := semaphore.NewWeighted(int64(*parallelismFlag))
 	var resolveWg sync.WaitGroup
 	resolveWg.Add(len(domains) * (*numQueriesFlag))
-	client := new(dns.Client)
-	client.ReadTimeout = 5 * time.Second
-	client.WriteTimeout = 5 * time.Second
-	resolverAddress := "8.8.8.8:53"
 
 	for i := 0; i < *numQueriesFlag; i++ {
 		for _, domain := range domains {
@@ -282,7 +350,7 @@ func main() {
 				slog.Error("Failed to acquire semaphore", "domain", domain.Name, "error", err)
 				return
 			}
-			go func(d tranco.Domain, run int) {
+			go func(d Domain, run int) {
 				defer resolveWg.Done()
 				slog.Info("Analyzing domain", "rank", d.Rank, "run", run, "name", d.Name)
 
