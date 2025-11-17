@@ -121,6 +121,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net" // Added for network interfaces
 	"os"
 	"unsafe"
 
@@ -246,5 +247,27 @@ func main() {
 	fmt.Printf("  Release:    %s\n", CstrToString(uts.Release[:]))
 	fmt.Printf("  Version:    %s\n", CstrToString(uts.Version[:]))
 	fmt.Printf("  Machine:    %s\n", CstrToString(uts.Machine[:]))
+
+	// List network interfaces
+	fmt.Printf("\n--- Network Interfaces ---\n")
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		fmt.Printf("Error getting network interfaces: %v\n", err)
+	} else {
+		for _, iface := range ifaces {
+			fmt.Printf("  Name: %s\n", iface.Name)
+			fmt.Printf("  Hardware Address: %s\n", iface.HardwareAddr)
+			fmt.Printf("  Flags: %v\n", iface.Flags)
+			addrs, err := iface.Addrs()
+			if err != nil {
+				fmt.Printf("    Error getting addresses for %s: %v\n", iface.Name, err)
+			} else {
+				for _, addr := range addrs {
+					fmt.Printf("    Address: %s\n", addr.String())
+				}
+			}
+			fmt.Println()
+		}
+	}
 	fmt.Println("-------------------------------------------")
 }

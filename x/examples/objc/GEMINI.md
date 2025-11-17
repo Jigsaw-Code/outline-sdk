@@ -44,7 +44,7 @@ xcrun simctl launch --console booted org.getoutline.test
 To build for a physical iOS device:
 
 ```sh
-CC="$(xcrun --sdk iphoneos --find cc) -isysroot \"$(xcrun --sdk iphoneos --show-sdk-path)\"" GOOS=ios GOARCH=arm64 CGO_ENABLED=1 go -C x build  -v ./examples/objc
+CC="$(xcrun --sdk iphoneos --find cc) -isysroot \"$(xcrun --sdk iphoneos --show-sdk-path)\"" GOOS=ios GOARCH=arm64 CGO_ENABLED=1 go -C x build -v ./examples/objc
 ```
 
 Note: As indicated in the `README.md`, building for a physical iOS device may fail due to the unavailability of certain APIs (e.g., `userName`, `fullUserName`).
