@@ -54,6 +54,12 @@ For the simulator:
 % CC="$(xcrun --sdk iphonesimulator --find cc) -isysroot \"$(xcrun --sdk iphonesimulator --show-sdk-path)\"" GOOS=ios GOARCH=arm64 CGO_ENABLED=1 go -C x build  -v ./examples/objc
 ```
 
+You can also boot a simulator using its name (e.g., "iPhone 16") instead of its UDID, as long as the name is unambiguous:
+
+```sh
+xcrun simctl boot "iPhone 16"
+```
+
 If you build it for the iOS Simulator, you can run on the iOS simulator. It correctly returns the iOS version on the simulator (18.4), though notice that "Is iOS App on Mac" is false, because it's not "on Mac". 
 
 ```
@@ -72,7 +78,7 @@ Process Name:           main
 Process ID (PID):       43075
 User Name:              
 Full User Name:         
-Globally Unique ID:     5A277847-FAB1-491C-930F-AEBFB8BC145C-43075-00000903D8910887
+Globally Unique ID:     5A277847-FAB1-41C-930F-AEBFB8BC145C-43075-00000903D8910887
 OS Version:             Version 18.4 (Build 22E238)
 Hostname:               fortuna-macbookpro2.roam.internal
 Is Mac Catalyst App:    false
