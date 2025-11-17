@@ -47,7 +47,7 @@ To build for a physical iOS device:
 CC="$(xcrun --sdk iphoneos --find cc) -isysroot \"$(xcrun --sdk iphoneos --show-sdk-path)\"" GOOS=ios GOARCH=arm64 CGO_ENABLED=1 go -C x build -v ./examples/objc
 ```
 
-Note: As indicated in the `README.md`, building for a physical iOS device may fail due to the unavailability of certain APIs (e.g., `userName`, `fullUserName`).
+Note: Directly installing the resulting `.app` bundle on a physical device from the command line is not straightforward due to Apple's strict code signing requirements. You will typically need to use Xcode to manage the signing and installation process.
 
 # Development Conventions
 
