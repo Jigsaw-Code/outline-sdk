@@ -68,7 +68,7 @@ xcrun simctl launch --console booted org.getoutline.test
 To build for a physical iOS device:
 
 ```sh
-CC="$(xcrun --sdk iphoneos --find cc) -isysroot \"$(xcrun --sdk iphoneos --show-sdk-path)\"" GOOS=ios GOARCH=arm64 CGO_ENABLED=1 go -C x build -v ./examples/objc
+CC="$(xcrun --sdk iphoneos --find cc) -isysroot \"$(xcrun --sdk iphoneos --show-sdk-path)\"" GOOS=ios GOARCH=arm64 CGO_ENABLED=1 go -C x build -v -o examples/objc/ProcessInfo.app ./examples/objc/main.go
 ```
 
 Note: Directly installing the resulting `.app` bundle on a physical device from the command line is not straightforward due to Apple's strict code signing requirements. You will typically need to use Xcode to manage the signing and installation process.
