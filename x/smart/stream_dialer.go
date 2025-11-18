@@ -300,20 +300,20 @@ func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsC
 		return nil, nil, err
 	}
 
-	ctx, searchDone := context.WithCancel(ctx)
-	defer searchDone()
+	raceCtx, raceDone := context.WithCancel(ctx)
+	defer raceDone()
 	raceStart := time.Now()
-	resolver, err := raceTests(ctx, 250*time.Millisecond, resolvers, func(_ int, resolver *smartResolver) (*smartResolver, error) {
+	resolver, err := raceTests(raceCtx, 250*time.Millisecond, resolvers, func(_ int, resolver *smartResolver) (*smartResolver, error) {
 		for _, testDomain := range testDomains {
 			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
+			case <-raceCtx.Done():
+				return nil, raceCtx.Err()
 			default:
 			}
 
-			f.logCtx(ctx, "🏃 run DNS: %v (domain: %v)\n", resolver.ID, testDomain)
+			f.logCtx(raceCtx, "🏃 run DNS: %v (domain: %v)\n", resolver.ID, testDomain)
 			startTime := time.Now()
-			ips, err := testDNSResolver(ctx, f.TestTimeout, resolver, testDomain)
+			ips, err := testDNSResolver(raceCtx, f.TestTimeout, resolver, testDomain)
 			duration := time.Since(startTime)
 
 			status := "ok ✅"
@@ -321,7 +321,7 @@ func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsC
 				status = fmt.Sprintf("%v ❌", err)
 			}
 			// Only output log if the search is not done yet.
-			f.logCtx(ctx, "🏁 got DNS: %v (domain: %v), duration=%v, ips=%v, status=%v\n", resolver.ID, testDomain, duration, ips, status)
+			f.logCtx(raceCtx, "🏁 got DNS: %v (domain: %v), duration=%v, ips=%v, status=%v\n", resolver.ID, testDomain, duration, ips, status)
 
 			if err != nil {
 				return nil, err
@@ -332,7 +332,7 @@ func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsC
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not find working resolver: %w", err)
 	}
-	f.log("🏆 selected DNS resolver %v in %0.2fs\n\n", resolver.ID, time.Since(raceStart).Seconds())
+	f.logCtx(ctx, "🏆 selected DNS resolver %v in %0.2fs\n\n", resolver.ID, time.Since(raceStart).Seconds())
 	return resolver.Resolver, &resolver.Config, nil
 }
 
@@ -345,21 +345,21 @@ func (f *StrategyFinder) findTLS(
 	var configModule = configurl.NewDefaultProviders()
 	configModule.StreamDialers.BaseInstance = baseDialer
 
-	searchCtx, searchDone := context.WithCancel(ctx)
-	defer searchDone()
+	raceCtx, raceDone := context.WithCancel(ctx)
+	defer raceDone()
 	raceStart := time.Now()
 	type SearchResult struct {
 		Dialer transport.StreamDialer
 		Config string
 	}
-	result, err := raceTests(searchCtx, 250*time.Millisecond, tlsConfig, func(index int, transportCfg string) (*SearchResult, error) {
-		tlsDialer, err := configModule.NewStreamDialer(searchCtx, transportCfg)
+	result, err := raceTests(raceCtx, 250*time.Millisecond, tlsConfig, func(index int, transportCfg string) (*SearchResult, error) {
+		tlsDialer, err := configModule.NewStreamDialer(raceCtx, transportCfg)
 		if err != nil {
-			f.logCtx(searchCtx, "❌ Failed to create tls[%d]: %v, error=%v\n", index, transportCfg, err)
+			f.logCtx(raceCtx, "❌ Failed to create tls[%d]: %v, error=%v\n", index, transportCfg, err)
 			return nil, fmt.Errorf("NewStreamDialer failed: %w", err)
 		}
 
-		err = f.testDialer(searchCtx, tlsDialer, testDomains, transportCfg)
+		err = f.testDialer(raceCtx, tlsDialer, testDomains, transportCfg)
 		if err != nil {
 			return nil, err
 		}
@@ -369,7 +369,7 @@ func (f *StrategyFinder) findTLS(
 	if err != nil {
 		return nil, "", fmt.Errorf("could not find TLS strategy: %w", err)
 	}
-	f.log("🏆 selected TLS strategy '%v' in %0.2fs\n\n", result.Config, time.Since(raceStart).Seconds())
+	f.logCtx(ctx, "🏆 selected TLS strategy '%v' in %0.2fs\n\n", result.Config, time.Since(raceStart).Seconds())
 	tlsDialer := result.Dialer
 	return transport.FuncStreamDialer(func(searchCtx context.Context, raddr string) (transport.StreamConn, error) {
 		_, portStr, err := net.SplitHostPort(raddr)
@@ -448,8 +448,8 @@ func (f *StrategyFinder) findFallback(
 		return nil, nil, errors.New("attempted to find fallback but no fallback configuration was specified")
 	}
 
-	raceCtx, searchDone := context.WithCancel(ctx)
-	defer searchDone()
+	raceCtx, raceDone := context.WithCancel(ctx)
+	defer raceDone()
 	raceStart := time.Now()
 
 	configModule := configurl.NewDefaultProviders()
@@ -473,7 +473,7 @@ func (f *StrategyFinder) findFallback(
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not find a working fallback: %w", err)
 	}
-	f.log("🏆 selected fallback '%v' in %0.2fs\n\n", fallback.ConfigSignature, time.Since(raceStart).Seconds())
+	f.logCtx(ctx, "🏆 selected fallback '%v' in %0.2fs\n\n", fallback.ConfigSignature, time.Since(raceStart).Seconds())
 
 	return fallback.Dialer, fallback.Config, nil
 }
