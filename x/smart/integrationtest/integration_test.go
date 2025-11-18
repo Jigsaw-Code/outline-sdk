@@ -74,7 +74,7 @@ fallback:
     - socks5://192.168.1.10:1080
 `)
 
-	testDomains := []string{"www.example.com"}
+	testDomains := []string{"www.example.com", "example.com"}
 	transportType := ""
 
 	logBuffer := new(bytes.Buffer)
