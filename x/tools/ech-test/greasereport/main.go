@@ -304,7 +304,7 @@ func main() {
 		go func(d tranco.Domain) {
 			defer sem.Release(1)
 			defer wg.Done()
-			slog.Info("Testing domain", "domain", d.Name, "ech_grease", false)
+			slog.Info("Testing domain", "rank", d.Rank, "domain", d.Name, "ech_grease", false)
 			resultsCh <- runTest(curlPath, d, false, *maxTimeFlag)
 		}(domain)
 
@@ -315,7 +315,7 @@ func main() {
 		go func(d tranco.Domain) {
 			defer sem.Release(1)
 			defer wg.Done()
-			slog.Info("Testing domain", "domain", d.Name, "ech_grease", true)
+			slog.Info("Testing domain", "rank", d.Rank, "domain", d.Name, "ech_grease", true)
 			resultsCh <- runTest(curlPath, d, true, *maxTimeFlag)
 		}(domain)
 	}
