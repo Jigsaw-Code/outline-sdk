@@ -1,6 +1,14 @@
 import pandas as pd
+import sys
 
-df = pd.read_csv('grease-results-top1000.csv')
+# Get the CSV file path from the command-line arguments
+if len(sys.argv) < 2:
+    print("Usage: python analyze.py <path_to_csv_file>")
+    sys.exit(1)
+
+csv_file_path = sys.argv[1]
+
+df = pd.read_csv(csv_file_path)
 
 grouped = df.groupby('domain')
 

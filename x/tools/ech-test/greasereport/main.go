@@ -156,6 +156,8 @@ func runTest(curlPath string, domain tranco.Domain, echGrease bool, maxTime time
 	}
 	if echGrease {
 		args = append(args, "--ech", "grease")
+	} else {
+		args = append(args, "--ech", "false")
 	}
 	args = append(args, url)
 
