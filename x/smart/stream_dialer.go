@@ -52,7 +52,6 @@ type StrategyFinder struct {
 	PacketDialer    transport.PacketDialer
 	Cache           StrategyResultCache
 	fallbackParsers map[string]FallbackParser
-	logMu           sync.Mutex
 }
 
 // RegisterFallbackParser register a fallback parser with the given name.
@@ -66,26 +65,6 @@ func (f *StrategyFinder) ensureFallbackParsers() map[string]FallbackParser {
 		f.fallbackParsers = make(map[string]FallbackParser)
 	}
 	return f.fallbackParsers
-}
-
-func (f *StrategyFinder) log(format string, a ...any) {
-	if f.LogWriter != nil {
-		f.logMu.Lock()
-		defer f.logMu.Unlock()
-		fmt.Fprintf(f.LogWriter, format, a...)
-	}
-}
-
-// Only log if context is not done
-func (f *StrategyFinder) logCtx(ctx context.Context, format string, a ...any) {
-	if ctx != nil {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-	}
-	f.log(format, a...)
 }
 
 type httpsEntryConfig struct {
@@ -244,7 +223,7 @@ func (f *StrategyFinder) testDialerSingleDomain(ctx context.Context, dialer tran
 	startTime := time.Now()
 
 	testAddr := net.JoinHostPort(testDomain, "443")
-	f.logCtx(ctx, "🏃 running test: '%v' (domain: %v)\n", transportCfg, testDomain)
+	logCtx(ctx, "🏃 running test: '%v' (domain: %v)\n", transportCfg, testDomain)
 
 	testCtx, cancel := context.WithTimeout(ctx, f.TestTimeout)
 	defer cancel()
@@ -253,7 +232,7 @@ func (f *StrategyFinder) testDialerSingleDomain(ctx context.Context, dialer tran
 
 	testConn, err := dialer.DialStream(testCtx, testAddr)
 	if err != nil {
-		f.logCtx(ctx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+		logCtx(ctx, "🏁 failed to dial: '%v' (domain: %v), duration=%v, dial_error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 		return err
 	}
 
@@ -263,7 +242,7 @@ func (f *StrategyFinder) testDialerSingleDomain(ctx context.Context, dialer tran
 	defer tlsConn.Close()
 	err = tlsConn.HandshakeContext(testCtx)
 	if err != nil {
-		f.logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+		logCtx(ctx, "🏁 failed TLS handshake: '%v' (domain: %v), duration=%v, handshake=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 		return err
 	}
 
@@ -275,20 +254,20 @@ func (f *StrategyFinder) testDialerSingleDomain(ctx context.Context, dialer tran
 	}
 
 	if err := req.Write(tlsConn); err != nil {
-		f.logCtx(ctx, "🏁 failed to write HTTP request: '%v' (domain: %v), duration=%v, error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+		logCtx(ctx, "🏁 failed to write HTTP request: '%v' (domain: %v), duration=%v, error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 		return err
 	}
 
 	resp, err := http.ReadResponse(bufio.NewReader(tlsConn), req)
 	if err != nil {
-		f.logCtx(ctx, "🏁 failed to read HTTP response: '%v' (domain: %v), duration=%v, error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
+		logCtx(ctx, "🏁 failed to read HTTP response: '%v' (domain: %v), duration=%v, error=%v ❌\n", transportCfg, testDomain, time.Since(startTime), err)
 		return err
 	}
 	defer resp.Body.Close()
 
 	// Many bare domains return i.e. 301 redirects, so we don't validate anything about the response here, just that the request succeeded.
 
-	f.logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
+	logCtx(ctx, "🏁 success: '%v' (domain: %v), duration=%v, status=ok ✅\n", transportCfg, testDomain, time.Since(startTime))
 	return nil
 }
 
@@ -328,20 +307,20 @@ func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsC
 		return nil, nil, err
 	}
 
-	ctx, searchDone := context.WithCancel(ctx)
-	defer searchDone()
+	raceCtx, raceDone := context.WithCancel(ctx)
+	defer raceDone()
 	raceStart := time.Now()
-	resolver, err := raceTests(ctx, 250*time.Millisecond, resolvers, func(_ int, resolver *smartResolver) (*smartResolver, error) {
+	resolver, err := raceTests(raceCtx, 250*time.Millisecond, resolvers, func(_ int, resolver *smartResolver) (*smartResolver, error) {
 		for _, testDomain := range testDomains {
 			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
+			case <-raceCtx.Done():
+				return nil, raceCtx.Err()
 			default:
 			}
 
-			f.logCtx(ctx, "🏃 run DNS: %v (domain: %v)\n", resolver.ID, testDomain)
+			logCtx(raceCtx, "🏃 run DNS: %v (domain: %v)\n", resolver.ID, testDomain)
 			startTime := time.Now()
-			ips, err := testDNSResolver(ctx, f.TestTimeout, resolver, testDomain)
+			ips, err := testDNSResolver(raceCtx, f.TestTimeout, resolver, testDomain)
 			duration := time.Since(startTime)
 
 			status := "ok ✅"
@@ -349,7 +328,7 @@ func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsC
 				status = fmt.Sprintf("%v ❌", err)
 			}
 			// Only output log if the search is not done yet.
-			f.logCtx(ctx, "🏁 got DNS: %v (domain: %v), duration=%v, ips=%v, status=%v\n", resolver.ID, testDomain, duration, ips, status)
+			logCtx(raceCtx, "🏁 got DNS: %v (domain: %v), duration=%v, ips=%v, status=%v\n", resolver.ID, testDomain, duration, ips, status)
 
 			if err != nil {
 				return nil, err
@@ -360,7 +339,7 @@ func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsC
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not find working resolver: %w", err)
 	}
-	f.log("🏆 selected DNS resolver %v in %0.2fs\n\n", resolver.ID, time.Since(raceStart).Seconds())
+	logCtx(ctx, "🏆 selected DNS resolver %v in %0.2fs\n\n", resolver.ID, time.Since(raceStart).Seconds())
 	return resolver.Resolver, &resolver.Config, nil
 }
 
@@ -373,21 +352,21 @@ func (f *StrategyFinder) findTLS(
 	var configModule = configurl.NewDefaultProviders()
 	configModule.StreamDialers.BaseInstance = baseDialer
 
-	searchCtx, searchDone := context.WithCancel(ctx)
-	defer searchDone()
+	raceCtx, raceDone := context.WithCancel(ctx)
+	defer raceDone()
 	raceStart := time.Now()
 	type SearchResult struct {
 		Dialer transport.StreamDialer
 		Config string
 	}
-	result, err := raceTests(searchCtx, 250*time.Millisecond, tlsConfig, func(index int, transportCfg string) (*SearchResult, error) {
-		tlsDialer, err := configModule.NewStreamDialer(searchCtx, transportCfg)
+	result, err := raceTests(raceCtx, 250*time.Millisecond, tlsConfig, func(index int, transportCfg string) (*SearchResult, error) {
+		tlsDialer, err := configModule.NewStreamDialer(raceCtx, transportCfg)
 		if err != nil {
-			f.logCtx(searchCtx, "❌ Failed to create tls[%d]: %v, error=%v\n", index, transportCfg, err)
+			logCtx(raceCtx, "❌ Failed to create tls[%d]: %v, error=%v\n", index, transportCfg, err)
 			return nil, fmt.Errorf("NewStreamDialer failed: %w", err)
 		}
 
-		err = f.testDialer(searchCtx, tlsDialer, testDomains, transportCfg)
+		err = f.testDialer(raceCtx, tlsDialer, testDomains, transportCfg)
 		if err != nil {
 			return nil, err
 		}
@@ -397,7 +376,7 @@ func (f *StrategyFinder) findTLS(
 	if err != nil {
 		return nil, "", fmt.Errorf("could not find TLS strategy: %w", err)
 	}
-	f.log("🏆 selected TLS strategy '%v' in %0.2fs\n\n", result.Config, time.Since(raceStart).Seconds())
+	logCtx(ctx, "🏆 selected TLS strategy '%v' in %0.2fs\n\n", result.Config, time.Since(raceStart).Seconds())
 	tlsDialer := result.Dialer
 	return transport.FuncStreamDialer(func(searchCtx context.Context, raddr string) (transport.StreamConn, error) {
 		_, portStr, err := net.SplitHostPort(raddr)
@@ -476,8 +455,8 @@ func (f *StrategyFinder) findFallback(
 		return nil, nil, errors.New("attempted to find fallback but no fallback configuration was specified")
 	}
 
-	raceCtx, searchDone := context.WithCancel(ctx)
-	defer searchDone()
+	raceCtx, raceDone := context.WithCancel(ctx)
+	defer raceDone()
 	raceStart := time.Now()
 
 	configModule := configurl.NewDefaultProviders()
@@ -487,7 +466,7 @@ func (f *StrategyFinder) findFallback(
 		if err != nil {
 			// Make up a config signature in case of failure.
 			configSignature := makeConfigErrorSignature(raceCtx, fallbackConfig)
-			f.logCtx(raceCtx, "❌ Failed to create fallback[%d]: [%v]: %v\n", index, configSignature, err)
+			logCtx(raceCtx, "❌ Failed to create fallback[%d]: [%v]: %v\n", index, configSignature, err)
 			return nil, err
 		}
 
@@ -501,7 +480,7 @@ func (f *StrategyFinder) findFallback(
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not find a working fallback: %w", err)
 	}
-	f.log("🏆 selected fallback '%v' in %0.2fs\n\n", fallback.ConfigSignature, time.Since(raceStart).Seconds())
+	logCtx(ctx, "🏆 selected fallback '%v' in %0.2fs\n\n", fallback.ConfigSignature, time.Since(raceStart).Seconds())
 
 	return fallback.Dialer, fallback.Config, nil
 }
@@ -573,6 +552,7 @@ func (f *StrategyFinder) parseConfig(configBytes []byte) (configConfig, error) {
 // rankStrategiesFromCache reads a winningStrategy from the cache and adjust the input config accordingly.
 // It returns the adjusted ranked config, and optionally a first2Try config that the caller should prioritize.
 func (f *StrategyFinder) rankStrategiesFromCache(
+	logWriter io.Writer,
 	input configConfig,
 ) (ranked configConfig, first2Try fallbackEntryConfig) {
 	data, ok := f.Cache.Get(winningStrategyCacheKey)
@@ -585,7 +565,7 @@ func (f *StrategyFinder) rankStrategiesFromCache(
 		return input, nil
 	}
 
-	f.log("💾 resume strategy from cache\n")
+	logWriter.Write([]byte("💾 resume strategy from cache\n"))
 	winner := winningConfig(cachedCfg)
 
 	if fbCfg, ok := winner.getFallbackIfExclusive(&input); ok {
@@ -595,10 +575,58 @@ func (f *StrategyFinder) rankStrategiesFromCache(
 	return input, nil
 }
 
+type logWriterContextKeyType struct{}
+
+var logWriterContextKey = logWriterContextKeyType{}
+
+// logCtx logs to the writer in the context, if any and if the context is not done.
+func logCtx(ctx context.Context, format string, a ...any) {
+	// Suppress logging if the context is done.
+	// There's a race condition where the context may be done after this check and before the
+	// output, and the output will still proceed, but we just need to minimize spurious logging.
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
+	writer, _ := ctx.Value(logWriterContextKey).(*turnOffWriter)
+	if writer != nil {
+		fmt.Fprintf(writer, format, a...)
+	}
+}
+
+// turnOffWriter is an io.Writer that can be turned off to stop writing.
+type turnOffWriter struct {
+	writer io.Writer
+	mu     sync.Mutex
+}
+
+// Write implements io.Writer.
+func (t *turnOffWriter) Write(p []byte) (n int, err error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.writer == nil {
+		return len(p), nil
+	}
+	return t.writer.Write(p)
+}
+
+// TurnOff stops the writer from writing any further.
+func (t *turnOffWriter) TurnOff() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.writer = nil
+}
+
 // NewDialer uses the config in configBytes to search for a strategy that unblocks DNS and TLS for all of the testDomains, returning a dialer with the found strategy.
 // It returns an error if no strategy was found that unblocks the testDomains.
 // The testDomains must be domains with a TLS service running on port 443.
 func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, configBytes []byte) (transport.StreamDialer, error) {
+	// Set up logger for this session.
+	logWriter := &turnOffWriter{writer: f.LogWriter}
+	ctx = context.WithValue(ctx, logWriterContextKey, logWriter)
+	defer logWriter.TurnOff()
+
 	// Parse the config and make sure it's valid
 	inputConfig, err := f.parseConfig(configBytes)
 	if err != nil {
@@ -613,7 +641,7 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 
 	// Fast resume the winning strategy from the cache
 	if f.Cache != nil {
-		rankedConfig, first2Try := f.rankStrategiesFromCache(inputConfig)
+		rankedConfig, first2Try := f.rankStrategiesFromCache(logWriter, inputConfig)
 		if first2Try != nil {
 			if dialer, _, err := f.findFallback(ctx, testDomains, []fallbackEntryConfig{first2Try}); err == nil {
 				return dialer, nil
@@ -643,9 +671,9 @@ func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, co
 		}
 		f.Cache.Put(winningStrategyCacheKey, data)
 		if data != nil {
-			f.log("💾 strategy stored to cache\n")
+			logWriter.Write([]byte("💾 strategy stored to cache\n"))
 		} else {
-			f.log("💾 strategy cache cleared\n")
+			logWriter.Write([]byte("💾 strategy cache cleared\n"))
 		}
 	}
 
