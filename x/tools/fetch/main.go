@@ -17,8 +17,11 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -26,12 +29,14 @@ import (
 	"net"
 	"net/http"
 	"net/textproto"
+	"net/url"
 	"os"
 	"path"
 	"strings"
 	"time"
 
 	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
+	"github.com/Jigsaw-Code/outline-sdk/x/ech"
 	"github.com/lmittmann/tint"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
@@ -107,10 +112,14 @@ func main() {
 		}
 	}
 
-	url := flag.Arg(0)
-	if url == "" {
+	if flag.Arg(0) == "" {
 		slog.Error("Need to pass the URL to fetch in the command-line")
 		flag.Usage()
+		os.Exit(1)
+	}
+	reqURL, err := url.Parse(flag.Arg(0))
+	if err != nil {
+		slog.Error("Invalid URL", "error", err)
 		os.Exit(1)
 	}
 
@@ -122,15 +131,42 @@ func main() {
 	}
 	defer httpClient.CloseIdleConnections()
 
-	var tlsConfig tls.Config
+	tlsConfig := tls.Config{
+		ServerName: reqURL.Hostname(),
+	}
+	fakeECHConfig := false
 	if *echConfigFlag != "" {
-		// TODO(fortuna): Add support for GREASE and automatic fetching of the HTTPS RR.
-		echConfigBytes, err := base64.StdEncoding.DecodeString(*echConfigFlag)
-		if err != nil {
-			slog.Error("Failed to decode base64 ECH config", "error", err)
-			os.Exit(1)
+		if strings.HasPrefix(*echConfigFlag, "fake") {
+			fakeECHConfig = true
+			publicName := reqURL.Hostname()
+			if len(*echConfigFlag) > 7 {
+				if (*echConfigFlag)[6] != ':' {
+					slog.Error("Invalid fake ECH config")
+					os.Exit(1)
+				}
+				publicName = (*echConfigFlag)[7:]
+			}
+			// Can we make it work with a fake domain that validates the right domain?
+			echConfigBytes, err := ech.GenerateFakeECHConfigList(rand.Reader, publicName)
+			if err != nil {
+				slog.Error("Failed to decode base64 ECH config", "error", err)
+				os.Exit(1)
+			}
+			tlsConfig.EncryptedClientHelloConfigList = echConfigBytes
+			tlsConfig.EncryptedClientHelloRejectionVerify = func(cs tls.ConnectionState) error {
+				// Ignore validation. There's no way to validate here. We will do it later in the handshake.
+				slog.Debug("EncryptedClientHelloRejectionVerify", "ConnectionState", cs)
+				return nil
+			}
+		} else {
+			// TODO(fortuna): Add support for fetching the ECH config in the HTTPS RR.
+			echConfigBytes, err := base64.StdEncoding.DecodeString(*echConfigFlag)
+			if err != nil {
+				slog.Error("Failed to decode base64 ECH config", "error", err)
+				os.Exit(1)
+			}
+			tlsConfig.EncryptedClientHelloConfigList = echConfigBytes
 		}
-		tlsConfig.EncryptedClientHelloConfigList = echConfigBytes
 	}
 	if *tlsKeyLogFlag != "" {
 		f, err := os.Create(*tlsKeyLogFlag)
@@ -158,17 +194,43 @@ func main() {
 			}
 			return dialer.DialStream(ctx, addressToDial)
 		}
+		dialTLSContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+			conn, err := dialContext(ctx, network, addr)
+			if err != nil {
+				return nil, err
+			}
+			tlsConn := tls.Client(conn, &tlsConfig)
+			err = tlsConn.HandshakeContext(ctx)
+			slog.Debug("tls.Conn.Handshake", "error", err, "ConnectionState", tlsConn.ConnectionState())
+			if len(tlsConn.ConnectionState().PeerCertificates) >= 1 {
+				opts := x509.VerifyOptions{
+					DNSName:       reqURL.Hostname(),
+					Intermediates: x509.NewCertPool(),
+				}
+				for _, cert := range tlsConn.ConnectionState().PeerCertificates[1:] {
+					opts.Intermediates.AddCert(cert)
+				}
+				_, validationErr := tlsConn.ConnectionState().PeerCertificates[0].Verify(opts)
+				slog.Debug("tls.Conn.VerifyHostname", "status", validationErr)
+				if validationErr != nil {
+					return nil, validationErr
+				}
+			}
+			return tlsConn, err
+		}
 		switch *protoFlag {
 		case "h1":
 			tlsConfig.NextProtos = []string{"http/1.1"}
 			httpClient.Transport = &http.Transport{
 				DialContext:     dialContext,
+				DialTLSContext:  dialTLSContext,
 				TLSClientConfig: &tlsConfig,
 			}
 		case "h2":
 			tlsConfig.NextProtos = []string{"h2"}
 			httpClient.Transport = &http.Transport{
 				DialContext:       dialContext,
+				DialTLSContext:    dialTLSContext,
 				TLSClientConfig:   &tlsConfig,
 				ForceAttemptHTTP2: true,
 			}
@@ -199,7 +261,11 @@ func main() {
 				if err != nil {
 					return nil, err
 				}
-				return quicTransport.DialEarly(ctx, udpAddr, tlsConf, quicConf)
+				conn, err := quicTransport.DialEarly(ctx, udpAddr, tlsConf, quicConf)
+				if err != nil {
+					slog.Debug("quicTransport.DialEarly", "ConnectionState", conn.ConnectionState().TLS)
+				}
+				return conn, err
 			},
 			Logger: slog.Default(),
 		}
@@ -210,7 +276,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	req, err := http.NewRequest(*methodFlag, url, nil)
+	req, err := http.NewRequest(*methodFlag, reqURL.String(), nil)
 	if err != nil {
 		slog.Error("Failed to create request", "error", err)
 		os.Exit(1)
@@ -228,7 +294,13 @@ func main() {
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		slog.Error("HTTP request failed", "error", err)
+		echErr := new(tls.ECHRejectionError)
+		echRejected := errors.As(err, &echErr)
+		if fakeECHConfig && echRejected {
+			slog.Info("Got expected ECH rejection error for fake ECH config", "ech_retry_config", base64.StdEncoding.EncodeToString(echErr.RetryConfigList))
+		} else {
+			slog.Error("HTTP request failed", "error", err)
+		}
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
