@@ -19,8 +19,8 @@ import (
 	"io"
 	"sync"
 
-	"github.com/Jigsaw-Code/outline-sdk/network"
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golang.getoutline.org/sdk/network"
+	"golang.getoutline.org/sdk/transport"
 	lwip "github.com/eycorsican/go-tun2socks/core"
 )
 

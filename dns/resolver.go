@@ -27,8 +27,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
+	"golang.getoutline.org/sdk/transport"
+	"golang.getoutline.org/sdk/transport/tls"
 	"golang.org/x/net/dns/dnsmessage"
 )
 

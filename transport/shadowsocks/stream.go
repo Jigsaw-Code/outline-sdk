@@ -22,7 +22,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/Jigsaw-Code/outline-sdk/internal/slicepool"
+	"golang.getoutline.org/sdk/internal/slicepool"
 )
 
 // payloadSizeMask is the maximum size of payload in bytes, as per https://shadowsocks.org/guide/aead.html#tcp.

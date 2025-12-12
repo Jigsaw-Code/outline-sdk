@@ -19,7 +19,7 @@ import (
 	"io"
 	"net"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golang.getoutline.org/sdk/transport"
 	lwip "github.com/eycorsican/go-tun2socks/core"
 )
 

@@ -20,7 +20,7 @@ import (
 	"net/netip"
 	"testing"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golang.getoutline.org/sdk/transport"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/dns/dnsmessage"
 )
