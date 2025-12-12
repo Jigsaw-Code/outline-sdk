@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/examples/outline-connectivity-app/shared_backend"
+	"golang.getoutline.org/sdk/x/examples/outline-connectivity-app/shared_backend"
 )
 
 // App struct

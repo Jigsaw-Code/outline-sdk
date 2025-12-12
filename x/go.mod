@@ -1,4 +1,4 @@
-module github.com/Jigsaw-Code/outline-sdk/x
+module golang.getoutline.org/sdk/x
 
 go 1.24.0
 
@@ -6,7 +6,7 @@ go 1.24.0
 retract [v0.0.4, v0.0.6]
 
 require (
-	github.com/Jigsaw-Code/outline-sdk v0.0.20
+	golang.getoutline.org/sdk v0.0.20
 	// Use github.com/Psiphon-Labs/psiphon-tunnel-core@staging-client as per
 	// https://github.com/Psiphon-Labs/psiphon-tunnel-core/?tab=readme-ov-file#using-psiphon-with-go-modules
 	github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20250319154633-ceb78316d06e

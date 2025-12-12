@@ -22,9 +22,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
-	"github.com/Jigsaw-Code/outline-sdk/x/smart"
+	"golang.getoutline.org/sdk/transport"
+	"golang.getoutline.org/sdk/x/configurl"
+	"golang.getoutline.org/sdk/x/smart"
 )
 
 // StreamDialer encapsulates the logic to create stream connections (like TCP).
@@ -35,7 +35,7 @@ type StreamDialer struct {
 var configRegistry = configurl.NewDefaultProviders()
 
 // NewStreamDialerFromConfig creates a [StreamDialer] based on the given config.
-// The config format is specified in https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk/x/configurl#hdr-Config_Format.
+// The config format is specified in https://pkg.go.dev/golang.getoutline.org/sdk/x/configurl#hdr-Config_Format.
 func NewStreamDialerFromConfig(transportConfig string) (*StreamDialer, error) {
 	dialer, err := configRegistry.NewStreamDialer(context.Background(), transportConfig)
 	if err != nil {
@@ -64,7 +64,7 @@ type SmartDialerOptions struct {
 //
 // `testDomains` are used to test connectivity for each DNS/TLS strategy.
 // `config` defines the strategies to test. For an example, see:
-// https://github.com/Jigsaw-Code/outline-sdk/blob/main/x/examples/smart-proxy/config.yaml
+// https://golang.getoutline.org/sdk/blob/main/x/examples/smart-proxy/config.yaml
 func NewSmartDialerOptions(testDomains *StringList, config string) *SmartDialerOptions {
 	return &SmartDialerOptions{
 		testDomains: testDomains.list,
@@ -135,7 +135,7 @@ func (opt *SmartDialerOptions) NewStreamDialer() (*StreamDialer, error) {
 // that will use the selected strategy.
 // It uses testDomains to find a strategy that works when accessing those domains.
 // The strategies to search are given in the searchConfig. An example can be found in
-// https://github.com/Jigsaw-Code/outline-sdk/x/examples/smart-proxy/config.yaml
+// https://golang.getoutline.org/sdk/x/examples/smart-proxy/config.yaml
 //
 // Deprecated: Use [SmartDialerOptions] NewStreamDialer instead.
 func NewSmartStreamDialer(testDomains *StringList, searchConfig string, logWriter LogWriter) (*StreamDialer, error) {

@@ -20,7 +20,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golang.getoutline.org/sdk/transport"
 )
 
 var _ transport.StreamConn = (*pipeConn)(nil)

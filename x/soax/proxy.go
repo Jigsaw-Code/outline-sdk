@@ -23,9 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/transport/socks5"
-	"github.com/Jigsaw-Code/outline-sdk/x/httpconnect"
+	"golang.getoutline.org/sdk/transport"
+	"golang.getoutline.org/sdk/transport/socks5"
+	"golang.getoutline.org/sdk/x/httpconnect"
 )
 
 // The official address of the SOAX proxy.

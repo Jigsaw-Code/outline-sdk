@@ -22,10 +22,10 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/Jigsaw-Code/outline-sdk/network"
-	"github.com/Jigsaw-Code/outline-sdk/network/lwip2transport"
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
+	"golang.getoutline.org/sdk/network"
+	"golang.getoutline.org/sdk/network/lwip2transport"
+	"golang.getoutline.org/sdk/transport"
+	"golang.getoutline.org/sdk/x/configurl"
 )
 
 const (

@@ -18,12 +18,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Jigsaw-Code/outline-sdk/dns"
-	"github.com/Jigsaw-Code/outline-sdk/network"
-	"github.com/Jigsaw-Code/outline-sdk/network/dnstruncate"
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
-	"github.com/Jigsaw-Code/outline-sdk/x/connectivity"
+	"golang.getoutline.org/sdk/dns"
+	"golang.getoutline.org/sdk/network"
+	"golang.getoutline.org/sdk/network/dnstruncate"
+	"golang.getoutline.org/sdk/transport"
+	"golang.getoutline.org/sdk/x/configurl"
+	"golang.getoutline.org/sdk/x/connectivity"
 )
 
 type outlinePacketProxy struct {

@@ -21,9 +21,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
-	"github.com/Jigsaw-Code/outline-sdk/x/smart"
+	"golang.getoutline.org/sdk/transport"
+	"golang.getoutline.org/sdk/x/mobileproxy"
+	"golang.getoutline.org/sdk/x/smart"
 )
 
 // Takes a (potentially very long) psiphon config and outputs

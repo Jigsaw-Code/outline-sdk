@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/dns"
+	"golang.getoutline.org/sdk/dns"
 	"golang.org/x/net/dns/dnsmessage"
 )
 

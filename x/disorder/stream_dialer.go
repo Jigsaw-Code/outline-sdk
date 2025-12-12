@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/sockopt"
+	"golang.getoutline.org/sdk/transport"
+	"golang.getoutline.org/sdk/x/sockopt"
 )
 
 type disorderDialer struct {

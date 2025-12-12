@@ -19,7 +19,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golang.getoutline.org/sdk/transport"
 )
 
 // ProviderContainer contains providers for the creation of network objects based on a config. The config is

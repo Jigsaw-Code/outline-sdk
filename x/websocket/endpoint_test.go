@@ -29,7 +29,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golang.getoutline.org/sdk/transport"
 	"github.com/stretchr/testify/require"
 )
 

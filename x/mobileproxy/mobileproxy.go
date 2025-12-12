@@ -28,7 +28,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
+	"golang.getoutline.org/sdk/x/httpproxy"
 )
 
 // Proxy enables you to get the actual address bound by the server and stop the service when no longer needed.

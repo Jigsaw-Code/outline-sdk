@@ -26,15 +26,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
-	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy/psiphon"
-	"github.com/Jigsaw-Code/outline-sdk/x/smart"
+	"golang.getoutline.org/sdk/x/configurl"
+	"golang.getoutline.org/sdk/x/mobileproxy/psiphon"
+	"golang.getoutline.org/sdk/x/smart"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_Integration_NewDialer_BrokenConfig(t *testing.T) {
 	if runtime.GOOS == "android" {
-		// See https://github.com/Jigsaw-Code/outline-sdk/issues/504
+		// See https://golang.getoutline.org/sdk/issues/504
 		t.Skip("Skip Smart Dialer integration test on Android until storage is made compatible with android emulator testing")
 	}
 

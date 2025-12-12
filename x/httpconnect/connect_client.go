@@ -21,7 +21,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golang.getoutline.org/sdk/transport"
 )
 
 // ConnectClient is a [transport.StreamDialer] that establishes an HTTP CONNECT tunnel over an abstract HTTP transport.
