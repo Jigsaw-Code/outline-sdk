@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golang.getoutline.org/sdk/transport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/things-go/go-socks5"

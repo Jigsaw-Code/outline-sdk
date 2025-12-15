@@ -18,7 +18,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golang.getoutline.org/sdk/transport"
 )
 
 // splitDialer is a [transport.StreamDialer] that implements the split strategy.

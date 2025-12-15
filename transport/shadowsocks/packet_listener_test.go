@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golang.getoutline.org/sdk/transport"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 	"github.com/stretchr/testify/require"
 )

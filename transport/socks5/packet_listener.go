@@ -24,8 +24,8 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/internal/slicepool"
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golang.getoutline.org/sdk/internal/slicepool"
+	"golang.getoutline.org/sdk/transport"
 )
 
 // clientUDPBufferSize is the maximum supported UDP packet size in bytes.
