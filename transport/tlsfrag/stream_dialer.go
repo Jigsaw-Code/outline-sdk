@@ -19,7 +19,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golang.getoutline.org/sdk/transport"
 )
 
 // FragFunc takes the content of the first [handshake record] in a TLS session as input, and returns an integer that

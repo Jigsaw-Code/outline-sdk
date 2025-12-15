@@ -1,4 +1,4 @@
-module github.com/Jigsaw-Code/outline-sdk
+module golang.getoutline.org/sdk
 
 go 1.24.1
 
