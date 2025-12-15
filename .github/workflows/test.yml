@@ -84,6 +84,14 @@ jobs:
           distribution: "zulu"
           java-version: "17"
 
+      # Free up disk space to avoid "Not enough space to create userdata partition" error.
+      # See https://github.com/Jigsaw-Code/outline-sdk/actions/runs/20183073943/job/58094204027?pr=556#step:7:98
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+
       # Android recipe from https://github.com/ReactiveCircus/android-emulator-runner/blob/v2/README.md#usage--examples
       # KVM makes the emulator faster.
       - name: Enable KVM
