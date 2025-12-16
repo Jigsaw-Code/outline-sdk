@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/transport/tlsfrag"
+	"golang.getoutline.org/sdk/transport"
+	"golang.getoutline.org/sdk/transport/tlsfrag"
 )
 
 func registerTLSFragStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {

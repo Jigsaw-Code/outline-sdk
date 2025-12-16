@@ -23,10 +23,10 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
-	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy/psiphon"
-	"github.com/Jigsaw-Code/outline-sdk/x/smart"
+	"golang.getoutline.org/sdk/transport"
+	"golang.getoutline.org/sdk/x/mobileproxy"
+	"golang.getoutline.org/sdk/x/mobileproxy/psiphon"
+	"golang.getoutline.org/sdk/x/smart"
 )
 
 // RegisterErrorConfig registers a config that creates a dialer that always outputs an error.

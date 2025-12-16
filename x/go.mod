@@ -1,12 +1,13 @@
-module github.com/Jigsaw-Code/outline-sdk/x
+module golang.getoutline.org/sdk/x
 
-go 1.24.0
+go 1.24.1
+
+toolchain go1.24.8
 
 // Due to https://github.com/Jigsaw-Code/outline-sdk/issues/501
 retract [v0.0.4, v0.0.6]
 
 require (
-	github.com/Jigsaw-Code/outline-sdk v0.0.20
 	// Use github.com/Psiphon-Labs/psiphon-tunnel-core@staging-client as per
 	// https://github.com/Psiphon-Labs/psiphon-tunnel-core/?tab=readme-ov-file#using-psiphon-with-go-modules
 	github.com/Psiphon-Labs/psiphon-tunnel-core v1.0.11-0.20250319154633-ceb78316d06e
@@ -18,6 +19,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/things-go/go-socks5 v0.0.5
 	github.com/vishvananda/netlink v1.2.1-beta.2
+	golang.getoutline.org/sdk v0.0.21-alpha.1
 	golang.org/x/mobile v0.0.0-20240520174638-fa72addaaa1b
 	golang.org/x/net v0.44.0
 	golang.org/x/sys v0.36.0
@@ -29,6 +31,7 @@ require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	filippo.io/keygen v0.0.0-20230306160926-5201437acf8e // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
+	github.com/Jigsaw-Code/outline-sdk v0.0.16 // indirect
 	github.com/Psiphon-Labs/bolt v0.0.0-20200624191537-23cedaef7ad7 // indirect
 	github.com/Psiphon-Labs/consistent v0.0.0-20240322131436-20aaa4e05737 // indirect
 	github.com/Psiphon-Labs/goptlib v0.0.0-20200406165125-c0e32a7a3464 // indirect

@@ -26,8 +26,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/dns"
-	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
+	"golang.getoutline.org/sdk/dns"
+	"golang.getoutline.org/sdk/x/configurl"
 	"golang.org/x/net/dns/dnsmessage"
 )
 

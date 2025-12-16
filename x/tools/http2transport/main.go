@@ -24,8 +24,8 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
-	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
+	"golang.getoutline.org/sdk/x/configurl"
+	"golang.getoutline.org/sdk/x/httpproxy"
 )
 
 func main() {

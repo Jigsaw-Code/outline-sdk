@@ -19,7 +19,7 @@ package psiphon
 import (
 	"testing"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
+	"golang.getoutline.org/sdk/x/mobileproxy"
 	"github.com/stretchr/testify/require"
 )
 

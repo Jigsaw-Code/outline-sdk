@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/sockopt"
+	"golang.getoutline.org/sdk/x/sockopt"
 )
 
 type disorderWriter struct {

@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
+	"golang.getoutline.org/sdk/x/configurl"
 )
 
 var debugLog log.Logger = *log.New(io.Discard, "", 0)

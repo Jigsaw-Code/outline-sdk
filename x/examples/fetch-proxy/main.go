@@ -22,7 +22,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/mobileproxy"
+	"golang.getoutline.org/sdk/x/mobileproxy"
 )
 
 func main() {

@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/disorder"
+	"golang.getoutline.org/sdk/transport"
+	"golang.getoutline.org/sdk/x/disorder"
 )
 
 func registerDisorderDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {

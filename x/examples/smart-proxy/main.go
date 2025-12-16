@@ -26,10 +26,10 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
-	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
-	"github.com/Jigsaw-Code/outline-sdk/x/smart"
+	"golang.getoutline.org/sdk/transport"
+	"golang.getoutline.org/sdk/x/configurl"
+	"golang.getoutline.org/sdk/x/httpproxy"
+	"golang.getoutline.org/sdk/x/smart"
 )
 
 var debugLog log.Logger = *log.New(io.Discard, "", 0)

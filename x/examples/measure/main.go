@@ -30,8 +30,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
-	"github.com/Jigsaw-Code/outline-sdk/x/configurl"
+	"golang.getoutline.org/sdk/transport/tls"
+	"golang.getoutline.org/sdk/x/configurl"
 	"github.com/goccy/go-yaml"
 	"github.com/lmittmann/tint"
 	"golang.org/x/term"

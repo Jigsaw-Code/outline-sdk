@@ -22,8 +22,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/Jigsaw-Code/outline-sdk/dns"
-	"github.com/Jigsaw-Code/outline-sdk/transport"
+	"golang.getoutline.org/sdk/dns"
+	"golang.getoutline.org/sdk/transport"
 	"golang.org/x/net/dns/dnsmessage"
 )
 

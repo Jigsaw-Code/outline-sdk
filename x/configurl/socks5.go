@@ -17,8 +17,8 @@ package configurl
 import (
 	"context"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/transport/socks5"
+	"golang.getoutline.org/sdk/transport"
+	"golang.getoutline.org/sdk/transport/socks5"
 )
 
 func registerSOCKS5StreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {

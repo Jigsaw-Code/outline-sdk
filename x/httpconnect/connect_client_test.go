@@ -34,12 +34,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/transport/tls"
+	"golang.getoutline.org/sdk/transport"
+	"golang.getoutline.org/sdk/transport/tls"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Jigsaw-Code/outline-sdk/x/httpproxy"
+	"golang.getoutline.org/sdk/x/httpproxy"
 )
 
 func newTargetSrv(t *testing.T, resp interface{}) *httptest.Server {

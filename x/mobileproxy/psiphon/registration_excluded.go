@@ -21,8 +21,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Jigsaw-Code/outline-sdk/transport"
-	"github.com/Jigsaw-Code/outline-sdk/x/smart"
+	"golang.getoutline.org/sdk/transport"
+	"golang.getoutline.org/sdk/x/smart"
 )
 
 func parsePsiphon(ctx context.Context, psiphonCfg smart.YAMLNode) (transport.StreamDialer, error) {
