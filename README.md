@@ -11,7 +11,7 @@
 > [!IMPORTANT]
 > **New Module Path**
 >
-> We are migrating our Go module paths to:
+> As part of the [Outline transition](https://medium.com/jigsaw/introducing-the-outline-foundation-an-independent-home-for-outline-39fba2ab4e25) from Jigsaw to the new Outline Foundation, we are migrating our Go module paths to:
 > - `golang.getoutline.org/sdk`
 > - `golang.getoutline.org/sdk/x`
 >
