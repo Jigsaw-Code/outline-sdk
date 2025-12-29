@@ -2,15 +2,30 @@
 
 [![Build Status](https://github.com/Jigsaw-Code/outline-sdk/actions/workflows/test.yml/badge.svg)](https://github.com/Jigsaw-Code/outline-sdk/actions/workflows/test.yml?query=branch%3Amain)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Jigsaw-Code/outline-sdk)](https://goreportcard.com/report/github.com/Jigsaw-Code/outline-sdk)
-[![Go Reference](https://pkg.go.dev/badge/github.com/Jigsaw-Code/outline-sdk.svg)](https://pkg.go.dev/github.com/Jigsaw-Code/outline-sdk)
+[![Go Reference](https://pkg.go.dev/badge/golang.getoutline.org/sdk.svg)](https://pkg.go.dev/golang.getoutline.org/sdk)
 
 <p align="center">
 <img src="https://github.com/Jigsaw-Code/outline-brand/blob/main/assets/powered_by_outline/color/logo.png?raw=true" width=400pt />
 </p>
 
-> [!Note]
-> This code is under active development and not guaranteed to be stable. If you are
-> interested in integrating with it, we'd love your [feedback](https://github.com/Jigsaw-Code/outline-sdk/issues/new).
+> [!IMPORTANT]
+> **New Module Path**
+>
+> As part of the [Outline transition](https://medium.com/jigsaw/introducing-the-outline-foundation-an-independent-home-for-outline-39fba2ab4e25) from Jigsaw to the new Outline Foundation, we are migrating our Go module paths to:
+> - `golang.getoutline.org/sdk`
+> - `golang.getoutline.org/sdk/x`
+>
+> **Please update your imports to the new paths as soon as possible.** The new paths are currently available in **preview**. You must target these versions explicitly:
+>
+> ```bash
+> # For the root module:
+> go get golang.getoutline.org/sdk@v0.0.21-alpha.1
+>
+> # For the x module tools:
+> go run golang.getoutline.org/sdk/x/tools/resolve@v0.0.9-alpha.1
+> ```
+>
+> *Note: The existing `github.com/Jigsaw-Code/outline-sdk` paths and the `@latest` tag will continue to resolve to the current stable versions (e.g., `v0.0.20`) during this transition period. Future stable releases will be published exclusively under the new module paths.*
 
 The Outline SDK allows you to:
 
