@@ -27,10 +27,6 @@
 >
 > *Note: The existing `github.com/Jigsaw-Code/outline-sdk` paths and the `@latest` tag will continue to resolve to the current stable versions (e.g., `v0.0.20`) during this transition period. Future stable releases will be published exclusively under the new module paths.*
 
-> [!Note]
-> This code is under active development and not guaranteed to be stable. If you are
-> interested in integrating with it, we'd love your [feedback](https://github.com/Jigsaw-Code/outline-sdk/issues/new).
-
 The Outline SDK allows you to:
 
 - Create tools to protect against network-level interference.
