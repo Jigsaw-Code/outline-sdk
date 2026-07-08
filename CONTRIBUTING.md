@@ -2,8 +2,6 @@
 
 We'd love to accept your patches and contributions to this project.
 
-Please review [Google's Open Source Community Guidelines](https://opensource.google/conduct/).
-
 ## Contribution process
 
 If you don't know what to contribute, a good start is to go over the [issue tracker](https://github.com/OutlineFoundation/outline-sdk/issues).
@@ -12,7 +10,7 @@ For new features, it's best to share your idea first before going too deep into 
 so we can align on the design.
 
 * If there's a feature request open, share your proposal there.
-* Otherwise, start with a discussion on [API Proposals](https://github.com/OutlineFoundation/outline-sdk/discussions/categories/api-proposals).
+* Otherwise, start with a discussion on [API Proposals](https://github.com/OutlineFoundation/outline-sdk/discussions/categories/api-proposals-and-ideas).
 
 For bug fixes, you can send a PR directly.
 
