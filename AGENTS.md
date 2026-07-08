@@ -34,4 +34,4 @@ Tools are declared via `tool` directives in go.mod — no separate installs.
 - New features and API changes should go through a [GitHub "API Proposals" discussion](https://github.com/OutlineFoundation/outline-sdk/discussions/categories/api-proposals-and-ideas) before implementation; bug fixes can be direct PRs.
 - All new code needs tests in `_test.go` files alongside the code.
 - Commit messages use conventional commits with the package as scope: `fix(packetrelay): …`, `test(x): …`, `docs(cli): …`.
-- See [docs/cross-platform.md](./docs/cross-platform.md) for building and running on other platforms (`run_on_android.sh`, `run_on_podman.sh`, wine), and [CONTRIBUTING.md](./CONTRIBUTING.md) for the contribution process and the Google CLA requirement.
+- See [docs/cross-platform.md](./docs/cross-platform.md) for building and running on other platforms (`run_on_android.sh`, `run_on_podman.sh`, wine), and [CONTRIBUTING.md](./CONTRIBUTING.md) for the contribution process.
