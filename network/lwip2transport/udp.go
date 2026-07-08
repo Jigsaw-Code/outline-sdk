@@ -25,20 +25,27 @@ import (
 
 // Compilation guard against interface implementation
 var _ lwip.UDPConnHandler = (*udpHandler)(nil)
+
+//lint:ignore SA1019 PacketProxy compat path until the PacketRelay migration (#618) completes.
 var _ network.PacketResponseReceiver = (*udpConnResponseWriter)(nil)
 
 type udpHandler struct {
-	mu      sync.Mutex                             // Protects the senders field
-	proxy   network.PacketProxy                    // A network stack neutral implementation of UDP PacketProxy
+	mu sync.Mutex // Protects the senders field
+	//lint:ignore SA1019 PacketProxy compat path until the PacketRelay migration (#618) completes.
+	proxy network.PacketProxy // A network stack neutral implementation of UDP PacketProxy
+	//lint:ignore SA1019 PacketProxy compat path until the PacketRelay migration (#618) completes.
 	senders map[string]network.PacketRequestSender // Maps local lwIP UDP socket to PacketRequestSender
 }
 
 // newUDPHandler returns a lwIP UDP connection handler.
 //
 // `pktProxy` is a PacketProxy that handles UDP packets.
+//
+//lint:ignore SA1019 PacketProxy compat path until the PacketRelay migration (#618) completes.
 func newUDPHandler(pktProxy network.PacketProxy) *udpHandler {
 	return &udpHandler{
-		proxy:   pktProxy,
+		proxy: pktProxy,
+		//lint:ignore SA1019 PacketProxy compat path until the PacketRelay migration (#618) completes.
 		senders: make(map[string]network.PacketRequestSender, 8),
 	}
 }
@@ -72,6 +79,8 @@ func (h *udpHandler) ReceiveTo(tunConn lwip.UDPConn, data []byte, destAddr *net.
 
 // newSession creates a new PacketRequestSender related to conn. The caller needs to put the new PacketRequestSender
 // to the h.senders map.
+//
+//lint:ignore SA1019 PacketProxy compat path until the PacketRelay migration (#618) completes.
 func (h *udpHandler) newSession(conn lwip.UDPConn) (network.PacketRequestSender, error) {
 	respWriter := &udpConnResponseWriter{
 		conn: conn,

@@ -69,10 +69,12 @@ func TestReceiveToNoDeadlockWhenError(t *testing.T) {
 
 // noopSingleSessionPacketProxy returns a single PacketRequestSender that does nothing.
 type noopSingleSessionPacketProxy struct {
-	closeCnt   int
+	closeCnt int
+	//lint:ignore SA1019 PacketProxy compat path until the PacketRelay migration (#618) completes.
 	respWriter network.PacketResponseReceiver
 }
 
+//lint:ignore SA1019 PacketProxy compat path until the PacketRelay migration (#618) completes.
 func (p *noopSingleSessionPacketProxy) NewSession(respWriter network.PacketResponseReceiver) (network.PacketRequestSender, error) {
 	if p.respWriter != nil {
 		return nil, errors.New("don't support multiple sessions in this proxy")
@@ -117,6 +119,7 @@ type errPacketProxy struct {
 
 var errNewSession = errors.New("error in NewSession")
 
+//lint:ignore SA1019 PacketProxy compat path until the PacketRelay migration (#618) completes.
 func (errPacketProxy) NewSession(network.PacketResponseReceiver) (network.PacketRequestSender, error) {
 	return nil, errNewSession
 }
