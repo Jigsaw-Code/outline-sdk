@@ -42,6 +42,7 @@ func TestStackClosedWriteError(t *testing.T) {
 	require.NotErrorIs(t, err, syscall.ESHUTDOWN)
 }
 
+//lint:ignore SA1019 PacketProxy compat path until the PacketRelay migration (#618) completes.
 func reConfigurelwIPDeviceForTest(t *testing.T, sd transport.StreamDialer, pp network.PacketProxy) *lwIPDevice {
 	t2s, err := ConfigureDevice(sd, pp)
 	require.NoError(t, err)
@@ -58,6 +59,7 @@ func (h *errTcpUdpHandler) DialStream(context.Context, string) (transport.Stream
 	return nil, h.err
 }
 
+//lint:ignore SA1019 PacketProxy compat path until the PacketRelay migration (#618) completes.
 func (h *errTcpUdpHandler) NewSession(network.PacketResponseReceiver) (network.PacketRequestSender, error) {
 	return nil, h.err
 }
