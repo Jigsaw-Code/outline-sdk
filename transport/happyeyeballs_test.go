@@ -40,6 +40,7 @@ var nilDialer = FuncStreamDialer(func(ctx context.Context, addr string) (StreamC
 	return nil, nil
 })
 
+//lint:ignore U1000 used by the commented-out flaky "IP order" test below.
 func newErrorStreamDialer(err error) StreamDialer {
 	return FuncStreamDialer(func(ctx context.Context, addr string) (StreamConn, error) {
 		return nil, err
