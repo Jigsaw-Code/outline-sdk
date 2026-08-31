@@ -77,8 +77,12 @@ func (d *lwIPDevice) newAsyncWriter(w io.Writer) *asyncWriter {
 // on the lwIP path p aliases the C pbuf payload, which is freed once the output callback returns.
 //
 // Write reports the first error encountered by the background writer, so an error surfaces on a
-// later call than the packet that caused it. It returns [network.ErrClosed] once the asyncWriter
-// has been closed.
+// later call than the packet that caused it. It returns [network.ErrClosed] once the asyncWriter has
+// been closed.
+//
+// A Write parked on a full queue must also wake when the background writer stops, which is why it
+// waits on aw.exit as well as aw.done: if the destination fails, nothing will ever drain the queue
+// again, and aw.done is closed by a Close that cannot run until this Write returns.
 func (aw *asyncWriter) Write(p []byte) (int, error) {
 	if err := aw.loadErr(); err != nil {
 		return 0, err
@@ -95,6 +99,13 @@ func (aw *asyncWriter) Write(p []byte) (int, error) {
 	select {
 	case aw.ch <- *bufp:
 		return len(p), nil
+	case <-aw.exit:
+		// The background writer is gone and nothing will drain the queue again.
+		aw.recycle(*bufp)
+		if err := aw.loadErr(); err != nil {
+			return 0, err
+		}
+		return 0, network.ErrClosed
 	case <-aw.done:
 		aw.recycle(*bufp)
 		return 0, network.ErrClosed
