@@ -96,7 +96,7 @@ sequenceDiagram
         RW->>LWIP: udpConn.WriteFrom(payload, srcAddr)
         Note over LWIP: udpConn calls C.udp_sendto().<br/>LwIP encapsulates UDP payload<br/>into an IP packet using<br/>associated local IP.
         LWIP->>Dev: forwardOutgoingIPPacket(ipPacket)
-        Note over Dev: Pushes IP packet to d.rdBuf channel.
+        Note over Dev: Hands the IP packet to the consumer<br/>over the unbuffered d.rdBuf channel<br/>and waits for d.rdN.
     end
 
     Dev-->>App: Unblocks, returns IP packet
@@ -123,7 +123,22 @@ The writer resolves the source address and calls `WriteFrom` on the underlying `
 Once LwIP constructs the IP packet, it calls its registered output callback: `forwardOutgoingIPPacket` (registered with `lwip.RegisterOutputFn`).
 
 #### 6. Sent to `lwIPDevice` Read Channel
-`forwardOutgoingIPPacket` writes the resulting IP packet into the `lwIPDevice`'s `d.rdBuf` channel. 
+`forwardOutgoingIPPacket` hands the resulting IP packet to the consumer over the `lwIPDevice`'s unbuffered `d.rdBuf` channel and waits for the byte count on `d.rdN`. The handoff is a rendezvous because the packet aliases the C pbuf payload, which LwIP frees as soon as the output callback returns — the consumer must copy it out before signalling `d.rdN`.
 
 #### 7. Read by App & Written to TUN
 The blocked `lwIPDevice.Read()` call (from Step 1) unblocks, copies the packet from `d.rdBuf`, and returns it to the application loop. The application then writes this complete IP packet back to the host OS local TUN interface.
+
+#### Alternative: `WriteTo` and the async writer
+Instead of looping on `Read`, an application can hand the device a destination writer once via `lwIPDevice.WriteTo(w)` (this is what the Outline clients do with their TUN file). The critical constraint on this path is that **LwIP calls `forwardOutgoingIPPacket` while holding its global stack lock**: any blocking work there — notably a `write(2)` to the TUN device — stalls every TCP and UDP flow in the stack for the duration of the syscall.
+
+So `WriteTo` never writes to `w` inline. It wraps `w` in an `asyncWriter` (`async_writer.go`), which:
+
+1. copies the packet into a pooled buffer (`lwIPDevice.pktPool`) and queues it (`writeQueueDepth` = 256 slots), returning immediately — this is what releases the pbuf and lets `WriteTo` signal `d.rdN`;
+2. performs the actual `w.Write` calls from a background goroutine, recycling each buffer afterwards.
+
+Consequences worth knowing:
+
+* **Backpressure** still applies: once the queue is full, `asyncWriter.Write` blocks, which blocks `WriteTo`, which blocks the LwIP callback. That happens only when the destination is genuinely slower than the stack is producing.
+* **Byte counts** returned by `WriteTo` are bytes *queued*, not bytes the destination has accepted.
+* **Write errors** surface one or more packets after the packet that caused them. `WriteTo` returns as soon as it observes the error, and packets still queued at that point are dropped.
+* Closing the device (or returning from `WriteTo`) stops the background goroutine; it waits for the in-flight write but drops the rest of the queue rather than letting a stuck destination block shutdown.

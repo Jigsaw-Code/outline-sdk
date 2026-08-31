@@ -38,24 +38,38 @@ type lwIPDevice struct {
 	// whether the device has been closed
 	done chan struct{}
 
-	// Outgoing IP packets queued for the TUN writer. Buffered so that lwIP's output
-	// callback never blocks: it runs with the global lwIP lock held, so blocking here
-	// stalls every TCP and UDP flow for the duration of a TUN write(2).
+	// async read call and its result
 	rdBuf chan []byte
+	rdN   chan int
+
+	// pktPool recycles the packet copies handed to the asyncWriter used by WriteTo. It is per
+	// device rather than package scoped, so buffers cannot leak between instances when
+	// ConfigureDevice reconfigures the singleton.
+	pktPool sync.Pool
 }
-
-// outQueueDepth bounds the outgoing packet queue. At ~2 KiB per slot this caps
-// queue memory at ~512 KiB. Once full, forwardOutgoingIPPacket blocks, which is
-// genuine backpressure (the TUN writer is truly slower) rather than the
-// unconditional per-packet stall it replaces.
-const outQueueDepth = 256
-
-// pktPool recycles the packet copies handed to the TUN writer.
-var pktPool = sync.Pool{New: func() any { b := make([]byte, 0, 2048); return &b }}
 
 // Singleton instance
 var instMu sync.Mutex
 var inst *lwIPDevice = nil
+
+// newLwIPDevice creates a device with the given handlers and registers it with the lwIP stack.
+// It must be called with instMu held, since lwIP's handler registration is global.
+func newLwIPDevice(tcp *tcpHandler, udp lwip.UDPConnHandler) *lwIPDevice {
+	d := &lwIPDevice{
+		tcp:   tcp,
+		udp:   udp,
+		stack: lwip.NewLWIPStack(),
+		done:  make(chan struct{}),
+		rdBuf: make(chan []byte),
+		rdN:   make(chan int),
+	}
+	d.pktPool.New = func() any { b := make([]byte, 0, packetBufCap); return &b }
+
+	lwip.RegisterTCPConnHandler(d.tcp)
+	lwip.RegisterUDPConnHandler(d.udp)
+	lwip.RegisterOutputFn(d.forwardOutgoingIPPacket)
+	return d
+}
 
 // ConfigureDevice configures the singleton LwIP device using the [transport.StreamDialer] to handle TCP streams and
 // the [transport.PacketProxy] to handle UDP packets.
@@ -90,16 +104,7 @@ func ConfigureDevice(sd transport.StreamDialer, pp network.PacketProxy) (network
 	if inst != nil {
 		inst.Close()
 	}
-	inst = &lwIPDevice{
-		tcp:   newTCPHandler(sd),
-		udp:   newUDPHandler(pp),
-		stack: lwip.NewLWIPStack(),
-		done:  make(chan struct{}),
-		rdBuf: make(chan []byte, outQueueDepth),
-	}
-	lwip.RegisterTCPConnHandler(inst.tcp)
-	lwip.RegisterUDPConnHandler(inst.udp)
-	lwip.RegisterOutputFn(inst.forwardOutgoingIPPacket)
+	inst = newLwIPDevice(newTCPHandler(sd), newUDPHandler(pp))
 
 	return inst, nil
 }
@@ -119,16 +124,7 @@ func ConfigureDeviceWithRelay(sd transport.StreamDialer, pr packetrelay.PacketRe
 	if inst != nil {
 		inst.Close()
 	}
-	inst = &lwIPDevice{
-		tcp:   newTCPHandler(sd),
-		udp:   newUDPRelayHandler(pr),
-		stack: lwip.NewLWIPStack(),
-		done:  make(chan struct{}),
-		rdBuf: make(chan []byte, outQueueDepth),
-	}
-	lwip.RegisterTCPConnHandler(inst.tcp)
-	lwip.RegisterUDPConnHandler(inst.udp)
-	lwip.RegisterOutputFn(inst.forwardOutgoingIPPacket)
+	inst = newLwIPDevice(newTCPHandler(sd), newUDPRelayHandler(pr))
 
 	return inst, nil
 }
@@ -154,38 +150,35 @@ func (d *lwIPDevice) MTU() int {
 	return packetMTU
 }
 
-// forwardOutgoingIPPacket queues an IP packet response `b` for delivery to the TUN device. The
-// packet can be read by calling the Read function, or redirected to an [io.Writer] via WriteTo.
+// forwardOutgoingIPPacket writes an IP packet response `b` to this device. The packet can be read by calling the Read
+// function, or it can be redirected to an [io.Writer] if the WriteTo function has been called. forwardOutgoingIPPacket
+// blocks until the packet is successfully consumed by a Read or WriteTo.
 //
 // forwardOutgoingIPPacket can be used as an output function for lwIP.
 //
-// It does NOT wait for the packet to reach the TUN. lwIP invokes this callback while holding its
-// global lock, so waiting here serializes the entire stack behind one blocking write(2) syscall --
-// measured at ~20k packets/sec on Android with the CPU 86% idle. Instead we copy the packet into a
-// pooled buffer, hand it to a buffered queue, and return immediately.
+// `b` aliases the C pbuf payload (see go-tun2socks core/output_export.go), which is freed as soon as this function
+// returns. That is why the consumer must copy it out before signalling completion: Read copies into the caller's
+// buffer, and WriteTo copies into a pooled buffer owned by its [asyncWriter]. Neither consumer performs a blocking
+// device write while lwIP holds its global lock -- doing so would stall every TCP and UDP flow in the stack for the
+// duration of the syscall.
 //
-// The copy is mandatory, not an optimization: `b` aliases the C pbuf payload (see go-tun2socks
-// core/output_export.go), which is freed as soon as this function returns.
+// forwardOutgoingIPPacket might be called by multiple goroutines (for example, when multiple UDP packets arrive at the
+// same time). We sequentialize the calls by using channels, if performance issues arise in the future, we can use
+// other more performant but more error-prone methods (e.g. the [sync] package) to resolve them.
 func (d *lwIPDevice) forwardOutgoingIPPacket(b []byte) (int, error) {
 	if len(b) == 0 {
 		return 0, nil
 	}
-	bufp := pktPool.Get().(*[]byte)
-	*bufp = append((*bufp)[:0], b...)
 	select {
-	case d.rdBuf <- *bufp:
-		return len(b), nil
+	case d.rdBuf <- b:
+		select {
+		case n := <-d.rdN:
+			return n, nil
+		case <-d.done:
+			return 0, network.ErrClosed
+		}
 	case <-d.done:
-		pktPool.Put(bufp)
 		return 0, network.ErrClosed
-	}
-}
-
-// recycle returns a packet buffer to the pool after it has been written to the TUN.
-func recycle(s []byte) {
-	if cap(s) >= 2048 {
-		b := s[:0]
-		pktPool.Put(&b)
 	}
 }
 
@@ -198,7 +191,7 @@ func (d *lwIPDevice) Read(p []byte) (int, error) {
 	select {
 	case s := <-d.rdBuf:
 		n := copy(p, s)
-		recycle(s)
+		d.rdN <- n
 		return n, nil
 	case <-d.done:
 		return 0, io.EOF
@@ -206,20 +199,35 @@ func (d *lwIPDevice) Read(p []byte) (int, error) {
 }
 
 // WriteTo implements [io.WriterTo]. It writes all IP packets from TCP/UDP responses to `w` until all data is written
-// or an error occurs. Packets come from a pooled buffer filled by forwardOutgoingIPPacket.
+// or an error occurs.
+//
+// Packets are handed to `w` by a background goroutine, so a slow `w` (such as a TUN device) does not stall the lwIP
+// stack. Two consequences of that:
+//   - the returned count is the number of bytes queued for `w`, which may be slightly ahead of the bytes `w` has
+//     actually accepted;
+//   - a write error is reported at least one packet after the packet that caused it. WriteTo still returns as soon as
+//     it observes the error, and packets already queued at that point are dropped.
 //
 // WriteTo returns the total number of bytes written and any error encountered during the write. If there are no more
 // data available, WriteTo returns nil error instead of [io.EOF].
 func (d *lwIPDevice) WriteTo(w io.Writer) (int64, error) {
+	aw := d.newAsyncWriter(w)
+	defer aw.Close()
+
 	nw := int64(0)
 	for {
 		select {
 		case s := <-d.rdBuf:
-			n, err := w.Write(s)
+			// Write copies `s` before returning, which is what releases the lwIP pbuf below.
+			n, err := aw.Write(s)
 			nw += int64(n)
-			recycle(s)
-			if err != nil {
-				return nw, err
+			select {
+			case d.rdN <- n:
+				if err != nil {
+					return nw, err
+				}
+			case <-d.done:
+				return nw, nil
 			}
 		case <-d.done:
 			return nw, nil
