@@ -17,6 +17,7 @@ package lwip2transport
 import (
 	"errors"
 	"io"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -196,6 +197,49 @@ func TestAsyncWriterClose(t *testing.T) {
 	require.ErrorIs(t, failing.Close(), writeErr)
 }
 
+// TestWriteReleasedWhenBackgroundWriterFails covers the deadlock a full queue used to cause: the
+// producer parks in Write, the destination then fails, and drain exits. Nothing will drain the queue
+// again, and aw.done cannot help -- Close is what closes it, and Close only runs once this Write
+// returns.
+func TestWriteReleasedWhenBackgroundWriterFails(t *testing.T) {
+	h := &errTcpUdpHandler{err: errors.New("not supported")}
+	d := reConfigurelwIPDeviceForTest(t, h, h)
+	defer d.Close()
+
+	writeErr := errors.New("tun is gone")
+	w := newFailingBlockingWriter(writeErr)
+	aw := d.newAsyncWriter(w)
+	defer aw.Close()
+
+	// Fill the queue. The background writer is parked inside the first w.Write, so it dequeues one
+	// packet and then stops consuming; the producer blocks a few packets later.
+	var queued atomic.Int64
+	producer := make(chan error, 1)
+	go func() {
+		for range writeQueueDepth + 8 {
+			if _, err := aw.Write([]byte{0x01}); err != nil {
+				producer <- err
+				return
+			}
+			queued.Add(1)
+		}
+		producer <- nil
+	}()
+	waitForWriter(t, w)
+	require.Eventually(t, func() bool { return queued.Load() >= writeQueueDepth }, testTimeout, time.Millisecond,
+		"the producer never filled the queue")
+
+	// Let the parked write fail, which ends drain.
+	close(w.release)
+
+	select {
+	case err := <-producer:
+		require.ErrorIs(t, err, writeErr)
+	case <-time.After(testTimeout):
+		t.Fatal("Write stayed blocked on the full queue after the background writer failed")
+	}
+}
+
 // TestReadForwardedPacket verifies the Read path still hands the packet over synchronously.
 func TestReadForwardedPacket(t *testing.T) {
 	h := &errTcpUdpHandler{err: errors.New("not supported")}
@@ -257,6 +301,7 @@ type blockingWriter struct {
 	entered chan struct{}
 	release chan struct{}
 	got     chan []byte
+	err     error // returned by every write once released
 }
 
 func newBlockingWriter() *blockingWriter {
@@ -267,12 +312,22 @@ func newBlockingWriter() *blockingWriter {
 	}
 }
 
+// newFailingBlockingWriter returns a blockingWriter that fails every write once released.
+func newFailingBlockingWriter(err error) *blockingWriter {
+	w := newBlockingWriter()
+	w.err = err
+	return w
+}
+
 func (w *blockingWriter) Write(p []byte) (int, error) {
 	select {
 	case w.entered <- struct{}{}:
 	default:
 	}
 	<-w.release
+	if w.err != nil {
+		return 0, w.err
+	}
 	select {
 	case w.got <- append([]byte(nil), p...):
 	default:
