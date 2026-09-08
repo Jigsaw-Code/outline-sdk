@@ -2,16 +2,16 @@
 
 This app illustrates how to use different transports to fetch a URL in Go.
 
-When using HTTP/3, `-quic-versions` selects the ordered QUIC versions offered by
-QUIC-Go. For example, force RFC 9369 QUIC v2 with:
+When using HTTP/3, `-quic-versions` selects the ordered QUIC versions. For
+example, force RFC 9369 QUIC v2 with:
 
 ```console
-fetch -proto h3 -quic-versions v2 -method HEAD -v https://example.com/
+fetch -proto h3 -quic-versions 2 -method HEAD -v https://example.com/
 ```
 
 The tool logs the negotiated QUIC version and wire codepoint after a successful
-HTTP/3 request. Use `v1,v2` (the default) for QUIC-Go's normal preference order,
-or `v2,v1` to prefer v2 while allowing fallback through version negotiation.
+HTTP/3 request. Use `1,2` (the default) to prefer v1, or `2,1` to prefer v2
+while allowing fallback through version negotiation.
 
 Direct fetch:
 

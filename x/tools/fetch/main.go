@@ -40,7 +40,7 @@ import (
 
 type stringArrayFlagValue []string
 
-const defaultQUICVersions = "v1,v2"
+const defaultQUICVersions = "1,2"
 
 func (v *stringArrayFlagValue) String() string {
 	return fmt.Sprint(*v)
@@ -56,13 +56,13 @@ func parseQUICVersions(value string) ([]quic.Version, error) {
 	seen := make(map[quic.Version]bool)
 	for _, name := range strings.Split(value, ",") {
 		var version quic.Version
-		switch strings.ToLower(strings.TrimSpace(name)) {
-		case "v1", "1", "0x00000001":
+		switch strings.TrimSpace(name) {
+		case "1":
 			version = quic.Version1
-		case "v2", "2", "0x6b3343cf":
+		case "2":
 			version = quic.Version2
 		default:
-			return nil, fmt.Errorf("unknown QUIC version %q (want v1 or v2)", name)
+			return nil, fmt.Errorf("unknown QUIC version %q (want 1 or 2)", name)
 		}
 		if seen[version] {
 			return nil, fmt.Errorf("duplicate QUIC version %q", name)
@@ -104,7 +104,7 @@ func main() {
 	transportFlag := flag.String("transport", "", "Transport config")
 
 	protoFlag := flag.String("proto", "h1", "HTTP version to use (h1, h2, h3)")
-	quicVersionsFlag := flag.String("quic-versions", defaultQUICVersions, "Ordered QUIC versions for h3 (v1, v2, or a comma-separated list)")
+	quicVersionsFlag := flag.String("quic-versions", defaultQUICVersions, "Ordered QUIC versions for h3 (1, 2, or a comma-separated list)")
 	methodFlag := flag.String("method", "GET", "The HTTP method to use")
 	var headersFlag stringArrayFlagValue
 	flag.Var(&headersFlag, "H", "Raw HTTP Header line to add. It must not end in \\r\\n")

@@ -27,14 +27,14 @@ func TestParseQUICVersions(t *testing.T) {
 		want    []quic.Version
 		wantErr bool
 	}{
-		{name: "v1", value: "v1", want: []quic.Version{quic.Version1}},
-		{name: "v2", value: "v2", want: []quic.Version{quic.Version2}},
-		{name: "ordered", value: "v2,v1", want: []quic.Version{quic.Version2, quic.Version1}},
-		{name: "codepoint", value: "0x6b3343cf", want: []quic.Version{quic.Version2}},
-		{name: "spaces and case", value: " V2, v1 ", want: []quic.Version{quic.Version2, quic.Version1}},
+		{name: "v1", value: "1", want: []quic.Version{quic.Version1}},
+		{name: "v2", value: "2", want: []quic.Version{quic.Version2}},
+		{name: "ordered", value: "2,1", want: []quic.Version{quic.Version2, quic.Version1}},
+		{name: "spaces", value: " 2, 1 ", want: []quic.Version{quic.Version2, quic.Version1}},
 		{name: "empty", value: "", wantErr: true},
-		{name: "unknown", value: "v3", wantErr: true},
-		{name: "duplicate", value: "v2,2", wantErr: true},
+		{name: "version name", value: "v1", wantErr: true},
+		{name: "unknown", value: "3", wantErr: true},
+		{name: "duplicate", value: "2,2", wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
