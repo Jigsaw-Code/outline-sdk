@@ -31,14 +31,16 @@ import (
 	"strings"
 	"time"
 
-	"golang.getoutline.org/sdk/x/configurl"
 	"github.com/lmittmann/tint"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
+	"golang.getoutline.org/sdk/x/configurl"
 	"golang.org/x/term"
 )
 
 type stringArrayFlagValue []string
+
+const defaultQUICVersions = "v1,v2"
 
 func (v *stringArrayFlagValue) String() string {
 	return fmt.Sprint(*v)
@@ -47,6 +49,28 @@ func (v *stringArrayFlagValue) String() string {
 func (v *stringArrayFlagValue) Set(value string) error {
 	*v = append(*v, value)
 	return nil
+}
+
+func parseQUICVersions(value string) ([]quic.Version, error) {
+	var versions []quic.Version
+	seen := make(map[quic.Version]bool)
+	for _, name := range strings.Split(value, ",") {
+		var version quic.Version
+		switch strings.ToLower(strings.TrimSpace(name)) {
+		case "v1", "1", "0x00000001":
+			version = quic.Version1
+		case "v2", "2", "0x6b3343cf":
+			version = quic.Version2
+		default:
+			return nil, fmt.Errorf("unknown QUIC version %q (want v1 or v2)", name)
+		}
+		if seen[version] {
+			return nil, fmt.Errorf("duplicate QUIC version %q", name)
+		}
+		seen[version] = true
+		versions = append(versions, version)
+	}
+	return versions, nil
 }
 
 func init() {
@@ -80,6 +104,7 @@ func main() {
 	transportFlag := flag.String("transport", "", "Transport config")
 
 	protoFlag := flag.String("proto", "h1", "HTTP version to use (h1, h2, h3)")
+	quicVersionsFlag := flag.String("quic-versions", defaultQUICVersions, "Ordered QUIC versions for h3 (v1, v2, or a comma-separated list)")
 	methodFlag := flag.String("method", "GET", "The HTTP method to use")
 	var headersFlag stringArrayFlagValue
 	flag.Var(&headersFlag, "H", "Raw HTTP Header line to add. It must not end in \\r\\n")
@@ -113,6 +138,10 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
+	if *protoFlag != "h3" && *quicVersionsFlag != defaultQUICVersions {
+		slog.Error("-quic-versions requires -proto h3")
+		os.Exit(1)
+	}
 
 	httpClient := &http.Client{
 		Timeout: time.Duration(*timeoutSecFlag) * time.Second,
@@ -141,6 +170,7 @@ func main() {
 		defer f.Close()
 		tlsConfig.KeyLogWriter = f
 	}
+	var quicConn quic.EarlyConnection
 	providers := configurl.NewDefaultProviders()
 	if *protoFlag == "h1" || *protoFlag == "h2" {
 		dialer, err := providers.NewStreamDialer(context.Background(), *transportFlag)
@@ -174,6 +204,11 @@ func main() {
 			}
 		}
 	} else if *protoFlag == "h3" {
+		quicVersions, err := parseQUICVersions(*quicVersionsFlag)
+		if err != nil {
+			slog.Error("Invalid QUIC versions", "error", err)
+			os.Exit(1)
+		}
 		listener, err := providers.NewPacketListener(context.Background(), *transportFlag)
 		if err != nil {
 			slog.Error("Could not create listener", "error", err)
@@ -199,7 +234,14 @@ func main() {
 				if err != nil {
 					return nil, err
 				}
-				return quicTransport.DialEarly(ctx, udpAddr, tlsConf, quicConf)
+				quicConf = quicConf.Clone()
+				quicConf.Versions = quicVersions
+				conn, err := quicTransport.DialEarly(ctx, udpAddr, tlsConf, quicConf)
+				if err != nil {
+					return nil, err
+				}
+				quicConn = conn
+				return conn, nil
 			},
 			Logger: slog.Default(),
 		}
@@ -236,6 +278,10 @@ func main() {
 	if *verboseFlag {
 		slog.Info("HTTP Proto", "version", resp.Proto)
 		slog.Info("HTTP Status", "status", resp.Status)
+		if quicConn != nil {
+			version := quicConn.ConnectionState().Version
+			slog.Info("QUIC Version", "version", version.String(), "codepoint", fmt.Sprintf("0x%08x", uint32(version)))
+		}
 		for k, v := range resp.Header {
 			slog.Debug("Header", "key", k, "value", v)
 		}
