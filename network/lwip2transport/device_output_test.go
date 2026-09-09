@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.getoutline.org/sdk/network"
 )
 
 const testTimeout = 5 * time.Second
@@ -188,6 +189,39 @@ func TestReadForwardedPacket(t *testing.T) {
 		require.Exactly(t, 3, n)
 	case <-time.After(testTimeout):
 		t.Fatal("forwardOutgoingIPPacket did not return after the packet was read")
+	}
+}
+
+// TestClosedDeviceDoesNotLeakQueuedPackets pins the shutdown contract. Because rdBuf is buffered,
+// a closed device can have both a queued packet and a closed done channel ready at once, and a
+// bare select would pick between them at random. Read must still report io.EOF, and the output
+// callback must not enqueue onto a device that is shutting down.
+func TestClosedDeviceDoesNotLeakQueuedPackets(t *testing.T) {
+	h := &errTcpUdpHandler{err: errors.New("not supported")}
+	d := reConfigurelwIPDeviceForTest(t, h, h)
+
+	// Queue packets while the device is still open, then close it with those packets pending.
+	for i := range 8 {
+		n, err := d.forwardOutgoingIPPacket([]byte{byte(i)})
+		require.NoError(t, err)
+		require.Exactly(t, 1, n)
+	}
+	require.NoError(t, d.Close())
+
+	// Every Read must report EOF, never a queued packet. Repeat: a random select would pass once
+	// with probability 1/2, so a single call proves nothing.
+	buf := make([]byte, packetMTU)
+	for range 64 {
+		n, err := d.Read(buf)
+		require.ErrorIs(t, err, io.EOF)
+		require.Exactly(t, 0, n)
+	}
+
+	// The output callback must refuse to enqueue, even though rdBuf still has free slots.
+	for range 64 {
+		n, err := d.forwardOutgoingIPPacket([]byte{0xff})
+		require.ErrorIs(t, err, network.ErrClosed)
+		require.Exactly(t, 0, n)
 	}
 }
 

@@ -174,6 +174,14 @@ func (d *lwIPDevice) forwardOutgoingIPPacket(b []byte) (int, error) {
 	if len(b) == 0 {
 		return 0, nil
 	}
+	// Checked before the send below. rdBuf is buffered, so on a closed device both cases of that
+	// select can be ready at once, and select picks between ready cases at random -- which would
+	// let a packet be queued onto a device that is already shutting down.
+	select {
+	case <-d.done:
+		return 0, network.ErrClosed
+	default:
+	}
 	bufp := d.getBuf()
 	*bufp = append((*bufp)[:0], b...)
 	select {
@@ -206,8 +214,17 @@ func (d *lwIPDevice) recycle(s []byte) {
 // a packet arrives or this device is closed. If a packet is too long to fit in the supplied buffer `p`, the excess
 // bytes are discarded.
 //
-// Read returns [io.EOF] error if this device is closed or no more data is available.
+// Read returns [io.EOF] error if this device is closed or no more data is available. A closed
+// device reports io.EOF even if packets are still queued: those packets belong to a session that
+// has ended, and the [network.IPDevice] contract promises io.EOF once closed.
 func (d *lwIPDevice) Read(p []byte) (int, error) {
+	// Checked before the receive below, which would otherwise be free to pick a queued packet over
+	// the closed done channel; select chooses among ready cases at random.
+	select {
+	case <-d.done:
+		return 0, io.EOF
+	default:
+	}
 	select {
 	case s := <-d.rdBuf:
 		n := copy(p, s)
@@ -226,6 +243,14 @@ func (d *lwIPDevice) Read(p []byte) (int, error) {
 func (d *lwIPDevice) WriteTo(w io.Writer) (int64, error) {
 	nw := int64(0)
 	for {
+		// Checked before the receive below for the same reason as in Read: with a buffered rdBuf
+		// both cases can be ready on a closed device, and packets from an ended session must not
+		// be written to the destination.
+		select {
+		case <-d.done:
+			return nw, nil
+		default:
+		}
 		select {
 		case s := <-d.rdBuf:
 			n, err := w.Write(s)
