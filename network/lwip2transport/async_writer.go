@@ -112,6 +112,37 @@ func (aw *asyncWriter) Write(p []byte) (int, error) {
 	}
 }
 
+// writeOwned queues an already-pooled buffer and takes ownership of it. Unlike Write it does not
+// copy, so the caller must not touch buf afterwards. It is used by [lwIPDevice.WriteTo], where the
+// packet was already copied out of the lwIP pbuf by forwardOutgoingIPPacket -- copying again here
+// would be pure waste.
+func (aw *asyncWriter) writeOwned(buf []byte) (int, error) {
+	if err := aw.loadErr(); err != nil {
+		aw.recycle(buf)
+		return 0, err
+	}
+	select {
+	case <-aw.done:
+		aw.recycle(buf)
+		return 0, network.ErrClosed
+	default:
+	}
+	n := len(buf)
+	select {
+	case aw.ch <- buf:
+		return n, nil
+	case <-aw.exit:
+		aw.recycle(buf)
+		if err := aw.loadErr(); err != nil {
+			return 0, err
+		}
+		return 0, network.ErrClosed
+	case <-aw.done:
+		aw.recycle(buf)
+		return 0, network.ErrClosed
+	}
+}
+
 // drain writes queued packets until the asyncWriter is closed or a write fails. It stops on the
 // first error: the underlying writer is a device, and a failed write to it is not transient.
 func (aw *asyncWriter) drain() {

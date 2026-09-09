@@ -38,9 +38,11 @@ type lwIPDevice struct {
 	// whether the device has been closed
 	done chan struct{}
 
-	// async read call and its result
+	// Outgoing packets, already copied out of the lwIP pbuf and owned by the receiver.
+	// Buffered so forwardOutgoingIPPacket never blocks: it runs under lwIP's global lock,
+	// which the inbound path (stack.Write) also needs. Holding it across a rendezvous
+	// starves the TUN reader and shows up as dropped ACKs.
 	rdBuf chan []byte
-	rdN   chan int
 
 	// pktPool recycles the packet copies handed to the asyncWriter used by WriteTo. It is per
 	// device rather than package scoped, so buffers cannot leak between instances when
@@ -60,8 +62,7 @@ func newLwIPDevice(tcp *tcpHandler, udp lwip.UDPConnHandler) *lwIPDevice {
 		udp:   udp,
 		stack: lwip.NewLWIPStack(),
 		done:  make(chan struct{}),
-		rdBuf: make(chan []byte),
-		rdN:   make(chan int),
+		rdBuf: make(chan []byte, writeQueueDepth),
 	}
 	d.pktPool.New = func() any { b := make([]byte, 0, packetBufCap); return &b }
 
@@ -169,16 +170,24 @@ func (d *lwIPDevice) forwardOutgoingIPPacket(b []byte) (int, error) {
 	if len(b) == 0 {
 		return 0, nil
 	}
+	// Copy before returning: `b` aliases the C pbuf payload, which lwIP frees as soon as this
+	// callback returns. The copy is also what lets us return without waiting for the consumer.
+	bufp := d.pktPool.Get().(*[]byte)
+	*bufp = append((*bufp)[:0], b...)
 	select {
-	case d.rdBuf <- b:
-		select {
-		case n := <-d.rdN:
-			return n, nil
-		case <-d.done:
-			return 0, network.ErrClosed
-		}
+	case d.rdBuf <- *bufp:
+		return len(b), nil
 	case <-d.done:
+		d.recycle(*bufp)
 		return 0, network.ErrClosed
+	}
+}
+
+// recycle returns a packet buffer to the device pool.
+func (d *lwIPDevice) recycle(s []byte) {
+	if cap(s) >= packetBufCap {
+		b := s[:0]
+		d.pktPool.Put(&b)
 	}
 }
 
@@ -191,7 +200,7 @@ func (d *lwIPDevice) Read(p []byte) (int, error) {
 	select {
 	case s := <-d.rdBuf:
 		n := copy(p, s)
-		d.rdN <- n
+		d.recycle(s)
 		return n, nil
 	case <-d.done:
 		return 0, io.EOF
@@ -218,16 +227,11 @@ func (d *lwIPDevice) WriteTo(w io.Writer) (int64, error) {
 	for {
 		select {
 		case s := <-d.rdBuf:
-			// Write copies `s` before returning, which is what releases the lwIP pbuf below.
-			n, err := aw.Write(s)
+			// `s` is already a pooled copy owned by us; hand ownership to the writer.
+			n, err := aw.writeOwned(s)
 			nw += int64(n)
-			select {
-			case d.rdN <- n:
-				if err != nil {
-					return nw, err
-				}
-			case <-d.done:
-				return nw, nil
+			if err != nil {
+				return nw, err
 			}
 		case <-d.done:
 			return nw, nil
