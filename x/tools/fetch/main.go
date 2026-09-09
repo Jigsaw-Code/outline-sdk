@@ -104,7 +104,7 @@ func main() {
 	transportFlag := flag.String("transport", "", "Transport config")
 
 	protoFlag := flag.String("proto", "h1", "HTTP version to use (h1, h2, h3)")
-	quicVersionsFlag := flag.String("quic-versions", defaultQUICVersions, "Ordered QUIC versions for h3 (1, 2, or a comma-separated list)")
+	quicVersionsFlag := flag.String("quic-versions", "", fmt.Sprintf("Ordered QUIC versions for h3 (1, 2, or a comma-separated list) (default %s)", defaultQUICVersions))
 	methodFlag := flag.String("method", "GET", "The HTTP method to use")
 	var headersFlag stringArrayFlagValue
 	flag.Var(&headersFlag, "H", "Raw HTTP Header line to add. It must not end in \\r\\n")
@@ -138,7 +138,7 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-	if *protoFlag != "h3" && *quicVersionsFlag != defaultQUICVersions {
+	if *protoFlag != "h3" && *quicVersionsFlag != "" {
 		slog.Error("-quic-versions requires -proto h3")
 		os.Exit(1)
 	}
@@ -204,7 +204,11 @@ func main() {
 			}
 		}
 	} else if *protoFlag == "h3" {
-		quicVersions, err := parseQUICVersions(*quicVersionsFlag)
+		quicVersionValue := *quicVersionsFlag
+		if quicVersionValue == "" {
+			quicVersionValue = defaultQUICVersions
+		}
+		quicVersions, err := parseQUICVersions(quicVersionValue)
 		if err != nil {
 			slog.Error("Invalid QUIC versions", "error", err)
 			os.Exit(1)
