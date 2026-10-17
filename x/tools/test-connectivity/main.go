@@ -31,12 +31,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/lmittmann/tint"
 	"golang.getoutline.org/sdk/dns"
 	"golang.getoutline.org/sdk/transport"
 	"golang.getoutline.org/sdk/x/configurl"
 	"golang.getoutline.org/sdk/x/connectivity"
 	"golang.getoutline.org/sdk/x/report"
-	"github.com/lmittmann/tint"
 	"golang.org/x/term"
 )
 
@@ -240,7 +240,7 @@ func main() {
 			var mu sync.Mutex
 			dnsReports := make([]dnsReport, 0)
 			tcpReports := make([]tcpReport, 0)
-			providers := configurl.NewDefaultProviders()
+			providers := configurl.NewDefaultRegistry()
 			onDNS := func(ctx context.Context, domain string) func(di httptrace.DNSDoneInfo) {
 				dnsStart := time.Now()
 				return func(di httptrace.DNSDoneInfo) {

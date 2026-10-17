@@ -59,7 +59,7 @@ func Test_H2Connect_H2C(t *testing.T) {
 	}()
 
 	// Build a dialer using the configurl h2connect type.
-	providers := configurl.NewDefaultProviders()
+	providers := configurl.NewDefaultRegistry()
 	dialer, err := providers.NewStreamDialer(context.Background(),
 		fmt.Sprintf("h2connect://%s?plain=true", ln.Addr().String()),
 	)
@@ -140,8 +140,8 @@ func newTestPacketConn(t *testing.T) *testPacketConn {
 
 // newProvidersWithPacketListener returns the default providers with pl registered as the "fake"
 // packet listener type.
-func newProvidersWithPacketListener(pl transport.PacketListener) *configurl.ProviderContainer {
-	providers := configurl.NewDefaultProviders()
+func newProvidersWithPacketListener(pl transport.PacketListener) *configurl.Registry {
+	providers := configurl.NewDefaultRegistry()
 	providers.PacketListeners.RegisterType("fake", func(ctx context.Context, config *configurl.Config) (transport.PacketListener, error) {
 		return pl, nil
 	})
@@ -160,7 +160,7 @@ func Test_H3Connect_UsesBasePacketListener(t *testing.T) {
 
 	pl := &recordingPacketListener{conn: conn}
 	var gotConfig *configurl.Config
-	providers := configurl.NewDefaultProviders()
+	providers := configurl.NewDefaultRegistry()
 	providers.PacketListeners.RegisterType("fake", func(ctx context.Context, config *configurl.Config) (transport.PacketListener, error) {
 		gotConfig = config
 		return pl, nil
@@ -178,7 +178,7 @@ func Test_H3Connect_UsesBasePacketListener(t *testing.T) {
 func Test_H3Connect_BasePacketListenerError(t *testing.T) {
 	t.Parallel()
 
-	providers := configurl.NewDefaultProviders()
+	providers := configurl.NewDefaultRegistry()
 	providers.PacketListeners.RegisterType("fail", func(ctx context.Context, config *configurl.Config) (transport.PacketListener, error) {
 		return nil, errors.New("fail listener")
 	})
