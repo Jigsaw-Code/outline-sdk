@@ -66,7 +66,7 @@ func main() {
 	resolverAddr := *resolverFlag
 
 	var resolver dns.Resolver
-	providers := configurl.NewDefaultProviders()
+	providers := configurl.NewDefaultRegistry()
 	if *tcpFlag {
 		streamDialer, err := providers.NewStreamDialer(context.Background(), *transportFlag)
 		if err != nil {

@@ -26,10 +26,10 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/lmittmann/tint"
 	"golang.getoutline.org/sdk/transport"
 	"golang.getoutline.org/sdk/x/configurl"
 	"golang.getoutline.org/sdk/x/websocket"
-	"github.com/lmittmann/tint"
 	"golang.org/x/term"
 )
 
@@ -67,7 +67,7 @@ func main() {
 	defer listener.Close()
 	slog.Info("Proxy listening", "address", listener.Addr().String())
 
-	providers := configurl.NewDefaultProviders()
+	providers := configurl.NewDefaultRegistry()
 	mux := http.NewServeMux()
 	if *tcpPathFlag != "" {
 		dialer, err := providers.NewStreamDialer(context.Background(), *transportFlag)

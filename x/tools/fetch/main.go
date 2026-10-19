@@ -170,7 +170,7 @@ func main() {
 		tlsConfig.KeyLogWriter = f
 	}
 	var quicConn quic.EarlyConnection
-	providers := configurl.NewDefaultProviders()
+	providers := configurl.NewDefaultRegistry()
 	if *protoFlag == "h1" || *protoFlag == "h2" {
 		dialer, err := providers.NewStreamDialer(context.Background(), *transportFlag)
 		if err != nil {

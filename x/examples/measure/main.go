@@ -30,10 +30,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.getoutline.org/sdk/transport/tls"
-	"golang.getoutline.org/sdk/x/configurl"
 	"github.com/goccy/go-yaml"
 	"github.com/lmittmann/tint"
+	"golang.getoutline.org/sdk/transport/tls"
+	"golang.getoutline.org/sdk/x/configurl"
 	"golang.org/x/term"
 )
 
@@ -82,7 +82,7 @@ type ISPInfo struct {
 	}
 }
 
-var transportToDialer = configurl.NewDefaultProviders()
+var transportToDialer = configurl.NewDefaultRegistry()
 
 func makeErrorMsg(err error, domain string) string {
 	return strings.ReplaceAll(err.Error(), domain, "${DOMAIN}")
