@@ -26,9 +26,9 @@ import (
 	"golang.getoutline.org/sdk/transport/shadowsocks"
 )
 
-func registerShadowsocksStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
-	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		sd, err := newSD(ctx, config.BaseConfig)
+func registerShadowsocksStreamDialer(registry MutableRegistry, typeID string) {
+	newInstance := func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		sd, err := New[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -45,12 +45,13 @@ func registerShadowsocksStreamDialer(r TypeRegistry[transport.StreamDialer], typ
 			dialer.SaltGenerator = shadowsocks.NewPrefixSaltGenerator(ssConfig.prefix)
 		}
 		return dialer, nil
-	})
+	}
+	Register(registry, typeID, newInstance)
 }
 
-func registerShadowsocksPacketDialer(r TypeRegistry[transport.PacketDialer], typeID string, newPD BuildFunc[transport.PacketDialer]) {
-	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
-		pd, err := newPD(ctx, config.BaseConfig)
+func registerShadowsocksPacketDialer(registry MutableRegistry, typeID string) {
+	newInstance := func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
+		pd, err := New[transport.PacketDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -65,12 +66,13 @@ func registerShadowsocksPacketDialer(r TypeRegistry[transport.PacketDialer], typ
 		}
 		// TODO: support UDP prefix.
 		return transport.PacketListenerDialer{Listener: pl}, nil
-	})
+	}
+	Register(registry, typeID, newInstance)
 }
 
-func registerShadowsocksPacketListener(r TypeRegistry[transport.PacketListener], typeID string, newPD BuildFunc[transport.PacketDialer]) {
-	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.PacketListener, error) {
-		pd, err := newPD(ctx, config.BaseConfig)
+func registerShadowsocksPacketListener(registry MutableRegistry, typeID string) {
+	newInstance := func(ctx context.Context, config *Config) (transport.PacketListener, error) {
+		pd, err := New[transport.PacketDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -80,7 +82,8 @@ func registerShadowsocksPacketListener(r TypeRegistry[transport.PacketListener],
 		}
 		endpoint := &transport.PacketDialerEndpoint{Dialer: pd, Address: ssConfig.serverAddress}
 		return shadowsocks.NewPacketListener(endpoint, ssConfig.cryptoKey)
-	})
+	}
+	Register(registry, typeID, newInstance)
 }
 
 type shadowsocksConfig struct {

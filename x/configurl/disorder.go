@@ -23,9 +23,9 @@ import (
 	"golang.getoutline.org/sdk/x/disorder"
 )
 
-func registerDisorderDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
-	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		sd, err := newSD(ctx, config.BaseConfig)
+func registerDisorderDialer(registry MutableRegistry, typeID string) {
+	newInstance := func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		sd, err := New[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -35,5 +35,6 @@ func registerDisorderDialer(r TypeRegistry[transport.StreamDialer], typeID strin
 			return nil, fmt.Errorf("disoder: could not parse splice position: %v", err)
 		}
 		return disorder.NewStreamDialer(sd, disorderPacketN)
-	})
+	}
+	Register(registry, typeID, newInstance)
 }

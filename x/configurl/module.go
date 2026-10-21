@@ -41,36 +41,7 @@ func NewProviderContainer() *ProviderContainer {
 
 // RegisterDefaultProviders registers a set of default providers with the providers in [ProviderContainer].
 func RegisterDefaultProviders(c *ProviderContainer) *ProviderContainer {
-	// Please keep the list in alphabetical order.
-	registerDisorderDialer(&c.StreamDialers, "disorder", c.StreamDialers.NewInstance)
-	registerDO53StreamDialer(&c.StreamDialers, "do53", c.StreamDialers.NewInstance, c.PacketDialers.NewInstance)
-	registerDOHStreamDialer(&c.StreamDialers, "doh", c.StreamDialers.NewInstance)
-
-	registerH2ConnectStreamDialer(&c.StreamDialers, "h2connect", c.StreamDialers.NewInstance)
-	registerH3ConnectStreamDialer(&c.StreamDialers, "h3connect", c.PacketListeners.NewInstance)
-	registerHTTPConnectStreamDialer(&c.StreamDialers, "httpconnect", c.StreamDialers.NewInstance)
-
-	registerOverrideStreamDialer(&c.StreamDialers, "override", c.StreamDialers.NewInstance)
-	registerOverridePacketDialer(&c.PacketDialers, "override", c.PacketDialers.NewInstance)
-
-	registerQUICPreludePacketListener(&c.PacketListeners, "quicprelude", c.PacketListeners.NewInstance)
-
-	registerSOCKS5StreamDialer(&c.StreamDialers, "socks5", c.StreamDialers.NewInstance)
-	registerSOCKS5PacketDialer(&c.PacketDialers, "socks5", c.StreamDialers.NewInstance, c.PacketDialers.NewInstance)
-	registerSOCKS5PacketListener(&c.PacketListeners, "socks5", c.StreamDialers.NewInstance, c.PacketDialers.NewInstance)
-
-	registerSplitStreamDialer(&c.StreamDialers, "split", c.StreamDialers.NewInstance)
-
-	registerShadowsocksStreamDialer(&c.StreamDialers, "ss", c.StreamDialers.NewInstance)
-	registerShadowsocksPacketDialer(&c.PacketDialers, "ss", c.PacketDialers.NewInstance)
-	registerShadowsocksPacketListener(&c.PacketListeners, "ss", c.PacketDialers.NewInstance)
-
-	registerTLSStreamDialer(&c.StreamDialers, "tls", c.StreamDialers.NewInstance)
-
-	registerTLSFragStreamDialer(&c.StreamDialers, "tlsfrag", c.StreamDialers.NewInstance)
-
-	registerWebsocketStreamDialer(&c.StreamDialers, "ws", c.StreamDialers.NewInstance)
-	registerWebsocketPacketDialer(&c.PacketDialers, "ws", c.StreamDialers.NewInstance)
+	RegisterDefaultTypes(providerContainerRegistry{c})
 
 	return c
 }

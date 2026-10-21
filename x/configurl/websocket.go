@@ -57,9 +57,9 @@ func parseWSConfig(configURL url.URL) (*wsConfig, error) {
 	return &cfg, nil
 }
 
-func registerWebsocketStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
-	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		sd, err := newSD(ctx, config.BaseConfig)
+func registerWebsocketStreamDialer(registry MutableRegistry, typeID string) {
+	newInstance := func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		sd, err := New[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -78,12 +78,13 @@ func registerWebsocketStreamDialer(r TypeRegistry[transport.StreamDialer], typeI
 			}
 			return connect(ctx)
 		}), nil
-	})
+	}
+	Register(registry, typeID, newInstance)
 }
 
-func registerWebsocketPacketDialer(r TypeRegistry[transport.PacketDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
-	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
-		sd, err := newSD(ctx, config.BaseConfig)
+func registerWebsocketPacketDialer(registry MutableRegistry, typeID string) {
+	newInstance := func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
+		sd, err := New[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -102,5 +103,6 @@ func registerWebsocketPacketDialer(r TypeRegistry[transport.PacketDialer], typeI
 			}
 			return connect(ctx)
 		}), nil
-	})
+	}
+	Register(registry, typeID, newInstance)
 }

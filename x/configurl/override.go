@@ -24,9 +24,9 @@ import (
 	"golang.getoutline.org/sdk/transport"
 )
 
-func registerOverrideStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
-	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		sd, err := newSD(ctx, config.BaseConfig)
+func registerOverrideStreamDialer(registry MutableRegistry, typeID string) {
+	newInstance := func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		sd, err := New[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -41,12 +41,13 @@ func registerOverrideStreamDialer(r TypeRegistry[transport.StreamDialer], typeID
 			}
 			return sd.DialStream(ctx, addr)
 		}), nil
-	})
+	}
+	Register(registry, typeID, newInstance)
 }
 
-func registerOverridePacketDialer(r TypeRegistry[transport.PacketDialer], typeID string, newPD BuildFunc[transport.PacketDialer]) {
-	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
-		pd, err := newPD(ctx, config.BaseConfig)
+func registerOverridePacketDialer(registry MutableRegistry, typeID string) {
+	newInstance := func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
+		pd, err := New[transport.PacketDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -61,7 +62,8 @@ func registerOverridePacketDialer(r TypeRegistry[transport.PacketDialer], typeID
 			}
 			return pd.DialPacket(ctx, addr)
 		}), nil
-	})
+	}
+	Register(registry, typeID, newInstance)
 }
 
 func newOverrideFromURL(configURL url.URL) (func(string) (string, error), error) {

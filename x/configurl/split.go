@@ -24,9 +24,9 @@ import (
 	"golang.getoutline.org/sdk/transport/split"
 )
 
-func registerSplitStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
-	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		sd, err := newSD(ctx, config.BaseConfig)
+func registerSplitStreamDialer(registry MutableRegistry, typeID string) {
+	newInstance := func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		sd, err := New[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -58,5 +58,6 @@ func registerSplitStreamDialer(r TypeRegistry[transport.StreamDialer], typeID st
 			splits = append(splits, split.RepeatedSplit{Count: count, Bytes: bytes})
 		}
 		return split.NewStreamDialer(sd, split.NewRepeatedSplitIterator(splits...))
-	})
+	}
+	Register(registry, typeID, newInstance)
 }

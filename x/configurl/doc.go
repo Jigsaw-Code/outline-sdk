@@ -223,31 +223,52 @@ DPI Evasion - To add packet splitting to a Shadowsocks server for enhanced DPI e
 
 # Defining custom strategies
 
-Core Concepts:
+A [Registry] looks up parsers by their Go result type and config URL scheme.
+A [MutableRegistry] also supports registration. Use [Register] to add a typed
+[Parser], [New] to construct an object from a parsed [Config], or [Parse] to
+construct it from a config URL string. Component parsers call New directly with
+the registry to construct their dependencies.
 
-  - [ProviderContainer]: A central registry for managing different types of network object builders (StreamDialers, PacketDialers, PacketListeners).
-  - [ExtensibleProvider]: A type that provides a mechanism to register and retrieve builders for specific subtypes of network objects.
-  - [BuildFunc]: A function that creates an instance of a network object from a parsed configuration.
-  - [Config]: A parsed representation of the configuration string.
-  - [TypeRegistry]: An interface for registering new transport types.
+For example, this component delegates to the configuration on its left:
 
-You can define your custom strategy by implementing and registering [BuildFunc[ObjectType]] functions:
+	func RegisterCustomComponent(registry configurl.MutableRegistry, typeID string) {
+		newInstance := func(ctx context.Context, config *configurl.Config) (transport.StreamDialer, error) {
+			return configurl.New[transport.StreamDialer](ctx, registry, config.BaseConfig)
+		}
+		configurl.Register(registry, typeID, newInstance)
+	}
 
-	// Create new config parser.
-	// p := configurl.NewProviderContainer()
-	// or
-	p := configurl.NewDefaultProviders()
-	// Register your custom dialer.
-	p.StreamDialers.RegisterType("custom", func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-	  // Build logic
-	  // ...
-	})
-	p.PacketDialers.RegisterType("custom", func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
-	  // Build logic
-	  // ...
-	})
-	// Then use it
-	dialer, err := p.NewStreamDialer(context.Background(), "custom://config")
+The app creates a registry, registers the component, and constructs a dialer:
+
+	registry := configurl.NewDefaultRegistry()
+	RegisterCustomComponent(registry, "custom")
+	dialer, err := configurl.Parse[transport.StreamDialer](context.Background(), registry, "custom|tlsfrag:1")
+
+Parsers forward the construction context when calling New for their dependencies.
+New looks up the current registration on each call. Returned objects should use
+the context of each later dial or listen operation, rather than retain the
+construction context.
+
+[NewRegistry] registers TCP, UDP, and UDP listener base instances but no named
+component parsers. [NewDefaultRegistry] also registers the built-in components.
+A nil Config invokes the default base parser, registered under the empty name.
+Use [RegisterBase] for a custom base parser, or [RegisterInstance] with an empty
+name to inject an existing base dialer. Instances are shared by all constructions.
+
+The registry supports arbitrary Go result types, including interfaces and slices.
+Types are matched exactly: use RegisterInstance[transport.StreamDialer] when an
+instance implements that interface, rather than inferring its concrete type.
+[Lookup] retrieves an existing typed parser, for example to wrap its behavior.
+External registries can implement Registry.LookupParser and
+MutableRegistry.RegisterParser without exposing their storage. Both methods use
+Parser[any]; typed helpers adapt functions and validate returned values. Nil
+results are accepted for types that can be nil, and a nil parser disables an entry.
+
+Component libraries can expose Register* helpers accepting a MutableRegistry
+and type name, alongside direct constructors for callers that do not need config URLs.
+Complete registration before using the constructed components. The existing
+[ProviderContainer], [ExtensibleProvider], [TypeRegistry], and [BuildFunc] APIs
+remain available; Parser is an alias of BuildFunc.
 
 [Onion Routing]: https://en.wikipedia.org/wiki/Onion_routing
 */
