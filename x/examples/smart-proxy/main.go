@@ -87,7 +87,7 @@ func main() {
 		log.Fatalf("Could not read config: %v", err)
 	}
 
-	providers := configurl.NewDefaultRegistry()
+	providers := configurl.NewDefaultProviders()
 	packetDialer, err := providers.NewPacketDialer(context.Background(), *transportFlag)
 	if err != nil {
 		log.Fatalf("Could not create packet dialer: %v", err)

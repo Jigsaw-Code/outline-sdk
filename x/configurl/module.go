@@ -22,39 +22,25 @@ import (
 	"golang.getoutline.org/sdk/transport"
 )
 
-// Registry contains providers for creating network objects from config URLs.
-// Register custom component types on StreamDialers, PacketDialers, or PacketListeners.
-type Registry struct {
+// ProviderContainer contains providers for the creation of network objects based on a config. The config is
+// extensible by registering providers for different config subtypes.
+type ProviderContainer struct {
 	StreamDialers   ExtensibleProvider[transport.StreamDialer]
 	PacketDialers   ExtensibleProvider[transport.PacketDialer]
 	PacketListeners ExtensibleProvider[transport.PacketListener]
 }
 
-// ProviderContainer is the former name of [Registry].
-//
-// Deprecated: Use Registry instead.
-type ProviderContainer = Registry
-
-// NewRegistry creates a [Registry] with default TCP, UDP, and UDP listener base
-// instances. It does not register any component types; use [NewDefaultRegistry]
-// to also register the built-in types.
-func NewRegistry() *Registry {
-	return &Registry{
+// NewProviderContainer creates a [ProviderContainer] with the base instances properly initialized.
+func NewProviderContainer() *ProviderContainer {
+	return &ProviderContainer{
 		StreamDialers:   NewExtensibleProvider[transport.StreamDialer](&transport.TCPDialer{}),
 		PacketDialers:   NewExtensibleProvider[transport.PacketDialer](&transport.UDPDialer{}),
 		PacketListeners: NewExtensibleProvider[transport.PacketListener](&transport.UDPListener{}),
 	}
 }
 
-// NewProviderContainer creates a [Registry] with default base instances.
-//
-// Deprecated: Use NewRegistry instead.
-func NewProviderContainer() *ProviderContainer {
-	return NewRegistry()
-}
-
-// RegisterDefaultTypes registers the built-in component types on c and returns c.
-func RegisterDefaultTypes(c *Registry) *Registry {
+// RegisterDefaultProviders registers a set of default providers with the providers in [ProviderContainer].
+func RegisterDefaultProviders(c *ProviderContainer) *ProviderContainer {
 	// Please keep the list in alphabetical order.
 	registerDisorderDialer(&c.StreamDialers, "disorder", c.StreamDialers.NewInstance)
 	registerDO53StreamDialer(&c.StreamDialers, "do53", c.StreamDialers.NewInstance, c.PacketDialers.NewInstance)
@@ -89,28 +75,13 @@ func RegisterDefaultTypes(c *Registry) *Registry {
 	return c
 }
 
-// RegisterDefaultProviders registers the built-in component types on c and returns c.
-//
-// Deprecated: Use RegisterDefaultTypes instead.
-func RegisterDefaultProviders(c *ProviderContainer) *ProviderContainer {
-	return RegisterDefaultTypes(c)
-}
-
-// NewDefaultRegistry creates a [Registry] with default base instances and the
-// built-in component types registered.
-func NewDefaultRegistry() *Registry {
-	return RegisterDefaultTypes(NewRegistry())
-}
-
-// NewDefaultProviders creates a [Registry] with the built-in component types registered.
-//
-// Deprecated: Use NewDefaultRegistry instead.
+// NewDefaultProviders creates a [ProviderContainer] with a set of default providers already registered.
 func NewDefaultProviders() *ProviderContainer {
-	return NewDefaultRegistry()
+	return RegisterDefaultProviders(NewProviderContainer())
 }
 
 // NewStreamDialer creates a [transport.StreamDialer] according to the config text.
-func (p *Registry) NewStreamDialer(ctx context.Context, configText string) (transport.StreamDialer, error) {
+func (p *ProviderContainer) NewStreamDialer(ctx context.Context, configText string) (transport.StreamDialer, error) {
 	config, err := ParseConfig(configText)
 	if err != nil {
 		return nil, err
@@ -119,7 +90,7 @@ func (p *Registry) NewStreamDialer(ctx context.Context, configText string) (tran
 }
 
 // NewPacketDialer creates a [transport.PacketDialer] according to the config text.
-func (p *Registry) NewPacketDialer(ctx context.Context, configText string) (transport.PacketDialer, error) {
+func (p *ProviderContainer) NewPacketDialer(ctx context.Context, configText string) (transport.PacketDialer, error) {
 	config, err := ParseConfig(configText)
 	if err != nil {
 		return nil, err
@@ -127,8 +98,8 @@ func (p *Registry) NewPacketDialer(ctx context.Context, configText string) (tran
 	return p.PacketDialers.NewInstance(ctx, config)
 }
 
-// NewPacketListener creates a [transport.PacketListener] according to the config text.
-func (p *Registry) NewPacketListener(ctx context.Context, configText string) (transport.PacketListener, error) {
+// NewPacketListner creates a [transport.PacketListener] according to the config text.
+func (p *ProviderContainer) NewPacketListener(ctx context.Context, configText string) (transport.PacketListener, error) {
 	config, err := ParseConfig(configText)
 	if err != nil {
 		return nil, err
