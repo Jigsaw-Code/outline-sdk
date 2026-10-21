@@ -45,16 +45,51 @@ type YAMLNode any
 // the dialer is nil, and the configSignature is empty.
 type FallbackParser func(context.Context, YAMLNode) (dialer transport.StreamDialer, configSignature string, err error)
 
+// StrategyFinder searches for working DNS, TLS, and fallback strategies.
+// Use [NewStrategyFinderOptions] to configure a finder. Finish configuration before
+// calling NewDialer, and do not copy a finder after its first use.
 type StrategyFinder struct {
-	TestTimeout     time.Duration
-	LogWriter       io.Writer
-	StreamDialer    transport.StreamDialer
-	PacketDialer    transport.PacketDialer
-	Cache           StrategyResultCache
-	fallbackParsers map[string]FallbackParser
+	TestTimeout time.Duration
+	LogWriter   io.Writer
+	Cache       StrategyResultCache
+
+	// Deprecated: Use configurl.RegisterBase[transport.StreamDialer] on the registry passed to
+	// StrategyFinderOptions.SetConfigURLRegistry instead. NewDialer imports and clears this field.
+	StreamDialer transport.StreamDialer
+	// Deprecated: Use configurl.RegisterBase[transport.PacketDialer] on the registry passed to
+	// StrategyFinderOptions.SetConfigURLRegistry instead. NewDialer imports and clears this field.
+	PacketDialer transport.PacketDialer
+
+	initMu            sync.Mutex
+	configURLRegistry configurl.Registry
+	fallbackParsers   map[string]FallbackParser
 }
 
-// RegisterFallbackParser register a fallback parser with the given name.
+// initConfigURLRegistry imports legacy dialers once, before any search work.
+func (f *StrategyFinder) initConfigURLRegistry() error {
+	f.initMu.Lock()
+	defer f.initMu.Unlock()
+	if f.configURLRegistry != nil {
+		if f.StreamDialer != nil || f.PacketDialer != nil {
+			return errors.New("config URL registry and deprecated StreamDialer/PacketDialer fields are mutually exclusive")
+		}
+		return nil
+	}
+	registry := configurl.NewDefaultRegistry()
+	if f.StreamDialer != nil {
+		configurl.RegisterInstance[transport.StreamDialer](registry, "", f.StreamDialer)
+	}
+	if f.PacketDialer != nil {
+		configurl.RegisterInstance[transport.PacketDialer](registry, "", f.PacketDialer)
+	}
+	registerContextStreamBase(registry)
+	f.configURLRegistry = registry
+	f.StreamDialer = nil
+	f.PacketDialer = nil
+	return nil
+}
+
+// RegisterFallbackParser registers a fallback parser with the given name before searches begin.
 // It overwrites an existing parser if it exists with the same name.
 func (f *StrategyFinder) RegisterFallbackParser(name string, parser FallbackParser) {
 	f.ensureFallbackParsers()[name] = parser
@@ -133,7 +168,24 @@ func mapToAny(in map[string]any, out any) error {
 
 // newDNSResolverFromEntry creates a [dns.Resolver] based on the config, returning the resolver and
 // a boolean indicating whether the resolver is secure (TLS, HTTPS) and a possible error.
-func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryConfig) (dns.Resolver, bool, error) {
+func (f *StrategyFinder) newDNSResolverFromEntry(ctx context.Context, entry dnsEntryConfig) (dns.Resolver, bool, error) {
+	var baseSD transport.StreamDialer
+	var basePD transport.PacketDialer
+	if entry.System == nil {
+		var err error
+		if entry.HTTPS != nil || entry.TLS != nil || entry.TCP != nil {
+			baseSD, err = configurl.NewFromConfig[transport.StreamDialer](ctx, f.configURLRegistry, nil)
+			if err != nil {
+				return nil, false, fmt.Errorf("DNS requires a stream base instance: %w", err)
+			}
+		}
+		if entry.UDP != nil {
+			basePD, err = configurl.NewFromConfig[transport.PacketDialer](ctx, f.configURLRegistry, nil)
+			if err != nil {
+				return nil, false, fmt.Errorf("DNS requires a packet base instance: %w", err)
+			}
+		}
+	}
 	if entry.System != nil {
 		return nil, false, nil
 	} else if cfg := entry.HTTPS; cfg != nil {
@@ -150,7 +202,7 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryConfig) (dns.Reso
 			port = "443"
 		}
 		dohURL := url.URL{Scheme: "https", Host: net.JoinHostPort(cfg.Name, port), Path: "/dns-query"}
-		return dns.NewHTTPSResolver(f.StreamDialer, serverAddr, dohURL.String()), true, nil
+		return dns.NewHTTPSResolver(baseSD, serverAddr, dohURL.String()), true, nil
 	} else if cfg := entry.TLS; cfg != nil {
 		if cfg.Name == "" {
 			return nil, true, errors.New("tls entry has empty server name")
@@ -163,7 +215,7 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryConfig) (dns.Reso
 		if err != nil {
 			serverAddr = net.JoinHostPort(serverAddr, "853")
 		}
-		return dns.NewTLSResolver(f.StreamDialer, serverAddr, cfg.Name), true, nil
+		return dns.NewTLSResolver(baseSD, serverAddr, cfg.Name), true, nil
 	} else if cfg := entry.TCP; cfg != nil {
 		if cfg.Address == "" {
 			return nil, false, errors.New("tcp entry has empty server address")
@@ -174,7 +226,7 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryConfig) (dns.Reso
 			port = "53"
 		}
 		serverAddr := net.JoinHostPort(host, port)
-		return dns.NewTCPResolver(f.StreamDialer, serverAddr), false, nil
+		return dns.NewTCPResolver(baseSD, serverAddr), false, nil
 	} else if cfg := entry.UDP; cfg != nil {
 		if cfg.Address == "" {
 			return nil, false, errors.New("udp entry has empty server address")
@@ -185,7 +237,7 @@ func (f *StrategyFinder) newDNSResolverFromEntry(entry dnsEntryConfig) (dns.Reso
 			port = "53"
 		}
 		serverAddr := net.JoinHostPort(host, port)
-		return dns.NewUDPResolver(f.PacketDialer, serverAddr), false, nil
+		return dns.NewUDPResolver(basePD, serverAddr), false, nil
 	} else {
 		return nil, false, errors.New("invalid DNS entry")
 	}
@@ -198,7 +250,7 @@ type smartResolver struct {
 	Config dnsEntryConfig
 }
 
-func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryConfig) ([]*smartResolver, error) {
+func (f *StrategyFinder) dnsConfigToResolver(ctx context.Context, dnsConfig []dnsEntryConfig) ([]*smartResolver, error) {
 	if len(dnsConfig) == 0 {
 		return nil, errors.New("no DNS config entry")
 	}
@@ -209,7 +261,7 @@ func (f *StrategyFinder) dnsConfigToResolver(dnsConfig []dnsEntryConfig) ([]*sma
 			return nil, fmt.Errorf("cannot serialize entry %v: %w", ei, err)
 		}
 		id := string(idBytes)
-		resolver, isSecure, err := f.newDNSResolverFromEntry(entry)
+		resolver, isSecure, err := f.newDNSResolverFromEntry(ctx, entry)
 		if err != nil {
 			return nil, fmt.Errorf("failed to process entry %v: %w", ei, err)
 		}
@@ -302,7 +354,7 @@ func (f *StrategyFinder) testDialer(ctx context.Context, dialer transport.Stream
 }
 
 func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsConfig []dnsEntryConfig) (dns.Resolver, *dnsEntryConfig, error) {
-	resolvers, err := f.dnsConfigToResolver(dnsConfig)
+	resolvers, err := f.dnsConfigToResolver(ctx, dnsConfig)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -349,11 +401,12 @@ func (f *StrategyFinder) findTLS(
 	if len(tlsConfig) == 0 {
 		return nil, "", errors.New("config for TLS is empty. Please specify at least one transport")
 	}
-	var configRegistry = configurl.NewDefaultRegistry()
+	// Each attempt gets the same prebuilt DNS dialer and cache through the
+	// default stream parser. Neither registrations nor config URLs change here.
 	newBase := func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
 		return baseDialer, nil
 	}
-	configurl.RegisterBase(configRegistry, newBase)
+	ctx = withStreamBaseParser(ctx, newBase)
 
 	raceCtx, raceDone := context.WithCancel(ctx)
 	defer raceDone()
@@ -363,7 +416,7 @@ func (f *StrategyFinder) findTLS(
 		Config string
 	}
 	result, err := raceTests(raceCtx, 250*time.Millisecond, tlsConfig, func(index int, transportCfg string) (*SearchResult, error) {
-		tlsDialer, err := configurl.New[transport.StreamDialer](raceCtx, configRegistry, transportCfg)
+		tlsDialer, err := configurl.New[transport.StreamDialer](raceCtx, f.configURLRegistry, transportCfg)
 		if err != nil {
 			logCtx(raceCtx, "❌ Failed to create tls[%d]: %v, error=%v\n", index, transportCfg, err)
 			return nil, fmt.Errorf("NewStreamDialer failed: %w", err)
@@ -407,11 +460,11 @@ type SearchResult struct {
 // Make a fallback dialer (either from a configurl or a Psiphon config)
 // Returns a stream dialer, config signature, error
 // In case of an error the stream dialer can be nil, but the string is always set.
-func (f *StrategyFinder) makeDialerFromConfig(ctx context.Context, configRegistry configurl.Registry, fallbackConfig fallbackEntryConfig) (transport.StreamDialer, string, error) {
+func (f *StrategyFinder) makeDialerFromConfig(ctx context.Context, registry configurl.Registry, fallbackConfig fallbackEntryConfig) (transport.StreamDialer, string, error) {
 	switch v := fallbackConfig.(type) {
 	case string:
 		configUrl := v
-		dialer, err := configurl.New[transport.StreamDialer](ctx, configRegistry, configUrl)
+		dialer, err := configurl.New[transport.StreamDialer](ctx, registry, configUrl)
 		if err != nil {
 			return nil, v, fmt.Errorf("getStreamDialer failed: %w", err)
 		}
@@ -423,8 +476,8 @@ func (f *StrategyFinder) makeDialerFromConfig(ctx context.Context, configRegistr
 		}
 		// There should be only one entry.
 		for key, config := range v {
-			parser, ok := f.ensureFallbackParsers()[key]
-			if !ok {
+			parser, ok := f.fallbackParsers[key]
+			if !ok || parser == nil {
 				return nil, fmt.Sprintf("Unknown Config: %v", fallbackConfig), fmt.Errorf("%.0wunsupported fallback type: %v", errors.ErrUnsupported, key)
 			}
 			dialer, signature, err := parser(ctx, config)
@@ -462,10 +515,8 @@ func (f *StrategyFinder) findFallback(
 	defer raceDone()
 	raceStart := time.Now()
 
-	configRegistry := configurl.NewDefaultRegistry()
-
 	fallback, err := raceTests(raceCtx, 250*time.Millisecond, fallbackConfigs, func(index int, fallbackConfig fallbackEntryConfig) (*SearchResult, error) {
-		dialer, configSignature, err := f.makeDialerFromConfig(raceCtx, configRegistry, fallbackConfig)
+		dialer, configSignature, err := f.makeDialerFromConfig(raceCtx, f.configURLRegistry, fallbackConfig)
 		if err != nil {
 			// Make up a config signature in case of failure.
 			configSignature := makeConfigErrorSignature(raceCtx, fallbackConfig)
@@ -496,15 +547,19 @@ func (f *StrategyFinder) newProxylessDialer(
 	if err != nil {
 		return nil, nil, "", err
 	}
+	baseSD, err := configurl.NewFromConfig[transport.StreamDialer](ctx, f.configURLRegistry, nil)
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("DNS requires a stream base instance: %w", err)
+	}
 	var dnsDialer transport.StreamDialer
 	if resolver == nil {
-		if _, ok := f.StreamDialer.(*transport.TCPDialer); !ok {
-			return nil, nil, "", fmt.Errorf("cannot use system resolver with base dialer of type %T", f.StreamDialer)
+		if _, ok := baseSD.(*transport.TCPDialer); !ok {
+			return nil, nil, "", fmt.Errorf("cannot use system resolver with base dialer of type %T", baseSD)
 		}
-		dnsDialer = f.StreamDialer
+		dnsDialer = baseSD
 	} else {
 		resolver = newSimpleLRUCacheResolver(resolver, 100)
-		dnsDialer, err = dns.NewStreamDialer(resolver, f.StreamDialer)
+		dnsDialer, err = dns.NewStreamDialer(resolver, baseSD)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf("dns.NewStreamDialer failed: %w", err)
 		}
@@ -624,7 +679,13 @@ func (t *turnOffWriter) TurnOff() {
 // NewDialer uses the config in configBytes to search for a strategy that unblocks DNS and TLS for all of the testDomains, returning a dialer with the found strategy.
 // It returns an error if no strategy was found that unblocks the testDomains.
 // The testDomains must be domains with a TLS service running on port 443.
+// For legacy struct initialization, the first call imports and clears StreamDialer
+// and PacketDialer. Setting either field alongside an initialized registry is an error.
 func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, configBytes []byte) (transport.StreamDialer, error) {
+	if err := f.initConfigURLRegistry(); err != nil {
+		return nil, err
+	}
+
 	// Set up logger for this session.
 	logWriter := &turnOffWriter{writer: f.LogWriter}
 	ctx = context.WithValue(ctx, logWriterContextKey, logWriter)

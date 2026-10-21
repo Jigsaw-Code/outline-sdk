@@ -27,9 +27,10 @@ import (
 	"testing"
 	"time"
 
-	"golang.getoutline.org/sdk/transport"
-	"golang.getoutline.org/sdk/x/smart"
 	"github.com/stretchr/testify/require"
+	"golang.getoutline.org/sdk/transport"
+	"golang.getoutline.org/sdk/x/configurl"
+	"golang.getoutline.org/sdk/x/smart"
 )
 
 // mockStreamDialer intercepts stream connections made by StrategyFinder.
@@ -126,16 +127,19 @@ fallback:
 	logBuffer := new(bytes.Buffer)
 	logger := log.New(logBuffer, "", log.LstdFlags)
 
-	finder := smart.StrategyFinder{
-		LogWriter:    logger.Writer(),
-		TestTimeout:  5 * time.Second,
-		StreamDialer: &mockStreamDialer{
-			base:                     &transport.TCPDialer{},
-			untrustedHTTPSServerAddr: ts.Listener.Addr().String(),
-			captivePortalServerAddr:  captivePortalAddr,
-		},
-		PacketDialer: &errorPacketDialer{},
-	}
+	registry := configurl.NewDefaultRegistry()
+	configurl.RegisterInstance[transport.StreamDialer](registry, "", &mockStreamDialer{
+		base:                     &transport.TCPDialer{},
+		untrustedHTTPSServerAddr: ts.Listener.Addr().String(),
+		captivePortalServerAddr:  captivePortalAddr,
+	})
+	configurl.RegisterInstance[transport.PacketDialer](registry, "", &errorPacketDialer{})
+	finder, err := smart.NewStrategyFinderOptions().
+		SetConfigURLRegistry(registry).
+		SetLogWriter(logger.Writer()).
+		SetTestTimeout(5 * time.Second).
+		New()
+	require.NoError(t, err)
 	finder.RegisterFallbackParser("error", func(ctx context.Context, config smart.YAMLNode) (transport.StreamDialer, string, error) {
 		m, ok := config.(map[string]any)
 		if !ok {
@@ -145,7 +149,7 @@ fallback:
 		return nil, "signature_placeholder", errors.New(errStr)
 	})
 
-	_, err := finder.NewDialer(context.Background(), testDomains, configBytes)
+	_, err = finder.NewDialer(context.Background(), testDomains, configBytes)
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "could not find a working fallback: all tests failed")

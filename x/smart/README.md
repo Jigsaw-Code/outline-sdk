@@ -127,14 +127,16 @@ fallback:
 
 ### Using the Smart Dialer
 
-To use the Smart Dialer, create a `StrategyFinder` object and call the `NewDialer` method, passing in the list of test domains and the JSON config. The `NewDialer` method will return a `transport.StreamDialer` that can be used to create connections using the found strategy. For example:
+To use the Smart Dialer, create a `StrategyFinder` with `NewStrategyFinderOptions().New()` and call the `NewDialer` method, passing in the list of test domains and the YAML config. The `NewDialer` method will return a `transport.StreamDialer` that can be used to create connections using the found strategy. For example:
 
 ```go
-finder := &smart.StrategyFinder{
-    TestTimeout:  5 * time.Second,
-    LogWriter:   os.Stdout,
-    StreamDialer: &transport.TCPDialer{},
-    PacketDialer: &transport.UDPDialer{},
+finder, err := smart.NewStrategyFinderOptions().
+	SetTestTimeout(5 * time.Second).
+	SetLogWriter(os.Stdout).
+	New()
+if err != nil {
+	// Handle invalid options.
+	return
 }
 
 configBytes := []byte(`
@@ -161,6 +163,31 @@ if err != nil {
 ```
 
 Please note that this is a basic example and may need to be adapted for your specific use case.
+
+## Extending config URLs
+
+Pass a `configurl.MutableRegistry` to `StrategyFinderOptions.SetConfigURLRegistry`.
+For Mobileproxy, use `SmartDialerOptions.ConfigURLRegistry()` to register components
+on the options' registry, or `SetConfigURLRegistry` to supply your own. Component
+libraries can expose `RegisterCustomComponent(opts *mobileproxy.SmartDialerOptions,
+name string)` from a Go wrapper package for mobile bindings.
+
+Use `configurl.Register` for named parsers, `RegisterBase` for a default base parser,
+and `RegisterInstance[transport.StreamDialer](registry, "", dialer)` to inject an
+existing stream base. Inside a component parser, call
+`configurl.NewFromConfig[transport.StreamDialer](ctx, registry, config.BaseConfig)` to
+construct its dependency. Fallback parsers
+can capture the same registry and call `configurl.New[transport.StreamDialer]`
+for nested config URLs.
+
+Complete registrations before the first `New` or `NewStreamDialer` call. During
+setup, SmartDialer wraps the default stream parser to read a TLS-specific parser
+from the construction context. Each TLS attempt receives the same selected DNS
+dialer and cache, including when a component parses a separate nested config.
+DNS discovery and fallbacks use the original base; packet bases are unchanged.
+Config URLs need no extra component or prefix. A component must forward its
+construction context to dependency parsers and use each later operation's context
+when dialing.
 
 ## Adding a new fallback strategy
 
