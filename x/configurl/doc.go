@@ -225,7 +225,7 @@ DPI Evasion - To add packet splitting to a Shadowsocks server for enhanced DPI e
 
 Core Concepts:
 
-  - [Registry]: A central registry for managing different types of network object builders (StreamDialers, PacketDialers, PacketListeners).
+  - [ProviderContainer]: A central registry for managing different types of network object builders (StreamDialers, PacketDialers, PacketListeners).
   - [ExtensibleProvider]: A type that provides a mechanism to register and retrieve builders for specific subtypes of network objects.
   - [BuildFunc]: A function that creates an instance of a network object from a parsed configuration.
   - [Config]: A parsed representation of the configuration string.
@@ -234,9 +234,9 @@ Core Concepts:
 You can define your custom strategy by implementing and registering [BuildFunc[ObjectType]] functions:
 
 	// Create new config parser.
-	// p := configurl.NewRegistry()
+	// p := configurl.NewProviderContainer()
 	// or
-	p := configurl.NewDefaultRegistry()
+	p := configurl.NewDefaultProviders()
 	// Register your custom dialer.
 	p.StreamDialers.RegisterType("custom", func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 	  // Build logic

@@ -105,7 +105,7 @@ func errorFor(t *testing.T, options string) error {
 func versionOf(p []byte) uint32 { return binary.BigEndian.Uint32(p[1:5]) }
 
 func TestRegisterQUICPreludePacketListener(t *testing.T) {
-	providers := NewDefaultRegistry()
+	providers := NewDefaultProviders()
 
 	_, err := providers.NewPacketListener(context.Background(), "quicprelude:count=2&version=0x1a2a3a4a")
 	require.NoError(t, err)

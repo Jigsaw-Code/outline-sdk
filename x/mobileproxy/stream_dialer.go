@@ -32,7 +32,7 @@ type StreamDialer struct {
 	transport.StreamDialer
 }
 
-var configRegistry = configurl.NewDefaultRegistry()
+var configRegistry = configurl.NewDefaultProviders()
 
 // NewStreamDialerFromConfig creates a [StreamDialer] based on the given config.
 // The config format is specified in https://pkg.go.dev/golang.getoutline.org/sdk/x/configurl#hdr-Config_Format.
