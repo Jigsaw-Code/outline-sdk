@@ -23,7 +23,7 @@ import (
 
 type streamBaseParserKey struct{}
 
-func withStreamBaseParser(ctx context.Context, parser configurl.Parser[transport.StreamDialer]) context.Context {
+func withStreamBaseParser(ctx context.Context, parser configurl.BuildFunc[transport.StreamDialer]) context.Context {
 	return context.WithValue(ctx, streamBaseParserKey{}, parser)
 }
 
@@ -33,7 +33,7 @@ func withStreamBaseParser(ctx context.Context, parser configurl.Parser[transport
 func registerContextStreamBase(registry configurl.MutableRegistry) {
 	originalBase, originalErr := configurl.Lookup[transport.StreamDialer](registry, "")
 	newBase := func(ctx context.Context, config *configurl.Config) (transport.StreamDialer, error) {
-		if override, ok := ctx.Value(streamBaseParserKey{}).(configurl.Parser[transport.StreamDialer]); ok && override != nil {
+		if override, ok := ctx.Value(streamBaseParserKey{}).(configurl.BuildFunc[transport.StreamDialer]); ok && override != nil {
 			return override(ctx, config)
 		}
 		if originalErr != nil {
