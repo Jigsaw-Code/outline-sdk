@@ -84,15 +84,6 @@ func RegisterBase[T any](r MutableRegistry, parser Parser[T]) {
 	Register(r, "", parser)
 }
 
-// RegisterInstance registers a parser that always returns instance. The empty
-// name registers a base instance. Instances are shared, not copied; their
-// implementation must support the concurrency of their callers. Nil and zero
-// values are returned unchanged, which may not be meaningful for every component.
-func RegisterInstance[T any](r MutableRegistry, name string, instance T) {
-	newInstance := func(context.Context, *Config) (T, error) { return instance, nil }
-	Register(r, name, newInstance)
-}
-
 // Lookup returns a typed parser without invoking it. The returned parser checks
 // that each result is assignable to T. Capturing it before replacing a
 // registration lets a new parser delegate to the previous parser.
@@ -145,9 +136,21 @@ func New[T any](ctx context.Context, r Registry, configText string) (T, error) {
 // Other result types and config URL schemes can be added with Register.
 func NewRegistry() MutableRegistry {
 	r := &registry{parsers: make(map[parserKey]Parser[any])}
-	RegisterInstance[transport.StreamDialer](r, "", &transport.TCPDialer{})
-	RegisterInstance[transport.PacketDialer](r, "", &transport.UDPDialer{})
-	RegisterInstance[transport.PacketListener](r, "", &transport.UDPListener{})
+	streamDialer := &transport.TCPDialer{}
+	newStreamDialer := func(context.Context, *Config) (transport.StreamDialer, error) {
+		return streamDialer, nil
+	}
+	RegisterBase(r, newStreamDialer)
+	packetDialer := &transport.UDPDialer{}
+	newPacketDialer := func(context.Context, *Config) (transport.PacketDialer, error) {
+		return packetDialer, nil
+	}
+	RegisterBase(r, newPacketDialer)
+	packetListener := &transport.UDPListener{}
+	newPacketListener := func(context.Context, *Config) (transport.PacketListener, error) {
+		return packetListener, nil
+	}
+	RegisterBase(r, newPacketListener)
 	return r
 }
 

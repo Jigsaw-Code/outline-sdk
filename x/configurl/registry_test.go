@@ -79,9 +79,16 @@ type lookupOnly struct{ configurl.Registry }
 func TestRegistryArbitraryTypesAndExternalImplementation(t *testing.T) {
 	for _, registry := range []configurl.MutableRegistry{configurl.NewRegistry(), externalRegistry{}} {
 		// Non-comparable output types and identical scheme names work independently.
-		configurl.RegisterInstance[[]string](registry, "value", []string{"hello"})
-		configurl.RegisterInstance[int](registry, "value", 42)
-		configurl.RegisterInstance[[]string](registry, "", nil)
+		registeredValues := []string{"hello"}
+		configurl.Register(registry, "value", func(context.Context, *configurl.Config) ([]string, error) {
+			return registeredValues, nil
+		})
+		configurl.Register(registry, "value", func(context.Context, *configurl.Config) (int, error) {
+			return 42, nil
+		})
+		configurl.RegisterBase(registry, func(context.Context, *configurl.Config) ([]string, error) {
+			return nil, nil
+		})
 		readOnly := lookupOnly{registry}
 		_, mutable := any(readOnly).(configurl.MutableRegistry)
 		require.False(t, mutable)
@@ -120,9 +127,15 @@ func TestParsersSeeCurrentBaseRegistrations(t *testing.T) {
 	ctx := context.Background()
 	for range 2 {
 		base := &registryBase{errors.New("configured base")}
-		configurl.RegisterInstance[transport.StreamDialer](registry, "", base)
-		configurl.RegisterInstance[transport.PacketDialer](registry, "", base)
-		configurl.RegisterInstance[transport.PacketListener](registry, "", base)
+		configurl.RegisterBase(registry, func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
+			return base, nil
+		})
+		configurl.RegisterBase(registry, func(context.Context, *configurl.Config) (transport.PacketDialer, error) {
+			return base, nil
+		})
+		configurl.RegisterBase(registry, func(context.Context, *configurl.Config) (transport.PacketListener, error) {
+			return base, nil
+		})
 		sd, err := configurl.New[transport.StreamDialer](ctx, registry, "custom|custom|tlsfrag:1|split:1")
 		require.NoError(t, err)
 		_, err = sd.DialStream(ctx, "target.invalid:443")
@@ -137,10 +150,14 @@ func TestParsersSeeCurrentBaseRegistrations(t *testing.T) {
 		require.ErrorIs(t, err, base.err)
 	}
 	base := &registryBase{}
-	configurl.RegisterInstance(registry, "concrete", base)
+	configurl.Register(registry, "concrete", func(context.Context, *configurl.Config) (*registryBase, error) {
+		return base, nil
+	})
 	_, err := configurl.New[transport.StreamDialer](ctx, registry, "concrete")
 	require.ErrorContains(t, err, "is not registered", "result types are matched exactly")
-	configurl.RegisterInstance[transport.StreamDialer](registry, "interface", base)
+	configurl.Register(registry, "interface", func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
+		return base, nil
+	})
 	got, err := configurl.New[transport.StreamDialer](ctx, registry, "interface")
 	require.NoError(t, err)
 	require.Same(t, base, got)
@@ -209,7 +226,9 @@ func checkNilParserResults[T any](t *testing.T) {
 	t.Helper()
 	registry := configurl.NewRegistry()
 	var zero T
-	configurl.RegisterInstance[T](registry, "typed", zero)
+	configurl.Register(registry, "typed", func(context.Context, *configurl.Config) (T, error) {
+		return zero, nil
+	})
 	registry.RegisterParser(reflect.TypeFor[T](), "untyped", func(context.Context, *configurl.Config) (any, error) {
 		return nil, nil
 	})
@@ -231,7 +250,9 @@ func TestParserNilResults(t *testing.T) {
 
 	registry := configurl.NewRegistry()
 	var base *registryBase
-	configurl.RegisterInstance[transport.StreamDialer](registry, "typed-nil", base)
+	configurl.Register(registry, "typed-nil", func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
+		return base, nil
+	})
 	got, err := configurl.New[transport.StreamDialer](context.Background(), registry, "typed-nil")
 	require.NoError(t, err)
 	require.True(t, got != nil, "a typed nil implementation must retain its dynamic type")
@@ -270,7 +291,9 @@ func TestParserAdaptersPreserveArgumentsAndResults(t *testing.T) {
 	require.Equal(t, 1, calls)
 
 	// Lookup captures the existing parser; NewFromConfig performs a fresh lookup.
-	configurl.RegisterInstance(registry, "value", 7)
+	configurl.Register(registry, "value", func(context.Context, *configurl.Config) (int, error) {
+		return 7, nil
+	})
 	value, err = parser(ctx, cfg)
 	require.Equal(t, 42, value)
 	require.ErrorIs(t, err, parserErr)

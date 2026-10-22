@@ -253,12 +253,12 @@ rather than retain the construction context.
 [transport.PacketDialer], and [transport.PacketListener].
 [NewDefaultRegistry] also registers the SDK's built-in configuration types.
 A nil Config invokes the default base parser, registered under the empty name.
-Use [RegisterBase] for a custom base parser, or [RegisterInstance] with an empty
-name to inject an existing base dialer. Instances are shared by all constructions.
+Use [RegisterBase] for a custom base parser. To reuse an existing dialer, register
+a parser that returns it.
 
 The registry supports arbitrary Go result types, including interfaces and slices.
-Types are matched exactly: use RegisterInstance[transport.StreamDialer] when an
-instance implements that interface, rather than inferring its concrete type.
+Types are matched exactly: registering a Parser[transport.StreamDialer] uses
+transport.StreamDialer as the result type.
 [Lookup] retrieves an existing typed parser, for example to wrap its behavior.
 External registries can implement Registry.LookupParser and
 MutableRegistry.RegisterParser without exposing their storage. Both methods use
