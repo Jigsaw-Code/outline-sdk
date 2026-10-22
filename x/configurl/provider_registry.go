@@ -15,7 +15,6 @@
 package configurl
 
 import (
-	"context"
 	"reflect"
 
 	"golang.getoutline.org/sdk/transport"
@@ -43,7 +42,7 @@ func (r providerContainerRegistry) LookupParser(resultType reflect.Type, name st
 
 // RegisterParser implements [MutableRegistry].
 func (r providerContainerRegistry) RegisterParser(resultType reflect.Type, name string, parser any) {
-	parser = normalizeParser(resultType, parser)
+	validateParser(resultType, parser)
 	switch resultType {
 	case reflect.TypeFor[transport.StreamDialer]():
 		registerProviderParser(&r.StreamDialers, name, parser)
@@ -58,16 +57,16 @@ func (r providerContainerRegistry) RegisterParser(resultType reflect.Type, name 
 
 func lookupProviderParser[T comparable](provider *ExtensibleProvider[T], name string) (any, bool) {
 	if name == "" {
-		return provider.NewInstance, true
+		return Parser[T](provider.NewInstance), true
 	}
 	parser, ok := provider.builders[name]
-	return (func(context.Context, *Config) (T, error))(parser), ok
+	return parser, ok
 }
 
 func registerProviderParser[T comparable](provider *ExtensibleProvider[T], name string, parser any) {
 	var newInstance BuildFunc[T]
 	if parser != nil {
-		newInstance = parser.(func(context.Context, *Config) (T, error))
+		newInstance = parser.(Parser[T])
 	}
 	provider.RegisterType(name, newInstance)
 }

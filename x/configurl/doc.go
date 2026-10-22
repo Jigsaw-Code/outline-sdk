@@ -262,11 +262,11 @@ transport.StreamDialer as the result type.
 [Lookup] retrieves an existing typed parser, for example to wrap its behavior.
 External registries can implement Registry.LookupParser and
 MutableRegistry.RegisterParser without exposing their storage. Both methods use
-any to hold functions with their original result types. [Register] checks parser
-signatures at compile time. Direct calls to MutableRegistry.RegisterParser validate
-signatures at registration and panic on incompatible types. [Lookup] checks the
-stored function's type before returning it; no result conversion is needed.
-A nil parser disables an entry.
+any to hold Parser[T] values unchanged. [Register] checks parser signatures at
+compile time. Direct callers of MutableRegistry.RegisterParser must supply a
+Parser[T], converting ordinary functions explicitly. Registration checks the function
+signature; [Lookup] checks the exact Parser[T] type before returning it.
+No parser normalization or result conversion is needed. A nil parser disables an entry.
 
 Component libraries can expose Register* helpers accepting a MutableRegistry
 and type name, alongside direct constructors for callers that do not need config URLs.
