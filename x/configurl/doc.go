@@ -249,8 +249,9 @@ dependencies. NewFromConfig looks up the current registration on each call.
 Returned objects should use the context of each later dial or listen operation,
 rather than retain the construction context.
 
-[NewRegistry] registers TCP, UDP, and UDP listener base instances but no named
-component parsers. [NewDefaultRegistry] also registers the built-in components.
+[NewRegistry] initializes the base [transport.StreamDialer],
+[transport.PacketDialer], and [transport.PacketListener].
+[NewDefaultRegistry] also registers the SDK's built-in configuration types.
 A nil Config invokes the default base parser, registered under the empty name.
 Use [RegisterBase] for a custom base parser, or [RegisterInstance] with an empty
 name to inject an existing base dialer. Instances are shared by all constructions.

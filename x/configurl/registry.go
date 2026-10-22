@@ -140,7 +140,8 @@ func New[T any](ctx context.Context, r Registry, configText string) (T, error) {
 	return NewFromConfig[T](ctx, r, config)
 }
 
-// NewRegistry creates a registry with TCP, UDP, and UDP listener base instances.
+// NewRegistry creates a registry with default base implementations of
+// [transport.StreamDialer], [transport.PacketDialer], and [transport.PacketListener].
 // Other result types and config URL schemes can be added with Register.
 func NewRegistry() MutableRegistry {
 	r := &registry{parsers: make(map[parserKey]Parser[any])}
