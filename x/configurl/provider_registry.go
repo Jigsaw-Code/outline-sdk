@@ -15,6 +15,7 @@
 package configurl
 
 import (
+	"context"
 	"reflect"
 
 	"golang.getoutline.org/sdk/transport"
@@ -27,7 +28,7 @@ import (
 type providerContainerRegistry struct{ *ProviderContainer }
 
 // LookupParser implements [Registry].
-func (r providerContainerRegistry) LookupParser(resultType reflect.Type, name string) (Parser[any], bool) {
+func (r providerContainerRegistry) LookupParser(resultType reflect.Type, name string) (any, bool) {
 	switch resultType {
 	case reflect.TypeFor[transport.StreamDialer]():
 		return lookupProviderParser(&r.StreamDialers, name)
@@ -41,23 +42,32 @@ func (r providerContainerRegistry) LookupParser(resultType reflect.Type, name st
 }
 
 // RegisterParser implements [MutableRegistry].
-func (r providerContainerRegistry) RegisterParser(resultType reflect.Type, name string, parser Parser[any]) {
+func (r providerContainerRegistry) RegisterParser(resultType reflect.Type, name string, parser any) {
+	parser = normalizeParser(resultType, parser)
 	switch resultType {
 	case reflect.TypeFor[transport.StreamDialer]():
-		r.StreamDialers.RegisterType(name, typedParser[transport.StreamDialer](name, parser))
+		registerProviderParser(&r.StreamDialers, name, parser)
 	case reflect.TypeFor[transport.PacketDialer]():
-		r.PacketDialers.RegisterType(name, typedParser[transport.PacketDialer](name, parser))
+		registerProviderParser(&r.PacketDialers, name, parser)
 	case reflect.TypeFor[transport.PacketListener]():
-		r.PacketListeners.RegisterType(name, typedParser[transport.PacketListener](name, parser))
+		registerProviderParser(&r.PacketListeners, name, parser)
 	default:
 		panic("unsupported built-in configurl result type: " + resultType.String())
 	}
 }
 
-func lookupProviderParser[T comparable](provider *ExtensibleProvider[T], name string) (Parser[any], bool) {
+func lookupProviderParser[T comparable](provider *ExtensibleProvider[T], name string) (any, bool) {
 	if name == "" {
-		return eraseParser(provider.NewInstance), true
+		return provider.NewInstance, true
 	}
 	parser, ok := provider.builders[name]
-	return eraseParser(parser), ok
+	return (func(context.Context, *Config) (T, error))(parser), ok
+}
+
+func registerProviderParser[T comparable](provider *ExtensibleProvider[T], name string, parser any) {
+	var newInstance BuildFunc[T]
+	if parser != nil {
+		newInstance = parser.(func(context.Context, *Config) (T, error))
+	}
+	provider.RegisterType(name, newInstance)
 }

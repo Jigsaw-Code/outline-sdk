@@ -36,9 +36,9 @@ type Registry interface {
 	// LookupParser returns the parser registered for resultType and name, with ok
 	// reporting whether the entry exists. The empty name denotes the default base
 	// parser, invoked with a nil Config. A registered nil parser disables the entry.
-	// When invoked successfully, the parser must return a value assignable to
-	// resultType. An untyped nil result is allowed for types that can be nil.
-	LookupParser(resultType reflect.Type, name string) (parser Parser[any], ok bool)
+	// A non-nil parser must have the unnamed function type
+	// func(context.Context, *Config) (T, error), where T is exactly resultType.
+	LookupParser(resultType reflect.Type, name string) (parser any, ok bool)
 }
 
 // MutableRegistry adds registration to [Registry]. Use [Register] or [RegisterBase]
@@ -51,7 +51,11 @@ type MutableRegistry interface {
 	// RegisterParser registers parser for resultType and name, replacing any existing
 	// registration. The empty name selects the default base parser; a nil parser
 	// disables the entry.
-	RegisterParser(resultType reflect.Type, name string, parser Parser[any])
+	// It accepts named or unnamed functions with signature
+	// func(context.Context, *Config) (T, error), where T is exactly resultType,
+	// and converts them to the unnamed function type returned by LookupParser.
+	// It panics if resultType is nil or parser has an incompatible type.
+	RegisterParser(resultType reflect.Type, name string, parser any)
 }
 
 type parserKey struct {
@@ -61,11 +65,11 @@ type parserKey struct {
 
 type registry struct {
 	mu      sync.RWMutex
-	parsers map[parserKey]Parser[any]
+	parsers map[parserKey]any
 }
 
 // LookupParser implements [Registry].
-func (r *registry) LookupParser(resultType reflect.Type, name string) (Parser[any], bool) {
+func (r *registry) LookupParser(resultType reflect.Type, name string) (any, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	parser, ok := r.parsers[parserKey{resultType, name}]
@@ -73,7 +77,8 @@ func (r *registry) LookupParser(resultType reflect.Type, name string) (Parser[an
 }
 
 // RegisterParser implements [MutableRegistry].
-func (r *registry) RegisterParser(resultType reflect.Type, name string, parser Parser[any]) {
+func (r *registry) RegisterParser(resultType reflect.Type, name string, parser any) {
+	parser = normalizeParser(resultType, parser)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.parsers[parserKey{resultType, name}] = parser
@@ -83,7 +88,7 @@ func (r *registry) RegisterParser(resultType reflect.Type, name string, parser P
 // Use an interface type argument when registering an implementation of it.
 // The empty name registers the default base parser. A nil parser disables the entry.
 func Register[T any](r MutableRegistry, name string, parser Parser[T]) {
-	r.RegisterParser(reflect.TypeFor[T](), name, eraseParser(parser))
+	r.RegisterParser(reflect.TypeFor[T](), name, parser)
 }
 
 // RegisterBase registers the parser used when a config is nil.
@@ -93,9 +98,9 @@ func RegisterBase[T any](r MutableRegistry, parser Parser[T]) {
 	Register(r, "", parser)
 }
 
-// Lookup returns a typed parser without invoking it. The returned parser checks
-// that each result is assignable to T. Capturing it before replacing a
-// registration lets a new parser delegate to the previous parser.
+// Lookup returns a typed parser without invoking it. It checks the function's
+// signature before returning it. Capturing it before replacing a registration
+// lets a new parser delegate to the previous parser.
 func Lookup[T any](r Registry, name string) (Parser[T], error) {
 	resultType := reflect.TypeFor[T]()
 	if r == nil {
@@ -108,7 +113,14 @@ func Lookup[T any](r Registry, name string) (Parser[T], error) {
 	if parser == nil {
 		return nil, fmt.Errorf("%v config type %q parser is nil", resultType, name)
 	}
-	return typedParser[T](name, parser), nil
+	newInstance, ok := parser.(func(context.Context, *Config) (T, error))
+	if !ok {
+		return nil, fmt.Errorf("%v config type %q has incompatible parser type %T", resultType, name, parser)
+	}
+	if newInstance == nil {
+		return nil, fmt.Errorf("%v config type %q parser is nil", resultType, name)
+	}
+	return Parser[T](newInstance), nil
 }
 
 // NewFromConfig constructs a T from a parsed config. A nil config invokes the base parser.
@@ -144,7 +156,7 @@ func New[T any](ctx context.Context, r Registry, configText string) (T, error) {
 // [transport.StreamDialer], [transport.PacketDialer], and [transport.PacketListener].
 // Other result types and config URL schemes can be added with Register.
 func NewRegistry() MutableRegistry {
-	r := &registry{parsers: make(map[parserKey]Parser[any])}
+	r := &registry{parsers: make(map[parserKey]any)}
 	streamDialer := &transport.TCPDialer{}
 	newStreamDialer := func(context.Context, *Config) (transport.StreamDialer, error) {
 		return streamDialer, nil
@@ -201,39 +213,25 @@ func RegisterDefaultTypes(registry MutableRegistry) MutableRegistry {
 	return registry
 }
 
-// eraseParser keeps disabled parsers nil rather than wrapping a nil function.
-func eraseParser[T any](parser Parser[T]) Parser[any] {
+// normalizeParser validates a registration and converts named functions to the
+// unnamed function type required by Registry, without wrapping or invoking them.
+func normalizeParser(resultType reflect.Type, parser any) any {
+	if resultType == nil {
+		panic("configurl: parser result type is nil")
+	}
 	if parser == nil {
 		return nil
 	}
-	return func(ctx context.Context, config *Config) (any, error) {
-		return parser(ctx, config)
+	parserType := reflect.FuncOf(
+		[]reflect.Type{reflect.TypeFor[context.Context](), reflect.TypeFor[*Config]()},
+		[]reflect.Type{resultType, reflect.TypeFor[error]()}, false,
+	)
+	value := reflect.ValueOf(parser)
+	if !value.Type().AssignableTo(parserType) {
+		panic(fmt.Sprintf("configurl: parser for %v has type %T, want %v", resultType, parser, parserType))
 	}
-}
-
-// typedParser adapts a low-level parser, preserving partial results and errors.
-func typedParser[T any](name string, parser Parser[any]) Parser[T] {
-	if parser == nil {
+	if value.IsNil() {
 		return nil
 	}
-	resultType := reflect.TypeFor[T]()
-	return func(ctx context.Context, config *Config) (T, error) {
-		result, err := parser(ctx, config)
-		if value, ok := result.(T); ok {
-			return value, err
-		}
-		var zero T
-		if result == nil {
-			// A nil interface loses its type when converted to any. Low-level
-			// parsers may also return an untyped nil for any nil-capable type.
-			switch resultType.Kind() {
-			case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice, reflect.UnsafePointer:
-				return zero, err
-			}
-		}
-		if err != nil {
-			return zero, err
-		}
-		return zero, fmt.Errorf("%v config type %q parser returned incompatible result %T", resultType, name, result)
-	}
+	return value.Convert(parserType).Interface()
 }

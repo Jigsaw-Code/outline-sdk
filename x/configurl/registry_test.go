@@ -61,18 +61,29 @@ func TestRegistryDefaults(t *testing.T) {
 }
 
 // A registry implemented outside configurl, including a read-only lookup wrapper.
-type externalRegistry map[reflect.Type]map[string]configurl.Parser[any]
+type externalRegistry map[reflect.Type]map[string]any
 
 // LookupParser implements [configurl.Registry].
-func (r externalRegistry) LookupParser(resultType reflect.Type, name string) (configurl.Parser[any], bool) {
+func (r externalRegistry) LookupParser(resultType reflect.Type, name string) (any, bool) {
 	p, ok := r[resultType][name]
 	return p, ok
 }
 
 // RegisterParser implements [configurl.MutableRegistry].
-func (r externalRegistry) RegisterParser(resultType reflect.Type, name string, parser configurl.Parser[any]) {
+func (r externalRegistry) RegisterParser(resultType reflect.Type, name string, parser any) {
+	parserType := reflect.FuncOf(
+		[]reflect.Type{reflect.TypeFor[context.Context](), reflect.TypeFor[*configurl.Config]()},
+		[]reflect.Type{resultType, reflect.TypeFor[error]()}, false,
+	)
+	if parser != nil {
+		value := reflect.ValueOf(parser)
+		if !value.Type().AssignableTo(parserType) {
+			panic("invalid parser type")
+		}
+		parser = value.Convert(parserType).Interface()
+	}
 	if r[resultType] == nil {
-		r[resultType] = make(map[string]configurl.Parser[any])
+		r[resultType] = make(map[string]any)
 	}
 	r[resultType][name] = parser
 }
@@ -175,10 +186,7 @@ func TestRegistryInvalidParsers(t *testing.T) {
 	ctx := context.Background()
 	registry := configurl.NewRegistry()
 	configurl.Register[int](registry, "disabled", nil)
-	registry.RegisterParser(reflect.TypeFor[int](), "wrong", func(context.Context, *configurl.Config) (any, error) { return "", nil })
-	// Nil cannot represent an int, even though it is valid for interface results.
-	registry.RegisterParser(reflect.TypeFor[int](), "nil", func(context.Context, *configurl.Config) (any, error) { return nil, nil })
-	for _, cfg := range []string{"", "missing", "disabled", "wrong", "nil", "a||b"} {
+	for _, cfg := range []string{"", "missing", "disabled", "a||b"} {
 		_, err := configurl.New[int](ctx, registry, cfg)
 		require.Error(t, err, cfg)
 	}
@@ -237,10 +245,10 @@ func checkNilParserResults[T any](t *testing.T) {
 	configurl.Register(registry, "typed", func(context.Context, *configurl.Config) (T, error) {
 		return zero, nil
 	})
-	registry.RegisterParser(reflect.TypeFor[T](), "untyped", func(context.Context, *configurl.Config) (any, error) {
-		return nil, nil
+	registry.RegisterParser(reflect.TypeFor[T](), "raw", func(context.Context, *configurl.Config) (T, error) {
+		return zero, nil
 	})
-	for _, name := range []string{"typed", "untyped"} {
+	for _, name := range []string{"typed", "raw"} {
 		value, err := configurl.New[T](context.Background(), registry, name)
 		require.NoError(t, err)
 		require.Nil(t, value)
@@ -275,7 +283,7 @@ func TestParserNilResults(t *testing.T) {
 	require.ErrorContains(t, err, "parser is nil")
 }
 
-func TestParserAdaptersPreserveArgumentsAndResults(t *testing.T) {
+func TestParsersPreserveArgumentsAndResults(t *testing.T) {
 	type contextKey struct{}
 	ctx := context.WithValue(context.Background(), contextKey{}, "request")
 	cfg, err := configurl.ParseConfig("value:options")
@@ -309,19 +317,126 @@ func TestParserAdaptersPreserveArgumentsAndResults(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 7, value)
 
-	// A low-level parser may return a concrete implementation of its result interface.
+	// Interface results retain their concrete implementation.
 	base := &registryBase{}
-	registry.RegisterParser(reflect.TypeFor[transport.StreamDialer](), "raw", func(context.Context, *configurl.Config) (any, error) {
+	registry.RegisterParser(reflect.TypeFor[transport.StreamDialer](), "raw", func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
 		return base, nil
 	})
 	dialer, err := configurl.New[transport.StreamDialer](ctx, registry, "raw")
 	require.NoError(t, err)
 	require.Same(t, base, dialer)
 
-	// An error from the parser takes precedence over checking an absent result.
-	registry.RegisterParser(reflect.TypeFor[int](), "error", func(context.Context, *configurl.Config) (any, error) {
+	// Nil interface results and errors are preserved together.
+	registry.RegisterParser(reflect.TypeFor[transport.StreamDialer](), "error", func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
 		return nil, parserErr
 	})
-	_, err = configurl.New[int](ctx, registry, "error")
+	dialer, err = configurl.New[transport.StreamDialer](ctx, registry, "error")
+	require.Nil(t, dialer)
 	require.ErrorIs(t, err, parserErr)
+}
+
+func TestRegisterParserAcceptsFunctionTypes(t *testing.T) {
+	type customParser func(context.Context, *configurl.Config) (int, error)
+	calls := 0
+	newInstance := func(context.Context, *configurl.Config) (int, error) {
+		calls++
+		return 42, nil
+	}
+	provider := configurl.NewExtensibleProvider(42)
+	for name, candidate := range map[string]any{
+		"ordinary": newInstance,
+		"parser":   configurl.Parser[int](newInstance),
+		"custom":   customParser(newInstance),
+		"method":   provider.NewInstance,
+	} {
+		t.Run(name, func(t *testing.T) {
+			registry := configurl.NewRegistry()
+			calls = 0
+			registry.RegisterParser(reflect.TypeFor[int](), "value", candidate)
+			parser, err := configurl.Lookup[int](registry, "value")
+			require.NoError(t, err)
+			require.Zero(t, calls, "registration and lookup must not invoke the parser")
+			value, err := parser(context.Background(), nil)
+			require.NoError(t, err)
+			require.Equal(t, 42, value)
+		})
+	}
+}
+
+func TestRegisterParserRejectsInvalidSignatures(t *testing.T) {
+	resultType := reflect.TypeFor[int]()
+	registry := configurl.NewRegistry()
+	configurl.Register(registry, "value", func(context.Context, *configurl.Config) (int, error) { return 42, nil })
+	for name, candidate := range map[string]any{
+		"non-function":   42,
+		"wrong-argument": func(context.Context, string) (int, error) { return 0, nil },
+		"wrong-result":   func(context.Context, *configurl.Config) (string, error) { return "", nil },
+		"any-result":     func(context.Context, *configurl.Config) (any, error) { return 42, nil },
+		"missing-error":  func(context.Context, *configurl.Config) int { return 0 },
+		"wrong-error":    func(context.Context, *configurl.Config) (int, string) { return 0, "" },
+		"variadic":       func(context.Context, ...*configurl.Config) (int, error) { return 0, nil },
+		"wrong-nil":      configurl.Parser[string](nil),
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Panics(t, func() { registry.RegisterParser(resultType, "value", candidate) })
+			value, err := configurl.New[int](context.Background(), registry, "value")
+			require.NoError(t, err)
+			require.Equal(t, 42, value, "invalid registration must preserve the existing parser")
+		})
+	}
+	require.PanicsWithValue(t, "configurl: parser result type is nil", func() {
+		registry.RegisterParser(nil, "value", nil)
+	})
+	// A function returning a concrete implementation cannot be registered as an interface parser.
+	require.Panics(t, func() {
+		registry.RegisterParser(reflect.TypeFor[transport.StreamDialer](), "concrete", func(context.Context, *configurl.Config) (*registryBase, error) {
+			return &registryBase{}, nil
+		})
+	})
+	// Even convertible result types must match exactly, including struct tags.
+	type tagged = struct {
+		Value int `json:"value"`
+	}
+	type otherTagged = struct {
+		Value int `json:"other"`
+	}
+	require.Panics(t, func() {
+		registry.RegisterParser(reflect.TypeFor[tagged](), "tags", func(context.Context, *configurl.Config) (otherTagged, error) {
+			return otherTagged{}, nil
+		})
+	})
+}
+
+func TestRegisterParserDisablesEntries(t *testing.T) {
+	for name, candidate := range map[string]any{
+		"nil":      nil,
+		"typed":    configurl.Parser[int](nil),
+		"ordinary": (func(context.Context, *configurl.Config) (int, error))(nil),
+	} {
+		t.Run(name, func(t *testing.T) {
+			registry := configurl.NewRegistry()
+			registry.RegisterParser(reflect.TypeFor[int](), name, candidate)
+			_, err := configurl.Lookup[int](registry, name)
+			require.ErrorContains(t, err, "parser is nil")
+		})
+	}
+}
+
+func TestLookupRejectsInvalidExternalParsers(t *testing.T) {
+	// Bypass registration to simulate a registry violating the lookup contract.
+	registry := externalRegistry{reflect.TypeFor[int](): {
+		"non-function": 42,
+		"wrong-result": func(context.Context, *configurl.Config) (string, error) {
+			t.Fatal("lookup must not invoke an incompatible parser")
+			return "", nil
+		},
+		"named": configurl.Parser[int](func(context.Context, *configurl.Config) (int, error) { return 42, nil }),
+	}}
+	for name := range registry[reflect.TypeFor[int]()] {
+		_, err := configurl.Lookup[int](registry, name)
+		require.ErrorContains(t, err, "incompatible parser type")
+	}
+	registry.RegisterParser(reflect.TypeFor[int](), "disabled", configurl.Parser[int](nil))
+	_, err := configurl.Lookup[int](registry, "disabled")
+	require.ErrorContains(t, err, "parser is nil")
 }
