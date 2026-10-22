@@ -33,8 +33,8 @@ type Parser[T any] = BuildFunc[T]
 // The empty name denotes the default base parser, invoked with a nil Config.
 // On success, the parser must return a value assignable to resultType. An untyped
 // nil result is allowed for types that can be nil. A nil parser disables an entry.
-// Use Lookup, New, or Parse for typed access. Implementations may store parsers
-// however they choose; the interface does not expose storage or base instances.
+// Use Lookup, New, or NewFromConfig for typed access. Implementations may store
+// parsers however they choose; the interface does not expose storage or base instances.
 type Registry interface {
 	LookupParser(resultType reflect.Type, name string) (parser Parser[any], ok bool)
 }
@@ -111,8 +111,8 @@ func Lookup[T any](r Registry, name string) (Parser[T], error) {
 	return typedParser[T](name, parser), nil
 }
 
-// New constructs a T from a parsed config. A nil config invokes the base parser.
-func New[T any](ctx context.Context, r Registry, config *Config) (T, error) {
+// NewFromConfig constructs a T from a parsed config. A nil config invokes the base parser.
+func NewFromConfig[T any](ctx context.Context, r Registry, config *Config) (T, error) {
 	name := ""
 	if config != nil {
 		name = config.URL.Scheme
@@ -129,14 +129,15 @@ func New[T any](ctx context.Context, r Registry, config *Config) (T, error) {
 	return parser(ctx, config)
 }
 
-// Parse parses configText and constructs a T with New.
-func Parse[T any](ctx context.Context, r Registry, configText string) (T, error) {
+// New constructs a T from a config URL string. An empty or whitespace-only string
+// invokes the base parser. Use NewFromConfig when the config is already parsed.
+func New[T any](ctx context.Context, r Registry, configText string) (T, error) {
 	config, err := ParseConfig(configText)
 	if err != nil {
 		var zero T
 		return zero, err
 	}
-	return New[T](ctx, r, config)
+	return NewFromConfig[T](ctx, r, config)
 }
 
 // NewRegistry creates a registry with TCP, UDP, and UDP listener base instances.

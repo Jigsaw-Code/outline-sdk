@@ -225,15 +225,15 @@ DPI Evasion - To add packet splitting to a Shadowsocks server for enhanced DPI e
 
 A [Registry] looks up parsers by their Go result type and config URL scheme.
 A [MutableRegistry] also supports registration. Use [Register] to add a typed
-[Parser], [New] to construct an object from a parsed [Config], or [Parse] to
-construct it from a config URL string. Component parsers call New directly with
+[Parser], [New] to construct an object from a config URL string, or [NewFromConfig]
+to construct it from a parsed [Config]. Component parsers call NewFromConfig with
 the registry to construct their dependencies.
 
 For example, this component delegates to the configuration on its left:
 
 	func RegisterCustomComponent(registry configurl.MutableRegistry, typeID string) {
 		newInstance := func(ctx context.Context, config *configurl.Config) (transport.StreamDialer, error) {
-			return configurl.New[transport.StreamDialer](ctx, registry, config.BaseConfig)
+			return configurl.NewFromConfig[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		}
 		configurl.Register(registry, typeID, newInstance)
 	}
@@ -242,12 +242,12 @@ The app creates a registry, registers the component, and constructs a dialer:
 
 	registry := configurl.NewDefaultRegistry()
 	RegisterCustomComponent(registry, "custom")
-	dialer, err := configurl.Parse[transport.StreamDialer](context.Background(), registry, "custom|tlsfrag:1")
+	dialer, err := configurl.New[transport.StreamDialer](context.Background(), registry, "custom|tlsfrag:1")
 
-Parsers forward the construction context when calling New for their dependencies.
-New looks up the current registration on each call. Returned objects should use
-the context of each later dial or listen operation, rather than retain the
-construction context.
+Parsers forward the construction context when calling NewFromConfig for their
+dependencies. NewFromConfig looks up the current registration on each call.
+Returned objects should use the context of each later dial or listen operation,
+rather than retain the construction context.
 
 [NewRegistry] registers TCP, UDP, and UDP listener base instances but no named
 component parsers. [NewDefaultRegistry] also registers the built-in components.

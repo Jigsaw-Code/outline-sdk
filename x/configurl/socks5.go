@@ -34,7 +34,7 @@ func registerSOCKS5PacketDialer(registry MutableRegistry, typeID string) {
 		if err != nil {
 			return nil, err
 		}
-		pd, err := New[transport.PacketDialer](ctx, registry, config.BaseConfig)
+		pd, err := NewFromConfig[transport.PacketDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -50,7 +50,7 @@ func registerSOCKS5PacketListener(registry MutableRegistry, typeID string) {
 		if err != nil {
 			return nil, err
 		}
-		pd, err := New[transport.PacketDialer](ctx, registry, config.BaseConfig)
+		pd, err := NewFromConfig[transport.PacketDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -61,7 +61,7 @@ func registerSOCKS5PacketListener(registry MutableRegistry, typeID string) {
 }
 
 func newSOCKS5Client(ctx context.Context, registry Registry, config Config) (*socks5.Client, error) {
-	sd, err := New[transport.StreamDialer](ctx, registry, config.BaseConfig)
+	sd, err := NewFromConfig[transport.StreamDialer](ctx, registry, config.BaseConfig)
 	if err != nil {
 		return nil, err
 	}

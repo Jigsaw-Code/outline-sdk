@@ -28,7 +28,7 @@ import (
 
 func registerShadowsocksStreamDialer(registry MutableRegistry, typeID string) {
 	newInstance := func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		sd, err := New[transport.StreamDialer](ctx, registry, config.BaseConfig)
+		sd, err := NewFromConfig[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -51,7 +51,7 @@ func registerShadowsocksStreamDialer(registry MutableRegistry, typeID string) {
 
 func registerShadowsocksPacketDialer(registry MutableRegistry, typeID string) {
 	newInstance := func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
-		pd, err := New[transport.PacketDialer](ctx, registry, config.BaseConfig)
+		pd, err := NewFromConfig[transport.PacketDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -72,7 +72,7 @@ func registerShadowsocksPacketDialer(registry MutableRegistry, typeID string) {
 
 func registerShadowsocksPacketListener(registry MutableRegistry, typeID string) {
 	newInstance := func(ctx context.Context, config *Config) (transport.PacketListener, error) {
-		pd, err := New[transport.PacketDialer](ctx, registry, config.BaseConfig)
+		pd, err := NewFromConfig[transport.PacketDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}

@@ -32,11 +32,11 @@ func registerDO53StreamDialer(registry MutableRegistry, typeID string) {
 		if config == nil {
 			return nil, fmt.Errorf("emtpy do53 config")
 		}
-		sd, err := New[transport.StreamDialer](ctx, registry, config.BaseConfig)
+		sd, err := NewFromConfig[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
-		pd, err := New[transport.PacketDialer](ctx, registry, config.BaseConfig)
+		pd, err := NewFromConfig[transport.PacketDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -54,7 +54,7 @@ func registerDOHStreamDialer(registry MutableRegistry, typeID string) {
 		if config == nil {
 			return nil, fmt.Errorf("emtpy doh config")
 		}
-		sd, err := New[transport.StreamDialer](ctx, registry, config.BaseConfig)
+		sd, err := NewFromConfig[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}

@@ -27,7 +27,7 @@ import (
 
 func registerQUICPreludePacketListener(registry MutableRegistry, typeID string) {
 	newInstance := func(ctx context.Context, config *Config) (transport.PacketListener, error) {
-		inner, err := New[transport.PacketListener](ctx, registry, config.BaseConfig)
+		inner, err := NewFromConfig[transport.PacketListener](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}

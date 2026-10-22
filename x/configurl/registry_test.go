@@ -35,21 +35,21 @@ func TestRegistryDefaults(t *testing.T) {
 			configurl.RegisterDefaultTypes(registry)
 		}
 		ctx := context.Background()
-		sd, err := configurl.New[transport.StreamDialer](ctx, registry, nil)
+		sd, err := configurl.NewFromConfig[transport.StreamDialer](ctx, registry, nil)
 		require.NoError(t, err)
 		require.IsType(t, &transport.TCPDialer{}, sd)
-		pd, err := configurl.New[transport.PacketDialer](ctx, registry, nil)
+		pd, err := configurl.NewFromConfig[transport.PacketDialer](ctx, registry, nil)
 		require.NoError(t, err)
 		require.IsType(t, &transport.UDPDialer{}, pd)
-		pl, err := configurl.New[transport.PacketListener](ctx, registry, nil)
+		pl, err := configurl.NewFromConfig[transport.PacketListener](ctx, registry, nil)
 		require.NoError(t, err)
 		require.IsType(t, &transport.UDPListener{}, pl)
-		same, err := configurl.Parse[transport.StreamDialer](ctx, registry, "  ")
+		same, err := configurl.New[transport.StreamDialer](ctx, registry, "  ")
 		require.NoError(t, err)
 		require.Same(t, sd, same)
-		_, streamErr := configurl.Parse[transport.StreamDialer](ctx, registry, "disorder:1|tlsfrag:1|split:1")
-		_, packetErr := configurl.Parse[transport.PacketDialer](ctx, registry, "override:port=53")
-		_, listenerErr := configurl.Parse[transport.PacketListener](ctx, registry, "quicprelude:count=0")
+		_, streamErr := configurl.New[transport.StreamDialer](ctx, registry, "disorder:1|tlsfrag:1|split:1")
+		_, packetErr := configurl.New[transport.PacketDialer](ctx, registry, "override:port=53")
+		_, listenerErr := configurl.New[transport.PacketListener](ctx, registry, "quicprelude:count=0")
 		for _, err := range []error{streamErr, packetErr, listenerErr} {
 			if defaults {
 				require.NoError(t, err)
@@ -85,13 +85,13 @@ func TestRegistryArbitraryTypesAndExternalImplementation(t *testing.T) {
 		readOnly := lookupOnly{registry}
 		_, mutable := any(readOnly).(configurl.MutableRegistry)
 		require.False(t, mutable)
-		values, err := configurl.Parse[[]string](context.Background(), readOnly, "value")
+		values, err := configurl.New[[]string](context.Background(), readOnly, "value")
 		require.NoError(t, err)
 		require.Equal(t, []string{"hello"}, values)
-		number, err := configurl.Parse[int](context.Background(), readOnly, "value")
+		number, err := configurl.New[int](context.Background(), readOnly, "value")
 		require.NoError(t, err)
 		require.Equal(t, 42, number)
-		values, err = configurl.New[[]string](context.Background(), readOnly, nil)
+		values, err = configurl.NewFromConfig[[]string](context.Background(), readOnly, nil)
 		require.NoError(t, err)
 		require.Nil(t, values)
 	}
@@ -107,7 +107,7 @@ func (b *registryBase) ListenPacket(context.Context) (net.PacketConn, error) { r
 
 func registerPassThrough[T any](registry configurl.MutableRegistry, name string) {
 	newInstance := func(ctx context.Context, cfg *configurl.Config) (T, error) {
-		return configurl.New[T](ctx, registry, cfg.BaseConfig)
+		return configurl.NewFromConfig[T](ctx, registry, cfg.BaseConfig)
 	}
 	configurl.Register(registry, name, newInstance)
 }
@@ -123,25 +123,25 @@ func TestParsersSeeCurrentBaseRegistrations(t *testing.T) {
 		configurl.RegisterInstance[transport.StreamDialer](registry, "", base)
 		configurl.RegisterInstance[transport.PacketDialer](registry, "", base)
 		configurl.RegisterInstance[transport.PacketListener](registry, "", base)
-		sd, err := configurl.Parse[transport.StreamDialer](ctx, registry, "custom|custom|tlsfrag:1|split:1")
+		sd, err := configurl.New[transport.StreamDialer](ctx, registry, "custom|custom|tlsfrag:1|split:1")
 		require.NoError(t, err)
 		_, err = sd.DialStream(ctx, "target.invalid:443")
 		require.ErrorIs(t, err, base.err)
-		pd, err := configurl.Parse[transport.PacketDialer](ctx, registry, "custom|override:port=53")
+		pd, err := configurl.New[transport.PacketDialer](ctx, registry, "custom|override:port=53")
 		require.NoError(t, err)
 		_, err = pd.DialPacket(ctx, "target.invalid:443")
 		require.ErrorIs(t, err, base.err)
-		pl, err := configurl.Parse[transport.PacketListener](ctx, registry, "custom|quicprelude:count=0")
+		pl, err := configurl.New[transport.PacketListener](ctx, registry, "custom|quicprelude:count=0")
 		require.NoError(t, err)
 		_, err = pl.ListenPacket(ctx)
 		require.ErrorIs(t, err, base.err)
 	}
 	base := &registryBase{}
 	configurl.RegisterInstance(registry, "concrete", base)
-	_, err := configurl.Parse[transport.StreamDialer](ctx, registry, "concrete")
+	_, err := configurl.New[transport.StreamDialer](ctx, registry, "concrete")
 	require.ErrorContains(t, err, "is not registered", "result types are matched exactly")
 	configurl.RegisterInstance[transport.StreamDialer](registry, "interface", base)
-	got, err := configurl.Parse[transport.StreamDialer](ctx, registry, "interface")
+	got, err := configurl.New[transport.StreamDialer](ctx, registry, "interface")
 	require.NoError(t, err)
 	require.Same(t, base, got)
 }
@@ -154,16 +154,16 @@ func TestRegistryInvalidParsers(t *testing.T) {
 	// Nil cannot represent an int, even though it is valid for interface results.
 	registry.RegisterParser(reflect.TypeFor[int](), "nil", func(context.Context, *configurl.Config) (any, error) { return nil, nil })
 	for _, cfg := range []string{"", "missing", "disabled", "wrong", "nil", "a||b"} {
-		_, err := configurl.Parse[int](ctx, registry, cfg)
+		_, err := configurl.New[int](ctx, registry, cfg)
 		require.Error(t, err, cfg)
 	}
-	_, err := configurl.New[int](ctx, nil, nil)
+	_, err := configurl.NewFromConfig[int](ctx, nil, nil)
 	require.ErrorContains(t, err, "nil registry")
-	_, err = configurl.New[int](ctx, registry, &configurl.Config{URL: url.URL{Path: "missing-scheme"}})
+	_, err = configurl.NewFromConfig[int](ctx, registry, &configurl.Config{URL: url.URL{Path: "missing-scheme"}})
 	require.ErrorContains(t, err, "no scheme")
 	parserErr := errors.New("parser failed")
 	configurl.Register(registry, "error", func(context.Context, *configurl.Config) (int, error) { return 0, parserErr })
-	_, err = configurl.Parse[int](ctx, registry, "error")
+	_, err = configurl.New[int](ctx, registry, "error")
 	require.ErrorIs(t, err, parserErr)
 }
 
@@ -187,7 +187,7 @@ func TestContextBaseWithConcurrentParsers(t *testing.T) {
 			defer wg.Done()
 			base := &registryBase{errors.New("own base")}
 			ctx, cancel := context.WithCancel(context.WithValue(context.Background(), baseKey{}, base))
-			sd, err := configurl.Parse[transport.StreamDialer](ctx, registry, "custom|tlsfrag:1")
+			sd, err := configurl.New[transport.StreamDialer](ctx, registry, "custom|tlsfrag:1")
 			cancel()
 			if err != nil {
 				t.Error(err)
@@ -200,7 +200,7 @@ func TestContextBaseWithConcurrentParsers(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	sd, err := configurl.Parse[transport.StreamDialer](context.Background(), registry, "custom")
+	sd, err := configurl.New[transport.StreamDialer](context.Background(), registry, "custom")
 	require.NoError(t, err)
 	require.IsType(t, &transport.TCPDialer{}, sd)
 }
@@ -214,7 +214,7 @@ func checkNilParserResults[T any](t *testing.T) {
 		return nil, nil
 	})
 	for _, name := range []string{"typed", "untyped"} {
-		value, err := configurl.Parse[T](context.Background(), registry, name)
+		value, err := configurl.New[T](context.Background(), registry, name)
 		require.NoError(t, err)
 		require.Nil(t, value)
 	}
@@ -232,7 +232,7 @@ func TestParserNilResults(t *testing.T) {
 	registry := configurl.NewRegistry()
 	var base *registryBase
 	configurl.RegisterInstance[transport.StreamDialer](registry, "typed-nil", base)
-	got, err := configurl.Parse[transport.StreamDialer](context.Background(), registry, "typed-nil")
+	got, err := configurl.New[transport.StreamDialer](context.Background(), registry, "typed-nil")
 	require.NoError(t, err)
 	require.True(t, got != nil, "a typed nil implementation must retain its dynamic type")
 	require.IsType(t, base, got)
@@ -269,12 +269,12 @@ func TestParserAdaptersPreserveArgumentsAndResults(t *testing.T) {
 	require.ErrorIs(t, err, parserErr)
 	require.Equal(t, 1, calls)
 
-	// Lookup captures the existing parser; New performs a fresh lookup.
+	// Lookup captures the existing parser; NewFromConfig performs a fresh lookup.
 	configurl.RegisterInstance(registry, "value", 7)
 	value, err = parser(ctx, cfg)
 	require.Equal(t, 42, value)
 	require.ErrorIs(t, err, parserErr)
-	value, err = configurl.New[int](ctx, registry, cfg)
+	value, err = configurl.NewFromConfig[int](ctx, registry, cfg)
 	require.NoError(t, err)
 	require.Equal(t, 7, value)
 
@@ -283,7 +283,7 @@ func TestParserAdaptersPreserveArgumentsAndResults(t *testing.T) {
 	registry.RegisterParser(reflect.TypeFor[transport.StreamDialer](), "raw", func(context.Context, *configurl.Config) (any, error) {
 		return base, nil
 	})
-	dialer, err := configurl.Parse[transport.StreamDialer](ctx, registry, "raw")
+	dialer, err := configurl.New[transport.StreamDialer](ctx, registry, "raw")
 	require.NoError(t, err)
 	require.Same(t, base, dialer)
 
@@ -291,6 +291,6 @@ func TestParserAdaptersPreserveArgumentsAndResults(t *testing.T) {
 	registry.RegisterParser(reflect.TypeFor[int](), "error", func(context.Context, *configurl.Config) (any, error) {
 		return nil, parserErr
 	})
-	_, err = configurl.Parse[int](ctx, registry, "error")
+	_, err = configurl.New[int](ctx, registry, "error")
 	require.ErrorIs(t, err, parserErr)
 }

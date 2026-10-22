@@ -126,7 +126,7 @@ func sanitizeConnectURL(u url.URL) (string, error) {
 // When H2 is negotiated via ALPN, CONNECT streams are multiplexed over the single TCP connection.
 func registerHTTPConnectStreamDialer(registry MutableRegistry, typeID string) {
 	newInstance := func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		sd, err := New[transport.StreamDialer](ctx, registry, config.BaseConfig)
+		sd, err := NewFromConfig[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -151,7 +151,7 @@ func registerHTTPConnectStreamDialer(registry MutableRegistry, typeID string) {
 // to the proxy. The base dialer is used to establish that connection.
 func registerH2ConnectStreamDialer(registry MutableRegistry, typeID string) {
 	newInstance := func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		sd, err := New[transport.StreamDialer](ctx, registry, config.BaseConfig)
+		sd, err := NewFromConfig[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -177,7 +177,7 @@ func registerH2ConnectStreamDialer(registry MutableRegistry, typeID string) {
 // With no previous element, the default packet listener creates a new UDP socket.
 func registerH3ConnectStreamDialer(registry MutableRegistry, typeID string) {
 	newInstance := func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		pl, err := New[transport.PacketListener](ctx, registry, config.BaseConfig)
+		pl, err := NewFromConfig[transport.PacketListener](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
