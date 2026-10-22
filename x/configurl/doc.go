@@ -225,7 +225,7 @@ DPI Evasion - To add packet splitting to a Shadowsocks server for enhanced DPI e
 
 A [Registry] looks up parsers by their Go result type and config URL scheme.
 A [MutableRegistry] also supports registration. Use [Register] to add a typed
-[Parser], [New] to construct an object from a config URL string, or [NewFromConfig]
+[BuildFunc], [New] to construct an object from a config URL string, or [NewFromConfig]
 to construct it from a parsed [Config]. Component parsers call NewFromConfig with
 the registry to construct their dependencies.
 
@@ -257,22 +257,22 @@ Use [RegisterBase] for a custom base parser. To reuse an existing dialer, regist
 a parser that returns it.
 
 The registry supports arbitrary Go result types, including interfaces and slices.
-Types are matched exactly: registering a Parser[transport.StreamDialer] uses
+Types are matched exactly: registering a BuildFunc[transport.StreamDialer] uses
 transport.StreamDialer as the result type.
 [Lookup] retrieves an existing typed parser, for example to wrap its behavior.
-External registries can implement Registry.LookupParser and
-MutableRegistry.RegisterParser without exposing their storage. Both methods use
-any to hold Parser[T] values unchanged. [Register] checks parser signatures at
-compile time. Direct callers of MutableRegistry.RegisterParser must supply a
-Parser[T], converting ordinary functions explicitly. Registration checks the function
-signature; [Lookup] checks the exact Parser[T] type before returning it.
+External registries can implement [Registry.Lookup] and
+[MutableRegistry.Register] without exposing their storage. Both methods use
+any to hold BuildFunc[T] values unchanged. [Register] checks parser signatures at
+compile time. Direct callers of [MutableRegistry.Register] must supply a
+BuildFunc[T], converting ordinary functions explicitly. Registration checks the function
+signature; [Lookup] checks the exact BuildFunc[T] type before returning it.
 No parser normalization or result conversion is needed. A nil parser disables an entry.
 
 Component libraries can expose Register* helpers accepting a MutableRegistry
 and type name, alongside direct constructors for callers that do not need config URLs.
 Complete registration before using the constructed components. The existing
 [ProviderContainer], [ExtensibleProvider], [TypeRegistry], and [BuildFunc] APIs
-remain available; Parser is an alias of BuildFunc.
+remain available.
 
 [Onion Routing]: https://en.wikipedia.org/wiki/Onion_routing
 */

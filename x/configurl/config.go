@@ -29,6 +29,9 @@ type Config struct {
 }
 
 // BuildFunc is a function that creates an instance of ObjectType given a [Config].
+// A nil config requests the default base. Forward ctx when constructing dependencies;
+// returned objects should use the context of each later operation rather than retain
+// the construction context.
 type BuildFunc[ObjectType any] func(ctx context.Context, config *Config) (ObjectType, error)
 
 // TypeRegistry registers config types.

@@ -23,21 +23,15 @@ import (
 	"golang.getoutline.org/sdk/transport"
 )
 
-// Parser constructs a value from a config. A nil config requests the default base.
-// Forward ctx to dependency parsers; returned objects should use the context of
-// each later operation rather than retain the construction context.
-// Parser and the existing BuildFunc are interchangeable.
-type Parser[T any] = BuildFunc[T]
-
 // Registry looks up parsers by their exact Go result type and config URL scheme.
 // Use [Lookup], [New], or [NewFromConfig] for typed access. Implementations may store
 // parsers however they choose; the interface does not expose storage or base instances.
 type Registry interface {
-	// LookupParser returns the parser registered for resultType and name, with ok
+	// Lookup returns the parser registered for resultType and name, with ok
 	// reporting whether the entry exists. The empty name denotes the default base
 	// parser, invoked with a nil Config. A registered nil parser disables the entry.
-	// A non-nil parser must be a Parser[T], where T is exactly resultType.
-	LookupParser(resultType reflect.Type, name string) (parser any, ok bool)
+	// A non-nil parser must be a BuildFunc[T], where T is exactly resultType.
+	Lookup(resultType reflect.Type, name string) (parser any, ok bool)
 }
 
 // MutableRegistry adds registration to [Registry]. Use [Register] or [RegisterBase]
@@ -47,14 +41,14 @@ type Registry interface {
 // must synchronize lookup and registration.
 type MutableRegistry interface {
 	Registry
-	// RegisterParser registers parser for resultType and name, replacing any existing
+	// Register registers parser for resultType and name, replacing any existing
 	// registration. The empty name selects the default base parser; a nil parser
 	// disables the entry.
-	// Callers must supply a Parser[T], where T is exactly resultType. The parser
+	// Callers must supply a BuildFunc[T], where T is exactly resultType. The parser
 	// is stored unchanged. Use [Register] for compile-time signature checking.
 	// It panics if resultType is nil or the function signature is incompatible.
-	// [Lookup] checks the exact Parser[T] type when retrieving the registration.
-	RegisterParser(resultType reflect.Type, name string, parser any)
+	// [Lookup] checks the exact BuildFunc[T] type when retrieving the registration.
+	Register(resultType reflect.Type, name string, parser any)
 }
 
 type parserKey struct {
@@ -67,17 +61,17 @@ type registry struct {
 	parsers map[parserKey]any
 }
 
-// LookupParser implements [Registry].
-func (r *registry) LookupParser(resultType reflect.Type, name string) (any, bool) {
+// Lookup implements [Registry].
+func (r *registry) Lookup(resultType reflect.Type, name string) (any, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	parser, ok := r.parsers[parserKey{resultType, name}]
 	return parser, ok
 }
 
-// RegisterParser implements [MutableRegistry].
-func (r *registry) RegisterParser(resultType reflect.Type, name string, parser any) {
-	validateParser(resultType, parser)
+// Register implements [MutableRegistry].
+func (r *registry) Register(resultType reflect.Type, name string, parser any) {
+	validateBuildFunc(resultType, parser)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.parsers[parserKey{resultType, name}] = parser
@@ -86,33 +80,33 @@ func (r *registry) RegisterParser(resultType reflect.Type, name string, parser a
 // Register registers a parser for a config URL scheme and exact result type T.
 // Use an interface type argument when registering an implementation of it.
 // The empty name registers the default base parser. A nil parser disables the entry.
-func Register[T any](r MutableRegistry, name string, parser Parser[T]) {
-	r.RegisterParser(reflect.TypeFor[T](), name, parser)
+func Register[T any](r MutableRegistry, name string, parser BuildFunc[T]) {
+	r.Register(reflect.TypeFor[T](), name, parser)
 }
 
 // RegisterBase registers the parser used when a config is nil.
 // It is a convenience function equivalent to calling [Register] with an empty name:
 // Register(r, "", parser).
-func RegisterBase[T any](r MutableRegistry, parser Parser[T]) {
+func RegisterBase[T any](r MutableRegistry, parser BuildFunc[T]) {
 	Register(r, "", parser)
 }
 
 // Lookup returns a typed parser without invoking it. It checks that the stored
-// value is a Parser[T]. Capturing it before replacing a registration
+// value is a BuildFunc[T]. Capturing it before replacing a registration
 // lets a new parser delegate to the previous parser.
-func Lookup[T any](r Registry, name string) (Parser[T], error) {
+func Lookup[T any](r Registry, name string) (BuildFunc[T], error) {
 	resultType := reflect.TypeFor[T]()
 	if r == nil {
 		return nil, fmt.Errorf("cannot look up %v parser %q in a nil registry", resultType, name)
 	}
-	parser, ok := r.LookupParser(resultType, name)
+	parser, ok := r.Lookup(resultType, name)
 	if !ok {
 		return nil, fmt.Errorf("%v config type %q is not registered", resultType, name)
 	}
 	if parser == nil {
 		return nil, fmt.Errorf("%v config type %q parser is nil", resultType, name)
 	}
-	newInstance, ok := parser.(Parser[T])
+	newInstance, ok := parser.(BuildFunc[T])
 	if !ok {
 		return nil, fmt.Errorf("%v config type %q has incompatible parser type %T", resultType, name, parser)
 	}
@@ -212,19 +206,27 @@ func RegisterDefaultTypes(registry MutableRegistry) MutableRegistry {
 	return registry
 }
 
-// validateParser checks the signature without changing or invoking the parser.
-// Lookup verifies the exact Parser[T] type when T is known.
-func validateParser(resultType reflect.Type, parser any) {
+// validateBuildFunc checks the signature without changing or invoking the parser.
+// Lookup verifies the exact BuildFunc[T] type when T is known.
+func validateBuildFunc(resultType reflect.Type, parser any) {
 	if resultType == nil {
 		panic("configurl: parser result type is nil")
 	}
 	if parser == nil {
 		return
 	}
-	parserType := reflect.FuncOf(
-		[]reflect.Type{reflect.TypeFor[context.Context](), reflect.TypeFor[*Config]()},
-		[]reflect.Type{resultType, reflect.TypeFor[error]()}, false,
-	)
+	// Derive the signature from BuildFunc, replacing only its component result T.
+	signature := reflect.TypeFor[BuildFunc[any]]()
+	inputs := make([]reflect.Type, signature.NumIn())
+	for i := range inputs {
+		inputs[i] = signature.In(i)
+	}
+	outputs := make([]reflect.Type, signature.NumOut())
+	for i := range outputs {
+		outputs[i] = signature.Out(i)
+	}
+	outputs[0] = resultType
+	parserType := reflect.FuncOf(inputs, outputs, signature.IsVariadic())
 	if !reflect.TypeOf(parser).AssignableTo(parserType) {
 		panic(fmt.Sprintf("configurl: parser for %v has type %T, want %v", resultType, parser, parserType))
 	}

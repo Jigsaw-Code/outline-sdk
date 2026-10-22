@@ -26,47 +26,47 @@ import (
 // This adapter is private and is used only to register the built-in named types.
 type providerContainerRegistry struct{ *ProviderContainer }
 
-// LookupParser implements [Registry].
-func (r providerContainerRegistry) LookupParser(resultType reflect.Type, name string) (any, bool) {
+// Lookup implements [Registry].
+func (r providerContainerRegistry) Lookup(resultType reflect.Type, name string) (any, bool) {
 	switch resultType {
 	case reflect.TypeFor[transport.StreamDialer]():
-		return lookupProviderParser(&r.StreamDialers, name)
+		return lookupProviderBuildFunc(&r.StreamDialers, name)
 	case reflect.TypeFor[transport.PacketDialer]():
-		return lookupProviderParser(&r.PacketDialers, name)
+		return lookupProviderBuildFunc(&r.PacketDialers, name)
 	case reflect.TypeFor[transport.PacketListener]():
-		return lookupProviderParser(&r.PacketListeners, name)
+		return lookupProviderBuildFunc(&r.PacketListeners, name)
 	default:
 		return nil, false
 	}
 }
 
-// RegisterParser implements [MutableRegistry].
-func (r providerContainerRegistry) RegisterParser(resultType reflect.Type, name string, parser any) {
-	validateParser(resultType, parser)
+// Register implements [MutableRegistry].
+func (r providerContainerRegistry) Register(resultType reflect.Type, name string, parser any) {
+	validateBuildFunc(resultType, parser)
 	switch resultType {
 	case reflect.TypeFor[transport.StreamDialer]():
-		registerProviderParser(&r.StreamDialers, name, parser)
+		registerProviderBuildFunc(&r.StreamDialers, name, parser)
 	case reflect.TypeFor[transport.PacketDialer]():
-		registerProviderParser(&r.PacketDialers, name, parser)
+		registerProviderBuildFunc(&r.PacketDialers, name, parser)
 	case reflect.TypeFor[transport.PacketListener]():
-		registerProviderParser(&r.PacketListeners, name, parser)
+		registerProviderBuildFunc(&r.PacketListeners, name, parser)
 	default:
 		panic("unsupported built-in configurl result type: " + resultType.String())
 	}
 }
 
-func lookupProviderParser[T comparable](provider *ExtensibleProvider[T], name string) (any, bool) {
+func lookupProviderBuildFunc[T comparable](provider *ExtensibleProvider[T], name string) (any, bool) {
 	if name == "" {
-		return Parser[T](provider.NewInstance), true
+		return BuildFunc[T](provider.NewInstance), true
 	}
 	parser, ok := provider.builders[name]
 	return parser, ok
 }
 
-func registerProviderParser[T comparable](provider *ExtensibleProvider[T], name string, parser any) {
+func registerProviderBuildFunc[T comparable](provider *ExtensibleProvider[T], name string, parser any) {
 	var newInstance BuildFunc[T]
 	if parser != nil {
-		newInstance = parser.(Parser[T])
+		newInstance = parser.(BuildFunc[T])
 	}
 	provider.RegisterType(name, newInstance)
 }
