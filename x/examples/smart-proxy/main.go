@@ -112,8 +112,14 @@ func main() {
 		})
 	}
 
-	configurl.RegisterInstance[transport.StreamDialer](registry, "", streamDialer)
-	configurl.RegisterInstance[transport.PacketDialer](registry, "", packetDialer)
+	newStreamDialer := func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
+		return streamDialer, nil
+	}
+	configurl.RegisterBase(registry, newStreamDialer)
+	newPacketDialer := func(context.Context, *configurl.Config) (transport.PacketDialer, error) {
+		return packetDialer, nil
+	}
+	configurl.RegisterBase(registry, newPacketDialer)
 	opts := smart.NewStrategyFinderOptions().
 		SetConfigURLRegistry(registry).
 		SetLogWriter(debugLog.Writer()).

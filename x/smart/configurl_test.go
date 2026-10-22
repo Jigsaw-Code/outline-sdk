@@ -32,7 +32,9 @@ import (
 
 func TestTLSSearchUsesRegistryAndKeepsContextsSeparate(t *testing.T) {
 	registry := configurl.NewDefaultRegistry()
-	configurl.RegisterInstance[transport.StreamDialer](registry, "", namedDialer("fallback"))
+	configurl.RegisterBase(registry, func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
+		return namedDialer("fallback"), nil
+	})
 	newInstance := func(ctx context.Context, cfg *configurl.Config) (transport.StreamDialer, error) {
 		return configurl.NewFromConfig[transport.StreamDialer](ctx, registry, cfg.BaseConfig)
 	}
@@ -128,9 +130,13 @@ func (d *countingDNSDialer) DialPacket(ctx context.Context, _ string) (net.Conn,
 
 func TestTLSAttemptsReuseDNSDialerAndCache(t *testing.T) {
 	registry := configurl.NewDefaultRegistry()
-	configurl.RegisterInstance[transport.StreamDialer](registry, "", namedDialer("selected"))
+	configurl.RegisterBase(registry, func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
+		return namedDialer("selected"), nil
+	})
 	pd := &countingDNSDialer{}
-	configurl.RegisterInstance[transport.PacketDialer](registry, "", pd)
+	configurl.RegisterBase(registry, func(context.Context, *configurl.Config) (transport.PacketDialer, error) {
+		return pd, nil
+	})
 	var mu sync.Mutex
 	var bases []transport.StreamDialer
 	newInstance := func(ctx context.Context, cfg *configurl.Config) (transport.StreamDialer, error) {
@@ -191,9 +197,15 @@ func TestTLSKeepsPacketBases(t *testing.T) {
 	pd := &countingDNSDialer{}
 	listener := &failingPacketListener{err: listenErr}
 	registry := configurl.NewDefaultRegistry()
-	configurl.RegisterInstance[transport.StreamDialer](registry, "", namedDialer("fallback"))
-	configurl.RegisterInstance[transport.PacketDialer](registry, "", pd)
-	configurl.RegisterInstance[transport.PacketListener](registry, "", listener)
+	configurl.RegisterBase(registry, func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
+		return namedDialer("fallback"), nil
+	})
+	configurl.RegisterBase(registry, func(context.Context, *configurl.Config) (transport.PacketDialer, error) {
+		return pd, nil
+	})
+	configurl.RegisterBase(registry, func(context.Context, *configurl.Config) (transport.PacketListener, error) {
+		return listener, nil
+	})
 	finder, err := NewStrategyFinderOptions().SetConfigURLRegistry(registry).New()
 	require.NoError(t, err)
 	dialer, _, err := finder.findTLS(context.Background(), nil, namedDialer("selected"), []string{"do53:address=192.0.2.53"})
@@ -260,8 +272,13 @@ func TestContextBaseDelegatesToOriginalParser(t *testing.T) {
 
 func TestFailedTLSSearchFallsBackToOriginalBase(t *testing.T) {
 	registry := configurl.NewDefaultRegistry()
-	configurl.RegisterInstance[transport.StreamDialer](registry, "", namedDialer("original"))
-	configurl.RegisterInstance[transport.PacketDialer](registry, "", &countingDNSDialer{})
+	configurl.RegisterBase(registry, func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
+		return namedDialer("original"), nil
+	})
+	pd := &countingDNSDialer{}
+	configurl.RegisterBase(registry, func(context.Context, *configurl.Config) (transport.PacketDialer, error) {
+		return pd, nil
+	})
 	var observed transport.StreamDialer
 	fail := func(ctx context.Context, cfg *configurl.Config) (transport.StreamDialer, error) {
 		var err error

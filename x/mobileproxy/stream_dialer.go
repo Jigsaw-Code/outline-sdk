@@ -73,8 +73,8 @@ func NewSmartDialerOptions(testDomains *StringList, config string) *SmartDialerO
 // fallback parser to parse nested config URLs. The first NewStreamDialer call
 // prepares the default stream parser for TLS search; finish configuring bases first.
 // Finish registrations before calling NewStreamDialer; do not change the registry
-// while dialers are being built or used. Use configurl.RegisterBase or
-// configurl.RegisterInstance to configure the default bases before first use.
+// while dialers are being built or used. Use configurl.RegisterBase to configure
+// the default bases before first use; its parser can return an existing dialer.
 //
 // This is a Go API. For mobile bindings, expose a Go helper such as
 // RegisterCustomComponent(opts *SmartDialerOptions, name string) from a bound

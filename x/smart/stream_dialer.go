@@ -76,11 +76,17 @@ func (f *StrategyFinder) initConfigURLRegistry() error {
 		return nil
 	}
 	registry := configurl.NewDefaultRegistry()
-	if f.StreamDialer != nil {
-		configurl.RegisterInstance[transport.StreamDialer](registry, "", f.StreamDialer)
+	if streamDialer := f.StreamDialer; streamDialer != nil {
+		newInstance := func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
+			return streamDialer, nil
+		}
+		configurl.RegisterBase(registry, newInstance)
 	}
-	if f.PacketDialer != nil {
-		configurl.RegisterInstance[transport.PacketDialer](registry, "", f.PacketDialer)
+	if packetDialer := f.PacketDialer; packetDialer != nil {
+		newInstance := func(context.Context, *configurl.Config) (transport.PacketDialer, error) {
+			return packetDialer, nil
+		}
+		configurl.RegisterBase(registry, newInstance)
 	}
 	registerContextStreamBase(registry)
 	f.configURLRegistry = registry

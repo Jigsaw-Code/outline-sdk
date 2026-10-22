@@ -128,12 +128,20 @@ fallback:
 	logger := log.New(logBuffer, "", log.LstdFlags)
 
 	registry := configurl.NewDefaultRegistry()
-	configurl.RegisterInstance[transport.StreamDialer](registry, "", &mockStreamDialer{
+	streamDialer := &mockStreamDialer{
 		base:                     &transport.TCPDialer{},
 		untrustedHTTPSServerAddr: ts.Listener.Addr().String(),
 		captivePortalServerAddr:  captivePortalAddr,
-	})
-	configurl.RegisterInstance[transport.PacketDialer](registry, "", &errorPacketDialer{})
+	}
+	newStreamDialer := func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
+		return streamDialer, nil
+	}
+	configurl.RegisterBase(registry, newStreamDialer)
+	packetDialer := &errorPacketDialer{}
+	newPacketDialer := func(context.Context, *configurl.Config) (transport.PacketDialer, error) {
+		return packetDialer, nil
+	}
+	configurl.RegisterBase(registry, newPacketDialer)
 	finder, err := smart.NewStrategyFinderOptions().
 		SetConfigURLRegistry(registry).
 		SetLogWriter(logger.Writer()).
