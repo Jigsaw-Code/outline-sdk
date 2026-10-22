@@ -63,10 +63,13 @@ func TestRegistryDefaults(t *testing.T) {
 // A registry implemented outside configurl, including a read-only lookup wrapper.
 type externalRegistry map[reflect.Type]map[string]configurl.Parser[any]
 
+// LookupParser implements [configurl.Registry].
 func (r externalRegistry) LookupParser(resultType reflect.Type, name string) (configurl.Parser[any], bool) {
 	p, ok := r[resultType][name]
 	return p, ok
 }
+
+// RegisterParser implements [configurl.MutableRegistry].
 func (r externalRegistry) RegisterParser(resultType reflect.Type, name string, parser configurl.Parser[any]) {
 	if r[resultType] == nil {
 		r[resultType] = make(map[string]configurl.Parser[any])
@@ -106,10 +109,15 @@ func TestRegistryArbitraryTypesAndExternalImplementation(t *testing.T) {
 
 type registryBase struct{ err error }
 
+// DialStream implements [transport.StreamDialer].
 func (b *registryBase) DialStream(context.Context, string) (transport.StreamConn, error) {
 	return nil, b.err
 }
+
+// DialPacket implements [transport.PacketDialer].
 func (b *registryBase) DialPacket(context.Context, string) (net.Conn, error) { return nil, b.err }
+
+// ListenPacket implements [transport.PacketListener].
 func (b *registryBase) ListenPacket(context.Context) (net.PacketConn, error) { return nil, b.err }
 
 func registerPassThrough[T any](registry configurl.MutableRegistry, name string) {

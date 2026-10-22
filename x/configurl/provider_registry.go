@@ -26,6 +26,7 @@ import (
 // This adapter is private and is used only to register the built-in named types.
 type providerContainerRegistry struct{ *ProviderContainer }
 
+// LookupParser implements [Registry].
 func (r providerContainerRegistry) LookupParser(resultType reflect.Type, name string) (Parser[any], bool) {
 	switch resultType {
 	case reflect.TypeFor[transport.StreamDialer]():
@@ -39,6 +40,7 @@ func (r providerContainerRegistry) LookupParser(resultType reflect.Type, name st
 	}
 }
 
+// RegisterParser implements [MutableRegistry].
 func (r providerContainerRegistry) RegisterParser(resultType reflect.Type, name string, parser Parser[any]) {
 	switch resultType {
 	case reflect.TypeFor[transport.StreamDialer]():

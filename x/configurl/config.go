@@ -33,6 +33,7 @@ type BuildFunc[ObjectType any] func(ctx context.Context, config *Config) (Object
 
 // TypeRegistry registers config types.
 type TypeRegistry[ObjectType any] interface {
+	// RegisterType registers a factory for the given subtype, replacing any existing one.
 	RegisterType(subtype string, newInstance BuildFunc[ObjectType])
 }
 
@@ -63,7 +64,7 @@ func (p *ExtensibleProvider[ObjectType]) ensureBuildersMap() map[string]BuildFun
 	return p.builders
 }
 
-// RegisterType will register a factory for the given subtype.
+// RegisterType implements [TypeRegistry].
 func (p *ExtensibleProvider[ObjectType]) RegisterType(subtype string, newInstance BuildFunc[ObjectType]) {
 	p.ensureBuildersMap()[subtype] = newInstance
 }

@@ -30,22 +30,27 @@ import (
 type Parser[T any] = BuildFunc[T]
 
 // Registry looks up parsers by their exact Go result type and config URL scheme.
-// The empty name denotes the default base parser, invoked with a nil Config.
-// On success, the parser must return a value assignable to resultType. An untyped
-// nil result is allowed for types that can be nil. A nil parser disables an entry.
-// Use Lookup, New, or NewFromConfig for typed access. Implementations may store
+// Use [Lookup], [New], or [NewFromConfig] for typed access. Implementations may store
 // parsers however they choose; the interface does not expose storage or base instances.
 type Registry interface {
+	// LookupParser returns the parser registered for resultType and name, with ok
+	// reporting whether the entry exists. The empty name denotes the default base
+	// parser, invoked with a nil Config. A registered nil parser disables the entry.
+	// When invoked successfully, the parser must return a value assignable to
+	// resultType. An untyped nil result is allowed for types that can be nil.
 	LookupParser(resultType reflect.Type, name string) (parser Parser[any], ok bool)
 }
 
-// MutableRegistry adds registration to Registry. RegisterParser replaces the
-// parser at the given type and name. Use Register or RegisterBase for type safety.
+// MutableRegistry adds registration to [Registry]. Use [Register] or [RegisterBase]
+// for type safety.
 // Configure registries before using components built from them; changing a parser
 // does not change objects already constructed. Implementations used concurrently
 // must synchronize lookup and registration.
 type MutableRegistry interface {
 	Registry
+	// RegisterParser registers parser for resultType and name, replacing any existing
+	// registration. The empty name selects the default base parser; a nil parser
+	// disables the entry.
 	RegisterParser(resultType reflect.Type, name string, parser Parser[any])
 }
 
@@ -59,6 +64,7 @@ type registry struct {
 	parsers map[parserKey]Parser[any]
 }
 
+// LookupParser implements [Registry].
 func (r *registry) LookupParser(resultType reflect.Type, name string) (Parser[any], bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -66,6 +72,7 @@ func (r *registry) LookupParser(resultType reflect.Type, name string) (Parser[an
 	return parser, ok
 }
 
+// RegisterParser implements [MutableRegistry].
 func (r *registry) RegisterParser(resultType reflect.Type, name string, parser Parser[any]) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -80,6 +87,8 @@ func Register[T any](r MutableRegistry, name string, parser Parser[T]) {
 }
 
 // RegisterBase registers the parser used when a config is nil.
+// It is a convenience function equivalent to calling [Register] with an empty name:
+// Register(r, "", parser).
 func RegisterBase[T any](r MutableRegistry, parser Parser[T]) {
 	Register(r, "", parser)
 }

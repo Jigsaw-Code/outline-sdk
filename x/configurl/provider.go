@@ -69,7 +69,7 @@ func (p *ProviderContainer) NewPacketDialer(ctx context.Context, configText stri
 	return p.PacketDialers.NewInstance(ctx, config)
 }
 
-// NewPacketListner creates a [transport.PacketListener] according to the config text.
+// NewPacketListener creates a [transport.PacketListener] according to the config text.
 func (p *ProviderContainer) NewPacketListener(ctx context.Context, configText string) (transport.PacketListener, error) {
 	config, err := ParseConfig(configText)
 	if err != nil {
