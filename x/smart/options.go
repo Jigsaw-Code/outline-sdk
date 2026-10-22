@@ -30,13 +30,26 @@ import (
 // registry and fallback registrations, before calling New. Do not copy options
 // after their first New call. Concurrent New calls are supported after setup.
 type StrategyFinderOptions struct {
-	testTimeout       time.Duration
-	logWriter         io.Writer
-	cache             StrategyResultCache
+	// testTimeout is the positive timeout for each connectivity test.
+	testTimeout time.Duration
+	// logWriter receives strategy selection logs; nil disables logging.
+	logWriter io.Writer
+	// cache stores successful strategies for later searches; nil disables caching.
+	cache StrategyResultCache
+	// configURLRegistry is shared by the finders created from these options.
+	// If nil, each New call creates and prepares a fresh default registry.
 	configURLRegistry configurl.MutableRegistry
-	registryMu        sync.Mutex
-	registryPrepared  bool
-	fallbackParsers   map[string]FallbackParser
+	// registryMu serializes registry preparation during concurrent New calls.
+	// It does not protect setters, which must finish before New is called.
+	registryMu sync.Mutex
+	// registryPrepared records whether these options have installed the context-aware
+	// default stream parser in configURLRegistry. It prevents repeated New calls from
+	// wrapping the previous wrapper again. New protects it with registryMu;
+	// SetConfigURLRegistry resets it during setup.
+	registryPrepared bool
+	// fallbackParsers maps YAML fallback type names to parsers. New copies this map
+	// into each finder so later changes to the options do not affect existing finders.
+	fallbackParsers map[string]FallbackParser
 }
 
 // NewStrategyFinderOptions creates options with a five-second test timeout.
