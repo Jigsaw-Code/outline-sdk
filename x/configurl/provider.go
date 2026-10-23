@@ -24,13 +24,26 @@ import (
 
 // ProviderContainer contains providers for the creation of network objects based on a config. The config is
 // extensible by registering providers for different config subtypes.
+//
+// Deprecated: Use [MutableRegistry], created with [NewRegistry] or [NewDefaultRegistry].
 type ProviderContainer struct {
-	StreamDialers   ExtensibleProvider[transport.StreamDialer]
-	PacketDialers   ExtensibleProvider[transport.PacketDialer]
+	// StreamDialers creates stream dialers.
+	//
+	// Deprecated: Use [Register] and [New] with [transport.StreamDialer].
+	StreamDialers ExtensibleProvider[transport.StreamDialer]
+	// PacketDialers creates packet dialers.
+	//
+	// Deprecated: Use [Register] and [New] with [transport.PacketDialer].
+	PacketDialers ExtensibleProvider[transport.PacketDialer]
+	// PacketListeners creates packet listeners.
+	//
+	// Deprecated: Use [Register] and [New] with [transport.PacketListener].
 	PacketListeners ExtensibleProvider[transport.PacketListener]
 }
 
 // NewProviderContainer creates a [ProviderContainer] with the base instances properly initialized.
+//
+// Deprecated: Use [NewRegistry] instead.
 func NewProviderContainer() *ProviderContainer {
 	return &ProviderContainer{
 		StreamDialers:   NewExtensibleProvider[transport.StreamDialer](&transport.TCPDialer{}),
@@ -40,6 +53,8 @@ func NewProviderContainer() *ProviderContainer {
 }
 
 // RegisterDefaultProviders registers a set of default providers with the providers in [ProviderContainer].
+//
+// Deprecated: Use [RegisterDefaultTypes] instead.
 func RegisterDefaultProviders(c *ProviderContainer) *ProviderContainer {
 	RegisterDefaultTypes(providerContainerRegistry{c})
 
@@ -47,11 +62,15 @@ func RegisterDefaultProviders(c *ProviderContainer) *ProviderContainer {
 }
 
 // NewDefaultProviders creates a [ProviderContainer] with a set of default providers already registered.
+//
+// Deprecated: Use [NewDefaultRegistry] instead.
 func NewDefaultProviders() *ProviderContainer {
 	return RegisterDefaultProviders(NewProviderContainer())
 }
 
 // NewStreamDialer creates a [transport.StreamDialer] according to the config text.
+//
+// Deprecated: Use [New] with [transport.StreamDialer] as its type argument.
 func (p *ProviderContainer) NewStreamDialer(ctx context.Context, configText string) (transport.StreamDialer, error) {
 	config, err := ParseConfig(configText)
 	if err != nil {
@@ -61,6 +80,8 @@ func (p *ProviderContainer) NewStreamDialer(ctx context.Context, configText stri
 }
 
 // NewPacketDialer creates a [transport.PacketDialer] according to the config text.
+//
+// Deprecated: Use [New] with [transport.PacketDialer] as its type argument.
 func (p *ProviderContainer) NewPacketDialer(ctx context.Context, configText string) (transport.PacketDialer, error) {
 	config, err := ParseConfig(configText)
 	if err != nil {
@@ -70,6 +91,8 @@ func (p *ProviderContainer) NewPacketDialer(ctx context.Context, configText stri
 }
 
 // NewPacketListener creates a [transport.PacketListener] according to the config text.
+//
+// Deprecated: Use [New] with [transport.PacketListener] as its type argument.
 func (p *ProviderContainer) NewPacketListener(ctx context.Context, configText string) (transport.PacketListener, error) {
 	config, err := ParseConfig(configText)
 	if err != nil {

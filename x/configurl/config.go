@@ -35,14 +35,22 @@ type Config struct {
 type BuildFunc[ObjectType any] func(ctx context.Context, config *Config) (ObjectType, error)
 
 // TypeRegistry registers config types.
+//
+// Deprecated: Use [MutableRegistry] and [Register] instead.
 type TypeRegistry[ObjectType any] interface {
 	// RegisterType registers a factory for the given subtype, replacing any existing one.
+	//
+	// Deprecated: Use [Register] with a [MutableRegistry] instead.
 	RegisterType(subtype string, newInstance BuildFunc[ObjectType])
 }
 
 // ExtensibleProvider creates instances of ObjectType in a way that can be extended via its [TypeRegistry] interface.
+//
+// Deprecated: Use [MutableRegistry] with [Register] and [NewFromConfig] instead.
 type ExtensibleProvider[ObjectType comparable] struct {
 	// Instance to return when config is nil.
+	//
+	// Deprecated: Use [RegisterBase] with a function that returns the base instance.
 	BaseInstance ObjectType
 	builders     map[string]BuildFunc[ObjectType]
 }
@@ -53,6 +61,8 @@ var (
 )
 
 // NewExtensibleProvider creates an [ExtensibleProvider] with the given base instance.
+//
+// Deprecated: Use [NewRegistry] and [RegisterBase] instead.
 func NewExtensibleProvider[ObjectType comparable](baseInstance ObjectType) ExtensibleProvider[ObjectType] {
 	return ExtensibleProvider[ObjectType]{
 		BaseInstance: baseInstance,
@@ -68,11 +78,15 @@ func (p *ExtensibleProvider[ObjectType]) ensureBuildersMap() map[string]BuildFun
 }
 
 // RegisterType implements [TypeRegistry].
+//
+// Deprecated: Use [Register] with a [MutableRegistry] instead.
 func (p *ExtensibleProvider[ObjectType]) RegisterType(subtype string, newInstance BuildFunc[ObjectType]) {
 	p.ensureBuildersMap()[subtype] = newInstance
 }
 
 // NewInstance creates a new instance of ObjectType according to the config.
+//
+// Deprecated: Use [NewFromConfig] with a [Registry] instead.
 func (p *ExtensibleProvider[ObjectType]) NewInstance(ctx context.Context, config *Config) (ObjectType, error) {
 	var zero ObjectType
 	if config == nil {

@@ -13,19 +13,19 @@
 // limitations under the License.
 
 /*
-Package configurl provides a flexible and extensible framework for creating network objects based on textual configurations.
-This enables dynamic, composable, and easily shared transport configurations, making it ideal for complex networking scenarios.
+Package configurl constructs [transport.StreamDialer], [transport.PacketDialer],
+and [transport.PacketListener] components from composable config URL strings.
 
-This package is currently experimental and primarily serves as a demonstration of its capabilities and potential use cases.
+Create a [MutableRegistry] with [NewDefaultRegistry] to use the SDK's built-in
+components, then call [New] with the type of component to construct:
 
-Key Features:
+	registry := configurl.NewDefaultRegistry()
+	dialer, err := configurl.New[transport.StreamDialer](ctx, registry, "tlsfrag:1|split:2")
 
-  - Ease of Use: Define and create complex transport stacks using simple, human-readable text strings.
-  - Serialization: Easily share and persist configurations between different components or users.
-  - Dynamic Configuration: Modify an application's transport behavior at runtime.
-  - Composability: Nest and combine various transport strategies to create sophisticated configurations.
-  - DPI Evasion: Implement advanced strategies like packet splitting and TLS fragmentation to evade Deep Packet Inspection (DPI).
-  - Extensibility: Define custom transport strategies and integrate them seamlessly.
+[Register] adds custom component types to a MutableRegistry. Pass the read-only
+[Registry] interface to code that only needs to construct components. For a parsed
+[Config], use [NewFromConfig]. The section on defining custom strategies shows how
+to publish reusable component registration helpers.
 
 # Configuration Format
 
@@ -270,9 +270,7 @@ No parser normalization or result conversion is needed. A nil parser disables an
 
 Component libraries can expose Register* helpers accepting a MutableRegistry
 and type name, alongside direct constructors for callers that do not need config URLs.
-Complete registration before using the constructed components. The existing
-[ProviderContainer], [ExtensibleProvider], [TypeRegistry], and [BuildFunc] APIs
-remain available.
+Complete registration before using the constructed components.
 
 [Onion Routing]: https://en.wikipedia.org/wiki/Onion_routing
 */
