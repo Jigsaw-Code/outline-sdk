@@ -175,26 +175,26 @@ func mapToAny(in map[string]any, out any) error {
 // newDNSResolverFromEntry creates a [dns.Resolver] based on the config, returning the resolver and
 // a boolean indicating whether the resolver is secure (TLS, HTTPS) and a possible error.
 func (f *StrategyFinder) newDNSResolverFromEntry(ctx context.Context, entry dnsEntryConfig) (dns.Resolver, bool, error) {
-	var baseSD transport.StreamDialer
-	var basePD transport.PacketDialer
-	if entry.System == nil {
-		var err error
-		if entry.HTTPS != nil || entry.TLS != nil || entry.TCP != nil {
-			baseSD, err = configurl.NewFromConfig[transport.StreamDialer](ctx, f.configURLRegistry, nil)
-			if err != nil {
-				return nil, false, fmt.Errorf("DNS requires a stream base instance: %w", err)
-			}
-		}
-		if entry.UDP != nil {
-			basePD, err = configurl.NewFromConfig[transport.PacketDialer](ctx, f.configURLRegistry, nil)
-			if err != nil {
-				return nil, false, fmt.Errorf("DNS requires a packet base instance: %w", err)
-			}
-		}
-	}
 	if entry.System != nil {
 		return nil, false, nil
-	} else if cfg := entry.HTTPS; cfg != nil {
+	}
+
+	var baseSD transport.StreamDialer
+	var basePD transport.PacketDialer
+	var err error
+	if entry.HTTPS != nil || entry.TLS != nil || entry.TCP != nil {
+		baseSD, err = configurl.NewFromConfig[transport.StreamDialer](ctx, f.configURLRegistry, nil)
+		if err != nil {
+			return nil, false, fmt.Errorf("DNS requires a stream base instance: %w", err)
+		}
+	}
+	if entry.UDP != nil {
+		basePD, err = configurl.NewFromConfig[transport.PacketDialer](ctx, f.configURLRegistry, nil)
+		if err != nil {
+			return nil, false, fmt.Errorf("DNS requires a packet base instance: %w", err)
+		}
+	}
+	if cfg := entry.HTTPS; cfg != nil {
 		if cfg.Name == "" {
 			return nil, true, errors.New("https entry has empty server name")
 		}
