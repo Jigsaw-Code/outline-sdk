@@ -110,6 +110,9 @@ func (o *StrategyFinderOptions) New() (*StrategyFinder, error) {
 		}
 	}
 	registry := o.configURLRegistry
+	// Prepare the stream base to accept a search-specific DNS dialer from the
+	// construction context. This lets TLS strategies share that dialer and its
+	// cache while DNS discovery and fallbacks keep using the registered base.
 	if registry == nil {
 		registry = configurl.NewDefaultRegistry()
 		registerContextStreamBase(registry)

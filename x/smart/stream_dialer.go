@@ -88,6 +88,8 @@ func (f *StrategyFinder) initConfigURLRegistry() error {
 		}
 		configurl.RegisterBase(registry, newInstance)
 	}
+	// Allow TLS searches to override the imported stream base with their selected
+	// DNS dialer; DNS discovery and fallbacks continue to use the imported base.
 	registerContextStreamBase(registry)
 	f.configURLRegistry = registry
 	f.StreamDialer = nil
@@ -179,22 +181,11 @@ func (f *StrategyFinder) newDNSResolverFromEntry(ctx context.Context, entry dnsE
 		return nil, false, nil
 	}
 
-	var baseSD transport.StreamDialer
-	var basePD transport.PacketDialer
-	var err error
-	if entry.HTTPS != nil || entry.TLS != nil || entry.TCP != nil {
-		baseSD, err = configurl.NewFromConfig[transport.StreamDialer](ctx, f.configURLRegistry, nil)
+	if cfg := entry.HTTPS; cfg != nil {
+		baseSD, err := configurl.NewFromConfig[transport.StreamDialer](ctx, f.configURLRegistry, nil)
 		if err != nil {
 			return nil, false, fmt.Errorf("DNS requires a stream base instance: %w", err)
 		}
-	}
-	if entry.UDP != nil {
-		basePD, err = configurl.NewFromConfig[transport.PacketDialer](ctx, f.configURLRegistry, nil)
-		if err != nil {
-			return nil, false, fmt.Errorf("DNS requires a packet base instance: %w", err)
-		}
-	}
-	if cfg := entry.HTTPS; cfg != nil {
 		if cfg.Name == "" {
 			return nil, true, errors.New("https entry has empty server name")
 		}
@@ -210,6 +201,10 @@ func (f *StrategyFinder) newDNSResolverFromEntry(ctx context.Context, entry dnsE
 		dohURL := url.URL{Scheme: "https", Host: net.JoinHostPort(cfg.Name, port), Path: "/dns-query"}
 		return dns.NewHTTPSResolver(baseSD, serverAddr, dohURL.String()), true, nil
 	} else if cfg := entry.TLS; cfg != nil {
+		baseSD, err := configurl.NewFromConfig[transport.StreamDialer](ctx, f.configURLRegistry, nil)
+		if err != nil {
+			return nil, false, fmt.Errorf("DNS requires a stream base instance: %w", err)
+		}
 		if cfg.Name == "" {
 			return nil, true, errors.New("tls entry has empty server name")
 		}
@@ -217,12 +212,16 @@ func (f *StrategyFinder) newDNSResolverFromEntry(ctx context.Context, entry dnsE
 		if serverAddr == "" {
 			serverAddr = cfg.Name
 		}
-		_, _, err := net.SplitHostPort(serverAddr)
+		_, _, err = net.SplitHostPort(serverAddr)
 		if err != nil {
 			serverAddr = net.JoinHostPort(serverAddr, "853")
 		}
 		return dns.NewTLSResolver(baseSD, serverAddr, cfg.Name), true, nil
 	} else if cfg := entry.TCP; cfg != nil {
+		baseSD, err := configurl.NewFromConfig[transport.StreamDialer](ctx, f.configURLRegistry, nil)
+		if err != nil {
+			return nil, false, fmt.Errorf("DNS requires a stream base instance: %w", err)
+		}
 		if cfg.Address == "" {
 			return nil, false, errors.New("tcp entry has empty server address")
 		}
@@ -234,6 +233,10 @@ func (f *StrategyFinder) newDNSResolverFromEntry(ctx context.Context, entry dnsE
 		serverAddr := net.JoinHostPort(host, port)
 		return dns.NewTCPResolver(baseSD, serverAddr), false, nil
 	} else if cfg := entry.UDP; cfg != nil {
+		basePD, err := configurl.NewFromConfig[transport.PacketDialer](ctx, f.configURLRegistry, nil)
+		if err != nil {
+			return nil, false, fmt.Errorf("DNS requires a packet base instance: %w", err)
+		}
 		if cfg.Address == "" {
 			return nil, false, errors.New("udp entry has empty server address")
 		}
@@ -401,14 +404,50 @@ func (f *StrategyFinder) findDNS(ctx context.Context, testDomains []string, dnsC
 	return resolver.Resolver, &resolver.Config, nil
 }
 
+// streamBaseParserKey identifies a StreamDialer constructor override in a config
+// construction context. It is private so only SmartDialer can set the override.
+type streamBaseParserKey struct{}
+
+// withStreamBaseParser returns a construction context whose default StreamDialer
+// is built by parser through the wrapper installed by registerContextStreamBase.
+// The override applies only to the returned context and its children. A nil parser
+// delegates to the original registered base.
+func withStreamBaseParser(ctx context.Context, parser configurl.BuildFunc[transport.StreamDialer]) context.Context {
+	return context.WithValue(ctx, streamBaseParserKey{}, parser)
+}
+
+// registerContextStreamBase wraps the registry's default StreamDialer constructor
+// so findTLS can use its selected DNS dialer as the base for every TLS strategy.
+// The wrapper uses the constructor supplied by withStreamBaseParser when present;
+// otherwise, DNS discovery and fallback construction use the original base.
+// Install it during setup, after base registrations and before searches begin.
+func registerContextStreamBase(registry configurl.MutableRegistry) {
+	// Capture the original constructor: looking it up after registering the wrapper
+	// would recurse. A TLS override also works when the original base is unavailable.
+	originalBase, originalErr := configurl.Lookup[transport.StreamDialer](registry, "")
+	newBase := func(ctx context.Context, config *configurl.Config) (transport.StreamDialer, error) {
+		if override, ok := ctx.Value(streamBaseParserKey{}).(configurl.BuildFunc[transport.StreamDialer]); ok && override != nil {
+			return override(ctx, config)
+		}
+		if originalErr != nil {
+			return nil, originalErr
+		}
+		return originalBase(ctx, config)
+	}
+	configurl.RegisterBase(registry, newBase)
+}
+
 func (f *StrategyFinder) findTLS(
 	ctx context.Context, testDomains []string, baseDialer transport.StreamDialer, tlsConfig []string,
 ) (transport.StreamDialer, string, error) {
 	if len(tlsConfig) == 0 {
 		return nil, "", errors.New("config for TLS is empty. Please specify at least one transport")
 	}
-	// Each attempt gets the same prebuilt DNS dialer and cache through the
-	// default stream parser. Neither registrations nor config URLs change here.
+	// All TLS strategies must use the selected DNS resolver. Return the same
+	// prebuilt baseDialer so every attempt shares its DNS cache. The wrapper from
+	// registerContextStreamBase reads this constructor from the context, including
+	// when nested config components request a base. Scoping the override to this
+	// search keeps concurrent searches and later fallbacks on their own bases.
 	newBase := func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
 		return baseDialer, nil
 	}
