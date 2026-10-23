@@ -13,19 +13,19 @@
 // limitations under the License.
 
 /*
-Package configurl provides a flexible and extensible framework for creating network objects based on textual configurations.
-This enables dynamic, composable, and easily shared transport configurations, making it ideal for complex networking scenarios.
+Package configurl constructs [transport.StreamDialer], [transport.PacketDialer],
+and [transport.PacketListener] components from composable config URL strings.
 
-This package is currently experimental and primarily serves as a demonstration of its capabilities and potential use cases.
+Create a [MutableRegistry] with [NewDefaultRegistry] to use the SDK's built-in
+components, then call [New] with the type of component to construct:
 
-Key Features:
+	registry := configurl.NewDefaultRegistry()
+	dialer, err := configurl.New[transport.StreamDialer](ctx, registry, "tlsfrag:1|split:2")
 
-  - Ease of Use: Define and create complex transport stacks using simple, human-readable text strings.
-  - Serialization: Easily share and persist configurations between different components or users.
-  - Dynamic Configuration: Modify an application's transport behavior at runtime.
-  - Composability: Nest and combine various transport strategies to create sophisticated configurations.
-  - DPI Evasion: Implement advanced strategies like packet splitting and TLS fragmentation to evade Deep Packet Inspection (DPI).
-  - Extensibility: Define custom transport strategies and integrate them seamlessly.
+[Register] adds custom component types to a MutableRegistry. Pass the read-only
+[Registry] interface to code that only needs to construct components. For a parsed
+[Config], use [NewFromConfig]. The section on defining custom strategies shows how
+to publish reusable component registration helpers.
 
 # Configuration Format
 
@@ -223,31 +223,54 @@ DPI Evasion - To add packet splitting to a Shadowsocks server for enhanced DPI e
 
 # Defining custom strategies
 
-Core Concepts:
+A [Registry] looks up parsers by their Go result type and config URL scheme.
+A [MutableRegistry] also supports registration. Use [Register] to add a typed
+[BuildFunc], [New] to construct an object from a config URL string, or [NewFromConfig]
+to construct it from a parsed [Config]. Component parsers call NewFromConfig with
+the registry to construct their dependencies.
 
-  - [ProviderContainer]: A central registry for managing different types of network object builders (StreamDialers, PacketDialers, PacketListeners).
-  - [ExtensibleProvider]: A type that provides a mechanism to register and retrieve builders for specific subtypes of network objects.
-  - [BuildFunc]: A function that creates an instance of a network object from a parsed configuration.
-  - [Config]: A parsed representation of the configuration string.
-  - [TypeRegistry]: An interface for registering new transport types.
+For example, this component delegates to the configuration on its left:
 
-You can define your custom strategy by implementing and registering [BuildFunc[ObjectType]] functions:
+	func RegisterCustomComponent(registry configurl.MutableRegistry, typeID string) {
+		newInstance := func(ctx context.Context, config *configurl.Config) (transport.StreamDialer, error) {
+			return configurl.NewFromConfig[transport.StreamDialer](ctx, registry, config.BaseConfig)
+		}
+		configurl.Register(registry, typeID, newInstance)
+	}
 
-	// Create new config parser.
-	// p := configurl.NewProviderContainer()
-	// or
-	p := configurl.NewDefaultProviders()
-	// Register your custom dialer.
-	p.StreamDialers.RegisterType("custom", func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-	  // Build logic
-	  // ...
-	})
-	p.PacketDialers.RegisterType("custom", func(ctx context.Context, config *Config) (transport.PacketDialer, error) {
-	  // Build logic
-	  // ...
-	})
-	// Then use it
-	dialer, err := p.NewStreamDialer(context.Background(), "custom://config")
+The app creates a registry, registers the component, and constructs a dialer:
+
+	registry := configurl.NewDefaultRegistry()
+	RegisterCustomComponent(registry, "custom")
+	dialer, err := configurl.New[transport.StreamDialer](context.Background(), registry, "custom|tlsfrag:1")
+
+Parsers forward the construction context when calling NewFromConfig for their
+dependencies. NewFromConfig looks up the current registration on each call.
+Returned objects should use the context of each later dial or listen operation,
+rather than retain the construction context.
+
+[NewRegistry] initializes the base [transport.StreamDialer],
+[transport.PacketDialer], and [transport.PacketListener].
+[NewDefaultRegistry] also registers the SDK's built-in configuration types.
+A nil Config invokes the default base parser, registered under the empty name.
+Use [RegisterBase] for a custom base parser. To reuse an existing dialer, register
+a parser that returns it.
+
+The registry supports arbitrary Go result types, including interfaces and slices.
+Types are matched exactly: registering a BuildFunc[transport.StreamDialer] uses
+transport.StreamDialer as the result type.
+[Lookup] retrieves an existing typed parser, for example to wrap its behavior.
+External registries can implement [Registry.Lookup] and
+[MutableRegistry.Register] without exposing their storage. Both methods use
+any to hold BuildFunc[T] values unchanged. [Register] checks parser signatures at
+compile time. Direct callers of [MutableRegistry.Register] must supply a
+BuildFunc[T], converting ordinary functions explicitly. Registration checks the function
+signature; [Lookup] checks the exact BuildFunc[T] type before returning it.
+No parser normalization or result conversion is needed. A nil parser disables an entry.
+
+Component libraries can expose Register* helpers accepting a MutableRegistry
+and type name, alongside direct constructors for callers that do not need config URLs.
+Complete registration before using the constructed components.
 
 [Onion Routing]: https://en.wikipedia.org/wiki/Onion_routing
 */

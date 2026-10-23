@@ -27,16 +27,16 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 )
 
-func registerDO53StreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer], newPD BuildFunc[transport.PacketDialer]) {
-	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+func registerDO53StreamDialer(registry MutableRegistry, typeID string) {
+	newInstance := func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		if config == nil {
 			return nil, fmt.Errorf("emtpy do53 config")
 		}
-		sd, err := newSD(ctx, config.BaseConfig)
+		sd, err := NewFromConfig[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
-		pd, err := newPD(ctx, config.BaseConfig)
+		pd, err := NewFromConfig[transport.PacketDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -45,15 +45,16 @@ func registerDO53StreamDialer(r TypeRegistry[transport.StreamDialer], typeID str
 			return nil, err
 		}
 		return dns.NewStreamDialer(resolver, sd)
-	})
+	}
+	Register(registry, typeID, newInstance)
 }
 
-func registerDOHStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
-	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+func registerDOHStreamDialer(registry MutableRegistry, typeID string) {
+	newInstance := func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
 		if config == nil {
 			return nil, fmt.Errorf("emtpy doh config")
 		}
-		sd, err := newSD(ctx, config.BaseConfig)
+		sd, err := NewFromConfig[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -62,7 +63,8 @@ func registerDOHStreamDialer(r TypeRegistry[transport.StreamDialer], typeID stri
 			return nil, err
 		}
 		return dns.NewStreamDialer(resolver, sd)
-	})
+	}
+	Register(registry, typeID, newInstance)
 }
 
 func newDO53Resolver(config url.URL, sd transport.StreamDialer, pd transport.PacketDialer) (dns.Resolver, error) {

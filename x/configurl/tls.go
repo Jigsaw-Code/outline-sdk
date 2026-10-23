@@ -24,9 +24,9 @@ import (
 	"golang.getoutline.org/sdk/transport/tls"
 )
 
-func registerTLSStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
-	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		sd, err := newSD(ctx, config.BaseConfig)
+func registerTLSStreamDialer(registry MutableRegistry, typeID string) {
+	newInstance := func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		sd, err := NewFromConfig[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -35,7 +35,8 @@ func registerTLSStreamDialer(r TypeRegistry[transport.StreamDialer], typeID stri
 			return nil, err
 		}
 		return tls.NewStreamDialer(sd, options...)
-	})
+	}
+	Register(registry, typeID, newInstance)
 }
 
 func parseOptions(configURL url.URL) ([]tls.ClientOption, error) {

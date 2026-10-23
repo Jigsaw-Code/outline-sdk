@@ -124,9 +124,9 @@ func sanitizeConnectURL(u url.URL) (string, error) {
 // The base dialer (from the previous element in the pipe chain) is used to establish
 // the TCP connection to the proxy. TLS is negotiated by the transport itself.
 // When H2 is negotiated via ALPN, CONNECT streams are multiplexed over the single TCP connection.
-func registerHTTPConnectStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
-	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		sd, err := newSD(ctx, config.BaseConfig)
+func registerHTTPConnectStreamDialer(registry MutableRegistry, typeID string) {
+	newInstance := func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		sd, err := NewFromConfig[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -139,7 +139,8 @@ func registerHTTPConnectStreamDialer(r TypeRegistry[transport.StreamDialer], typ
 			return nil, err
 		}
 		return httpconnect.NewConnectClient(tr, opts.client...)
-	})
+	}
+	Register(registry, typeID, newInstance)
 }
 
 // registerH2ConnectStreamDialer registers a pure HTTP/2 CONNECT proxy transport.
@@ -148,9 +149,9 @@ func registerHTTPConnectStreamDialer(r TypeRegistry[transport.StreamDialer], typ
 //
 // Unlike httpconnect, all CONNECT streams are multiplexed over a single TCP connection
 // to the proxy. The base dialer is used to establish that connection.
-func registerH2ConnectStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
-	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		sd, err := newSD(ctx, config.BaseConfig)
+func registerH2ConnectStreamDialer(registry MutableRegistry, typeID string) {
+	newInstance := func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		sd, err := NewFromConfig[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -163,7 +164,8 @@ func registerH2ConnectStreamDialer(r TypeRegistry[transport.StreamDialer], typeI
 			return nil, err
 		}
 		return httpconnect.NewConnectClient(tr, opts.client...)
-	})
+	}
+	Register(registry, typeID, newInstance)
 }
 
 // registerH3ConnectStreamDialer registers an HTTP/3 CONNECT proxy transport over QUIC.
@@ -173,9 +175,9 @@ func registerH2ConnectStreamDialer(r TypeRegistry[transport.StreamDialer], typeI
 // QUIC runs over a single [net.PacketConn] obtained from the base packet listener (from the
 // previous element in the pipe chain), shared across all CONNECT streams (QUIC multiplexing).
 // With no previous element, the default packet listener creates a new UDP socket.
-func registerH3ConnectStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newPL BuildFunc[transport.PacketListener]) {
-	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		pl, err := newPL(ctx, config.BaseConfig)
+func registerH3ConnectStreamDialer(registry MutableRegistry, typeID string) {
+	newInstance := func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		pl, err := NewFromConfig[transport.PacketListener](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -193,5 +195,6 @@ func registerH3ConnectStreamDialer(r TypeRegistry[transport.StreamDialer], typeI
 			return nil, err
 		}
 		return httpconnect.NewConnectClient(tr, opts.client...)
-	})
+	}
+	Register(registry, typeID, newInstance)
 }

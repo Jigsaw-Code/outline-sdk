@@ -23,9 +23,9 @@ import (
 	"golang.getoutline.org/sdk/transport/tlsfrag"
 )
 
-func registerTLSFragStreamDialer(r TypeRegistry[transport.StreamDialer], typeID string, newSD BuildFunc[transport.StreamDialer]) {
-	r.RegisterType(typeID, func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
-		sd, err := newSD(ctx, config.BaseConfig)
+func registerTLSFragStreamDialer(registry MutableRegistry, typeID string) {
+	newInstance := func(ctx context.Context, config *Config) (transport.StreamDialer, error) {
+		sd, err := NewFromConfig[transport.StreamDialer](ctx, registry, config.BaseConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -35,5 +35,6 @@ func registerTLSFragStreamDialer(r TypeRegistry[transport.StreamDialer], typeID 
 			return nil, fmt.Errorf("invalid tlsfrag option: %v. It should be in tlsfrag:<number> format", lenStr)
 		}
 		return tlsfrag.NewFixedLenStreamDialer(sd, fixedLen)
-	})
+	}
+	Register(registry, typeID, newInstance)
 }
