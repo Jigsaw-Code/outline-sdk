@@ -46,54 +46,67 @@ type YAMLNode any
 type FallbackParser func(context.Context, YAMLNode) (dialer transport.StreamDialer, configSignature string, err error)
 
 // StrategyFinder searches for working DNS, TLS, and fallback strategies.
-// Use [NewStrategyFinderOptions] to configure a finder. Finish configuration before
-// calling NewDialer, and do not copy a finder after its first use.
+// Use [NewStrategyFinderOptions] to configure a finder. Do not change configuration
+// while NewDialer is running, or copy a finder after its first use.
 type StrategyFinder struct {
 	TestTimeout time.Duration
 	LogWriter   io.Writer
 	Cache       StrategyResultCache
 
+	// StreamDialer is the base for finders constructed directly. Nil uses a TCPDialer.
+	//
 	// Deprecated: Use configurl.RegisterBase[transport.StreamDialer] on the registry passed to
-	// StrategyFinderOptions.SetConfigURLRegistry instead. NewDialer imports and clears this field.
+	// StrategyFinderOptions.SetConfigURLRegistry instead.
 	StreamDialer transport.StreamDialer
+	// PacketDialer is the base for finders constructed directly. Nil uses a UDPDialer.
+	//
 	// Deprecated: Use configurl.RegisterBase[transport.PacketDialer] on the registry passed to
-	// StrategyFinderOptions.SetConfigURLRegistry instead. NewDialer imports and clears this field.
+	// StrategyFinderOptions.SetConfigURLRegistry instead.
 	PacketDialer transport.PacketDialer
 
 	initMu            sync.Mutex
 	configURLRegistry configurl.Registry
+	// usesLegacyDialers is true when configURLRegistry was created lazily to read
+	// StreamDialer and PacketDialer. It is false for registries supplied by options.
+	// initMu protects initialization of this flag and configURLRegistry.
+	usesLegacyDialers bool
 	fallbackParsers   map[string]FallbackParser
 }
 
-// initConfigURLRegistry imports legacy dialers once, before any search work.
+// initConfigURLRegistry creates a registry once for a finder constructed directly.
+// Its base constructors read the legacy fields on each invocation, so changes
+// between searches apply to newly constructed dialers without changing existing ones.
 func (f *StrategyFinder) initConfigURLRegistry() error {
 	f.initMu.Lock()
 	defer f.initMu.Unlock()
 	if f.configURLRegistry != nil {
-		if f.StreamDialer != nil || f.PacketDialer != nil {
+		if !f.usesLegacyDialers && (f.StreamDialer != nil || f.PacketDialer != nil) {
 			return errors.New("config URL registry and deprecated StreamDialer/PacketDialer fields are mutually exclusive")
 		}
 		return nil
 	}
 	registry := configurl.NewDefaultRegistry()
-	if streamDialer := f.StreamDialer; streamDialer != nil {
-		newInstance := func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
+	defaultSD := &transport.TCPDialer{}
+	newStreamDialer := func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
+		if streamDialer := f.StreamDialer; streamDialer != nil {
 			return streamDialer, nil
 		}
-		configurl.RegisterBase(registry, newInstance)
+		return defaultSD, nil
 	}
-	if packetDialer := f.PacketDialer; packetDialer != nil {
-		newInstance := func(context.Context, *configurl.Config) (transport.PacketDialer, error) {
+	configurl.RegisterBase(registry, newStreamDialer)
+	defaultPD := &transport.UDPDialer{}
+	newPacketDialer := func(context.Context, *configurl.Config) (transport.PacketDialer, error) {
+		if packetDialer := f.PacketDialer; packetDialer != nil {
 			return packetDialer, nil
 		}
-		configurl.RegisterBase(registry, newInstance)
+		return defaultPD, nil
 	}
-	// Allow TLS searches to override the imported stream base with their selected
-	// DNS dialer; DNS discovery and fallbacks continue to use the imported base.
+	configurl.RegisterBase(registry, newPacketDialer)
+	// Allow TLS searches to override the legacy stream base with their selected
+	// DNS dialer; DNS discovery and fallbacks continue to read the legacy fields.
 	registerContextStreamBase(registry)
 	f.configURLRegistry = registry
-	f.StreamDialer = nil
-	f.PacketDialer = nil
+	f.usesLegacyDialers = true
 	return nil
 }
 
@@ -724,8 +737,10 @@ func (t *turnOffWriter) TurnOff() {
 // NewDialer uses the config in configBytes to search for a strategy that unblocks DNS and TLS for all of the testDomains, returning a dialer with the found strategy.
 // It returns an error if no strategy was found that unblocks the testDomains.
 // The testDomains must be domains with a TLS service running on port 443.
-// For legacy struct initialization, the first call imports and clears StreamDialer
-// and PacketDialer. Setting either field alongside an initialized registry is an error.
+// For finders constructed directly, base constructors read StreamDialer and PacketDialer.
+// These fields may be changed between calls; previously returned dialers keep their
+// original bases. Setting either field on a finder created by StrategyFinderOptions.New
+// is an error, since its registry supplies the bases instead.
 func (f *StrategyFinder) NewDialer(ctx context.Context, testDomains []string, configBytes []byte) (transport.StreamDialer, error) {
 	if err := f.initConfigURLRegistry(); err != nil {
 		return nil, err
