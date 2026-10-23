@@ -112,16 +112,26 @@ func main() {
 		})
 	}
 
-	finder := smart.StrategyFinder{
-		LogWriter:    debugLog.Writer(),
-		TestTimeout:  5 * time.Second,
-		StreamDialer: streamDialer,
-		PacketDialer: packetDialer,
+	newStreamDialer := func(context.Context, *configurl.Config) (transport.StreamDialer, error) {
+		return streamDialer, nil
 	}
+	configurl.RegisterBase(registry, newStreamDialer)
+	newPacketDialer := func(context.Context, *configurl.Config) (transport.PacketDialer, error) {
+		return packetDialer, nil
+	}
+	configurl.RegisterBase(registry, newPacketDialer)
+	opts := smart.NewStrategyFinderOptions().
+		SetConfigURLRegistry(registry).
+		SetLogWriter(debugLog.Writer()).
+		SetTestTimeout(5 * time.Second)
 	if len(*cacheFlag) > 0 {
 		if cache, err := NewJSONFileCache(*cacheFlag); err == nil {
-			finder.Cache = cache
+			opts.SetCache(cache)
 		}
+	}
+	finder, err := opts.New()
+	if err != nil {
+		log.Fatalf("Could not create strategy finder: %v", err)
 	}
 
 	fmt.Println("Finding strategy")
